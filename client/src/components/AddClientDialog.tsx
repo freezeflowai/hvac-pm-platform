@@ -178,12 +178,12 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" data-testid="dialog-add-client">
+      <DialogContent className="max-w-2xl" data-testid="dialog-add-client">
         <DialogHeader>
           <DialogTitle>{editData ? 'Edit Client' : 'Add New Client'}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <ScrollArea className="flex-1 pr-4">
+        <form onSubmit={handleSubmit}>
+          <ScrollArea className="max-h-[60vh] pr-4">
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="companyName">Company Name</Label>
