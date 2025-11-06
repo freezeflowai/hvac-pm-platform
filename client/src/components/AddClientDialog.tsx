@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Plus, X } from "lucide-react";
@@ -51,6 +51,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     size: "",
     quantity: 1,
   });
+  const addPartFormRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadClientParts = async () => {
@@ -90,6 +91,15 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
       loadClientParts();
     }
   }, [editData, open]);
+
+  useEffect(() => {
+    if (showAddPart && addPartFormRef.current) {
+      const scrollTimer = requestAnimationFrame(() => {
+        addPartFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+      return () => cancelAnimationFrame(scrollTimer);
+    }
+  }, [showAddPart]);
 
   const toggleMonth = (monthIndex: number) => {
     setFormData(prev => ({
@@ -255,7 +265,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                 </div>
 
                 {showAddPart && (
-                  <div className="border rounded-md p-3 space-y-3">
+                  <div ref={addPartFormRef} className="border rounded-md p-3 space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label htmlFor="part-name">Part Name</Label>
