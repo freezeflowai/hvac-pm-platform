@@ -5,14 +5,23 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useQuery } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
+import { Plus, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 export interface ClientFormData {
   companyName: string;
   location: string;
   selectedMonths: number[];
   parts: Array<{ partId: string; quantity: number }>;
+}
+
+export interface ClientPart {
+  name: string;
+  type: string;
+  size: string;
+  quantity: number;
 }
 
 interface AddClientDialogProps {
@@ -22,46 +31,63 @@ interface AddClientDialogProps {
   editData?: ClientFormData & { id: string };
 }
 
-interface Part {
-  id: string;
-  name: string;
-  type: string;
-  size: string;
-}
-
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
 ];
 
 export default function AddClientDialog({ open, onClose, onSubmit, editData }: AddClientDialogProps) {
-  const [formData, setFormData] = useState<ClientFormData>({
+  const [formData, setFormData] = useState({
     companyName: "",
     location: "",
-    selectedMonths: [],
-    parts: [],
+    selectedMonths: [] as number[],
   });
 
-  const { data: allParts = [] } = useQuery<Part[]>({
-    queryKey: ["/api/parts"],
-    enabled: open,
+  const [clientParts, setClientParts] = useState<ClientPart[]>([]);
+  const [showAddPart, setShowAddPart] = useState(false);
+  const [newPart, setNewPart] = useState<ClientPart>({
+    name: "",
+    type: "filter",
+    size: "",
+    quantity: 1,
   });
 
   useEffect(() => {
-    if (editData) {
-      setFormData({
-        companyName: editData.companyName,
-        location: editData.location,
-        selectedMonths: editData.selectedMonths,
-        parts: editData.parts || [],
-      });
-    } else {
-      setFormData({
-        companyName: "",
-        location: "",
-        selectedMonths: [],
-        parts: [],
-      });
+    const loadClientParts = async () => {
+      if (editData) {
+        setFormData({
+          companyName: editData.companyName,
+          location: editData.location,
+          selectedMonths: editData.selectedMonths,
+        });
+
+        // Fetch the actual parts data for this client
+        try {
+          const res = await fetch(`/api/clients/${editData.id}/parts`);
+          if (res.ok) {
+            const parts = await res.json();
+            setClientParts(parts.map((cp: any) => ({
+              name: cp.part.name,
+              type: cp.part.type,
+              size: cp.part.size,
+              quantity: cp.quantity,
+            })));
+          }
+        } catch (error) {
+          console.error('Failed to load client parts', error);
+        }
+      } else {
+        setFormData({
+          companyName: "",
+          location: "",
+          selectedMonths: [],
+        });
+        setClientParts([]);
+      }
+    };
+
+    if (open) {
+      loadClientParts();
     }
   }, [editData, open]);
 
@@ -74,53 +100,91 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     }));
   };
 
-  const updatePartQuantity = (partId: string, quantity: number) => {
-    setFormData(prev => {
-      const existingIndex = prev.parts.findIndex(p => p.partId === partId);
-      if (quantity === 0) {
-        return {
-          ...prev,
-          parts: prev.parts.filter(p => p.partId !== partId)
-        };
-      }
-      if (existingIndex >= 0) {
-        const newParts = [...prev.parts];
-        newParts[existingIndex] = { partId, quantity };
-        return { ...prev, parts: newParts };
-      }
-      return {
-        ...prev,
-        parts: [...prev.parts, { partId, quantity }]
-      };
-    });
+  const handleAddPart = () => {
+    if (!newPart.name || !newPart.size || newPart.quantity < 1) {
+      return;
+    }
+
+    setClientParts(prev => [...prev, { ...newPart }]);
+    setNewPart({ name: "", type: "filter", size: "", quantity: 1 });
+    setShowAddPart(false);
   };
 
-  const getPartQuantity = (partId: string) => {
-    return formData.parts.find(p => p.partId === partId)?.quantity || 0;
+  const handleRemovePart = (index: number) => {
+    setClientParts(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.selectedMonths.length === 0) {
       return;
     }
-    onSubmit(formData);
-    setFormData({ companyName: "", location: "", selectedMonths: [], parts: [] });
-    onClose();
-  };
 
-  const filterParts = allParts.filter(p => p.type === "filter");
-  const beltParts = allParts.filter(p => p.type === "belt");
+    try {
+      // Fetch all parts once for efficiency
+      const searchRes = await fetch(`/api/parts`);
+      if (!searchRes.ok) {
+        throw new Error('Failed to fetch parts');
+      }
+      const allParts = await searchRes.json();
+
+      // For each part, find or create it in the global inventory
+      const partsWithIds = [];
+      
+      for (const part of clientParts) {
+        const existingPart = allParts.find(
+          (p: any) => p.name === part.name && p.type === part.type && p.size === part.size
+        );
+
+        if (existingPart) {
+          partsWithIds.push({ partId: existingPart.id, quantity: part.quantity });
+          continue;
+        }
+
+        // Create new part
+        const createRes = await fetch(`/api/parts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: part.name,
+            type: part.type,
+            size: part.size,
+          }),
+        });
+
+        if (!createRes.ok) {
+          throw new Error(`Failed to create part: ${part.name}`);
+        }
+
+        const newPartData = await createRes.json();
+        // Add newly created part to allParts so subsequent iterations can find it
+        allParts.push(newPartData);
+        partsWithIds.push({ partId: newPartData.id, quantity: part.quantity });
+      }
+
+      onSubmit({
+        ...formData,
+        parts: partsWithIds,
+      });
+
+      setFormData({ companyName: "", location: "", selectedMonths: [] });
+      setClientParts([]);
+      onClose();
+    } catch (error) {
+      console.error('Error saving client:', error);
+      alert('Failed to save client. Please try again.');
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl" data-testid="dialog-add-client">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" data-testid="dialog-add-client">
         <DialogHeader>
           <DialogTitle>{editData ? 'Edit Client' : 'Add New Client'}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <ScrollArea className="max-h-[70vh]">
-            <div className="space-y-4 py-4 pr-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="companyName">Company Name</Label>
                 <Input
@@ -174,63 +238,131 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
               <Separator />
 
-              <div className="space-y-4">
-                <Label>Required Parts</Label>
-                
-                {filterParts.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Filters</p>
-                    <div className="space-y-2">
-                      {filterParts.map((part) => (
-                        <div key={part.id} className="flex items-center gap-4">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{part.name}</p>
-                            <p className="text-xs text-muted-foreground">{part.size}</p>
-                          </div>
-                          <div className="w-24">
-                            <Input
-                              type="number"
-                              min="0"
-                              value={getPartQuantity(part.id)}
-                              onChange={(e) => updatePartQuantity(part.id, parseInt(e.target.value) || 0)}
-                              data-testid={`input-quantity-${part.id}`}
-                              placeholder="Qty"
-                            />
-                          </div>
-                        </div>
-                      ))}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Required Parts</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowAddPart(true)}
+                    data-testid="button-add-part"
+                    className="gap-2"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add Part
+                  </Button>
+                </div>
+
+                {showAddPart && (
+                  <div className="border rounded-md p-3 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="part-name">Part Name</Label>
+                        <Input
+                          id="part-name"
+                          data-testid="input-part-name"
+                          value={newPart.name}
+                          onChange={(e) => setNewPart({ ...newPart, name: e.target.value })}
+                          placeholder="e.g., MERV 11 Filter"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="part-type">Type</Label>
+                        <Select
+                          value={newPart.type}
+                          onValueChange={(value) => setNewPart({ ...newPart, type: value })}
+                        >
+                          <SelectTrigger id="part-type" data-testid="select-part-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="filter">Filter</SelectItem>
+                            <SelectItem value="belt">Belt</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="part-size">Size</Label>
+                        <Input
+                          id="part-size"
+                          data-testid="input-part-size"
+                          value={newPart.size}
+                          onChange={(e) => setNewPart({ ...newPart, size: e.target.value })}
+                          placeholder="e.g., 16x25x4"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="part-quantity">Quantity</Label>
+                        <Input
+                          id="part-quantity"
+                          type="number"
+                          min="1"
+                          data-testid="input-part-quantity"
+                          value={newPart.quantity}
+                          onChange={(e) => setNewPart({ ...newPart, quantity: parseInt(e.target.value) || 1 })}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowAddPart(false)}
+                        data-testid="button-cancel-part"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleAddPart}
+                        data-testid="button-save-part"
+                      >
+                        Add Part
+                      </Button>
                     </div>
                   </div>
                 )}
 
-                {beltParts.length > 0 && (
+                {clientParts.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Belts</p>
-                    <div className="space-y-2">
-                      {beltParts.map((part) => (
-                        <div key={part.id} className="flex items-center gap-4">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{part.name}</p>
-                            <p className="text-xs text-muted-foreground">{part.size}</p>
-                          </div>
-                          <div className="w-24">
-                            <Input
-                              type="number"
-                              min="0"
-                              value={getPartQuantity(part.id)}
-                              onChange={(e) => updatePartQuantity(part.id, parseInt(e.target.value) || 0)}
-                              data-testid={`input-quantity-${part.id}`}
-                              placeholder="Qty"
-                            />
+                    {clientParts.map((part, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 border rounded-md"
+                        data-testid={`part-item-${index}`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Badge variant="outline" className="shrink-0">
+                            {part.quantity}x
+                          </Badge>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{part.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {part.type} • {part.size}
+                            </p>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRemovePart(index)}
+                          data-testid={`button-remove-part-${index}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 )}
 
-                {allParts.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No parts available. Add parts first in Parts Management.</p>
+                {clientParts.length === 0 && !showAddPart && (
+                  <p className="text-sm text-muted-foreground">No parts added yet. Click "Add Part" to add required parts.</p>
                 )}
               </div>
             </div>
