@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Plus, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
 
 export interface ClientFormData {
   companyName: string;
@@ -45,13 +46,14 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
   const [clientParts, setClientParts] = useState<ClientPart[]>([]);
   const [showAddPart, setShowAddPart] = useState(false);
-  const [newPart, setNewPart] = useState<ClientPart>({
-    name: "",
-    type: "filter",
-    size: "",
-    quantity: 1,
-  });
+  const [selectedPartId, setSelectedPartId] = useState<string>("");
+  const [partQuantity, setPartQuantity] = useState<number>(1);
   const addPartFormRef = useRef<HTMLDivElement>(null);
+  const initializedRef = useRef(false);
+
+  const { data: availableParts = [] } = useQuery<Array<{ id: string; name: string; type: string; size: string }>>({
+    queryKey: ["/api/parts"],
+  });
 
   useEffect(() => {
     const loadClientParts = async () => {
@@ -77,18 +79,22 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
         } catch (error) {
           console.error('Failed to load client parts', error);
         }
-      } else {
+        initializedRef.current = true;
+      } else if (!initializedRef.current) {
         setFormData({
           companyName: "",
           location: "",
           selectedMonths: [],
         });
         setClientParts([]);
+        initializedRef.current = true;
       }
     };
 
     if (open) {
       loadClientParts();
+    } else {
+      initializedRef.current = false;
     }
   }, [editData, open]);
 
@@ -111,12 +117,22 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
   };
 
   const handleAddPart = () => {
-    if (!newPart.name || !newPart.size || newPart.quantity < 1) {
+    if (!selectedPartId || partQuantity < 1) {
       return;
     }
 
-    setClientParts(prev => [...prev, { ...newPart }]);
-    setNewPart({ name: "", type: "filter", size: "", quantity: 1 });
+    const selectedPart = availableParts.find(p => p.id === selectedPartId);
+    if (!selectedPart) return;
+
+    setClientParts(prev => [...prev, {
+      name: selectedPart.name,
+      type: selectedPart.type,
+      size: selectedPart.size,
+      quantity: partQuantity,
+    }]);
+    
+    setSelectedPartId("");
+    setPartQuantity(1);
     setShowAddPart(false);
   };
 
@@ -266,74 +282,69 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
                 {showAddPart && (
                   <div ref={addPartFormRef} className="border rounded-md p-3 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="part-name">Part Name</Label>
-                        <Input
-                          id="part-name"
-                          data-testid="input-part-name"
-                          value={newPart.name}
-                          onChange={(e) => setNewPart({ ...newPart, name: e.target.value })}
-                          placeholder="e.g., MERV 11 Filter"
-                        />
+                    {availableParts.length === 0 ? (
+                      <div className="text-center py-4">
+                        <p className="text-sm text-muted-foreground">No parts in inventory yet.</p>
+                        <p className="text-xs text-muted-foreground mt-1">Go to Parts Management to add parts first.</p>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="part-type">Type</Label>
-                        <Select
-                          value={newPart.type}
-                          onValueChange={(value) => setNewPart({ ...newPart, type: value })}
-                        >
-                          <SelectTrigger id="part-type" data-testid="select-part-type">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="filter">Filter</SelectItem>
-                            <SelectItem value="belt">Belt</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="part-size">Size</Label>
-                        <Input
-                          id="part-size"
-                          data-testid="input-part-size"
-                          value={newPart.size}
-                          onChange={(e) => setNewPart({ ...newPart, size: e.target.value })}
-                          placeholder="e.g., 16x25x4"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="part-quantity">Quantity</Label>
-                        <Input
-                          id="part-quantity"
-                          type="number"
-                          min="1"
-                          data-testid="input-part-quantity"
-                          value={newPart.quantity}
-                          onChange={(e) => setNewPart({ ...newPart, quantity: parseInt(e.target.value) || 1 })}
-                        />
-                      </div>
-                    </div>
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="select-part">Select Part from Inventory</Label>
+                          <Select
+                            value={selectedPartId}
+                            onValueChange={setSelectedPartId}
+                          >
+                            <SelectTrigger id="select-part" data-testid="select-part">
+                              <SelectValue placeholder="Choose a part..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableParts.map((part) => (
+                                <SelectItem key={part.id} value={part.id}>
+                                  {part.name} - {part.type} ({part.size})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="part-quantity">Quantity</Label>
+                          <Input
+                            id="part-quantity"
+                            type="number"
+                            min="1"
+                            data-testid="input-part-quantity"
+                            value={partQuantity}
+                            onChange={(e) => setPartQuantity(parseInt(e.target.value) || 1)}
+                          />
+                        </div>
+                      </>
+                    )}
                     <div className="flex justify-end gap-2">
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={() => setShowAddPart(false)}
+                        onClick={() => {
+                          setShowAddPart(false);
+                          setSelectedPartId("");
+                          setPartQuantity(1);
+                        }}
                         data-testid="button-cancel-part"
                       >
                         Cancel
                       </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleAddPart}
-                        data-testid="button-save-part"
-                      >
-                        Add Part
-                      </Button>
+                      {availableParts.length > 0 && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleAddPart}
+                          data-testid="button-save-part"
+                          disabled={!selectedPartId}
+                        >
+                          Add Part
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}
