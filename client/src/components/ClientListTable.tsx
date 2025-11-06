@@ -34,9 +34,6 @@ export default function ClientListTable({ clients, onEdit }: ClientListTableProp
   );
 
   const getMonthsDisplay = (selectedMonths: number[]) => {
-    if (selectedMonths.length > 4) {
-      return `${selectedMonths.length} months/year`;
-    }
     return selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
   };
 
@@ -83,7 +80,7 @@ export default function ClientListTable({ clients, onEdit }: ClientListTableProp
                     {client.location}
                   </td>
                   <td className="py-3 px-4 text-sm">
-                    <Badge variant="secondary">{getMonthsDisplay(client.selectedMonths)}</Badge>
+                    <span className="text-muted-foreground">{getMonthsDisplay(client.selectedMonths)}</span>
                   </td>
                   <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`text-next-due-${client.id}`}>
                     {format(client.nextDue, "MMM d, yyyy")}
@@ -123,7 +120,7 @@ export default function ClientListTable({ clients, onEdit }: ClientListTableProp
                     </Button>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <Badge variant="secondary">{getMonthsDisplay(client.selectedMonths)}</Badge>
+                    <span className="text-sm text-muted-foreground">{getMonthsDisplay(client.selectedMonths)}</span>
                     <span className="text-sm text-muted-foreground">
                       {format(client.nextDue, "MMM d, yyyy")}
                     </span>

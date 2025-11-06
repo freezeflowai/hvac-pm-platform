@@ -20,7 +20,7 @@ export default function ClientListTableExample() {
       id: '3',
       companyName: 'Downtown Plaza',
       location: '789 Main Street',
-      selectedMonths: [4, 10],
+      selectedMonths: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
       nextDue: new Date(2025, 11, 15),
     },
   ];

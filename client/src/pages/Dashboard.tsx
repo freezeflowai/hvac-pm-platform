@@ -15,28 +15,22 @@ function calculateNextDueDate(selectedMonths: number[]): Date {
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
   
+  // If current month is in selected months, use the 15th of current month as due date
+  // (gives contractors the whole month to complete maintenance)
+  if (selectedMonths.includes(currentMonth)) {
+    return new Date(currentYear, currentMonth, 15);
+  }
+  
   // Find the next month in the selected months
-  let nextMonth = selectedMonths.find(m => m >= currentMonth);
+  let nextMonth = selectedMonths.find(m => m > currentMonth);
   
   // If no month found in current year, use first month of next year
   if (nextMonth === undefined) {
     nextMonth = selectedMonths[0];
-    return new Date(currentYear + 1, nextMonth, 1);
+    return new Date(currentYear + 1, nextMonth, 15);
   }
   
-  // If the month is this month but we're past the 1st, move to next occurrence
-  if (nextMonth === currentMonth && today.getDate() > 1) {
-    const nextIndex = selectedMonths.indexOf(nextMonth) + 1;
-    if (nextIndex < selectedMonths.length) {
-      nextMonth = selectedMonths[nextIndex];
-      return new Date(currentYear, nextMonth, 1);
-    } else {
-      nextMonth = selectedMonths[0];
-      return new Date(currentYear + 1, nextMonth, 1);
-    }
-  }
-  
-  return new Date(currentYear, nextMonth, 1);
+  return new Date(currentYear, nextMonth, 15);
 }
 
 // Helper function to determine status based on due date
