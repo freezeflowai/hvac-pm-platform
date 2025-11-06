@@ -139,6 +139,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reports route
+  app.get("/api/reports/parts/:month", async (req, res) => {
+    try {
+      const month = parseInt(req.params.month);
+      if (isNaN(month) || month < 0 || month > 11) {
+        return res.status(400).json({ error: "Invalid month. Must be 0-11." });
+      }
+      const report = await storage.getPartsReportByMonth(month);
+      res.json(report);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to generate report" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

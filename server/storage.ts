@@ -37,6 +37,9 @@ export interface IStorage {
   updateClientPart(id: string, quantity: number): Promise<ClientPart | undefined>;
   deleteClientPart(id: string): Promise<boolean>;
   deleteAllClientParts(clientId: string): Promise<void>;
+  
+  // Reports
+  getPartsReportByMonth(month: number): Promise<Array<{ part: Part; totalQuantity: number }>>;
 }
 
 export class MemStorage implements IStorage {
@@ -181,6 +184,40 @@ export class MemStorage implements IStorage {
       .map(([id]) => id);
     
     toDelete.forEach(id => this.clientParts.delete(id));
+  }
+
+  async getPartsReportByMonth(month: number): Promise<Array<{ part: Part; totalQuantity: number }>> {
+    const clientsWithMaintenance = Array.from(this.clients.values())
+      .filter(client => client.selectedMonths.includes(month));
+    
+    const clientIds = clientsWithMaintenance.map(c => c.id);
+    
+    const partsMap = new Map<string, { part: Part; totalQuantity: number }>();
+    
+    for (const clientId of clientIds) {
+      const clientParts = await this.getClientParts(clientId);
+      
+      for (const cp of clientParts) {
+        const key = `${cp.part.name}-${cp.part.type}-${cp.part.size}`;
+        
+        if (partsMap.has(key)) {
+          const existing = partsMap.get(key)!;
+          existing.totalQuantity += cp.quantity;
+        } else {
+          partsMap.set(key, {
+            part: cp.part,
+            totalQuantity: cp.quantity
+          });
+        }
+      }
+    }
+    
+    return Array.from(partsMap.values()).sort((a, b) => {
+      if (a.part.type !== b.part.type) {
+        return a.part.type.localeCompare(b.part.type);
+      }
+      return a.part.name.localeCompare(b.part.name);
+    });
   }
 }
 
