@@ -9,6 +9,42 @@ import { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+// Helper function to calculate next due date based on selected months
+function calculateNextDueDate(selectedMonths: number[]): Date {
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  
+  // Find the next month in the selected months
+  let nextMonth = selectedMonths.find(m => m >= currentMonth);
+  
+  // If no month found in current year, use first month of next year
+  if (nextMonth === undefined) {
+    nextMonth = selectedMonths[0];
+    return new Date(currentYear + 1, nextMonth, 1);
+  }
+  
+  // If the month is this month but we're past the 1st, move to next occurrence
+  if (nextMonth === currentMonth && today.getDate() > 1) {
+    const nextIndex = selectedMonths.indexOf(nextMonth) + 1;
+    if (nextIndex < selectedMonths.length) {
+      nextMonth = selectedMonths[nextIndex];
+      return new Date(currentYear, nextMonth, 1);
+    } else {
+      nextMonth = selectedMonths[0];
+      return new Date(currentYear + 1, nextMonth, 1);
+    }
+  }
+  
+  return new Date(currentYear, nextMonth, 1);
+}
+
+// Helper function to determine status based on due date
+function getMaintenanceStatus(dueDate: Date): "overdue" | "upcoming" {
+  const today = new Date();
+  return dueDate < today ? "overdue" : "upcoming";
+}
+
 export default function Dashboard() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingClient, setEditingClient] = useState<(Client & { id: string }) | null>(null);
@@ -98,28 +134,46 @@ export default function Dashboard() {
   const handleAddClient = (data: ClientFormData) => {
     if (editingClient) {
       // TODO: remove mock functionality - send update to backend API
+      const nextDue = calculateNextDueDate(data.selectedMonths);
+      const status = getMaintenanceStatus(nextDue);
+      
       setClients(clients.map(c => 
         c.id === editingClient.id 
-          ? { ...c, companyName: data.companyName, location: data.location, selectedMonths: data.selectedMonths }
+          ? { ...c, companyName: data.companyName, location: data.location, selectedMonths: data.selectedMonths, nextDue }
           : c
       ));
       setMaintenanceItems(maintenanceItems.map(item =>
         item.id === editingClient.id
-          ? { ...item, companyName: data.companyName, location: data.location, selectedMonths: data.selectedMonths }
+          ? { ...item, companyName: data.companyName, location: data.location, selectedMonths: data.selectedMonths, nextDue, status }
           : item
       ));
       console.log('Client updated:', data);
       setEditingClient(null);
     } else {
       // TODO: remove mock functionality - send to backend API
+      const newId = Date.now().toString();
+      const nextDue = calculateNextDueDate(data.selectedMonths);
+      const status = getMaintenanceStatus(nextDue);
+      
       const newClient: Client = {
-        id: Date.now().toString(),
+        id: newId,
         companyName: data.companyName,
         location: data.location,
         selectedMonths: data.selectedMonths,
-        nextDue: new Date(),
+        nextDue: nextDue,
       };
+      
+      const newMaintenanceItem: MaintenanceItem = {
+        id: newId,
+        companyName: data.companyName,
+        location: data.location,
+        selectedMonths: data.selectedMonths,
+        nextDue: nextDue,
+        status: status,
+      };
+      
       setClients([...clients, newClient]);
+      setMaintenanceItems([...maintenanceItems, newMaintenanceItem]);
       console.log('New client added:', data);
     }
   };
@@ -134,6 +188,7 @@ export default function Dashboard() {
 
   const handleMarkComplete = (id: string) => {
     // TODO: remove mock functionality - send to backend API
+    // For now, just remove from maintenance items but keep in clients list
     setMaintenanceItems(maintenanceItems.filter(item => item.id !== id));
     console.log('Marked complete:', id);
   };
