@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Dashboard() {
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingClient, setEditingClient] = useState<(Client & { id: string }) | null>(null);
   
   // TODO: remove mock functionality - replace with real data from backend
   const [clients, setClients] = useState<Client[]>([
@@ -18,35 +19,35 @@ export default function Dashboard() {
       id: '1',
       companyName: 'ABC Manufacturing',
       location: '123 Industrial Blvd',
-      scheduleType: 'monthly',
+      selectedMonths: [0, 2, 4, 6, 8, 10], // Jan, Mar, May, Jul, Sep, Nov
       nextDue: new Date(2025, 10, 8),
     },
     {
       id: '2',
       companyName: 'XYZ Office Complex',
       location: '456 Business Park Dr',
-      scheduleType: 'quarterly',
+      selectedMonths: [2, 5, 8, 11], // Mar, Jun, Sep, Dec (quarterly)
       nextDue: new Date(2025, 10, 12),
     },
     {
       id: '3',
       companyName: 'Downtown Plaza',
       location: '789 Main Street',
-      scheduleType: 'semi-annual',
+      selectedMonths: [4, 10], // May, Nov (semi-annual)
       nextDue: new Date(2025, 11, 15),
     },
     {
       id: '4',
       companyName: 'Riverside Restaurant',
       location: '321 Water St',
-      scheduleType: 'monthly',
+      selectedMonths: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], // Every month
       nextDue: new Date(2025, 10, 20),
     },
     {
       id: '5',
       companyName: 'Tech Solutions Inc',
       location: '555 Innovation Way',
-      scheduleType: 'quarterly',
+      selectedMonths: [5, 6, 7], // Jun, Jul, Aug (summer months)
       nextDue: new Date(2025, 11, 1),
     },
   ]);
@@ -57,7 +58,7 @@ export default function Dashboard() {
       id: '1',
       companyName: 'ABC Manufacturing',
       location: '123 Industrial Blvd',
-      scheduleType: 'monthly',
+      selectedMonths: [0, 2, 4, 6, 8, 10],
       nextDue: new Date(2025, 10, 8),
       status: 'overdue',
     },
@@ -65,7 +66,7 @@ export default function Dashboard() {
       id: '2',
       companyName: 'XYZ Office Complex',
       location: '456 Business Park Dr',
-      scheduleType: 'quarterly',
+      selectedMonths: [2, 5, 8, 11],
       nextDue: new Date(2025, 10, 12),
       status: 'upcoming',
     },
@@ -73,7 +74,7 @@ export default function Dashboard() {
       id: '4',
       companyName: 'Riverside Restaurant',
       location: '321 Water St',
-      scheduleType: 'monthly',
+      selectedMonths: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
       nextDue: new Date(2025, 10, 20),
       status: 'upcoming',
     },
@@ -95,22 +96,51 @@ export default function Dashboard() {
   const completedCount = 156;
 
   const handleAddClient = (data: ClientFormData) => {
-    // TODO: remove mock functionality - send to backend API
-    const newClient: Client = {
-      id: Date.now().toString(),
-      companyName: data.companyName,
-      location: data.location,
-      scheduleType: data.scheduleType,
-      nextDue: new Date(),
-    };
-    setClients([...clients, newClient]);
-    console.log('New client added:', data);
+    if (editingClient) {
+      // TODO: remove mock functionality - send update to backend API
+      setClients(clients.map(c => 
+        c.id === editingClient.id 
+          ? { ...c, companyName: data.companyName, location: data.location, selectedMonths: data.selectedMonths }
+          : c
+      ));
+      setMaintenanceItems(maintenanceItems.map(item =>
+        item.id === editingClient.id
+          ? { ...item, companyName: data.companyName, location: data.location, selectedMonths: data.selectedMonths }
+          : item
+      ));
+      console.log('Client updated:', data);
+      setEditingClient(null);
+    } else {
+      // TODO: remove mock functionality - send to backend API
+      const newClient: Client = {
+        id: Date.now().toString(),
+        companyName: data.companyName,
+        location: data.location,
+        selectedMonths: data.selectedMonths,
+        nextDue: new Date(),
+      };
+      setClients([...clients, newClient]);
+      console.log('New client added:', data);
+    }
+  };
+
+  const handleEditClient = (id: string) => {
+    const client = clients.find(c => c.id === id);
+    if (client) {
+      setEditingClient(client);
+      setShowAddDialog(true);
+    }
   };
 
   const handleMarkComplete = (id: string) => {
     // TODO: remove mock functionality - send to backend API
     setMaintenanceItems(maintenanceItems.filter(item => item.id !== id));
     console.log('Marked complete:', id);
+  };
+
+  const handleCloseDialog = () => {
+    setShowAddDialog(false);
+    setEditingClient(null);
   };
 
   return (
@@ -141,6 +171,7 @@ export default function Dashboard() {
                 title="Overdue Maintenance"
                 items={overdueItems}
                 onMarkComplete={handleMarkComplete}
+                onEdit={handleEditClient}
                 emptyMessage="No overdue maintenance"
               />
             )}
@@ -149,6 +180,7 @@ export default function Dashboard() {
               title="Due This Week"
               items={thisWeekItems}
               onMarkComplete={handleMarkComplete}
+              onEdit={handleEditClient}
               emptyMessage="No maintenance due this week"
             />
 
@@ -156,20 +188,27 @@ export default function Dashboard() {
               title="Due This Month"
               items={thisMonthItems}
               onMarkComplete={handleMarkComplete}
+              onEdit={handleEditClient}
               emptyMessage="No maintenance due this month"
             />
           </TabsContent>
 
           <TabsContent value="clients">
-            <ClientListTable clients={clients} />
+            <ClientListTable clients={clients} onEdit={handleEditClient} />
           </TabsContent>
         </Tabs>
       </main>
 
       <AddClientDialog
         open={showAddDialog}
-        onClose={() => setShowAddDialog(false)}
+        onClose={handleCloseDialog}
         onSubmit={handleAddClient}
+        editData={editingClient ? {
+          id: editingClient.id,
+          companyName: editingClient.companyName,
+          location: editingClient.location,
+          selectedMonths: editingClient.selectedMonths,
+        } : undefined}
       />
     </div>
   );

@@ -6,7 +6,7 @@ export default function MaintenanceSectionExample() {
       id: '1',
       companyName: 'ABC Manufacturing',
       location: '123 Industrial Blvd',
-      scheduleType: 'monthly' as const,
+      selectedMonths: [0, 2, 4, 6, 8, 10],
       nextDue: new Date(2025, 10, 8),
       status: 'overdue' as const,
     },
@@ -18,6 +18,7 @@ export default function MaintenanceSectionExample() {
         title="Overdue Maintenance"
         items={items}
         onMarkComplete={(id) => console.log('Mark complete:', id)}
+        onEdit={(id) => console.log('Edit:', id)}
         emptyMessage="No overdue items"
       />
     </div>

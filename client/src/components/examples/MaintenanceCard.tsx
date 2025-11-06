@@ -6,7 +6,7 @@ export default function MaintenanceCardExample() {
       id: '1',
       companyName: 'ABC Manufacturing',
       location: '123 Industrial Blvd',
-      scheduleType: 'monthly' as const,
+      selectedMonths: [0, 2, 4, 6, 8, 10],
       nextDue: new Date(2025, 10, 8),
       status: 'overdue' as const,
     },
@@ -14,7 +14,7 @@ export default function MaintenanceCardExample() {
       id: '2',
       companyName: 'XYZ Office Complex',
       location: '456 Business Park Dr',
-      scheduleType: 'quarterly' as const,
+      selectedMonths: [2, 5, 8, 11],
       nextDue: new Date(2025, 10, 12),
       status: 'upcoming' as const,
     },
@@ -27,6 +27,7 @@ export default function MaintenanceCardExample() {
           key={item.id}
           item={item}
           onMarkComplete={(id) => console.log('Mark complete:', id)}
+          onEdit={(id) => console.log('Edit:', id)}
         />
       ))}
     </div>

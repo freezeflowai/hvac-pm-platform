@@ -5,6 +5,7 @@ interface MaintenanceSectionProps {
   title: string;
   items: MaintenanceItem[];
   onMarkComplete: (id: string) => void;
+  onEdit: (id: string) => void;
   emptyMessage?: string;
 }
 
@@ -12,6 +13,7 @@ export default function MaintenanceSection({
   title,
   items,
   onMarkComplete,
+  onEdit,
   emptyMessage = "No items"
 }: MaintenanceSectionProps) {
   return (
@@ -32,6 +34,7 @@ export default function MaintenanceSection({
                 key={item.id}
                 item={item}
                 onMarkComplete={onMarkComplete}
+                onEdit={onEdit}
               />
             ))}
           </div>

@@ -2,86 +2,129 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useState, useEffect } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export interface ClientFormData {
   companyName: string;
   location: string;
-  scheduleType: "monthly" | "quarterly" | "semi-annual" | "custom";
+  selectedMonths: number[];
 }
 
 interface AddClientDialogProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: ClientFormData) => void;
+  editData?: ClientFormData & { id: string };
 }
 
-export default function AddClientDialog({ open, onClose, onSubmit }: AddClientDialogProps) {
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+export default function AddClientDialog({ open, onClose, onSubmit, editData }: AddClientDialogProps) {
   const [formData, setFormData] = useState<ClientFormData>({
     companyName: "",
     location: "",
-    scheduleType: "monthly",
+    selectedMonths: [],
   });
+
+  useEffect(() => {
+    if (editData) {
+      setFormData({
+        companyName: editData.companyName,
+        location: editData.location,
+        selectedMonths: editData.selectedMonths,
+      });
+    } else {
+      setFormData({
+        companyName: "",
+        location: "",
+        selectedMonths: [],
+      });
+    }
+  }, [editData, open]);
+
+  const toggleMonth = (monthIndex: number) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedMonths: prev.selectedMonths.includes(monthIndex)
+        ? prev.selectedMonths.filter(m => m !== monthIndex)
+        : [...prev.selectedMonths, monthIndex].sort((a, b) => a - b)
+    }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.selectedMonths.length === 0) {
+      return;
+    }
     onSubmit(formData);
-    setFormData({ companyName: "", location: "", scheduleType: "monthly" });
+    setFormData({ companyName: "", location: "", selectedMonths: [] });
     onClose();
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent data-testid="dialog-add-client">
+      <DialogContent className="max-w-md" data-testid="dialog-add-client">
         <DialogHeader>
-          <DialogTitle>Add New Client</DialogTitle>
+          <DialogTitle>{editData ? 'Edit Client' : 'Add New Client'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="companyName">Company Name</Label>
-              <Input
-                id="companyName"
-                data-testid="input-company-name"
-                value={formData.companyName}
-                onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                placeholder="Enter company name"
-                required
-              />
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-4 py-4 pr-4">
+              <div className="space-y-2">
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input
+                  id="companyName"
+                  data-testid="input-company-name"
+                  value={formData.companyName}
+                  onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                  placeholder="Enter company name"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  id="location"
+                  data-testid="input-location"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder="Enter location or address"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Maintenance Months</Label>
+                <p className="text-sm text-muted-foreground">Select which months require maintenance</p>
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  {MONTHS.map((month, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`month-${index}`}
+                        data-testid={`checkbox-month-${index}`}
+                        checked={formData.selectedMonths.includes(index)}
+                        onCheckedChange={() => toggleMonth(index)}
+                      />
+                      <label
+                        htmlFor={`month-${index}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        {month}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {formData.selectedMonths.length === 0 && (
+                  <p className="text-sm text-destructive pt-2">Please select at least one month</p>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                data-testid="input-location"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                placeholder="Enter location or address"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="scheduleType">Maintenance Schedule</Label>
-              <Select
-                value={formData.scheduleType}
-                onValueChange={(value: ClientFormData["scheduleType"]) =>
-                  setFormData({ ...formData, scheduleType: value })
-                }
-              >
-                <SelectTrigger id="scheduleType" data-testid="select-schedule-type">
-                  <SelectValue placeholder="Select schedule type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="semi-annual">Semi-Annual</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
+          </ScrollArea>
+          <DialogFooter className="pt-4">
             <Button
               type="button"
               variant="outline"
@@ -90,8 +133,12 @@ export default function AddClientDialog({ open, onClose, onSubmit }: AddClientDi
             >
               Cancel
             </Button>
-            <Button type="submit" data-testid="button-save-client">
-              Save Client
+            <Button 
+              type="submit" 
+              data-testid="button-save-client"
+              disabled={formData.selectedMonths.length === 0}
+            >
+              {editData ? 'Update Client' : 'Save Client'}
             </Button>
           </DialogFooter>
         </form>

@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Pencil } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 
@@ -9,22 +10,21 @@ export interface Client {
   id: string;
   companyName: string;
   location: string;
-  scheduleType: "monthly" | "quarterly" | "semi-annual" | "custom";
+  selectedMonths: number[];
   nextDue: Date;
 }
 
 interface ClientListTableProps {
   clients: Client[];
+  onEdit: (id: string) => void;
 }
 
-const scheduleLabels = {
-  monthly: "Monthly",
-  quarterly: "Quarterly",
-  "semi-annual": "Semi-Annual",
-  custom: "Custom",
-};
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+];
 
-export default function ClientListTable({ clients }: ClientListTableProps) {
+export default function ClientListTable({ clients, onEdit }: ClientListTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
 
   const filteredClients = clients.filter(
@@ -32,6 +32,13 @@ export default function ClientListTable({ clients }: ClientListTableProps) {
       client.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const getMonthsDisplay = (selectedMonths: number[]) => {
+    if (selectedMonths.length > 4) {
+      return `${selectedMonths.length} months/year`;
+    }
+    return selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
+  };
 
   return (
     <Card>
@@ -57,8 +64,9 @@ export default function ClientListTable({ clients }: ClientListTableProps) {
               <tr className="border-b">
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Company</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Location</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Schedule</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Maintenance Months</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Next Due</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -75,10 +83,20 @@ export default function ClientListTable({ clients }: ClientListTableProps) {
                     {client.location}
                   </td>
                   <td className="py-3 px-4 text-sm">
-                    <Badge variant="secondary">{scheduleLabels[client.scheduleType]}</Badge>
+                    <Badge variant="secondary">{getMonthsDisplay(client.selectedMonths)}</Badge>
                   </td>
                   <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`text-next-due-${client.id}`}>
                     {format(client.nextDue, "MMM d, yyyy")}
+                  </td>
+                  <td className="py-3 px-4">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onEdit(client.id)}
+                      data-testid={`button-edit-client-${client.id}`}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -90,12 +108,22 @@ export default function ClientListTable({ clients }: ClientListTableProps) {
             <Card key={client.id} data-testid={`card-client-${client.id}`}>
               <CardContent className="p-4">
                 <div className="space-y-2">
-                  <div>
-                    <div className="font-medium">{client.companyName}</div>
-                    <div className="text-sm text-muted-foreground">{client.location}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-medium">{client.companyName}</div>
+                      <div className="text-sm text-muted-foreground">{client.location}</div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onEdit(client.id)}
+                      data-testid={`button-edit-client-${client.id}`}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <Badge variant="secondary">{scheduleLabels[client.scheduleType]}</Badge>
+                    <Badge variant="secondary">{getMonthsDisplay(client.selectedMonths)}</Badge>
                     <span className="text-sm text-muted-foreground">
                       {format(client.nextDue, "MMM d, yyyy")}
                     </span>
