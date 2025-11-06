@@ -129,6 +129,14 @@ export class MemStorage implements IStorage {
   }
 
   async deletePart(id: string): Promise<boolean> {
+    // Delete all client-part associations for this part
+    const toDelete = Array.from(this.clientParts.entries())
+      .filter(([_, cp]) => cp.partId === id)
+      .map(([cpId]) => cpId);
+    
+    toDelete.forEach(cpId => this.clientParts.delete(cpId));
+    
+    // Delete the part itself
     return this.parts.delete(id);
   }
 
@@ -137,11 +145,14 @@ export class MemStorage implements IStorage {
     const clientPartsList = Array.from(this.clientParts.values())
       .filter(cp => cp.clientId === clientId);
     
-    return clientPartsList.map(cp => {
-      const part = this.parts.get(cp.partId);
-      if (!part) throw new Error(`Part ${cp.partId} not found`);
-      return { ...cp, part };
-    });
+    // Filter out any client-parts where the part no longer exists
+    return clientPartsList
+      .map(cp => {
+        const part = this.parts.get(cp.partId);
+        if (!part) return null;
+        return { ...cp, part };
+      })
+      .filter((cp): cp is (ClientPart & { part: Part }) => cp !== null);
   }
 
   async addClientPart(insertClientPart: InsertClientPart): Promise<ClientPart> {

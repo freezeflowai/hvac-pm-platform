@@ -1,7 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Calendar, CheckCircle, Pencil } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { MapPin, Calendar, CheckCircle, Pencil, Package } from "lucide-react";
 import { format } from "date-fns";
+import { useState, useEffect } from "react";
 
 export interface MaintenanceItem {
   id: string;
@@ -18,6 +20,18 @@ interface MaintenanceCardProps {
   onEdit: (id: string) => void;
 }
 
+interface ClientPart {
+  id: string;
+  partId: string;
+  quantity: number;
+  part: {
+    id: string;
+    name: string;
+    type: string;
+    size: string;
+  };
+}
+
 const MONTH_NAMES = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
@@ -26,6 +40,21 @@ const MONTH_NAMES = [
 export default function MaintenanceCard({ item, onMarkComplete, onEdit }: MaintenanceCardProps) {
   const isOverdue = item.status === "overdue";
   const isCompleted = item.status === "completed";
+  const [parts, setParts] = useState<ClientPart[]>([]);
+
+  useEffect(() => {
+    const fetchParts = async () => {
+      try {
+        const res = await fetch(`/api/clients/${item.id}/parts`);
+        if (res.ok) {
+          setParts(await res.json());
+        }
+      } catch (error) {
+        console.error('Failed to fetch parts', error);
+      }
+    };
+    fetchParts();
+  }, [item.id]);
 
   const monthsDisplay = item.selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
 
@@ -56,6 +85,21 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit }: Mainte
               <div className="text-xs text-muted-foreground mt-1">
                 Months: {monthsDisplay}
               </div>
+              {parts.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center gap-1 text-xs font-medium">
+                    <Package className="h-3 w-3" />
+                    <span>Required Parts:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {parts.map(cp => (
+                      <Badge key={cp.id} variant="outline" className="text-xs">
+                        {cp.quantity}x {cp.part.name} ({cp.part.size})
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex gap-2 flex-shrink-0">
