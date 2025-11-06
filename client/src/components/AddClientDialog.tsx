@@ -117,19 +117,35 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
   };
 
   const handleAddPart = () => {
+    console.log('handleAddPart called', { selectedPartId, partQuantity, availableParts });
+    
     if (!selectedPartId || partQuantity < 1) {
+      console.log('Early return: no part selected or invalid quantity');
       return;
     }
 
     const selectedPart = availableParts.find(p => p.id === selectedPartId);
-    if (!selectedPart) return;
+    console.log('Selected part:', selectedPart);
+    
+    if (!selectedPart) {
+      console.log('Part not found in availableParts');
+      return;
+    }
 
-    setClientParts(prev => [...prev, {
+    const newPart = {
       name: selectedPart.name,
       type: selectedPart.type,
       size: selectedPart.size,
       quantity: partQuantity,
-    }]);
+    };
+    
+    console.log('Adding part to clientParts:', newPart);
+    setClientParts(prev => {
+      console.log('Previous clientParts:', prev);
+      const updated = [...prev, newPart];
+      console.log('Updated clientParts:', updated);
+      return updated;
+    });
     
     setSelectedPartId("");
     setPartQuantity(1);
@@ -335,15 +351,20 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                         Cancel
                       </Button>
                       {availableParts.length > 0 && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={handleAddPart}
-                          data-testid="button-save-part"
-                          disabled={!selectedPartId}
-                        >
-                          Add Part
-                        </Button>
+                        <div className="flex flex-col items-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleAddPart}
+                            data-testid="button-save-part"
+                            disabled={!selectedPartId}
+                          >
+                            Add Part
+                          </Button>
+                          {!selectedPartId && (
+                            <p className="text-xs text-muted-foreground mt-1">Select a part first</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
