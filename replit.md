@@ -45,6 +45,15 @@ This is a preventive maintenance scheduling application designed for HVAC/R cont
 - Prevents stale state issues with parts selection that were occurring on subsequent edits
 - All dialog state (clientParts, showAddPart, selectedPartId, etc.) properly resets on each open
 
+### Client Deletion
+- Added delete button (trash icon) to client list table (both desktop and mobile views)
+- Implemented confirmation dialog with clear warning about consequences
+- Async deletion flow prevents UI from getting stuck
+- On success: dialog closes, client removed, queries invalidated, success toast
+- On error: dialog stays open, error toast shown, buttons re-enabled for retry
+- Backend deletes all client parts and maintenance records before deleting client
+- Loading state ("Deleting...") and disabled buttons during deletion prevent duplicate requests
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
