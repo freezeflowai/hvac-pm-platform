@@ -38,16 +38,12 @@ This is a preventive maintenance scheduling application designed for HVAC/R cont
   - Added responsive button text (desktop: "Complete"/"Reopen", mobile: "Done"/"Undo")
   - Reduced spacing between cards for better density
 
-### Recently Completed Section
-- Added "Recently Completed" section at top of dashboard showing maintenance completed in current month
-- Backend storage method `getRecentlyCompletedMaintenance(month, year)` filters records by completion date
-- API endpoint `/api/maintenance/recently-completed` returns completed records with joined client data
-- Multiple completions per client in same month are handled via composite IDs (`clientId|dueDate`)
-- Each completion renders as a separate card with unique React key to prevent overwrites
-- Clicking "Reopen" on a recently completed item targets the specific maintenance cycle
-- Edit button extracts clientId from composite ID to load correct client data
-- Query cache invalidates on toggle to keep recently completed list in sync
-- Completion count stat displays number of items completed this month
+### Parts Dialog State Management Fix
+- Fixed recurring parts editing bug by adding key prop to AddClientDialog
+- Key changes based on client ID and mode (`edit-${clientId}` or `new-client`)
+- Forces React to remount dialog component when switching between clients or modes
+- Prevents stale state issues with parts selection that were occurring on subsequent edits
+- All dialog state (clientParts, showAddPart, selectedPartId, etc.) properly resets on each open
 
 ## User Preferences
 
