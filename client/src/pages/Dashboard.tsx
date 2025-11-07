@@ -64,12 +64,6 @@ export default function Dashboard() {
     queryKey: ["/api/clients"],
   });
 
-  const { data: recentlyCompletedData = [] } = useQuery<Array<{
-    record: { id: string; clientId: string; dueDate: string; completedAt: string };
-    client: DBClient;
-  }>>({
-    queryKey: ["/api/maintenance/recently-completed"],
-  });
 
   const [clientParts, setClientParts] = useState<Record<string, ClientPart[]>>({});
   const [completionStatuses, setCompletionStatuses] = useState<Record<string, { completed: boolean; completedDueDate?: string }>>({});
@@ -202,16 +196,7 @@ export default function Dashboard() {
     return item.nextDue <= monthFromNow && item.status !== "overdue";
   });
 
-  const recentlyCompletedItems: MaintenanceItem[] = recentlyCompletedData.map((item) => ({
-    id: `${item.client.id}|${item.record.dueDate}`, // Unique ID per completion
-    companyName: item.client.companyName,
-    location: item.client.location,
-    selectedMonths: item.client.selectedMonths,
-    nextDue: new Date(item.record.dueDate), // Use the completed dueDate, not current nextDue
-    status: "completed" as const,
-  }));
-
-  const completedCount = recentlyCompletedItems.length;
+  const completedCount = 0;
 
   const handleAddClient = (data: ClientFormData) => {
     if (editingClient) {
@@ -350,18 +335,6 @@ export default function Dashboard() {
           </TabsList>
 
           <TabsContent value="schedule" className="space-y-6">
-            {recentlyCompletedItems.length > 0 && (
-              <MaintenanceSection
-                title="Recently Completed"
-                items={recentlyCompletedItems}
-                onMarkComplete={handleMarkComplete}
-                onEdit={handleEditClient}
-                emptyMessage="No recently completed maintenance"
-                clientParts={clientParts}
-                completionStatuses={completionStatuses}
-              />
-            )}
-
             {overdueItems.length > 0 && (
               <MaintenanceSection
                 title="Overdue Maintenance"
@@ -392,6 +365,7 @@ export default function Dashboard() {
       </main>
 
       <AddClientDialog
+        key={editingClient ? `edit-${editingClient.id}` : 'new-client'}
         open={showAddDialog}
         onClose={handleCloseDialog}
         onSubmit={handleAddClient}
