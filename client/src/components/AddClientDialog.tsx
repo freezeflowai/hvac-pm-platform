@@ -165,11 +165,11 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
   useEffect(() => {
     if (showAddPart && addPartFormRef.current) {
       const scrollTimer = requestAnimationFrame(() => {
-        addPartFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        addPartFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
       });
       return () => cancelAnimationFrame(scrollTimer);
     }
-  }, [showAddPart]);
+  }, [showAddPart, pendingParts.length]);
 
   const toggleMonth = (monthIndex: number) => {
     setFormData(prev => ({

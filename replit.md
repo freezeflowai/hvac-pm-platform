@@ -21,6 +21,7 @@ This is a preventive maintenance scheduling application designed for HVAC/R cont
 - **Improved User Experience**: Clear visual separation makes it easier to find and add the right parts
   - No more scrolling through mixed lists of filters, belts, and other parts
   - Alphabetical sorting within each category for quick lookup
+  - Auto-scroll when adding rows ensures new entries are always visible
 
 ### Chronological Ordering
 - Both parts list and client list now display in chronological order (newest first)
