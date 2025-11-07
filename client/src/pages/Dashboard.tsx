@@ -172,6 +172,28 @@ export default function Dashboard() {
     },
   });
 
+  const deleteClientMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/clients/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/parts"] });
+      toast({
+        title: "Client deleted",
+        description: "The client has been deleted successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete client.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const clients: Client[] = dbClients.map(c => ({
     id: c.id,
     companyName: c.companyName,
@@ -220,6 +242,10 @@ export default function Dashboard() {
       });
       setShowAddDialog(true);
     }
+  };
+
+  const handleDeleteClient = async (id: string) => {
+    await deleteClientMutation.mutateAsync(id);
   };
 
   const handleMarkComplete = async (id: string) => {
@@ -359,7 +385,7 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="clients">
-            <ClientListTable clients={clients} onEdit={handleEditClient} />
+            <ClientListTable clients={clients} onEdit={handleEditClient} onDelete={handleDeleteClient} />
           </TabsContent>
         </Tabs>
       </main>

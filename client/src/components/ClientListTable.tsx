@@ -2,9 +2,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Pencil } from "lucide-react";
+import { Search, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export interface Client {
   id: string;
@@ -17,6 +27,7 @@ export interface Client {
 interface ClientListTableProps {
   clients: Client[];
   onEdit: (id: string) => void;
+  onDelete: (id: string) => Promise<void>;
 }
 
 const MONTH_NAMES = [
@@ -24,8 +35,31 @@ const MONTH_NAMES = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
 
-export default function ClientListTable({ clients, onEdit }: ClientListTableProps) {
+export default function ClientListTable({ clients, onEdit, onDelete }: ClientListTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteClick = (client: Client) => {
+    setClientToDelete(client);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (clientToDelete && !isDeleting) {
+      setIsDeleting(true);
+      try {
+        await onDelete(clientToDelete.id);
+        setDeleteDialogOpen(false);
+        setClientToDelete(null);
+      } catch (error) {
+        // Error toast is already shown by the mutation, just keep dialog open
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
 
   const filteredClients = clients.filter(
     (client) =>
@@ -86,14 +120,24 @@ export default function ClientListTable({ clients, onEdit }: ClientListTableProp
                     {format(client.nextDue, "MMM d, yyyy")}
                   </td>
                   <td className="py-3 px-4">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onEdit(client.id)}
-                      data-testid={`button-edit-client-${client.id}`}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onEdit(client.id)}
+                        data-testid={`button-edit-client-${client.id}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteClick(client)}
+                        data-testid={`button-delete-client-${client.id}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -110,14 +154,24 @@ export default function ClientListTable({ clients, onEdit }: ClientListTableProp
                       <div className="font-medium">{client.companyName}</div>
                       <div className="text-sm text-muted-foreground">{client.location}</div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onEdit(client.id)}
-                      data-testid={`button-edit-client-${client.id}`}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onEdit(client.id)}
+                        data-testid={`button-edit-client-${client.id}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteClick(client)}
+                        data-testid={`button-delete-client-${client.id}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm text-muted-foreground">{getMonthsDisplay(client.selectedMonths)}</span>
@@ -136,6 +190,30 @@ export default function ClientListTable({ clients, onEdit }: ClientListTableProp
           </div>
         )}
       </CardContent>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent data-testid="dialog-delete-client">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Client</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {clientToDelete?.companyName}? This will remove all their maintenance records and parts assignments. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete" disabled={isDeleting}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteConfirm}
+              data-testid="button-confirm-delete"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
