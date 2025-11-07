@@ -122,6 +122,7 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/parts"] });
       toast({
         title: "Client added",
         description: "The client has been added successfully.",
@@ -155,6 +156,7 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/parts"] });
       toast({
         title: "Client updated",
         description: "The client has been updated successfully.",
