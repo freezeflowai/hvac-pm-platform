@@ -153,6 +153,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all completed maintenance statuses
+  app.get("/api/maintenance/statuses", async (req, res) => {
+    try {
+      const clients = await storage.getAllClients();
+      const statuses: Record<string, { completed: boolean; completedDueDate?: string }> = {};
+      
+      for (const client of clients) {
+        // Check for the most recent completed maintenance
+        const latestCompleted = await storage.getLatestCompletedMaintenanceRecord(client.id);
+        
+        if (latestCompleted && latestCompleted.completedAt) {
+          statuses[client.id] = {
+            completed: true,
+            completedDueDate: latestCompleted.dueDate
+          };
+        } else {
+          statuses[client.id] = { completed: false };
+        }
+      }
+      
+      res.json(statuses);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch maintenance statuses" });
+    }
+  });
+
+  // Maintenance completion routes
+  app.post("/api/maintenance/:clientId/toggle", async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      const { dueDate } = req.body;  // Frontend sends the dueDate it's displaying
+      
+      if (!dueDate) {
+        return res.status(400).json({ error: "dueDate is required" });
+      }
+      
+      const client = await storage.getClient(clientId);
+      
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      // Check if there's a record for the requested dueDate
+      const record = await storage.getMaintenanceRecord(clientId, dueDate);
+
+      if (record && record.completedAt) {
+        // This cycle is completed - uncomplete it and restore nextDue
+        await storage.updateClient(clientId, { nextDue: dueDate });
+        await storage.updateMaintenanceRecord(record.id, { completedAt: null });
+        res.json({ completed: false, record });
+      } else {
+        // Mark this maintenance cycle as complete and advance nextDue
+        const currentDate = new Date(dueDate);
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
+        const completedAt = new Date().toISOString();
+
+        // Create or update maintenance record for this dueDate
+        if (record) {
+          await storage.updateMaintenanceRecord(record.id, { completedAt });
+        } else {
+          await storage.createMaintenanceRecord({
+            clientId,
+            dueDate,
+            completedAt,
+          });
+        }
+
+        // Calculate next due date
+        const nextMonth = client.selectedMonths.find(m => m > currentMonth);
+        let nextDue: Date;
+
+        if (nextMonth === undefined) {
+          nextDue = new Date(currentYear + 1, client.selectedMonths[0], 15);
+        } else {
+          nextDue = new Date(currentYear, nextMonth, 15);
+        }
+
+        // Update client's nextDue
+        await storage.updateClient(clientId, { nextDue: nextDue.toISOString() });
+
+        res.json({ completed: true, nextDue: nextDue.toISOString() });
+      }
+    } catch (error) {
+      console.error('Toggle maintenance error:', error);
+      res.status(500).json({ error: "Failed to toggle maintenance status" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

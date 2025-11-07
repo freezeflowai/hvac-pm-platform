@@ -58,7 +58,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
   useEffect(() => {
     const loadClientParts = async () => {
-      if (editData) {
+      if (editData && !initializedRef.current) {
         setFormData({
           companyName: editData.companyName,
           location: editData.location,
@@ -82,7 +82,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
           console.error('Failed to load client parts', error);
         }
         initializedRef.current = true;
-      } else if (!initializedRef.current) {
+      } else if (!editData && !initializedRef.current) {
         setFormData({
           companyName: "",
           location: "",

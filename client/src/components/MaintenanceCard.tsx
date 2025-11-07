@@ -18,6 +18,7 @@ interface MaintenanceCardProps {
   onMarkComplete: (id: string) => void;
   onEdit: (id: string) => void;
   parts?: ClientPart[];
+  isCompleted?: boolean;
 }
 
 interface ClientPart {
@@ -37,9 +38,8 @@ const MONTH_NAMES = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
 
-export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = [] }: MaintenanceCardProps) {
+export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = [], isCompleted = false }: MaintenanceCardProps) {
   const isOverdue = item.status === "overdue";
-  const isCompleted = item.status === "completed";
   const monthsDisplay = item.selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
 
   return (
@@ -95,18 +95,16 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
             >
               <Pencil className="h-3 w-3" />
             </Button>
-            {!isCompleted && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onMarkComplete(item.id)}
-                data-testid={`button-complete-${item.id}`}
-                className="gap-2"
-              >
-                <CheckCircle className="h-3 w-3" />
-                Complete
-              </Button>
-            )}
+            <Button
+              size="sm"
+              variant={isCompleted ? "default" : "outline"}
+              onClick={() => onMarkComplete(item.id)}
+              data-testid={`button-complete-${item.id}`}
+              className="gap-2"
+            >
+              <CheckCircle className="h-3 w-3" />
+              {isCompleted ? "Reopen" : "Complete"}
+            </Button>
           </div>
         </div>
       </CardContent>

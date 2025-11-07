@@ -20,6 +20,7 @@ interface MaintenanceSectionProps {
   onEdit: (id: string) => void;
   emptyMessage?: string;
   clientParts?: Record<string, ClientPart[]>;
+  completionStatuses?: Record<string, { completed: boolean; completedDueDate?: string }>;
 }
 
 export default function MaintenanceSection({
@@ -28,7 +29,8 @@ export default function MaintenanceSection({
   onMarkComplete,
   onEdit,
   emptyMessage = "No items",
-  clientParts = {}
+  clientParts = {},
+  completionStatuses = {}
 }: MaintenanceSectionProps) {
   return (
     <Card>
@@ -50,6 +52,7 @@ export default function MaintenanceSection({
                 onMarkComplete={onMarkComplete}
                 onEdit={onEdit}
                 parts={clientParts[item.id] || []}
+                isCompleted={completionStatuses[item.id]?.completed || false}
               />
             ))}
           </div>

@@ -6,7 +6,9 @@ import {
   type Part,
   type InsertPart,
   type ClientPart,
-  type InsertClientPart
+  type InsertClientPart,
+  type MaintenanceRecord,
+  type InsertMaintenanceRecord
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -40,6 +42,13 @@ export interface IStorage {
   
   // Reports
   getPartsReportByMonth(month: number): Promise<Array<{ part: Part; totalQuantity: number }>>;
+  
+  // Maintenance record methods
+  getMaintenanceRecord(clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined>;
+  getLatestCompletedMaintenanceRecord(clientId: string): Promise<MaintenanceRecord | undefined>;
+  createMaintenanceRecord(record: InsertMaintenanceRecord): Promise<MaintenanceRecord>;
+  updateMaintenanceRecord(id: string, record: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined>;
+  deleteMaintenanceRecord(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -47,12 +56,14 @@ export class MemStorage implements IStorage {
   private clients: Map<string, Client>;
   private parts: Map<string, Part>;
   private clientParts: Map<string, ClientPart>;
+  private maintenanceRecords: Map<string, MaintenanceRecord>;
 
   constructor() {
     this.users = new Map();
     this.clients = new Map();
     this.parts = new Map();
     this.clientParts = new Map();
+    this.maintenanceRecords = new Map();
   }
 
   // User methods
@@ -218,6 +229,51 @@ export class MemStorage implements IStorage {
       }
       return a.part.name.localeCompare(b.part.name);
     });
+  }
+
+  // Maintenance record methods
+  async getMaintenanceRecord(clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined> {
+    return Array.from(this.maintenanceRecords.values()).find(
+      record => record.clientId === clientId && record.dueDate === dueDate
+    );
+  }
+
+  async getLatestCompletedMaintenanceRecord(clientId: string): Promise<MaintenanceRecord | undefined> {
+    const records = Array.from(this.maintenanceRecords.values())
+      .filter(record => record.clientId === clientId && record.completedAt);
+    
+    if (records.length === 0) return undefined;
+    
+    // Sort by completedAt descending and return the most recent
+    return records.sort((a, b) => {
+      const dateA = new Date(a.completedAt!).getTime();
+      const dateB = new Date(b.completedAt!).getTime();
+      return dateB - dateA;
+    })[0];
+  }
+
+  async createMaintenanceRecord(insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
+    const id = randomUUID();
+    const record: MaintenanceRecord = { 
+      ...insertRecord, 
+      id,
+      completedAt: insertRecord.completedAt ?? null 
+    };
+    this.maintenanceRecords.set(id, record);
+    return record;
+  }
+
+  async updateMaintenanceRecord(id: string, recordUpdate: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined> {
+    const existing = this.maintenanceRecords.get(id);
+    if (!existing) return undefined;
+    
+    const updated: MaintenanceRecord = { ...existing, ...recordUpdate };
+    this.maintenanceRecords.set(id, updated);
+    return updated;
+  }
+
+  async deleteMaintenanceRecord(id: string): Promise<boolean> {
+    return this.maintenanceRecords.delete(id);
   }
 }
 

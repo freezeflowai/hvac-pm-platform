@@ -59,3 +59,17 @@ export const insertClientPartSchema = createInsertSchema(clientParts).omit({
 
 export type InsertClientPart = z.infer<typeof insertClientPartSchema>;
 export type ClientPart = typeof clientParts.$inferSelect;
+
+export const maintenanceRecords = pgTable("maintenance_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull(),
+  dueDate: text("due_date").notNull(),
+  completedAt: text("completed_at"),
+});
+
+export const insertMaintenanceRecordSchema = createInsertSchema(maintenanceRecords).omit({
+  id: true,
+});
+
+export type InsertMaintenanceRecord = z.infer<typeof insertMaintenanceRecordSchema>;
+export type MaintenanceRecord = typeof maintenanceRecords.$inferSelect;

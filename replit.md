@@ -4,6 +4,26 @@
 
 This is a preventive maintenance scheduling application designed for HVAC/R contractors. The system helps track client contracts, schedule maintenance visits, and manage parts inventory. It provides a dashboard view for monitoring overdue maintenance, upcoming schedules, and completed work. The application follows Material Design principles optimized for productivity and data organization.
 
+## Recent Changes (November 2025)
+
+### Dashboard Simplification
+- Removed "Due this week" section from dashboard
+- Dashboard now shows only two categories: "Overdue" and "Due in the month"
+- Stats grid updated to show 3 cards instead of 4
+
+### Parts Editing Bug Fix
+- Fixed bug where editing client parts stopped working after the first edit attempt
+- Added `initializedRef` guard to prevent useEffect from resetting state while dialog is open
+
+### Maintenance Completion Tracking
+- Implemented maintenance completion toggle functionality
+- Each completion is recorded in `maintenanceRecords` table with clientId, dueDate, and completedAt timestamp
+- Completion status API (`/api/maintenance/statuses`) returns both completion state and the completedDueDate
+- Toggle endpoint (`/api/maintenance/:clientId/toggle`) accepts dueDate in request body to support proper undo
+- "Complete" button marks maintenance as complete and advances nextDue to the next scheduled month
+- "Reopen" button uncomplets the maintenance and restores nextDue to the completed cycle
+- Frontend tracks completed dueDate separately to ensure reopening affects the correct maintenance cycle
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

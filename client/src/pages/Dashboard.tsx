@@ -65,6 +65,7 @@ export default function Dashboard() {
   });
 
   const [clientParts, setClientParts] = useState<Record<string, ClientPart[]>>({});
+  const [completionStatuses, setCompletionStatuses] = useState<Record<string, { completed: boolean; completedDueDate?: string }>>({});
 
   useEffect(() => {
     const fetchAllClientParts = async () => {
@@ -82,8 +83,21 @@ export default function Dashboard() {
       setClientParts(partsData);
     };
 
+    const fetchCompletionStatuses = async () => {
+      try {
+        const res = await fetch(`/api/maintenance/statuses`);
+        if (res.ok) {
+          const statuses = await res.json();
+          setCompletionStatuses(statuses);
+        }
+      } catch (error) {
+        console.error('Failed to fetch completion statuses', error);
+      }
+    };
+
     if (dbClients.length > 0) {
       fetchAllClientParts();
+      fetchCompletionStatuses();
     }
   }, [dbClients]);
 
@@ -203,11 +217,56 @@ export default function Dashboard() {
   };
 
   const handleMarkComplete = async (id: string) => {
-    console.log('Marked complete:', id);
-    toast({
-      title: "Maintenance completed",
-      description: "The maintenance has been marked as complete.",
-    });
+    try {
+      // Find the client to get their current nextDue
+      const client = clients.find(c => c.id === id);
+      if (!client) {
+        toast({
+          title: "Error",
+          description: "Client not found.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Determine which dueDate to send
+      const status = completionStatuses[id];
+      const dueDateToSend = status?.completed && status.completedDueDate
+        ? status.completedDueDate  // Reopening: use the completed dueDate
+        : client.nextDue.toISOString();  // Completing: use current nextDue
+      
+      const res = await apiRequest("POST", `/api/maintenance/${id}/toggle`, {
+        dueDate: dueDateToSend
+      });
+      const data = await res.json();
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      
+      // Refetch completion statuses
+      const statusRes = await fetch(`/api/maintenance/statuses`);
+      if (statusRes.ok) {
+        const statuses = await statusRes.json();
+        setCompletionStatuses(statuses);
+      }
+      
+      if (data.completed) {
+        toast({
+          title: "Maintenance completed",
+          description: "The maintenance has been marked as complete.",
+        });
+      } else {
+        toast({
+          title: "Maintenance reopened",
+          description: "The maintenance has been marked as uncompleted.",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update maintenance status.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCloseDialog = () => {
@@ -265,6 +324,7 @@ export default function Dashboard() {
                 onEdit={handleEditClient}
                 emptyMessage="No overdue maintenance"
                 clientParts={clientParts}
+                completionStatuses={completionStatuses}
               />
             )}
 
@@ -275,6 +335,7 @@ export default function Dashboard() {
               onEdit={handleEditClient}
               emptyMessage="No maintenance due this month"
               clientParts={clientParts}
+              completionStatuses={completionStatuses}
             />
           </TabsContent>
 
