@@ -173,11 +173,6 @@ export default function Dashboard() {
   }));
 
   const overdueItems = maintenanceItems.filter(item => item.status === "overdue");
-  const thisWeekItems = maintenanceItems.filter(item => {
-    const weekFromNow = new Date();
-    weekFromNow.setDate(weekFromNow.getDate() + 7);
-    return item.nextDue <= weekFromNow && item.status !== "overdue";
-  });
   const thisMonthItems = maintenanceItems.filter(item => {
     const monthFromNow = new Date();
     monthFromNow.setMonth(monthFromNow.getMonth() + 1);
@@ -245,9 +240,8 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatsCard title="Overdue" value={overdueItems.length} icon={AlertCircle} variant="danger" />
-          <StatsCard title="This Week" value={thisWeekItems.length} icon={Clock} variant="warning" />
           <StatsCard title="This Month" value={thisMonthItems.length} icon={Calendar} variant="default" />
           <StatsCard title="Completed" value={completedCount} icon={CheckCircle} variant="default" />
         </div>
@@ -273,15 +267,6 @@ export default function Dashboard() {
                 clientParts={clientParts}
               />
             )}
-
-            <MaintenanceSection
-              title="Due This Week"
-              items={thisWeekItems}
-              onMarkComplete={handleMarkComplete}
-              onEdit={handleEditClient}
-              emptyMessage="No maintenance due this week"
-              clientParts={clientParts}
-            />
 
             <MaintenanceSection
               title="Due This Month"
