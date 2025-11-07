@@ -270,6 +270,7 @@ export default function Dashboard() {
                 onMarkComplete={handleMarkComplete}
                 onEdit={handleEditClient}
                 emptyMessage="No overdue maintenance"
+                clientParts={clientParts}
               />
             )}
 
@@ -279,6 +280,7 @@ export default function Dashboard() {
               onMarkComplete={handleMarkComplete}
               onEdit={handleEditClient}
               emptyMessage="No maintenance due this week"
+              clientParts={clientParts}
             />
 
             <MaintenanceSection
@@ -287,6 +289,7 @@ export default function Dashboard() {
               onMarkComplete={handleMarkComplete}
               onEdit={handleEditClient}
               emptyMessage="No maintenance due this month"
+              clientParts={clientParts}
             />
           </TabsContent>
 

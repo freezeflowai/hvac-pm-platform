@@ -1,12 +1,25 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import MaintenanceCard, { MaintenanceItem } from "./MaintenanceCard";
 
+interface ClientPart {
+  id: string;
+  partId: string;
+  quantity: number;
+  part: {
+    id: string;
+    name: string;
+    type: string;
+    size: string;
+  };
+}
+
 interface MaintenanceSectionProps {
   title: string;
   items: MaintenanceItem[];
   onMarkComplete: (id: string) => void;
   onEdit: (id: string) => void;
   emptyMessage?: string;
+  clientParts?: Record<string, ClientPart[]>;
 }
 
 export default function MaintenanceSection({
@@ -14,7 +27,8 @@ export default function MaintenanceSection({
   items,
   onMarkComplete,
   onEdit,
-  emptyMessage = "No items"
+  emptyMessage = "No items",
+  clientParts = {}
 }: MaintenanceSectionProps) {
   return (
     <Card>
@@ -35,6 +49,7 @@ export default function MaintenanceSection({
                 item={item}
                 onMarkComplete={onMarkComplete}
                 onEdit={onEdit}
+                parts={clientParts[item.id] || []}
               />
             ))}
           </div>

@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Calendar, CheckCircle, Pencil, Package } from "lucide-react";
 import { format } from "date-fns";
-import { useState, useEffect } from "react";
 
 export interface MaintenanceItem {
   id: string;
@@ -18,6 +17,7 @@ interface MaintenanceCardProps {
   item: MaintenanceItem;
   onMarkComplete: (id: string) => void;
   onEdit: (id: string) => void;
+  parts?: ClientPart[];
 }
 
 interface ClientPart {
@@ -37,25 +37,9 @@ const MONTH_NAMES = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
 
-export default function MaintenanceCard({ item, onMarkComplete, onEdit }: MaintenanceCardProps) {
+export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = [] }: MaintenanceCardProps) {
   const isOverdue = item.status === "overdue";
   const isCompleted = item.status === "completed";
-  const [parts, setParts] = useState<ClientPart[]>([]);
-
-  useEffect(() => {
-    const fetchParts = async () => {
-      try {
-        const res = await fetch(`/api/clients/${item.id}/parts`);
-        if (res.ok) {
-          setParts(await res.json());
-        }
-      } catch (error) {
-        console.error('Failed to fetch parts', error);
-      }
-    };
-    fetchParts();
-  }, [item.id]);
-
   const monthsDisplay = item.selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
 
   return (

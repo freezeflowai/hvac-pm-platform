@@ -117,35 +117,19 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
   };
 
   const handleAddPart = () => {
-    console.log('handleAddPart called', { selectedPartId, partQuantity, availableParts });
-    
     if (!selectedPartId || partQuantity < 1) {
-      console.log('Early return: no part selected or invalid quantity');
       return;
     }
 
     const selectedPart = availableParts.find(p => p.id === selectedPartId);
-    console.log('Selected part:', selectedPart);
-    
-    if (!selectedPart) {
-      console.log('Part not found in availableParts');
-      return;
-    }
+    if (!selectedPart) return;
 
-    const newPart = {
+    setClientParts(prev => [...prev, {
       name: selectedPart.name,
       type: selectedPart.type,
       size: selectedPart.size,
       quantity: partQuantity,
-    };
-    
-    console.log('Adding part to clientParts:', newPart);
-    setClientParts(prev => {
-      console.log('Previous clientParts:', prev);
-      const updated = [...prev, newPart];
-      console.log('Updated clientParts:', updated);
-      return updated;
-    });
+    }]);
     
     setSelectedPartId("");
     setPartQuantity(1);
