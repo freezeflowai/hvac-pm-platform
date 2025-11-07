@@ -20,9 +20,12 @@ export interface ClientFormData {
 
 export interface ClientPart {
   partId: string;
-  name: string;
   type: string;
-  size: string;
+  filterType?: string | null;
+  beltType?: string | null;
+  size?: string | null;
+  name?: string | null;
+  description?: string | null;
   quantity: number;
 }
 
@@ -38,6 +41,25 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December"
 ];
 
+function getPartDisplay(part: Omit<ClientPart, 'quantity' | 'partId'>) {
+  if (part.type === "filter") {
+    return {
+      primary: `${part.filterType} Filter`,
+      secondary: part.size || ""
+    };
+  } else if (part.type === "belt") {
+    return {
+      primary: `Type ${part.beltType} Belt`,
+      secondary: part.size || ""
+    };
+  } else {
+    return {
+      primary: part.name || "",
+      secondary: part.description || ""
+    };
+  }
+}
+
 export default function AddClientDialog({ open, onClose, onSubmit, editData }: AddClientDialogProps) {
   const [formData, setFormData] = useState({
     companyName: "",
@@ -52,7 +74,15 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
   const addPartFormRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
 
-  const { data: availableParts = [] } = useQuery<Array<{ id: string; name: string; type: string; size: string }>>({
+  const { data: availableParts = [] } = useQuery<Array<{ 
+    id: string; 
+    type: string; 
+    filterType?: string | null;
+    beltType?: string | null;
+    size?: string | null;
+    name?: string | null;
+    description?: string | null;
+  }>>({
     queryKey: ["/api/parts"],
   });
 
@@ -72,9 +102,12 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
             const parts = await res.json();
             setClientParts(parts.map((cp: any) => ({
               partId: cp.part.id,
-              name: cp.part.name,
               type: cp.part.type,
+              filterType: cp.part.filterType,
+              beltType: cp.part.beltType,
               size: cp.part.size,
+              name: cp.part.name,
+              description: cp.part.description,
               quantity: cp.quantity,
             })));
           }
@@ -128,9 +161,12 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
     setClientParts(prev => [...prev, {
       partId: selectedPart.id,
-      name: selectedPart.name,
       type: selectedPart.type,
+      filterType: selectedPart.filterType,
+      beltType: selectedPart.beltType,
       size: selectedPart.size,
+      name: selectedPart.name,
+      description: selectedPart.description,
       quantity: partQuantity,
     }]);
     
@@ -266,11 +302,14 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                               <SelectValue placeholder="Choose a part..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {availableParts.map((part) => (
-                                <SelectItem key={part.id} value={part.id}>
-                                  {part.name} - {part.type} ({part.size})
-                                </SelectItem>
-                              ))}
+                              {availableParts.map((part) => {
+                                const display = getPartDisplay(part);
+                                return (
+                                  <SelectItem key={part.id} value={part.id}>
+                                    {display.primary} - {display.secondary}
+                                  </SelectItem>
+                                );
+                              })}
                             </SelectContent>
                           </Select>
                         </div>
@@ -323,34 +362,39 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
                 {clientParts.length > 0 && (
                   <div className="space-y-2">
-                    {clientParts.map((part, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-2 border rounded-md"
-                        data-testid={`part-item-${index}`}
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <Badge variant="outline" className="shrink-0">
-                            {part.quantity}x
-                          </Badge>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{part.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {part.type} • {part.size}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleRemovePart(index)}
-                          data-testid={`button-remove-part-${index}`}
+                    {clientParts.map((part, index) => {
+                      const display = getPartDisplay(part);
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-2 border rounded-md"
+                          data-testid={`part-item-${index}`}
                         >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <Badge variant="outline" className="shrink-0">
+                              {part.quantity}x
+                            </Badge>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{display.primary}</p>
+                              {display.secondary && (
+                                <p className="text-xs text-muted-foreground">
+                                  {display.secondary}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRemovePart(index)}
+                            data-testid={`button-remove-part-${index}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 

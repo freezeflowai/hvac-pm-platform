@@ -29,7 +29,7 @@ export interface IStorage {
   getPart(id: string): Promise<Part | undefined>;
   getAllParts(): Promise<Part[]>;
   getPartsByType(type: string): Promise<Part[]>;
-  getPartByNameTypeSize(name: string, type: string, size: string): Promise<Part | undefined>;
+  findDuplicatePart(part: InsertPart): Promise<Part | undefined>;
   createPart(part: InsertPart): Promise<Part>;
   updatePart(id: string, part: Partial<InsertPart>): Promise<Part | undefined>;
   deletePart(id: string): Promise<boolean>;
@@ -134,17 +134,32 @@ export class MemStorage implements IStorage {
     return Array.from(this.parts.values()).filter(part => part.type === type);
   }
 
-  async getPartByNameTypeSize(name: string, type: string, size: string): Promise<Part | undefined> {
-    return Array.from(this.parts.values()).find(
-      part => part.name === name && part.type === type && part.size === size
-    );
+  async findDuplicatePart(insertPart: InsertPart): Promise<Part | undefined> {
+    return Array.from(this.parts.values()).find(part => {
+      if (part.type !== insertPart.type) return false;
+      
+      if (insertPart.type === 'filter') {
+        return part.filterType === insertPart.filterType && part.size === insertPart.size;
+      } else if (insertPart.type === 'belt') {
+        return part.beltType === insertPart.beltType && part.size === insertPart.size;
+      } else if (insertPart.type === 'other') {
+        return part.name === insertPart.name;
+      }
+      
+      return false;
+    });
   }
 
   async createPart(insertPart: InsertPart): Promise<Part> {
     const id = randomUUID();
     const part: Part = { 
-      ...insertPart, 
       id,
+      type: insertPart.type,
+      filterType: insertPart.filterType ?? null,
+      beltType: insertPart.beltType ?? null,
+      size: insertPart.size ?? null,
+      name: insertPart.name ?? null,
+      description: insertPart.description ?? null,
       createdAt: new Date().toISOString()
     };
     this.parts.set(id, part);
@@ -227,7 +242,15 @@ export class MemStorage implements IStorage {
       const clientParts = await this.getClientParts(clientId);
       
       for (const cp of clientParts) {
-        const key = `${cp.part.name}-${cp.part.type}-${cp.part.size}`;
+        // Generate unique key based on part type
+        let key: string;
+        if (cp.part.type === 'filter') {
+          key = `filter-${cp.part.filterType}-${cp.part.size}`;
+        } else if (cp.part.type === 'belt') {
+          key = `belt-${cp.part.beltType}-${cp.part.size}`;
+        } else {
+          key = `other-${cp.part.name}`;
+        }
         
         if (partsMap.has(key)) {
           const existing = partsMap.get(key)!;
@@ -242,10 +265,19 @@ export class MemStorage implements IStorage {
     }
     
     return Array.from(partsMap.values()).sort((a, b) => {
+      // Sort by type first
       if (a.part.type !== b.part.type) {
         return a.part.type.localeCompare(b.part.type);
       }
-      return a.part.name.localeCompare(b.part.name);
+      
+      // Then sort within type
+      if (a.part.type === 'filter') {
+        return (a.part.filterType || '').localeCompare(b.part.filterType || '');
+      } else if (a.part.type === 'belt') {
+        return (a.part.beltType || '').localeCompare(b.part.beltType || '');
+      } else {
+        return (a.part.name || '').localeCompare(b.part.name || '');
+      }
     });
   }
 

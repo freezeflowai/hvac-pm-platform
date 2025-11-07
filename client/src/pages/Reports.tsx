@@ -15,11 +15,33 @@ const MONTHS = [
 interface ReportItem {
   part: {
     id: string;
-    name: string;
     type: string;
-    size: string;
+    filterType?: string | null;
+    beltType?: string | null;
+    size?: string | null;
+    name?: string | null;
+    description?: string | null;
   };
   totalQuantity: number;
+}
+
+function getPartDisplay(part: ReportItem['part']) {
+  if (part.type === "filter") {
+    return {
+      name: `${part.filterType} Filter`,
+      details: part.size || ""
+    };
+  } else if (part.type === "belt") {
+    return {
+      name: `Type ${part.beltType} Belt`,
+      details: part.size || ""
+    };
+  } else {
+    return {
+      name: part.name || "",
+      details: part.description || ""
+    };
+  }
 }
 
 export default function Reports() {
@@ -32,6 +54,7 @@ export default function Reports() {
 
   const filters = reportData.filter(item => item.part.type === "filter");
   const belts = reportData.filter(item => item.part.type === "belt");
+  const other = reportData.filter(item => item.part.type === "other");
 
   return (
     <div className="min-h-screen bg-background">
@@ -106,23 +129,26 @@ export default function Reports() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Part Name</TableHead>
+                        <TableHead>Filter Type</TableHead>
                         <TableHead>Size</TableHead>
                         <TableHead className="text-right">Total Quantity</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filters.map((item, index) => (
-                        <TableRow key={index} data-testid={`filter-row-${index}`}>
-                          <TableCell className="font-medium">{item.part.name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{item.part.size}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Badge data-testid={`filter-quantity-${index}`}>{item.totalQuantity}</Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {filters.map((item, index) => {
+                        const display = getPartDisplay(item.part);
+                        return (
+                          <TableRow key={index} data-testid={`filter-row-${index}`}>
+                            <TableCell className="font-medium">{display.name}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{display.details}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge data-testid={`filter-quantity-${index}`}>{item.totalQuantity}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -144,23 +170,67 @@ export default function Reports() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Part Name</TableHead>
+                        <TableHead>Belt Type</TableHead>
                         <TableHead>Size</TableHead>
                         <TableHead className="text-right">Total Quantity</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {belts.map((item, index) => (
-                        <TableRow key={index} data-testid={`belt-row-${index}`}>
-                          <TableCell className="font-medium">{item.part.name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{item.part.size}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Badge data-testid={`belt-quantity-${index}`}>{item.totalQuantity}</Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {belts.map((item, index) => {
+                        const display = getPartDisplay(item.part);
+                        return (
+                          <TableRow key={index} data-testid={`belt-row-${index}`}>
+                            <TableCell className="font-medium">{display.name}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{display.details}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge data-testid={`belt-quantity-${index}`}>{item.totalQuantity}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+
+            {other.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Other Parts
+                  </CardTitle>
+                  <CardDescription>
+                    Other parts needed for {MONTHS[selectedMonth]}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Part Name</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Total Quantity</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {other.map((item, index) => {
+                        const display = getPartDisplay(item.part);
+                        return (
+                          <TableRow key={index} data-testid={`other-row-${index}`}>
+                            <TableCell className="font-medium">{display.name}</TableCell>
+                            <TableCell>
+                              {display.details && <Badge variant="outline">{display.details}</Badge>}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge data-testid={`other-quantity-${index}`}>{item.totalQuantity}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </CardContent>

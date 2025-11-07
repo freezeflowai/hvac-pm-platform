@@ -61,13 +61,21 @@ This is a preventive maintenance scheduling application designed for HVAC/R cont
 - Backend deletes all client parts and maintenance records before deleting client
 - Loading state ("Deleting...") and disabled buttons during deletion prevent duplicate requests
 
-### Parts Type Enhancement
-- Added "Other" as a third part type alongside "Filter" and "Belt"
-- Parts Management dialog now shows three sections: Filters, Belts, and Other
-- All three types can be selected when creating or editing parts
-- Parts are automatically categorized and displayed in their respective sections
-- Duplicate prevention: Cannot create a part with the same name, type, and size as an existing part
-- Clear error message shown when attempting to add a duplicate part
+### Parts System Redesign (November 2025)
+- Complete redesign of parts inventory system with type-specific fields
+- **Filters**: Type dropdown (Pleated, Media, Ecology, Throwaway, Other) + Size field
+- **Belts**: Type dropdown (A, B, Other) + Size field
+- **Other Parts**: Name + Description fields
+- Parts Management now uses tabbed interface (Filters, Belts, Other)
+- Bulk addition feature: Add multiple parts at once within each tab
+- Add Row button allows building a list of parts before saving
+- Duplicate prevention updated for new structure:
+  - Filters: Checks filterType + size combination
+  - Belts: Checks beltType + size combination
+  - Other: Checks name uniqueness
+- Bulk creation API endpoint (`POST /api/parts/bulk`) handles multiple parts with partial error reporting
+- All displays updated: client parts selection, monthly reports, and parts management
+- Monthly reports now include "Other Parts" section with name and description columns
 
 ## User Preferences
 

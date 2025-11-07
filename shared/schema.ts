@@ -36,9 +36,16 @@ export type Client = typeof clients.$inferSelect;
 
 export const parts = pgTable("parts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
   type: text("type").notNull(), // "filter", "belt", or "other"
-  size: text("size").notNull(),
+  // Filter-specific fields
+  filterType: text("filter_type"), // "Pleated", "Media", "Ecology", "Throwaway", "Other"
+  // Belt-specific fields
+  beltType: text("belt_type"), // "A", "B", "Other"
+  // Shared between filters and belts
+  size: text("size"),
+  // Other parts fields
+  name: text("name"),
+  description: text("description"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 

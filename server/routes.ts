@@ -64,23 +64,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validated = insertPartSchema.parse(req.body);
       
-      // Check for duplicate part (same name, type, and size)
-      const existingPart = await storage.getPartByNameTypeSize(
-        validated.name,
-        validated.type,
-        validated.size
-      );
+      // Check for duplicate part
+      const existingPart = await storage.findDuplicatePart(validated);
       
       if (existingPart) {
-        return res.status(409).json({ 
-          error: "A part with this name, type, and size already exists" 
-        });
+        let errorMessage = "A part with these details already exists";
+        if (validated.type === 'filter') {
+          errorMessage = `A filter with type "${validated.filterType}" and size "${validated.size}" already exists`;
+        } else if (validated.type === 'belt') {
+          errorMessage = `A belt with type "${validated.beltType}" and size "${validated.size}" already exists`;
+        } else if (validated.type === 'other') {
+          errorMessage = `A part named "${validated.name}" already exists`;
+        }
+        
+        return res.status(409).json({ error: errorMessage });
       }
       
       const part = await storage.createPart(validated);
       res.json(part);
     } catch (error) {
       res.status(400).json({ error: "Invalid part data" });
+    }
+  });
+
+  app.post("/api/parts/bulk", async (req, res) => {
+    try {
+      const parts = Array.isArray(req.body) ? req.body : [req.body];
+      const validated = parts.map(p => insertPartSchema.parse(p));
+      
+      const createdParts = [];
+      const errors = [];
+      
+      for (let i = 0; i < validated.length; i++) {
+        const partData = validated[i];
+        
+        // Check for duplicate
+        const existingPart = await storage.findDuplicatePart(partData);
+        
+        if (existingPart) {
+          let errorMessage = "Duplicate";
+          if (partData.type === 'filter') {
+            errorMessage = `${partData.filterType} ${partData.size} already exists`;
+          } else if (partData.type === 'belt') {
+            errorMessage = `${partData.beltType} ${partData.size} already exists`;
+          } else if (partData.type === 'other') {
+            errorMessage = `${partData.name} already exists`;
+          }
+          errors.push({ index: i, error: errorMessage });
+        } else {
+          const part = await storage.createPart(partData);
+          createdParts.push(part);
+        }
+      }
+      
+      res.json({ 
+        created: createdParts,
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error) {
+      res.status(400).json({ error: "Invalid parts data" });
     }
   });
 
