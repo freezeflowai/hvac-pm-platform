@@ -24,6 +24,20 @@ This is a preventive maintenance scheduling application designed for HVAC/R cont
 - "Reopen" button uncomplets the maintenance and restores nextDue to the completed cycle
 - Frontend tracks completed dueDate separately to ensure reopening affects the correct maintenance cycle
 
+### Parts Report Auto-Refresh
+- Fixed issue where monthly parts report didn't update after adding/editing clients
+- Reports query now invalidates when clients are created or updated
+
+### UI Compaction for Better Client Density
+- Redesigned maintenance cards to show ~40-50% more clients on screen:
+  - Reduced card padding and spacing
+  - Moved location to same line as company name
+  - Removed redundant due date display (already shown in section header)
+  - Changed "Months:" to "PM Schedule:" for clearer terminology
+  - Made edit button icon-only to save space
+  - Added responsive button text (desktop: "Complete"/"Reopen", mobile: "Done"/"Undo")
+  - Reduced spacing between cards for better density
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
