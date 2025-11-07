@@ -60,6 +60,11 @@ function getPartDisplay(part: Omit<ClientPart, 'quantity' | 'partId'>) {
   }
 }
 
+interface PendingPart {
+  partId: string;
+  quantity: number;
+}
+
 export default function AddClientDialog({ open, onClose, onSubmit, editData }: AddClientDialogProps) {
   const [formData, setFormData] = useState({
     companyName: "",
@@ -69,8 +74,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
   const [clientParts, setClientParts] = useState<ClientPart[]>([]);
   const [showAddPart, setShowAddPart] = useState(false);
-  const [selectedPartId, setSelectedPartId] = useState<string>("");
-  const [partQuantity, setPartQuantity] = useState<number>(1);
+  const [pendingParts, setPendingParts] = useState<PendingPart[]>([]);
   const addPartFormRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
 
@@ -84,6 +88,15 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     description?: string | null;
   }>>({
     queryKey: ["/api/parts"],
+  });
+
+  // Sort parts alphabetically by display name
+  const sortedParts = [...availableParts].sort((a, b) => {
+    const displayA = getPartDisplay(a);
+    const displayB = getPartDisplay(b);
+    const nameA = `${displayA.primary} ${displayA.secondary}`.toLowerCase();
+    const nameB = `${displayB.primary} ${displayB.secondary}`.toLowerCase();
+    return nameA.localeCompare(nameB);
   });
 
   useEffect(() => {
@@ -122,6 +135,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
           selectedMonths: [],
         });
         setClientParts([]);
+        setPendingParts([]);
         initializedRef.current = true;
       }
     };
@@ -130,6 +144,8 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
       loadClientParts();
     } else {
       initializedRef.current = false;
+      setPendingParts([]);
+      setShowAddPart(false);
     }
   }, [editData, open]);
 
@@ -151,27 +167,47 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     }));
   };
 
-  const handleAddPart = () => {
-    if (!selectedPartId || partQuantity < 1) {
+  const handleAddRow = () => {
+    setPendingParts(prev => [...prev, { partId: "", quantity: 1 }]);
+  };
+
+  const handleRemovePendingPart = (index: number) => {
+    setPendingParts(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdatePendingPart = (index: number, field: 'partId' | 'quantity', value: string | number) => {
+    setPendingParts(prev => prev.map((part, i) => 
+      i === index ? { ...part, [field]: value } : part
+    ));
+  };
+
+  const handleAddAllParts = () => {
+    const validParts = pendingParts.filter(p => p.partId && p.quantity > 0);
+    
+    if (validParts.length === 0) {
       return;
     }
 
-    const selectedPart = availableParts.find(p => p.id === selectedPartId);
-    if (!selectedPart) return;
-
-    setClientParts(prev => [...prev, {
-      partId: selectedPart.id,
-      type: selectedPart.type,
-      filterType: selectedPart.filterType,
-      beltType: selectedPart.beltType,
-      size: selectedPart.size,
-      name: selectedPart.name,
-      description: selectedPart.description,
-      quantity: partQuantity,
-    }]);
+    const newClientParts: ClientPart[] = [];
     
-    setSelectedPartId("");
-    setPartQuantity(1);
+    for (const pending of validParts) {
+      const selectedPart = availableParts.find(p => p.id === pending.partId);
+      if (!selectedPart) continue;
+      
+      newClientParts.push({
+        partId: selectedPart.id,
+        type: selectedPart.type,
+        filterType: selectedPart.filterType,
+        beltType: selectedPart.beltType,
+        size: selectedPart.size,
+        name: selectedPart.name,
+        description: selectedPart.description,
+        quantity: pending.quantity,
+      });
+    }
+
+    setClientParts(prev => [...prev, ...newClientParts]);
+    setPendingParts([]);
     setShowAddPart(false);
   };
 
@@ -285,47 +321,84 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
                 {showAddPart && (
                   <div ref={addPartFormRef} className="border rounded-md p-3 space-y-3">
-                    {availableParts.length === 0 ? (
+                    {sortedParts.length === 0 ? (
                       <div className="text-center py-4">
                         <p className="text-sm text-muted-foreground">No parts in inventory yet.</p>
                         <p className="text-xs text-muted-foreground mt-1">Go to Parts Management to add parts first.</p>
                       </div>
                     ) : (
                       <>
-                        <div className="space-y-2">
-                          <Label htmlFor="select-part">Select Part from Inventory</Label>
-                          <Select
-                            value={selectedPartId}
-                            onValueChange={setSelectedPartId}
+                        <div className="flex items-center justify-between">
+                          <Label>Parts to Add</Label>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleAddRow}
+                            data-testid="button-add-row"
+                            className="gap-2"
                           >
-                            <SelectTrigger id="select-part" data-testid="select-part">
-                              <SelectValue placeholder="Choose a part..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableParts.map((part) => {
-                                const display = getPartDisplay(part);
-                                return (
-                                  <SelectItem key={part.id} value={part.id}>
-                                    {display.primary} - {display.secondary}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
+                            <Plus className="h-3 w-3" />
+                            Add Row
+                          </Button>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="part-quantity">Quantity</Label>
-                          <Input
-                            id="part-quantity"
-                            type="number"
-                            min="1"
-                            data-testid="input-part-quantity"
-                            value={partQuantity}
-                            onChange={(e) => setPartQuantity(parseInt(e.target.value) || 1)}
-                          />
-                        </div>
+
+                        {pendingParts.length > 0 && (
+                          <div className="space-y-2">
+                            {pendingParts.map((pending, index) => (
+                              <div key={index} className="flex items-center gap-2" data-testid={`pending-part-row-${index}`}>
+                                <div className="flex-1">
+                                  <Select
+                                    value={pending.partId}
+                                    onValueChange={(value) => handleUpdatePendingPart(index, 'partId', value)}
+                                  >
+                                    <SelectTrigger data-testid={`select-pending-part-${index}`}>
+                                      <SelectValue placeholder="Choose a part..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {sortedParts.map((part) => {
+                                        const display = getPartDisplay(part);
+                                        return (
+                                          <SelectItem key={part.id} value={part.id}>
+                                            {display.primary} - {display.secondary}
+                                          </SelectItem>
+                                        );
+                                      })}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="w-24">
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    placeholder="Qty"
+                                    data-testid={`input-pending-quantity-${index}`}
+                                    value={pending.quantity}
+                                    onChange={(e) => handleUpdatePendingPart(index, 'quantity', parseInt(e.target.value) || 1)}
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleRemovePendingPart(index)}
+                                  data-testid={`button-remove-pending-${index}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {pendingParts.length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            Click "Add Row" to start adding parts
+                          </p>
+                        )}
                       </>
                     )}
+
                     <div className="flex justify-end gap-2">
                       <Button
                         type="button"
@@ -333,28 +406,22 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                         variant="outline"
                         onClick={() => {
                           setShowAddPart(false);
-                          setSelectedPartId("");
-                          setPartQuantity(1);
+                          setPendingParts([]);
                         }}
                         data-testid="button-cancel-part"
                       >
                         Cancel
                       </Button>
-                      {availableParts.length > 0 && (
-                        <div className="flex flex-col items-end">
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={handleAddPart}
-                            data-testid="button-save-part"
-                            disabled={!selectedPartId}
-                          >
-                            Add Part
-                          </Button>
-                          {!selectedPartId && (
-                            <p className="text-xs text-muted-foreground mt-1">Select a part first</p>
-                          )}
-                        </div>
+                      {sortedParts.length > 0 && pendingParts.length > 0 && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleAddAllParts}
+                          data-testid="button-save-parts"
+                          disabled={!pendingParts.some(p => p.partId && p.quantity > 0)}
+                        >
+                          Add Parts
+                        </Button>
                       )}
                     </div>
                   </div>
