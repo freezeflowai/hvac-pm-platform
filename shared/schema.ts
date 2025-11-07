@@ -23,10 +23,12 @@ export const clients = pgTable("clients", {
   location: text("location").notNull(),
   selectedMonths: integer("selected_months").array().notNull(),
   nextDue: text("next_due").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const insertClientSchema = createInsertSchema(clients).omit({
   id: true,
+  createdAt: true,
 });
 
 export type InsertClient = z.infer<typeof insertClientSchema>;
@@ -37,10 +39,12 @@ export const parts = pgTable("parts", {
   name: text("name").notNull(),
   type: text("type").notNull(), // "filter", "belt", or "other"
   size: text("size").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const insertPartSchema = createInsertSchema(parts).omit({
   id: true,
+  createdAt: true,
 });
 
 export type InsertPart = z.infer<typeof insertPartSchema>;

@@ -6,6 +6,13 @@ This is a preventive maintenance scheduling application designed for HVAC/R cont
 
 ## Recent Changes (November 2025)
 
+### Chronological Ordering
+- Both parts list and client list now display in chronological order (newest first)
+- Added createdAt timestamp to clients and parts tables
+- Makes it easy to find recently added items at the top of each list
+
+
+
 ### Dashboard Simplification
 - Removed "Due this week" section from dashboard
 - Dashboard now shows only two categories: "Overdue" and "Due in the month"

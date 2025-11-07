@@ -48,18 +48,24 @@ export default function PartsManagementDialog({ open, onClose }: PartsManagement
         description: "The part has been added successfully.",
       });
     },
-    onError: async (error: any) => {
+    onError: (error: Error) => {
+      // Error message is in format "409: {"error":"A part with this name..."}"
+      // Extract the actual error message
       let errorMessage = "Failed to add part.";
       
-      // Try to get the error message from the response
-      if (error?.response) {
-        try {
-          const data = await error.response.json();
+      try {
+        // Extract JSON from error message after the status code
+        const match = error.message.match(/\d+:\s*({.*})/);
+        if (match) {
+          const data = JSON.parse(match[1]);
           if (data.error) {
             errorMessage = data.error;
           }
-        } catch {
-          // If parsing fails, use default message
+        }
+      } catch {
+        // If parsing fails, use the full error message or default
+        if (error.message && !error.message.includes("500")) {
+          errorMessage = error.message;
         }
       }
       

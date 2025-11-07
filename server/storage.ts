@@ -92,12 +92,17 @@ export class MemStorage implements IStorage {
   }
 
   async getAllClients(): Promise<Client[]> {
-    return Array.from(this.clients.values());
+    return Array.from(this.clients.values())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async createClient(insertClient: InsertClient): Promise<Client> {
     const id = randomUUID();
-    const client: Client = { ...insertClient, id };
+    const client: Client = { 
+      ...insertClient, 
+      id,
+      createdAt: new Date().toISOString()
+    };
     this.clients.set(id, client);
     return client;
   }
@@ -121,7 +126,8 @@ export class MemStorage implements IStorage {
   }
 
   async getAllParts(): Promise<Part[]> {
-    return Array.from(this.parts.values());
+    return Array.from(this.parts.values())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getPartsByType(type: string): Promise<Part[]> {
@@ -136,7 +142,11 @@ export class MemStorage implements IStorage {
 
   async createPart(insertPart: InsertPart): Promise<Part> {
     const id = randomUUID();
-    const part: Part = { ...insertPart, id };
+    const part: Part = { 
+      ...insertPart, 
+      id,
+      createdAt: new Date().toISOString()
+    };
     this.parts.set(id, part);
     return part;
   }
