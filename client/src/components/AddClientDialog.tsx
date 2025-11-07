@@ -19,6 +19,7 @@ export interface ClientFormData {
 }
 
 export interface ClientPart {
+  partId: string;
   name: string;
   type: string;
   size: string;
@@ -70,6 +71,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
           if (res.ok) {
             const parts = await res.json();
             setClientParts(parts.map((cp: any) => ({
+              partId: cp.part.id,
               name: cp.part.name,
               type: cp.part.type,
               size: cp.part.size,
@@ -125,6 +127,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     if (!selectedPart) return;
 
     setClientParts(prev => [...prev, {
+      partId: selectedPart.id,
       name: selectedPart.name,
       type: selectedPart.type,
       size: selectedPart.size,
@@ -147,46 +150,10 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     }
 
     try {
-      // Fetch all parts once for efficiency
-      const searchRes = await fetch(`/api/parts`);
-      if (!searchRes.ok) {
-        throw new Error('Failed to fetch parts');
-      }
-      const allParts = await searchRes.json();
-
-      // For each part, find or create it in the global inventory
-      const partsWithIds = [];
-      
-      for (const part of clientParts) {
-        const existingPart = allParts.find(
-          (p: any) => p.name === part.name && p.type === part.type && p.size === part.size
-        );
-
-        if (existingPart) {
-          partsWithIds.push({ partId: existingPart.id, quantity: part.quantity });
-          continue;
-        }
-
-        // Create new part
-        const createRes = await fetch(`/api/parts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: part.name,
-            type: part.type,
-            size: part.size,
-          }),
-        });
-
-        if (!createRes.ok) {
-          throw new Error(`Failed to create part: ${part.name}`);
-        }
-
-        const newPartData = await createRes.json();
-        // Add newly created part to allParts so subsequent iterations can find it
-        allParts.push(newPartData);
-        partsWithIds.push({ partId: newPartData.id, quantity: part.quantity });
-      }
+      const partsWithIds = clientParts.map(part => ({
+        partId: part.partId,
+        quantity: part.quantity,
+      }));
 
       onSubmit({
         ...formData,
