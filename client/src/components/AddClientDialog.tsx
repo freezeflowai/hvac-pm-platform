@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,6 +63,7 @@ function getPartDisplay(part: Omit<ClientPart, 'quantity' | 'partId'>) {
 interface PendingPart {
   partId: string;
   quantity: number;
+  category: 'filter' | 'belt' | 'other';
 }
 
 export default function AddClientDialog({ open, onClose, onSubmit, editData }: AddClientDialogProps) {
@@ -90,14 +91,26 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     queryKey: ["/api/parts"],
   });
 
-  // Sort parts alphabetically by display name
-  const sortedParts = [...availableParts].sort((a, b) => {
-    const displayA = getPartDisplay(a);
-    const displayB = getPartDisplay(b);
-    const nameA = `${displayA.primary} ${displayA.secondary}`.toLowerCase();
-    const nameB = `${displayB.primary} ${displayB.secondary}`.toLowerCase();
-    return nameA.localeCompare(nameB);
-  });
+  // Group and sort parts by category
+  const filterParts = availableParts
+    .filter(p => p.type === 'filter')
+    .sort((a, b) => {
+      const typeCompare = (a.filterType || '').localeCompare(b.filterType || '');
+      if (typeCompare !== 0) return typeCompare;
+      return (a.size || '').localeCompare(b.size || '');
+    });
+  
+  const beltParts = availableParts
+    .filter(p => p.type === 'belt')
+    .sort((a, b) => {
+      const typeCompare = (a.beltType || '').localeCompare(b.beltType || '');
+      if (typeCompare !== 0) return typeCompare;
+      return (a.size || '').localeCompare(b.size || '');
+    });
+  
+  const otherParts = availableParts
+    .filter(p => p.type === 'other')
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   useEffect(() => {
     const loadClientParts = async () => {
@@ -167,8 +180,8 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     }));
   };
 
-  const handleAddRow = () => {
-    setPendingParts(prev => [...prev, { partId: "", quantity: 1 }]);
+  const handleAddRow = (category: 'filter' | 'belt' | 'other') => {
+    setPendingParts(prev => [...prev, { partId: "", quantity: 1, category }]);
   };
 
   const handleRemovePendingPart = (index: number) => {
@@ -246,6 +259,9 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
       <DialogContent className="max-w-2xl" data-testid="dialog-add-client">
         <DialogHeader>
           <DialogTitle>{editData ? 'Edit Client' : 'Add New Client'}</DialogTitle>
+          <DialogDescription>
+            {editData ? 'Update client information and required parts.' : 'Add a new client with their maintenance schedule and required parts.'}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <ScrollArea className="max-h-[60vh] pr-4">
@@ -320,81 +336,207 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                 </div>
 
                 {showAddPart && (
-                  <div ref={addPartFormRef} className="border rounded-md p-3 space-y-3">
-                    {sortedParts.length === 0 ? (
+                  <div ref={addPartFormRef} className="border rounded-md p-3 space-y-4">
+                    {availableParts.length === 0 ? (
                       <div className="text-center py-4">
                         <p className="text-sm text-muted-foreground">No parts in inventory yet.</p>
                         <p className="text-xs text-muted-foreground mt-1">Go to Parts Management to add parts first.</p>
                       </div>
                     ) : (
                       <>
-                        <div className="flex items-center justify-between">
-                          <Label>Parts to Add</Label>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={handleAddRow}
-                            data-testid="button-add-row"
-                            className="gap-2"
-                          >
-                            <Plus className="h-3 w-3" />
-                            Add Row
-                          </Button>
-                        </div>
-
-                        {pendingParts.length > 0 && (
+                        {filterParts.length > 0 && (
                           <div className="space-y-2">
-                            {pendingParts.map((pending, index) => (
-                              <div key={index} className="flex items-center gap-2" data-testid={`pending-part-row-${index}`}>
-                                <div className="flex-1">
-                                  <Select
-                                    value={pending.partId}
-                                    onValueChange={(value) => handleUpdatePendingPart(index, 'partId', value)}
+                            <div className="flex items-center justify-between">
+                              <Label className="text-base font-semibold">Filters</Label>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAddRow('filter')}
+                                data-testid="button-add-row-filter"
+                                className="gap-2"
+                              >
+                                <Plus className="h-3 w-3" />
+                                Add Row
+                              </Button>
+                            </div>
+                            {pendingParts.filter(p => p.category === 'filter').map((pending, categoryIndex) => {
+                              const globalIndex = pendingParts.findIndex(p => p === pending);
+                              return (
+                                <div key={globalIndex} className="flex items-center gap-2" data-testid={`pending-part-row-${globalIndex}`}>
+                                  <div className="flex-1">
+                                    <Select
+                                      value={pending.partId}
+                                      onValueChange={(value) => handleUpdatePendingPart(globalIndex, 'partId', value)}
+                                    >
+                                      <SelectTrigger data-testid={`select-pending-part-${globalIndex}`}>
+                                        <SelectValue placeholder="Choose a filter..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {filterParts.map((part) => {
+                                          const display = getPartDisplay(part);
+                                          return (
+                                            <SelectItem key={part.id} value={part.id}>
+                                              {display.primary} - {display.secondary}
+                                            </SelectItem>
+                                          );
+                                        })}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="w-24">
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      placeholder="Qty"
+                                      data-testid={`input-pending-quantity-${globalIndex}`}
+                                      value={pending.quantity}
+                                      onChange={(e) => handleUpdatePendingPart(globalIndex, 'quantity', parseInt(e.target.value) || 1)}
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleRemovePendingPart(globalIndex)}
+                                    data-testid={`button-remove-pending-${globalIndex}`}
                                   >
-                                    <SelectTrigger data-testid={`select-pending-part-${index}`}>
-                                      <SelectValue placeholder="Choose a part..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {sortedParts.map((part) => {
-                                        const display = getPartDisplay(part);
-                                        return (
-                                          <SelectItem key={part.id} value={part.id}>
-                                            {display.primary} - {display.secondary}
-                                          </SelectItem>
-                                        );
-                                      })}
-                                    </SelectContent>
-                                  </Select>
+                                    <X className="h-4 w-4" />
+                                  </Button>
                                 </div>
-                                <div className="w-24">
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    placeholder="Qty"
-                                    data-testid={`input-pending-quantity-${index}`}
-                                    value={pending.quantity}
-                                    onChange={(e) => handleUpdatePendingPart(index, 'quantity', parseInt(e.target.value) || 1)}
-                                  />
-                                </div>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleRemovePendingPart(index)}
-                                  data-testid={`button-remove-pending-${index}`}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
 
-                        {pendingParts.length === 0 && (
-                          <p className="text-sm text-muted-foreground text-center py-4">
-                            Click "Add Row" to start adding parts
-                          </p>
+                        {beltParts.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-base font-semibold">Belts</Label>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAddRow('belt')}
+                                data-testid="button-add-row-belt"
+                                className="gap-2"
+                              >
+                                <Plus className="h-3 w-3" />
+                                Add Row
+                              </Button>
+                            </div>
+                            {pendingParts.filter(p => p.category === 'belt').map((pending, categoryIndex) => {
+                              const globalIndex = pendingParts.findIndex(p => p === pending);
+                              return (
+                                <div key={globalIndex} className="flex items-center gap-2" data-testid={`pending-part-row-${globalIndex}`}>
+                                  <div className="flex-1">
+                                    <Select
+                                      value={pending.partId}
+                                      onValueChange={(value) => handleUpdatePendingPart(globalIndex, 'partId', value)}
+                                    >
+                                      <SelectTrigger data-testid={`select-pending-part-${globalIndex}`}>
+                                        <SelectValue placeholder="Choose a belt..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {beltParts.map((part) => {
+                                          const display = getPartDisplay(part);
+                                          return (
+                                            <SelectItem key={part.id} value={part.id}>
+                                              {display.primary} - {display.secondary}
+                                            </SelectItem>
+                                          );
+                                        })}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="w-24">
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      placeholder="Qty"
+                                      data-testid={`input-pending-quantity-${globalIndex}`}
+                                      value={pending.quantity}
+                                      onChange={(e) => handleUpdatePendingPart(globalIndex, 'quantity', parseInt(e.target.value) || 1)}
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleRemovePendingPart(globalIndex)}
+                                    data-testid={`button-remove-pending-${globalIndex}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {otherParts.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-base font-semibold">Other Parts</Label>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAddRow('other')}
+                                data-testid="button-add-row-other"
+                                className="gap-2"
+                              >
+                                <Plus className="h-3 w-3" />
+                                Add Row
+                              </Button>
+                            </div>
+                            {pendingParts.filter(p => p.category === 'other').map((pending, categoryIndex) => {
+                              const globalIndex = pendingParts.findIndex(p => p === pending);
+                              return (
+                                <div key={globalIndex} className="flex items-center gap-2" data-testid={`pending-part-row-${globalIndex}`}>
+                                  <div className="flex-1">
+                                    <Select
+                                      value={pending.partId}
+                                      onValueChange={(value) => handleUpdatePendingPart(globalIndex, 'partId', value)}
+                                    >
+                                      <SelectTrigger data-testid={`select-pending-part-${globalIndex}`}>
+                                        <SelectValue placeholder="Choose a part..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {otherParts.map((part) => {
+                                          const display = getPartDisplay(part);
+                                          return (
+                                            <SelectItem key={part.id} value={part.id}>
+                                              {display.primary} - {display.secondary}
+                                            </SelectItem>
+                                          );
+                                        })}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="w-24">
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      placeholder="Qty"
+                                      data-testid={`input-pending-quantity-${globalIndex}`}
+                                      value={pending.quantity}
+                                      onChange={(e) => handleUpdatePendingPart(globalIndex, 'quantity', parseInt(e.target.value) || 1)}
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleRemovePendingPart(globalIndex)}
+                                    data-testid={`button-remove-pending-${globalIndex}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          </div>
                         )}
                       </>
                     )}
@@ -412,7 +554,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                       >
                         Cancel
                       </Button>
-                      {sortedParts.length > 0 && pendingParts.length > 0 && (
+                      {availableParts.length > 0 && pendingParts.length > 0 && (
                         <Button
                           type="button"
                           size="sm"
