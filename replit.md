@@ -54,6 +54,12 @@ This is a preventive maintenance scheduling application designed for HVAC/R cont
 - Backend deletes all client parts and maintenance records before deleting client
 - Loading state ("Deleting...") and disabled buttons during deletion prevent duplicate requests
 
+### Parts Type Enhancement
+- Added "Other" as a third part type alongside "Filter" and "Belt"
+- Parts Management dialog now shows three sections: Filters, Belts, and Other
+- All three types can be selected when creating or editing parts
+- Parts are automatically categorized and displayed in their respective sections
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

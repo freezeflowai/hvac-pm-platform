@@ -35,7 +35,7 @@ export type Client = typeof clients.$inferSelect;
 export const parts = pgTable("parts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  type: text("type").notNull(), // "filter" or "belt"
+  type: text("type").notNull(), // "filter", "belt", or "other"
   size: text("size").notNull(),
 });
 

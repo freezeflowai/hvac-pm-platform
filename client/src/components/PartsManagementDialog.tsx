@@ -85,6 +85,7 @@ export default function PartsManagementDialog({ open, onClose }: PartsManagement
 
   const filterParts = parts.filter(p => p.type === "filter");
   const beltParts = parts.filter(p => p.type === "belt");
+  const otherParts = parts.filter(p => p.type === "other");
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -119,6 +120,7 @@ export default function PartsManagementDialog({ open, onClose }: PartsManagement
                   <SelectContent>
                     <SelectItem value="filter">Filter</SelectItem>
                     <SelectItem value="belt">Belt</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -206,6 +208,37 @@ export default function PartsManagementDialog({ open, onClose }: PartsManagement
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No belts added yet</p>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="font-semibold">Other</h3>
+            {isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            ) : otherParts.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {otherParts.map((part) => (
+                  <Card key={part.id} data-testid={`card-part-${part.id}`}>
+                    <CardContent className="p-3 flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{part.name}</p>
+                        <p className="text-xs text-muted-foreground">{part.size}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deletePartMutation.mutate(part.id)}
+                        data-testid={`button-delete-part-${part.id}`}
+                        disabled={deletePartMutation.isPending}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No other parts added yet</p>
             )}
           </div>
         </div>
