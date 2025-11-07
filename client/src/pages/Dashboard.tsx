@@ -64,6 +64,13 @@ export default function Dashboard() {
     queryKey: ["/api/clients"],
   });
 
+  const { data: recentlyCompletedData = [] } = useQuery<Array<{
+    record: { id: string; clientId: string; dueDate: string; completedAt: string };
+    client: DBClient;
+  }>>({
+    queryKey: ["/api/maintenance/recently-completed"],
+  });
+
   const [clientParts, setClientParts] = useState<Record<string, ClientPart[]>>({});
   const [completionStatuses, setCompletionStatuses] = useState<Record<string, { completed: boolean; completedDueDate?: string }>>({});
 
@@ -195,7 +202,16 @@ export default function Dashboard() {
     return item.nextDue <= monthFromNow && item.status !== "overdue";
   });
 
-  const completedCount = 0;
+  const recentlyCompletedItems: MaintenanceItem[] = recentlyCompletedData.map((item) => ({
+    id: `${item.client.id}|${item.record.dueDate}`, // Unique ID per completion
+    companyName: item.client.companyName,
+    location: item.client.location,
+    selectedMonths: item.client.selectedMonths,
+    nextDue: new Date(item.record.dueDate), // Use the completed dueDate, not current nextDue
+    status: "completed" as const,
+  }));
+
+  const completedCount = recentlyCompletedItems.length;
 
   const handleAddClient = (data: ClientFormData) => {
     if (editingClient) {
@@ -207,9 +223,12 @@ export default function Dashboard() {
   };
 
   const handleEditClient = async (id: string) => {
-    const client = clients.find(c => c.id === id);
+    // Extract clientId from composite ID if needed (for recently completed items)
+    const clientId = id.includes('|') ? id.split('|')[0] : id;
+    
+    const client = clients.find(c => c.id === clientId);
     if (client) {
-      const parts = clientParts[id] || [];
+      const parts = clientParts[clientId] || [];
       setEditingClient({
         ...client,
         parts: parts.map(cp => ({ partId: cp.partId, quantity: cp.quantity })),
@@ -220,29 +239,42 @@ export default function Dashboard() {
 
   const handleMarkComplete = async (id: string) => {
     try {
-      // Find the client to get their current nextDue
-      const client = clients.find(c => c.id === id);
-      if (!client) {
-        toast({
-          title: "Error",
-          description: "Client not found.",
-          variant: "destructive",
-        });
-        return;
+      // Check if this is a recently completed item (composite ID format: clientId|dueDate)
+      let clientId: string;
+      let dueDateToSend: string;
+      
+      if (id.includes('|')) {
+        // Recently completed item - extract clientId and dueDate
+        const [cId, dueDate] = id.split('|');
+        clientId = cId;
+        dueDateToSend = dueDate;
+      } else {
+        // Regular item - find the client
+        const client = clients.find(c => c.id === id);
+        if (!client) {
+          toast({
+            title: "Error",
+            description: "Client not found.",
+            variant: "destructive",
+          });
+          return;
+        }
+        clientId = id;
+        
+        // Determine which dueDate to send
+        const status = completionStatuses[id];
+        dueDateToSend = status?.completed && status.completedDueDate
+          ? status.completedDueDate  // Reopening: use the completed dueDate
+          : client.nextDue.toISOString();  // Completing: use current nextDue
       }
       
-      // Determine which dueDate to send
-      const status = completionStatuses[id];
-      const dueDateToSend = status?.completed && status.completedDueDate
-        ? status.completedDueDate  // Reopening: use the completed dueDate
-        : client.nextDue.toISOString();  // Completing: use current nextDue
-      
-      const res = await apiRequest("POST", `/api/maintenance/${id}/toggle`, {
+      const res = await apiRequest("POST", `/api/maintenance/${clientId}/toggle`, {
         dueDate: dueDateToSend
       });
       const data = await res.json();
       
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance/recently-completed"] });
       
       // Refetch completion statuses
       const statusRes = await fetch(`/api/maintenance/statuses`);
@@ -318,6 +350,18 @@ export default function Dashboard() {
           </TabsList>
 
           <TabsContent value="schedule" className="space-y-6">
+            {recentlyCompletedItems.length > 0 && (
+              <MaintenanceSection
+                title="Recently Completed"
+                items={recentlyCompletedItems}
+                onMarkComplete={handleMarkComplete}
+                onEdit={handleEditClient}
+                emptyMessage="No recently completed maintenance"
+                clientParts={clientParts}
+                completionStatuses={completionStatuses}
+              />
+            )}
+
             {overdueItems.length > 0 && (
               <MaintenanceSection
                 title="Overdue Maintenance"

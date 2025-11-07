@@ -179,6 +179,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get recently completed maintenance (this month)
+  app.get("/api/maintenance/recently-completed", async (req, res) => {
+    try {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
+      const records = await storage.getRecentlyCompletedMaintenance(currentMonth, currentYear);
+      
+      // Fetch client details for each record
+      const completedItems = [];
+      for (const record of records) {
+        const client = await storage.getClient(record.clientId);
+        if (client) {
+          completedItems.push({
+            record,
+            client
+          });
+        }
+      }
+      
+      res.json(completedItems);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch recently completed maintenance" });
+    }
+  });
+
   // Maintenance completion routes
   app.post("/api/maintenance/:clientId/toggle", async (req, res) => {
     try {

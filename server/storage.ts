@@ -46,6 +46,7 @@ export interface IStorage {
   // Maintenance record methods
   getMaintenanceRecord(clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined>;
   getLatestCompletedMaintenanceRecord(clientId: string): Promise<MaintenanceRecord | undefined>;
+  getRecentlyCompletedMaintenance(month: number, year: number): Promise<MaintenanceRecord[]>;
   createMaintenanceRecord(record: InsertMaintenanceRecord): Promise<MaintenanceRecord>;
   updateMaintenanceRecord(id: string, record: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined>;
   deleteMaintenanceRecord(id: string): Promise<boolean>;
@@ -250,6 +251,20 @@ export class MemStorage implements IStorage {
       const dateB = new Date(b.completedAt!).getTime();
       return dateB - dateA;
     })[0];
+  }
+
+  async getRecentlyCompletedMaintenance(month: number, year: number): Promise<MaintenanceRecord[]> {
+    return Array.from(this.maintenanceRecords.values())
+      .filter(record => {
+        if (!record.completedAt) return false;
+        const completedDate = new Date(record.completedAt);
+        return completedDate.getMonth() === month && completedDate.getFullYear() === year;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.completedAt!).getTime();
+        const dateB = new Date(b.completedAt!).getTime();
+        return dateB - dateA; // Most recent first
+      });
   }
 
   async createMaintenanceRecord(insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
