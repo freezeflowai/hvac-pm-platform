@@ -63,6 +63,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/parts", async (req, res) => {
     try {
       const validated = insertPartSchema.parse(req.body);
+      
+      // Check for duplicate part (same name, type, and size)
+      const existingPart = await storage.getPartByNameTypeSize(
+        validated.name,
+        validated.type,
+        validated.size
+      );
+      
+      if (existingPart) {
+        return res.status(409).json({ 
+          error: "A part with this name, type, and size already exists" 
+        });
+      }
+      
       const part = await storage.createPart(validated);
       res.json(part);
     } catch (error) {

@@ -59,6 +59,8 @@ This is a preventive maintenance scheduling application designed for HVAC/R cont
 - Parts Management dialog now shows three sections: Filters, Belts, and Other
 - All three types can be selected when creating or editing parts
 - Parts are automatically categorized and displayed in their respective sections
+- Duplicate prevention: Cannot create a part with the same name, type, and size as an existing part
+- Clear error message shown when attempting to add a duplicate part
 
 ## User Preferences
 

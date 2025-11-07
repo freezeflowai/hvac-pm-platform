@@ -48,10 +48,24 @@ export default function PartsManagementDialog({ open, onClose }: PartsManagement
         description: "The part has been added successfully.",
       });
     },
-    onError: () => {
+    onError: async (error: any) => {
+      let errorMessage = "Failed to add part.";
+      
+      // Try to get the error message from the response
+      if (error?.response) {
+        try {
+          const data = await error.response.json();
+          if (data.error) {
+            errorMessage = data.error;
+          }
+        } catch {
+          // If parsing fails, use default message
+        }
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to add part.",
+        description: errorMessage,
         variant: "destructive",
       });
     },

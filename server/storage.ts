@@ -29,6 +29,7 @@ export interface IStorage {
   getPart(id: string): Promise<Part | undefined>;
   getAllParts(): Promise<Part[]>;
   getPartsByType(type: string): Promise<Part[]>;
+  getPartByNameTypeSize(name: string, type: string, size: string): Promise<Part | undefined>;
   createPart(part: InsertPart): Promise<Part>;
   updatePart(id: string, part: Partial<InsertPart>): Promise<Part | undefined>;
   deletePart(id: string): Promise<boolean>;
@@ -125,6 +126,12 @@ export class MemStorage implements IStorage {
 
   async getPartsByType(type: string): Promise<Part[]> {
     return Array.from(this.parts.values()).filter(part => part.type === type);
+  }
+
+  async getPartByNameTypeSize(name: string, type: string, size: string): Promise<Part | undefined> {
+    return Array.from(this.parts.values()).find(
+      part => part.name === name && part.type === type && part.size === size
+    );
   }
 
   async createPart(insertPart: InsertPart): Promise<Part> {
