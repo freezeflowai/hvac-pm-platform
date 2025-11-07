@@ -6,6 +6,20 @@ This is a preventive maintenance scheduling application designed for HVAC/R cont
 
 ## Recent Changes (November 2025)
 
+### Client Parts Bulk Addition and Alphabetical Sorting (November 2025)
+- **Bulk Part Addition**: Users can now add multiple parts to a client at once
+  - Click "Add Part" button to open the parts addition panel
+  - Click "Add Row" button to add multiple pending part rows
+  - Each row has: part dropdown, quantity input, and remove button
+  - Click "Add Parts" to commit all pending parts at once
+  - Click "Cancel" to discard pending parts without adding them
+- **Alphabetical Sorting**: Parts dropdown now displays in alphabetical order by display name
+  - Filters: "Media Filter - 20x25x4", "Pleated Filter - 16x20x1"
+  - Belts: "Type A Belt - A42", "Type B Belt - B55"
+  - Other: "Capacitor - 40μF 370V", "Contactor - 3-pole 30A"
+  - Case-insensitive sorting for better user experience
+- Improved workflow allows adding multiple parts without repeatedly opening and closing the parts selection dialog
+
 ### Chronological Ordering
 - Both parts list and client list now display in chronological order (newest first)
 - Added createdAt timestamp to clients and parts tables
