@@ -228,6 +228,12 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     setClientParts(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleUpdatePartQuantity = (index: number, quantity: number) => {
+    setClientParts(prev => prev.map((part, i) => 
+      i === index ? { ...part, quantity } : part
+    ));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.selectedMonths.length === 0) {
@@ -571,27 +577,31 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
                 {clientParts.length > 0 && (
                   <div className="space-y-2">
+                    <Label className="text-sm font-medium">Current Parts</Label>
                     {clientParts.map((part, index) => {
                       const display = getPartDisplay(part);
                       return (
                         <div
                           key={index}
-                          className="flex items-center justify-between p-2 border rounded-md"
+                          className="flex items-center gap-2 p-2 border rounded-md"
                           data-testid={`part-item-${index}`}
                         >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <Badge variant="outline" className="shrink-0">
-                              {part.quantity}x
-                            </Badge>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{display.primary}</p>
-                              {display.secondary && (
-                                <p className="text-xs text-muted-foreground">
-                                  {display.secondary}
-                                </p>
-                              )}
-                            </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{display.primary}</p>
+                            {display.secondary && (
+                              <p className="text-xs text-muted-foreground">
+                                {display.secondary}
+                              </p>
+                            )}
                           </div>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={part.quantity}
+                            onChange={(e) => handleUpdatePartQuantity(index, parseInt(e.target.value) || 1)}
+                            className="w-20"
+                            data-testid={`input-quantity-${index}`}
+                          />
                           <Button
                             type="button"
                             size="sm"
@@ -599,7 +609,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                             onClick={() => handleRemovePart(index)}
                             data-testid={`button-remove-part-${index}`}
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-4 w-4" />
                           </Button>
                         </div>
                       );
