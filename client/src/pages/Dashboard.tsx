@@ -64,6 +64,10 @@ export default function Dashboard() {
     queryKey: ["/api/clients"],
   });
 
+  const { data: recentlyCompleted = [] } = useQuery<MaintenanceItem[]>({
+    queryKey: ["/api/maintenance/recently-completed"],
+  });
+
 
   const [clientParts, setClientParts] = useState<Record<string, ClientPart[]>>({});
   const [completionStatuses, setCompletionStatuses] = useState<Record<string, { completed: boolean; completedDueDate?: string }>>({});
@@ -218,7 +222,7 @@ export default function Dashboard() {
     return item.nextDue <= monthFromNow && item.status !== "overdue";
   });
 
-  const completedCount = 0;
+  const completedCount = recentlyCompleted.length;
 
   const handleAddClient = (data: ClientFormData) => {
     if (editingClient) {
@@ -382,6 +386,18 @@ export default function Dashboard() {
               clientParts={clientParts}
               completionStatuses={completionStatuses}
             />
+
+            {recentlyCompleted.length > 0 && (
+              <MaintenanceSection
+                title="Recently Completed (This Month)"
+                items={recentlyCompleted}
+                onMarkComplete={handleMarkComplete}
+                onEdit={handleEditClient}
+                emptyMessage="No recently completed maintenance"
+                clientParts={clientParts}
+                completionStatuses={completionStatuses}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="clients">
