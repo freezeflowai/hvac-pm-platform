@@ -6,6 +6,13 @@ This is a preventive maintenance scheduling application designed for HVAC/R cont
 
 ## Recent Changes (November 2025)
 
+### Recently Completed Maintenance View (November 2025)
+- **No More Disappearing Jobs**: Completed maintenance now appears in a "Recently Completed (This Month)" section
+- **Easy Undo**: Click "Reopen" button to reverse accidental completions
+- **Accurate Stats**: Completed count now shows actual number of jobs completed this month
+- **Full Details**: Recently completed items show all information (company, location, parts, PM schedule)
+- **Seamless Workflow**: Complete and reopen actions work smoothly with toast notifications
+
 ### Categorized Parts Selection (November 2025)
 - **Separated by Category**: Parts are now organized into three distinct sections when adding to clients
   - **Filters Section**: Shows only filter parts, sorted alphabetically by filterType then size
