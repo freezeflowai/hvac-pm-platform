@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema } from "@shared/schema";
+import { STANDARD_FILTERS, STANDARD_BELTS } from "./seed-data";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Client routes
@@ -136,6 +137,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(part);
     } catch (error) {
       res.status(400).json({ error: "Invalid part data" });
+    }
+  });
+
+  app.post("/api/parts/seed", async (_req, res) => {
+    try {
+      const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
+      const createdParts = [];
+      const skippedParts = [];
+      
+      for (const partData of allSeedParts) {
+        const existingPart = await storage.findDuplicatePart(partData);
+        
+        if (!existingPart) {
+          const part = await storage.createPart(partData);
+          createdParts.push(part);
+        } else {
+          skippedParts.push(partData);
+        }
+      }
+      
+      res.json({ 
+        message: "Seed data processed",
+        created: createdParts.length,
+        skipped: skippedParts.length,
+        total: allSeedParts.length
+      });
+    } catch (error) {
+      console.error('Seed error:', error);
+      res.status(500).json({ error: "Failed to seed parts data" });
     }
   });
 
