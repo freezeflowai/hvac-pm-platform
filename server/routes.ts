@@ -244,14 +244,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const records = await storage.getRecentlyCompletedMaintenance(currentMonth, currentYear);
       
-      // Fetch client details for each record
+      // Fetch client details for each record and format for frontend
       const completedItems = [];
       for (const record of records) {
         const client = await storage.getClient(record.clientId);
         if (client) {
+          // Format to match MaintenanceItem interface expected by frontend
           completedItems.push({
-            record,
-            client
+            id: `${client.id}|${record.dueDate}`, // Composite ID for recently completed items
+            companyName: client.companyName,
+            location: client.location,
+            selectedMonths: client.selectedMonths,
+            nextDue: new Date(record.dueDate), // Use the completed dueDate
+            status: "upcoming" // Status doesn't matter for completed items
           });
         }
       }
