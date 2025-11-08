@@ -209,6 +209,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Schedule report - get all clients scheduled for a particular month
+  app.get("/api/reports/schedule/:month", async (req, res) => {
+    try {
+      const month = parseInt(req.params.month);
+      if (isNaN(month) || month < 0 || month > 11) {
+        return res.status(400).json({ error: "Invalid month. Must be 0-11." });
+      }
+      
+      const allClients = await storage.getAllClients();
+      
+      // Filter clients that have the selected month in their selectedMonths array
+      const scheduledClients = allClients.filter(client => 
+        client.selectedMonths.includes(month)
+      );
+      
+      res.json(scheduledClients);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to generate schedule report" });
+    }
+  });
+
   // Get all completed maintenance statuses
   app.get("/api/maintenance/statuses", async (req, res) => {
     try {
