@@ -6,6 +6,12 @@ This is a preventive maintenance scheduling application designed for HVAC/R cont
 
 ## Recent Changes (November 2025)
 
+### Database Migration to PostgreSQL (November 2025)
+- **Persistent Storage**: Switched from in-memory storage to PostgreSQL database
+- **Data Persistence**: Client, parts, and maintenance data now survives server restarts
+- **Database Connection**: Using Neon serverless PostgreSQL with Drizzle ORM
+- **Migration Tool**: Database schema changes handled via `npm run db:push`
+
 ### Editable Client Parts (November 2025)
 - **View Existing Parts**: When editing a client, all current parts are displayed in a "Current Parts" section
 - **Edit Quantities**: Change part quantities using number inputs directly in the edit dialog

@@ -341,4 +341,257 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+import { db } from './db';
+import { users, clients, parts, clientParts, maintenanceRecords } from '@shared/schema';
+import { eq, and, desc, inArray, sql } from 'drizzle-orm';
+
+export class DbStorage implements IStorage {
+  // User methods
+  async getUser(id: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    return result[0];
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  // Client methods
+  async getClient(id: string): Promise<Client | undefined> {
+    const result = await db.select().from(clients).where(eq(clients.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAllClients(): Promise<Client[]> {
+    return db.select().from(clients).orderBy(desc(clients.createdAt));
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    const result = await db.insert(clients).values(insertClient).returning();
+    return result[0];
+  }
+
+  async updateClient(id: string, clientUpdate: Partial<InsertClient>): Promise<Client | undefined> {
+    const result = await db.update(clients).set(clientUpdate).where(eq(clients.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteClient(id: string): Promise<boolean> {
+    await this.deleteAllClientParts(id);
+    await db.delete(maintenanceRecords).where(eq(maintenanceRecords.clientId, id));
+    const result = await db.delete(clients).where(eq(clients.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Part methods
+  async getPart(id: string): Promise<Part | undefined> {
+    const result = await db.select().from(parts).where(eq(parts.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAllParts(): Promise<Part[]> {
+    return db.select().from(parts).orderBy(desc(parts.createdAt));
+  }
+
+  async getPartsByType(type: string): Promise<Part[]> {
+    return db.select().from(parts).where(eq(parts.type, type));
+  }
+
+  async findDuplicatePart(insertPart: InsertPart): Promise<Part | undefined> {
+    if (insertPart.type === 'filter') {
+      const result = await db.select().from(parts)
+        .where(and(
+          eq(parts.type, 'filter'),
+          eq(parts.filterType, insertPart.filterType ?? ''),
+          eq(parts.size, insertPart.size ?? '')
+        ))
+        .limit(1);
+      return result[0];
+    } else if (insertPart.type === 'belt') {
+      const result = await db.select().from(parts)
+        .where(and(
+          eq(parts.type, 'belt'),
+          eq(parts.beltType, insertPart.beltType ?? ''),
+          eq(parts.size, insertPart.size ?? '')
+        ))
+        .limit(1);
+      return result[0];
+    } else if (insertPart.type === 'other') {
+      const result = await db.select().from(parts)
+        .where(and(
+          eq(parts.type, 'other'),
+          eq(parts.name, insertPart.name ?? '')
+        ))
+        .limit(1);
+      return result[0];
+    }
+    return undefined;
+  }
+
+  async createPart(insertPart: InsertPart): Promise<Part> {
+    const result = await db.insert(parts).values(insertPart).returning();
+    return result[0];
+  }
+
+  async updatePart(id: string, partUpdate: Partial<InsertPart>): Promise<Part | undefined> {
+    const result = await db.update(parts).set(partUpdate).where(eq(parts.id, id)).returning();
+    return result[0];
+  }
+
+  async deletePart(id: string): Promise<boolean> {
+    await db.delete(clientParts).where(eq(clientParts.partId, id));
+    const result = await db.delete(parts).where(eq(parts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Client-Part relationship methods
+  async getClientParts(clientId: string): Promise<(ClientPart & { part: Part })[]> {
+    const result = await db.select()
+      .from(clientParts)
+      .leftJoin(parts, eq(clientParts.partId, parts.id))
+      .where(eq(clientParts.clientId, clientId));
+    
+    return result
+      .filter(row => row.parts !== null)
+      .map(row => ({
+        ...row.client_parts,
+        part: row.parts!
+      }));
+  }
+
+  async addClientPart(insertClientPart: InsertClientPart): Promise<ClientPart> {
+    const result = await db.insert(clientParts).values(insertClientPart).returning();
+    return result[0];
+  }
+
+  async updateClientPart(id: string, quantity: number): Promise<ClientPart | undefined> {
+    const result = await db.update(clientParts).set({ quantity }).where(eq(clientParts.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteClientPart(id: string): Promise<boolean> {
+    const result = await db.delete(clientParts).where(eq(clientParts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async deleteAllClientParts(clientId: string): Promise<void> {
+    await db.delete(clientParts).where(eq(clientParts.clientId, clientId));
+  }
+
+  async getPartsReportByMonth(month: number): Promise<Array<{ part: Part; totalQuantity: number }>> {
+    const clientsWithMaintenance = await db.select()
+      .from(clients)
+      .where(sql`${month} = ANY(${clients.selectedMonths})`);
+    
+    if (clientsWithMaintenance.length === 0) {
+      return [];
+    }
+    
+    const clientIds = clientsWithMaintenance.map(c => c.id);
+    
+    const partsData = await db.select()
+      .from(clientParts)
+      .leftJoin(parts, eq(clientParts.partId, parts.id))
+      .where(inArray(clientParts.clientId, clientIds));
+    
+    const partsMap = new Map<string, { part: Part; totalQuantity: number }>();
+    
+    for (const row of partsData) {
+      if (!row.parts) continue;
+      
+      let key: string;
+      if (row.parts.type === 'filter') {
+        key = `filter-${row.parts.filterType}-${row.parts.size}`;
+      } else if (row.parts.type === 'belt') {
+        key = `belt-${row.parts.beltType}-${row.parts.size}`;
+      } else {
+        key = `other-${row.parts.name}`;
+      }
+      
+      if (partsMap.has(key)) {
+        const existing = partsMap.get(key)!;
+        existing.totalQuantity += row.client_parts.quantity;
+      } else {
+        partsMap.set(key, {
+          part: row.parts,
+          totalQuantity: row.client_parts.quantity
+        });
+      }
+    }
+    
+    return Array.from(partsMap.values()).sort((a, b) => {
+      if (a.part.type !== b.part.type) {
+        return a.part.type.localeCompare(b.part.type);
+      }
+      
+      if (a.part.type === 'filter') {
+        return (a.part.filterType || '').localeCompare(b.part.filterType || '');
+      } else if (a.part.type === 'belt') {
+        return (a.part.beltType || '').localeCompare(b.part.beltType || '');
+      } else {
+        return (a.part.name || '').localeCompare(b.part.name || '');
+      }
+    });
+  }
+
+  // Maintenance record methods
+  async getMaintenanceRecord(clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined> {
+    const result = await db.select()
+      .from(maintenanceRecords)
+      .where(and(
+        eq(maintenanceRecords.clientId, clientId),
+        eq(maintenanceRecords.dueDate, dueDate)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async getLatestCompletedMaintenanceRecord(clientId: string): Promise<MaintenanceRecord | undefined> {
+    const result = await db.select()
+      .from(maintenanceRecords)
+      .where(and(
+        eq(maintenanceRecords.clientId, clientId),
+        sql`${maintenanceRecords.completedAt} IS NOT NULL`
+      ))
+      .orderBy(desc(maintenanceRecords.completedAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async getRecentlyCompletedMaintenance(month: number, year: number): Promise<MaintenanceRecord[]> {
+    const startDate = new Date(year, month, 1).toISOString();
+    const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+    
+    return db.select()
+      .from(maintenanceRecords)
+      .where(and(
+        sql`${maintenanceRecords.completedAt} IS NOT NULL`,
+        sql`${maintenanceRecords.completedAt} >= ${startDate}`,
+        sql`${maintenanceRecords.completedAt} <= ${endDate}`
+      ))
+      .orderBy(desc(maintenanceRecords.completedAt));
+  }
+
+  async createMaintenanceRecord(insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
+    const result = await db.insert(maintenanceRecords).values(insertRecord).returning();
+    return result[0];
+  }
+
+  async updateMaintenanceRecord(id: string, recordUpdate: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined> {
+    const result = await db.update(maintenanceRecords).set(recordUpdate).where(eq(maintenanceRecords.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteMaintenanceRecord(id: string): Promise<boolean> {
+    const result = await db.delete(maintenanceRecords).where(eq(maintenanceRecords.id, id)).returning();
+    return result.length > 0;
+  }
+}
+
+export const storage = new DbStorage();
