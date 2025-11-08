@@ -6,6 +6,19 @@ This is a preventive maintenance scheduling application designed for HVAC/R cont
 
 ## Recent Changes (November 2025)
 
+### Editable Client Parts (November 2025)
+- **View Existing Parts**: When editing a client, all current parts are displayed in a "Current Parts" section
+- **Edit Quantities**: Change part quantities using number inputs directly in the edit dialog
+- **Delete Parts**: Remove parts from a client using the X button next to each part
+- **Full Visibility**: No more mystery about what parts a client has - everything is visible and editable
+
+### Monthly PM Schedule Report (November 2025)
+- **New Report Tab**: Added "PM Schedule" tab to Reports page alongside Parts Order report
+- **Month Selector**: Choose any month to see which clients have preventive maintenance scheduled
+- **Client List View**: Shows company name, location, and full PM schedule for each client
+- **Visual Schedule**: Badge indicators show all scheduled months, with current selection highlighted
+- **Empty State Handling**: Clear messaging when no clients are scheduled for a particular month
+
 ### Recently Completed Maintenance View (November 2025)
 - **No More Disappearing Jobs**: Completed maintenance now appears in a "Recently Completed (This Month)" section
 - **Easy Undo**: Click "Reopen" button to reverse accidental completions
