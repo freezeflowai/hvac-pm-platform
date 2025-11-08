@@ -59,8 +59,8 @@ export type Part = typeof parts.$inferSelect;
 
 export const clientParts = pgTable("client_parts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  clientId: varchar("client_id").notNull(),
-  partId: varchar("part_id").notNull(),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  partId: varchar("part_id").notNull().references(() => parts.id, { onDelete: "cascade" }),
   quantity: integer("quantity").notNull(),
 });
 
@@ -73,7 +73,7 @@ export type ClientPart = typeof clientParts.$inferSelect;
 
 export const maintenanceRecords = pgTable("maintenance_records", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  clientId: varchar("client_id").notNull(),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   dueDate: text("due_date").notNull(),
   completedAt: text("completed_at"),
 });

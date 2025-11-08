@@ -383,6 +383,8 @@ export class DbStorage implements IStorage {
   }
 
   async deleteClient(id: string): Promise<boolean> {
+    // Foreign key constraints with ON DELETE CASCADE will automatically delete
+    // client_parts and maintenance_records, but we keep manual deletes as defensive fallback
     await this.deleteAllClientParts(id);
     await db.delete(maintenanceRecords).where(eq(maintenanceRecords.clientId, id));
     const result = await db.delete(clients).where(eq(clients.id, id)).returning();
