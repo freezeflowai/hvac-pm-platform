@@ -430,6 +430,7 @@ export default function Dashboard() {
           companyName: editingClient.companyName,
           location: editingClient.location,
           selectedMonths: editingClient.selectedMonths,
+          inactive: editingClient.inactive,
           parts: editingClient.parts,
         } : undefined}
       />
