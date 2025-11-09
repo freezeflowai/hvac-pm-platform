@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect, useRef } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Plus, X, Check, ChevronsUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -373,8 +372,8 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
             {editData ? 'Update client information and required parts.' : 'Add a new client with their maintenance schedule and required parts.'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <ScrollArea className="flex-1 pr-4" style={{ maxHeight: 'calc(90vh - 180px)' }}>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto pr-4">
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="companyName">Company Name</Label>
@@ -693,7 +692,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                 )}
               </div>
             </div>
-          </ScrollArea>
+          </div>
           <DialogFooter className="pt-4">
             <Button
               type="button"
