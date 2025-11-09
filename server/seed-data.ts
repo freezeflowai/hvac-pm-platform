@@ -1,55 +1,48 @@
 import { InsertPart } from "@shared/schema";
 
-// Standard filter sizes commonly used in HVAC systems
-export const STANDARD_FILTERS: InsertPart[] = [
-  // Pleated filters - most common residential sizes
-  { type: "filter", filterType: "Pleated", size: "16x20x1" },
-  { type: "filter", filterType: "Pleated", size: "16x25x1" },
-  { type: "filter", filterType: "Pleated", size: "20x20x1" },
-  { type: "filter", filterType: "Pleated", size: "20x25x1" },
-  { type: "filter", filterType: "Pleated", size: "16x20x2" },
-  { type: "filter", filterType: "Pleated", size: "20x20x2" },
-  { type: "filter", filterType: "Pleated", size: "20x25x2" },
+// Generate belt sizes 18-70 for both A and B types
+const generateBelts = (): InsertPart[] => {
+  const belts: InsertPart[] = [];
   
-  // Media filters - thicker, high-efficiency filters
-  { type: "filter", filterType: "Media", size: "16x25x4" },
-  { type: "filter", filterType: "Media", size: "20x20x4" },
-  { type: "filter", filterType: "Media", size: "20x25x4" },
-  { type: "filter", filterType: "Media", size: "24x24x4" },
-  { type: "filter", filterType: "Media", size: "16x25x5" },
-  { type: "filter", filterType: "Media", size: "20x25x5" },
+  for (let size = 18; size <= 70; size++) {
+    belts.push({ type: "belt", beltType: "A", size: size.toString() });
+    belts.push({ type: "belt", beltType: "B", size: size.toString() });
+  }
   
-  // Ecology filters
-  { type: "filter", filterType: "Ecology", size: "16x20x1" },
-  { type: "filter", filterType: "Ecology", size: "20x20x1" },
-  { type: "filter", filterType: "Ecology", size: "20x25x1" },
-  
-  // Throwaway filters
-  { type: "filter", filterType: "Throwaway", size: "16x20x1" },
-  { type: "filter", filterType: "Throwaway", size: "20x20x1" },
-  { type: "filter", filterType: "Throwaway", size: "20x25x1" },
-];
+  return belts;
+};
 
-// Standard belt sizes for HVAC equipment
-export const STANDARD_BELTS: InsertPart[] = [
-  // Type A belts - common smaller belts
-  { type: "belt", beltType: "A", size: "35" },
-  { type: "belt", beltType: "A", size: "38" },
-  { type: "belt", beltType: "A", size: "42" },
-  { type: "belt", beltType: "A", size: "46" },
-  { type: "belt", beltType: "A", size: "48" },
-  { type: "belt", beltType: "A", size: "50" },
-  { type: "belt", beltType: "A", size: "53" },
-  { type: "belt", beltType: "A", size: "55" },
-  { type: "belt", beltType: "A", size: "60" },
+// Generate filter sizes with x1 and x2 thickness variants
+const generateFilters = (): InsertPart[] => {
+  const filters: InsertPart[] = [];
   
-  // Type B belts - larger commercial belts
-  { type: "belt", beltType: "B", size: "42" },
-  { type: "belt", beltType: "B", size: "46" },
-  { type: "belt", beltType: "B", size: "50" },
-  { type: "belt", beltType: "B", size: "53" },
-  { type: "belt", beltType: "B", size: "55" },
-  { type: "belt", beltType: "B", size: "60" },
-  { type: "belt", beltType: "B", size: "68" },
-  { type: "belt", beltType: "B", size: "75" },
-];
+  // Base filter sizes (without thickness)
+  const baseSizes = [
+    "10x10", "10x20", "12x12", "12x24", "14x20", "14x24", "14x25", "15x20",
+    "16x16", "16x20", "16x24", "16x25", "16x30", "18x18", "18x24", "18x25",
+    "20x20", "20x24", "20x25", "20x30", "24x24", "24x30", "25x25"
+  ];
+  
+  // Filter types that need x1 and x2 variants
+  const filterTypes = ["Media", "Pleated", "Throwaway"];
+  
+  // Thickness variants
+  const thicknesses = ["1", "2"];
+  
+  for (const filterType of filterTypes) {
+    for (const baseSize of baseSizes) {
+      for (const thickness of thicknesses) {
+        filters.push({
+          type: "filter",
+          filterType,
+          size: `${baseSize}x${thickness}`
+        });
+      }
+    }
+  }
+  
+  return filters;
+};
+
+export const STANDARD_BELTS: InsertPart[] = generateBelts();
+export const STANDARD_FILTERS: InsertPart[] = generateFilters();
