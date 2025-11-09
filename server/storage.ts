@@ -232,7 +232,7 @@ export class MemStorage implements IStorage {
 
   async getPartsReportByMonth(month: number): Promise<Array<{ part: Part; totalQuantity: number }>> {
     const clientsWithMaintenance = Array.from(this.clients.values())
-      .filter(client => client.selectedMonths.includes(month));
+      .filter(client => client.selectedMonths.includes(month) && !client.inactive);
     
     const clientIds = clientsWithMaintenance.map(c => c.id);
     
@@ -489,7 +489,10 @@ export class DbStorage implements IStorage {
   async getPartsReportByMonth(month: number): Promise<Array<{ part: Part; totalQuantity: number }>> {
     const clientsWithMaintenance = await db.select()
       .from(clients)
-      .where(sql`${month} = ANY(${clients.selectedMonths})`);
+      .where(and(
+        sql`${month} = ANY(${clients.selectedMonths})`,
+        eq(clients.inactive, false)
+      ));
     
     if (clientsWithMaintenance.length === 0) {
       return [];

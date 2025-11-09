@@ -249,9 +249,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const allClients = await storage.getAllClients();
       
-      // Filter clients that have the selected month in their selectedMonths array
+      // Filter clients that have the selected month in their selectedMonths array and are not inactive
       const scheduledClients = allClients.filter(client => 
-        client.selectedMonths.includes(month)
+        client.selectedMonths.includes(month) && !client.inactive
       );
       
       res.json(scheduledClients);
