@@ -128,6 +128,7 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/parts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/schedule"] });
       toast({
         title: "Client added",
         description: "The client has been added successfully.",
@@ -162,6 +163,7 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/parts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/schedule"] });
       toast({
         title: "Client updated",
         description: "The client has been updated successfully.",
@@ -184,6 +186,7 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/parts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/schedule"] });
       toast({
         title: "Client deleted",
         description: "The client has been deleted successfully.",
@@ -290,6 +293,7 @@ export default function Dashboard() {
       
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance/recently-completed"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/schedule"] });
       
       // Refetch completion statuses
       const statusRes = await fetch(`/api/maintenance/statuses`);

@@ -6,10 +6,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Plus, X } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, X, Check, ChevronsUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 export interface ClientFormData {
   companyName: string;
@@ -64,6 +66,107 @@ interface PendingPart {
   partId: string;
   quantity: number;
   category: 'filter' | 'belt' | 'other';
+}
+
+interface PartCommandPickerProps {
+  category: 'filter' | 'belt' | 'other';
+  parts: Array<{ 
+    id: string; 
+    type: string; 
+    filterType?: string | null;
+    beltType?: string | null;
+    size?: string | null;
+    name?: string | null;
+    description?: string | null;
+  }>;
+  value: string;
+  onValueChange: (value: string) => void;
+  testId?: string;
+}
+
+function PartCommandPicker({ category, parts, value, onValueChange, testId }: PartCommandPickerProps) {
+  const [open, setOpen] = useState(false);
+  const selectedPart = parts.find(p => p.id === value);
+  
+  const selectedDisplay = selectedPart ? getPartDisplay(selectedPart) : null;
+
+  const groupedParts = parts.reduce((acc, part) => {
+    let groupKey = '';
+    
+    if (category === 'filter') {
+      groupKey = part.filterType || 'Other';
+    } else if (category === 'belt') {
+      groupKey = part.beltType ? `Type ${part.beltType}` : 'Other';
+    } else {
+      groupKey = 'Parts';
+    }
+    
+    if (!acc[groupKey]) acc[groupKey] = [];
+    acc[groupKey].push(part);
+    return acc;
+  }, {} as Record<string, typeof parts>);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+          data-testid={testId}
+        >
+          {selectedDisplay ? (
+            <span className="truncate">
+              {selectedDisplay.primary} - {selectedDisplay.secondary}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">
+              Search {category === 'filter' ? 'filters' : category === 'belt' ? 'belts' : 'parts'}...
+            </span>
+          )}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[400px] p-0">
+        <Command>
+          <CommandInput placeholder={`Search ${category}...`} />
+          <CommandList>
+            <CommandEmpty>No {category} found.</CommandEmpty>
+            {Object.entries(groupedParts).map(([groupName, groupParts]) => (
+              <CommandGroup key={groupName} heading={groupName}>
+                {groupParts.map((part) => {
+                  const display = getPartDisplay(part);
+                  return (
+                    <CommandItem
+                      key={part.id}
+                      value={`${display.primary} ${display.secondary}`}
+                      onSelect={() => {
+                        onValueChange(part.id);
+                        setOpen(false);
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          value === part.id ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium">{display.primary}</div>
+                        <div className="text-sm text-muted-foreground">{display.secondary}</div>
+                      </div>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export default function AddClientDialog({ open, onClose, onSubmit, editData }: AddClientDialogProps) {
@@ -228,7 +331,8 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     setClientParts(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleUpdatePartQuantity = (index: number, quantity: number) => {
+  const handleUpdatePartQuantity = (index: number, value: string) => {
+    const quantity = Math.max(1, parseInt(value) || 1);
     setClientParts(prev => prev.map((part, i) => 
       i === index ? { ...part, quantity } : part
     ));
@@ -371,24 +475,13 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                               return (
                                 <div key={globalIndex} className="flex items-center gap-2" data-testid={`pending-part-row-${globalIndex}`}>
                                   <div className="flex-1">
-                                    <Select
+                                    <PartCommandPicker
+                                      category="filter"
+                                      parts={filterParts}
                                       value={pending.partId}
                                       onValueChange={(value) => handleUpdatePendingPart(globalIndex, 'partId', value)}
-                                    >
-                                      <SelectTrigger data-testid={`select-pending-part-${globalIndex}`}>
-                                        <SelectValue placeholder="Choose a filter..." />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {filterParts.map((part) => {
-                                          const display = getPartDisplay(part);
-                                          return (
-                                            <SelectItem key={part.id} value={part.id}>
-                                              {display.primary} - {display.secondary}
-                                            </SelectItem>
-                                          );
-                                        })}
-                                      </SelectContent>
-                                    </Select>
+                                      testId={`select-pending-part-${globalIndex}`}
+                                    />
                                   </div>
                                   <div className="w-24">
                                     <Input
@@ -436,24 +529,13 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                               return (
                                 <div key={globalIndex} className="flex items-center gap-2" data-testid={`pending-part-row-${globalIndex}`}>
                                   <div className="flex-1">
-                                    <Select
+                                    <PartCommandPicker
+                                      category="belt"
+                                      parts={beltParts}
                                       value={pending.partId}
                                       onValueChange={(value) => handleUpdatePendingPart(globalIndex, 'partId', value)}
-                                    >
-                                      <SelectTrigger data-testid={`select-pending-part-${globalIndex}`}>
-                                        <SelectValue placeholder="Choose a belt..." />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {beltParts.map((part) => {
-                                          const display = getPartDisplay(part);
-                                          return (
-                                            <SelectItem key={part.id} value={part.id}>
-                                              {display.primary} - {display.secondary}
-                                            </SelectItem>
-                                          );
-                                        })}
-                                      </SelectContent>
-                                    </Select>
+                                      testId={`select-pending-part-${globalIndex}`}
+                                    />
                                   </div>
                                   <div className="w-24">
                                     <Input
@@ -501,24 +583,13 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                               return (
                                 <div key={globalIndex} className="flex items-center gap-2" data-testid={`pending-part-row-${globalIndex}`}>
                                   <div className="flex-1">
-                                    <Select
+                                    <PartCommandPicker
+                                      category="other"
+                                      parts={otherParts}
                                       value={pending.partId}
                                       onValueChange={(value) => handleUpdatePendingPart(globalIndex, 'partId', value)}
-                                    >
-                                      <SelectTrigger data-testid={`select-pending-part-${globalIndex}`}>
-                                        <SelectValue placeholder="Choose a part..." />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {otherParts.map((part) => {
-                                          const display = getPartDisplay(part);
-                                          return (
-                                            <SelectItem key={part.id} value={part.id}>
-                                              {display.primary} - {display.secondary}
-                                            </SelectItem>
-                                          );
-                                        })}
-                                      </SelectContent>
-                                    </Select>
+                                      testId={`select-pending-part-${globalIndex}`}
+                                    />
                                   </div>
                                   <div className="w-24">
                                     <Input
@@ -598,7 +669,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                             type="number"
                             min="1"
                             value={part.quantity}
-                            onChange={(e) => handleUpdatePartQuantity(index, parseInt(e.target.value) || 1)}
+                            onChange={(e) => handleUpdatePartQuantity(index, e.target.value)}
                             className="w-20"
                             data-testid={`input-quantity-${index}`}
                           />
