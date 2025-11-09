@@ -217,14 +217,14 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
   useEffect(() => {
     const loadClientParts = async () => {
-      if (editData && !initializedRef.current) {
+      if (editData) {
         setFormData({
           companyName: editData.companyName,
           location: editData.location,
           selectedMonths: editData.selectedMonths,
         });
 
-        // Fetch the actual parts data for this client
+        // Always fetch fresh parts data for this client from API
         try {
           const res = await fetch(`/api/clients/${editData.id}/parts`);
           if (res.ok) {
@@ -239,12 +239,14 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
               description: cp.part.description,
               quantity: cp.quantity,
             })));
+          } else {
+            setClientParts([]);
           }
         } catch (error) {
           console.error('Failed to load client parts', error);
+          setClientParts([]);
         }
-        initializedRef.current = true;
-      } else if (!editData && !initializedRef.current) {
+      } else {
         setFormData({
           companyName: "",
           location: "",
@@ -252,18 +254,16 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
         });
         setClientParts([]);
         setPendingParts([]);
-        initializedRef.current = true;
       }
     };
 
     if (open) {
       loadClientParts();
     } else {
-      initializedRef.current = false;
       setPendingParts([]);
       setShowAddPart(false);
     }
-  }, [editData, open]);
+  }, [editData?.id, open]);
 
   useEffect(() => {
     if (showAddPart && addPartFormRef.current) {
