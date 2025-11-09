@@ -15,7 +15,11 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 // Helper function to calculate next due date based on selected months
-function calculateNextDueDate(selectedMonths: number[]): Date {
+function calculateNextDueDate(selectedMonths: number[], inactive: boolean): Date | null {
+  if (inactive || selectedMonths.length === 0) {
+    return null;
+  }
+  
   const today = new Date();
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
@@ -39,6 +43,7 @@ interface DBClient {
   companyName: string;
   location: string;
   selectedMonths: number[];
+  inactive: boolean;
   nextDue: string;
 }
 
@@ -108,12 +113,13 @@ export default function Dashboard() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormData) => {
-      const nextDue = calculateNextDueDate(data.selectedMonths);
+      const nextDue = calculateNextDueDate(data.selectedMonths, data.inactive);
       const clientData = {
         companyName: data.companyName,
         location: data.location,
         selectedMonths: data.selectedMonths,
-        nextDue: nextDue.toISOString(),
+        inactive: data.inactive,
+        nextDue: nextDue ? nextDue.toISOString() : new Date('9999-12-31').toISOString(),
       };
       
       const res = await apiRequest("POST", "/api/clients", clientData);
@@ -145,12 +151,13 @@ export default function Dashboard() {
 
   const updateClientMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ClientFormData }) => {
-      const nextDue = calculateNextDueDate(data.selectedMonths);
+      const nextDue = calculateNextDueDate(data.selectedMonths, data.inactive);
       const clientData = {
         companyName: data.companyName,
         location: data.location,
         selectedMonths: data.selectedMonths,
-        nextDue: nextDue.toISOString(),
+        inactive: data.inactive,
+        nextDue: nextDue ? nextDue.toISOString() : new Date('9999-12-31').toISOString(),
       };
       
       const res = await apiRequest("PUT", `/api/clients/${id}`, clientData);
@@ -206,17 +213,20 @@ export default function Dashboard() {
     companyName: c.companyName,
     location: c.location,
     selectedMonths: c.selectedMonths,
+    inactive: c.inactive,
     nextDue: new Date(c.nextDue),
   }));
 
-  const maintenanceItems: MaintenanceItem[] = clients.map(c => ({
-    id: c.id,
-    companyName: c.companyName,
-    location: c.location,
-    selectedMonths: c.selectedMonths,
-    nextDue: c.nextDue,
-    status: c.nextDue < new Date() ? "overdue" : "upcoming",
-  }));
+  const maintenanceItems: MaintenanceItem[] = clients
+    .filter(c => !c.inactive)
+    .map(c => ({
+      id: c.id,
+      companyName: c.companyName,
+      location: c.location,
+      selectedMonths: c.selectedMonths,
+      nextDue: c.nextDue,
+      status: c.nextDue < new Date() ? "overdue" : "upcoming",
+    }));
 
   const overdueItems = maintenanceItems.filter(item => item.status === "overdue");
   const thisMonthItems = maintenanceItems.filter(item => {

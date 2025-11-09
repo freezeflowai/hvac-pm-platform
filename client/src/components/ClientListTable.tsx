@@ -21,6 +21,7 @@ export interface Client {
   companyName: string;
   location: string;
   selectedMonths: number[];
+  inactive: boolean;
   nextDue: Date;
 }
 
@@ -117,7 +118,11 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                     <span className="text-muted-foreground">{getMonthsDisplay(client.selectedMonths)}</span>
                   </td>
                   <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`text-next-due-${client.id}`}>
-                    {format(client.nextDue, "MMM d, yyyy")}
+                    {client.inactive ? (
+                      <Badge variant="secondary">Inactive</Badge>
+                    ) : (
+                      format(client.nextDue, "MMM d, yyyy")
+                    )}
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
@@ -176,7 +181,11 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm text-muted-foreground">{getMonthsDisplay(client.selectedMonths)}</span>
                     <span className="text-sm text-muted-foreground">
-                      {format(client.nextDue, "MMM d, yyyy")}
+                      {client.inactive ? (
+                        <Badge variant="secondary">Inactive</Badge>
+                      ) : (
+                        format(client.nextDue, "MMM d, yyyy")
+                      )}
                     </span>
                   </div>
                 </div>

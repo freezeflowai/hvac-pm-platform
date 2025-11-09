@@ -16,6 +16,7 @@ export interface ClientFormData {
   companyName: string;
   location: string;
   selectedMonths: number[];
+  inactive: boolean;
   parts: Array<{ partId: string; quantity: number }>;
 }
 
@@ -173,6 +174,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     companyName: "",
     location: "",
     selectedMonths: [] as number[],
+    inactive: false,
   });
 
   const [clientParts, setClientParts] = useState<ClientPart[]>([]);
@@ -221,6 +223,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
           companyName: editData.companyName,
           location: editData.location,
           selectedMonths: editData.selectedMonths,
+          inactive: editData.inactive,
         });
 
         // Always fetch fresh parts data for this client from API
@@ -250,6 +253,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
           companyName: "",
           location: "",
           selectedMonths: [],
+          inactive: false,
         });
         setClientParts([]);
         setPendingParts([]);
@@ -339,7 +343,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.selectedMonths.length === 0) {
+    if (!formData.inactive && formData.selectedMonths.length === 0) {
       return;
     }
 
@@ -354,7 +358,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
         parts: partsWithIds,
       });
 
-      setFormData({ companyName: "", location: "", selectedMonths: [] });
+      setFormData({ companyName: "", location: "", selectedMonths: [], inactive: false });
       setClientParts([]);
       onClose();
     } catch (error) {
@@ -421,8 +425,24 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                     </div>
                   ))}
                 </div>
-                {formData.selectedMonths.length === 0 && (
-                  <p className="text-sm text-destructive pt-2">Please select at least one month</p>
+                
+                <div className="flex items-center space-x-2 pt-3">
+                  <Checkbox
+                    id="inactive"
+                    data-testid="checkbox-inactive"
+                    checked={formData.inactive}
+                    onCheckedChange={(checked) => setFormData({ ...formData, inactive: checked === true })}
+                  />
+                  <label
+                    htmlFor="inactive"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Inactive (on-call/as-needed basis)
+                  </label>
+                </div>
+
+                {!formData.inactive && formData.selectedMonths.length === 0 && (
+                  <p className="text-sm text-destructive">Please select at least one month or mark as Inactive</p>
                 )}
               </div>
 
@@ -705,7 +725,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
             <Button 
               type="submit" 
               data-testid="button-save-client"
-              disabled={formData.selectedMonths.length === 0}
+              disabled={!formData.inactive && formData.selectedMonths.length === 0}
             >
               {editData ? 'Update Client' : 'Save Client'}
             </Button>

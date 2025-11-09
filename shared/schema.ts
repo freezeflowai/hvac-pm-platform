@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -22,6 +22,7 @@ export const clients = pgTable("clients", {
   companyName: text("company_name").notNull(),
   location: text("location").notNull(),
   selectedMonths: integer("selected_months").array().notNull(),
+  inactive: boolean("inactive").notNull().default(false),
   nextDue: text("next_due").notNull(),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
