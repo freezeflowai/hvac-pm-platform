@@ -2,124 +2,7 @@
 
 ## Overview
 
-This is a preventive maintenance scheduling application designed for HVAC/R contractors. The system helps track client contracts, schedule maintenance visits, and manage parts inventory. It provides a dashboard view for monitoring overdue maintenance, upcoming schedules, and completed work. The application follows Material Design principles optimized for productivity and data organization.
-
-## Recent Changes (November 2025)
-
-### Database Migration to PostgreSQL (November 2025)
-- **Persistent Storage**: Switched from in-memory storage to PostgreSQL database
-- **Data Persistence**: Client, parts, and maintenance data now survives server restarts
-- **Database Connection**: Using Neon serverless PostgreSQL with Drizzle ORM
-- **Migration Tool**: Database schema changes handled via `npm run db:push`
-
-### Editable Client Parts (November 2025)
-- **View Existing Parts**: When editing a client, all current parts are displayed in a "Current Parts" section
-- **Edit Quantities**: Change part quantities using number inputs directly in the edit dialog
-- **Delete Parts**: Remove parts from a client using the X button next to each part
-- **Full Visibility**: No more mystery about what parts a client has - everything is visible and editable
-
-### Monthly PM Schedule Report (November 2025)
-- **New Report Tab**: Added "PM Schedule" tab to Reports page alongside Parts Order report
-- **Month Selector**: Choose any month to see which clients have preventive maintenance scheduled
-- **Client List View**: Shows company name, location, and full PM schedule for each client
-- **Visual Schedule**: Badge indicators show all scheduled months, with current selection highlighted
-- **Empty State Handling**: Clear messaging when no clients are scheduled for a particular month
-
-### Recently Completed Maintenance View (November 2025)
-- **No More Disappearing Jobs**: Completed maintenance now appears in a "Recently Completed (This Month)" section
-- **Easy Undo**: Click "Reopen" button to reverse accidental completions
-- **Accurate Stats**: Completed count now shows actual number of jobs completed this month
-- **Full Details**: Recently completed items show all information (company, location, parts, PM schedule)
-- **Seamless Workflow**: Complete and reopen actions work smoothly with toast notifications
-
-### Categorized Parts Selection (November 2025)
-- **Separated by Category**: Parts are now organized into three distinct sections when adding to clients
-  - **Filters Section**: Shows only filter parts, sorted alphabetically by filterType then size
-  - **Belts Section**: Shows only belt parts, sorted alphabetically by beltType then size
-  - **Other Parts Section**: Shows only other parts, sorted alphabetically by name
-  - Each section has its own "Add Row" button and part dropdown
-- **Bulk Addition Across Categories**: Add multiple parts from different categories at once
-  - Click "Add Part" button to open the categorized parts panel
-  - Click "Add Row" in any section to add a pending part row for that category
-  - Select parts from category-specific dropdowns (only shows relevant parts)
-  - Click "Add Parts" to commit all pending parts from all categories at once
-  - Click "Cancel" to discard all pending parts
-- **Improved User Experience**: Clear visual separation makes it easier to find and add the right parts
-  - No more scrolling through mixed lists of filters, belts, and other parts
-  - Alphabetical sorting within each category for quick lookup
-  - Auto-scroll when adding rows ensures new entries are always visible
-  - Visible scrollbar for easy navigation back to top of form (wider scrollbar with better contrast)
-
-### Chronological Ordering
-- Both parts list and client list now display in chronological order (newest first)
-- Added createdAt timestamp to clients and parts tables
-- Makes it easy to find recently added items at the top of each list
-
-
-
-### Dashboard Simplification
-- Removed "Due this week" section from dashboard
-- Dashboard now shows only two categories: "Overdue" and "Due in the month"
-- Stats grid updated to show 3 cards instead of 4
-
-### Parts Editing Bug Fix
-- Fixed bug where editing client parts stopped working after the first edit attempt
-- Added `initializedRef` guard to prevent useEffect from resetting state while dialog is open
-
-### Maintenance Completion Tracking
-- Implemented maintenance completion toggle functionality
-- Each completion is recorded in `maintenanceRecords` table with clientId, dueDate, and completedAt timestamp
-- Completion status API (`/api/maintenance/statuses`) returns both completion state and the completedDueDate
-- Toggle endpoint (`/api/maintenance/:clientId/toggle`) accepts dueDate in request body to support proper undo
-- "Complete" button marks maintenance as complete and advances nextDue to the next scheduled month
-- "Reopen" button uncomplets the maintenance and restores nextDue to the completed cycle
-- Frontend tracks completed dueDate separately to ensure reopening affects the correct maintenance cycle
-
-### Parts Report Auto-Refresh
-- Fixed issue where monthly parts report didn't update after adding/editing clients
-- Reports query now invalidates when clients are created or updated
-
-### UI Compaction for Better Client Density
-- Redesigned maintenance cards to show ~40-50% more clients on screen:
-  - Reduced card padding and spacing
-  - Moved location to same line as company name
-  - Removed redundant due date display (already shown in section header)
-  - Changed "Months:" to "PM Schedule:" for clearer terminology
-  - Made edit button icon-only to save space
-  - Added responsive button text (desktop: "Complete"/"Reopen", mobile: "Done"/"Undo")
-  - Reduced spacing between cards for better density
-
-### Parts Dialog State Management Fix
-- Fixed recurring parts editing bug by adding key prop to AddClientDialog
-- Key changes based on client ID and mode (`edit-${clientId}` or `new-client`)
-- Forces React to remount dialog component when switching between clients or modes
-- Prevents stale state issues with parts selection that were occurring on subsequent edits
-- All dialog state (clientParts, showAddPart, selectedPartId, etc.) properly resets on each open
-
-### Client Deletion
-- Added delete button (trash icon) to client list table (both desktop and mobile views)
-- Implemented confirmation dialog with clear warning about consequences
-- Async deletion flow prevents UI from getting stuck
-- On success: dialog closes, client removed, queries invalidated, success toast
-- On error: dialog stays open, error toast shown, buttons re-enabled for retry
-- Backend deletes all client parts and maintenance records before deleting client
-- Loading state ("Deleting...") and disabled buttons during deletion prevent duplicate requests
-
-### Parts System Redesign (November 2025)
-- Complete redesign of parts inventory system with type-specific fields
-- **Filters**: Type dropdown (Pleated, Media, Ecology, Throwaway, Other) + Size field
-- **Belts**: Type dropdown (A, B, Other) + Size field
-- **Other Parts**: Name + Description fields
-- Parts Management now uses tabbed interface (Filters, Belts, Other)
-- Bulk addition feature: Add multiple parts at once within each tab
-- Add Row button allows building a list of parts before saving
-- Duplicate prevention updated for new structure:
-  - Filters: Checks filterType + size combination
-  - Belts: Checks beltType + size combination
-  - Other: Checks name uniqueness
-- Bulk creation API endpoint (`POST /api/parts/bulk`) handles multiple parts with partial error reporting
-- All displays updated: client parts selection, monthly reports, and parts management
-- Monthly reports now include "Other Parts" section with name and description columns
+This project is a preventive maintenance scheduling application designed for HVAC/R contractors. Its primary purpose is to streamline the management of client contracts, schedule maintenance visits, and track parts inventory. The application aims to enhance productivity and data organization through a dashboard that provides an overview of overdue maintenance, upcoming schedules, and completed work. The business vision is to provide a robust tool for contractors to efficiently manage their maintenance operations, reduce downtime, and improve client satisfaction.
 
 ## User Preferences
 
@@ -129,124 +12,56 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Architecture
 
-**Framework & Build System**
-- React with TypeScript for type-safe component development
-- Vite as the build tool and development server
-- Wouter for client-side routing (lightweight React Router alternative)
-
-**UI Component System**
-- shadcn/ui component library built on Radix UI primitives
-- Tailwind CSS for styling with custom design tokens
-- Material Design-inspired design system for productivity-focused interfaces
-- Inter font family via Google Fonts CDN
-
-**State Management & Data Fetching**
-- TanStack Query (React Query) for server state management
-- Custom query client with optimistic updates and caching strategies
-- Form state managed with React Hook Form and Zod validation
-
-**Component Structure**
-- Atomic design pattern with reusable UI components in `client/src/components/ui`
-- Feature components in `client/src/components` (Header, MaintenanceCard, ClientListTable, etc.)
-- Page components in `client/src/pages`
-- Path aliases configured for clean imports (@/, @shared/, @assets/)
+The frontend is built with React and TypeScript, utilizing Vite for fast development and bundling. It employs `wouter` for client-side routing. The UI is constructed using `shadcn/ui`, which is based on Radix UI primitives, styled with Tailwind CSS, and follows Material Design principles. State management and data fetching are handled by TanStack Query, while form management and validation are implemented with React Hook Form and Zod. The component structure follows an atomic design pattern, with reusable UI components and dedicated feature and page components.
 
 ### Backend Architecture
 
-**Server Framework**
-- Express.js server with TypeScript
-- RESTful API design pattern
-- JSON request/response format
-- Custom logging middleware for API requests
-
-**Data Layer**
-- Drizzle ORM for type-safe database interactions
-- PostgreSQL database (via Neon serverless adapter)
-- In-memory storage fallback for development (MemStorage class)
-- Schema-first approach with Zod validation
-
-**API Structure**
-- `/api/clients` - CRUD operations for client management
-- `/api/parts` - Parts inventory management
-- `/api/clients/:id/parts` - Client-part relationship management
-- Type-safe request/response contracts shared between client and server
-
-**Database Schema**
-- `users` - User authentication (prepared for future auth implementation)
-- `clients` - Client company information and maintenance schedules
-- `parts` - Parts inventory (filters, belts) with type and size
-- `client_parts` - Many-to-many relationship linking clients to their required parts
+The backend is an Express.js server developed with TypeScript, adhering to a RESTful API design. Data persistence is managed using a PostgreSQL database (via Neon serverless) and Drizzle ORM for type-safe interactions. The API provides endpoints for CRUD operations on clients, parts inventory, and client-part relationships. The database schema includes tables for `clients`, `parts`, and `client_parts`, with foreign key constraints ensuring data integrity.
 
 ### Design System Decisions
 
-**Typography**
-- Material Design-inspired hierarchy with Inter font
-- Tabular numbers for consistent numeric data alignment
-- Semantic heading levels (H1 for dashboard titles, H2 for sections, H3 for cards)
+The application uses a Material Design-inspired typography hierarchy with the Inter font family. Spacing and layout are consistent, employing Tailwind's spacing units and a 12-column responsive grid system with a mobile-first approach. The color system uses CSS custom properties for semantic naming and theme tokens. Key component patterns include stats cards, maintenance cards, and dialog-based forms for data entry and management.
 
-**Spacing & Layout**
-- Consistent Tailwind spacing units (2, 4, 6, 8) for predictable visual rhythm
-- 12-column responsive grid system
-- Max-width container (max-w-7xl) for optimal reading experience
-- Mobile-first responsive breakpoints
+### Technical Implementations
 
-**Color System**
-- CSS custom properties for theme tokens (light/dark mode ready)
-- Semantic color naming (primary, secondary, destructive, muted, accent)
-- Separate border colors for elevated UI clarity
-- Elevate system using transparency overlays for hover/active states
-
-**Component Patterns**
-- Stats cards with large metrics and icons for dashboard KPIs
-- Maintenance cards showing client info, next due date, and parts list
-- Search and filter functionality for client management
-- Dialog-based forms for creating/editing clients and managing parts
-
-### Development Workflow
-
-**Type Safety**
-- Shared TypeScript types between client and server via `shared/` directory
-- Drizzle schema generates TypeScript types
-- Zod schemas for runtime validation matching database schema
-- React Hook Form resolver integration for form validation
-
-**Development Server**
-- Vite dev server with HMR for fast frontend development
-- Express middleware mode integration
-- Replit-specific plugins for development tooling
-- Separate build outputs for client (dist/public) and server (dist)
+- **Data Integrity**: Foreign key constraints with CASCADE delete ensure referential integrity in the database.
+- **Parts Inventory**: A comprehensive, seeded parts inventory (244 standard parts including belts and filters) is available, with support for custom parts and idempotent seeding. Parts are categorized for easier selection.
+- **Persistent Storage**: Migration from in-memory storage to PostgreSQL ensures data persistence across server restarts.
+- **Editable Client Parts**: Clients' associated parts can be viewed, quantities edited, and parts deleted directly within the edit interface.
+- **Monthly PM Schedule Report**: A dedicated report tab allows viewing of preventive maintenance schedules for any given month, showing client details and visual schedule indicators.
+- **Recently Completed Maintenance**: A section for recently completed maintenance with an "undo" (reopen) option and accurate completion tracking.
+- **Categorized Parts Selection**: Parts selection is organized into categories (Filters, Belts, Other) with distinct dropdowns and bulk addition capabilities for improved UX.
+- **Client Management**: Chronological ordering for client and parts lists, client deletion with confirmation, and robust state management for forms and dialogs.
+- **Maintenance Completion**: Toggle functionality to mark maintenance as complete, recording completion in `maintenanceRecords`, with options to reopen and adjust next due dates.
+- **UI Compaction**: Redesigned maintenance cards to increase client density on screen by reducing padding, consolidating information, and using icon-only buttons.
+- **Parts System Redesign**: A complete overhaul of the parts inventory system, introducing type-specific fields for filters, belts, and other parts, a tabbed management interface, and updated duplicate prevention logic.
 
 ## External Dependencies
 
 ### Database
-- **Neon PostgreSQL** - Serverless PostgreSQL database
-- **Drizzle ORM** - TypeScript ORM with migrations support
-- **connect-pg-simple** - PostgreSQL session store (prepared for authentication)
+- **Neon PostgreSQL**: Serverless PostgreSQL database.
+- **Drizzle ORM**: TypeScript ORM for database interactions.
 
 ### UI Libraries
-- **Radix UI** - Unstyled, accessible component primitives (dialogs, dropdowns, tooltips, etc.)
-- **Tailwind CSS** - Utility-first CSS framework
-- **shadcn/ui** - Pre-built component library configuration
-- **Lucide React** - Icon library for consistent iconography
-- **date-fns** - Date manipulation and formatting
+- **Radix UI**: Unstyled, accessible component primitives.
+- **Tailwind CSS**: Utility-first CSS framework.
+- **shadcn/ui**: Pre-built component library configuration.
+- **Lucide React**: Icon library.
+- **date-fns**: Date manipulation and formatting utility.
 
 ### Form & Validation
-- **React Hook Form** - Performant form state management
-- **Zod** - TypeScript-first schema validation
-- **@hookform/resolvers** - Zod integration for React Hook Form
+- **React Hook Form**: Performant form state management.
+- **Zod**: TypeScript-first schema validation.
+- **@hookform/resolvers**: Zod integration for React Hook Form.
 
 ### State Management
-- **TanStack Query (React Query)** - Server state management, caching, and synchronization
+- **TanStack Query (React Query)**: Server state management, caching, and synchronization.
 
 ### Development Tools
-- **Vite** - Fast build tool and dev server
-- **TypeScript** - Type safety across the stack
-- **ESBuild** - Fast JavaScript bundler for production builds
-- **Replit plugins** - Development environment integrations (cartographer, dev banner, runtime error overlay)
+- **Vite**: Fast build tool and development server.
+- **TypeScript**: Ensures type safety across the application.
 
 ### Additional Libraries
-- **wouter** - Lightweight client-side routing
-- **class-variance-authority** - Type-safe component variant management
-- **clsx** & **tailwind-merge** - Conditional class name utilities
-- **embla-carousel-react** - Carousel component implementation
-- **cmdk** - Command palette component
+- **wouter**: Lightweight client-side routing.
+- **class-variance-authority**: Type-safe component variant management.
+- **clsx** & **tailwind-merge**: Utilities for conditional class names.
