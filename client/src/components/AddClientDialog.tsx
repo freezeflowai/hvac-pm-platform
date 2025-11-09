@@ -373,8 +373,8 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
             {editData ? 'Update client information and required parts.' : 'Add a new client with their maintenance schedule and required parts.'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <ScrollArea className="flex-1 pr-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <ScrollArea className="flex-1 pr-4" style={{ maxHeight: 'calc(90vh - 180px)' }}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="companyName">Company Name</Label>
