@@ -51,7 +51,7 @@ function getPartDisplay(part: Omit<ClientPart, 'quantity' | 'partId'>) {
     };
   } else if (part.type === "belt") {
     return {
-      primary: `Type ${part.beltType} Belt`,
+      primary: `${part.beltType} Belt`,
       secondary: part.size || ""
     };
   } else {
@@ -96,7 +96,7 @@ function PartCommandPicker({ category, parts, value, onValueChange, testId }: Pa
     if (category === 'filter') {
       groupKey = part.filterType || 'Other';
     } else if (category === 'belt') {
-      groupKey = part.beltType ? `Type ${part.beltType}` : 'Other';
+      groupKey = part.beltType ? `${part.beltType} Belts` : 'Other';
     } else {
       groupKey = 'Parts';
     }

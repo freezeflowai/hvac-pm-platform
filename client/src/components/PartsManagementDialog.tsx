@@ -165,7 +165,7 @@ export default function PartsManagementDialog({ open, onClose }: PartsManagement
       };
     } else if (part.type === "belt") {
       return {
-        primary: `Type ${part.beltType} Belt`,
+        primary: `${part.beltType} Belt`,
         secondary: part.size || ""
       };
     } else {

@@ -34,7 +34,7 @@ function getPartDisplay(part: ReportItem['part']) {
     };
   } else if (part.type === "belt") {
     return {
-      name: `Type ${part.beltType} Belt`,
+      name: `${part.beltType} Belt`,
       details: part.size || ""
     };
   } else {
