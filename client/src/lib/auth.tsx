@@ -4,14 +4,14 @@ import { apiRequest, queryClient } from "./queryClient";
 
 interface User {
   id: string;
-  username: string;
+  email: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  signup: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -32,8 +32,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [data]);
 
   const loginMutation = useMutation({
-    mutationFn: async ({ username, password }: { username: string; password: string }) => {
-      const response = await apiRequest("POST", "/api/auth/login", { username, password });
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      const response = await apiRequest("POST", "/api/auth/login", { email, password });
       return await response.json() as User;
     },
     onSuccess: (data) => {
@@ -43,8 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const signupMutation = useMutation({
-    mutationFn: async ({ username, password }: { username: string; password: string }) => {
-      const response = await apiRequest("POST", "/api/auth/signup", { username, password });
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      const response = await apiRequest("POST", "/api/auth/signup", { email, password });
       return await response.json() as User;
     },
     onSuccess: (data) => {
@@ -64,12 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const login = async (username: string, password: string) => {
-    await loginMutation.mutateAsync({ username, password });
+  const login = async (email: string, password: string) => {
+    await loginMutation.mutateAsync({ email, password });
   };
 
-  const signup = async (username: string, password: string) => {
-    await signupMutation.mutateAsync({ username, password });
+  const signup = async (email: string, password: string) => {
+    await signupMutation.mutateAsync({ email, password });
   };
 
   const logout = async () => {
