@@ -1,10 +1,12 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema } from "@shared/schema";
 import { STANDARD_FILTERS, STANDARD_BELTS } from "./seed-data";
 import { passport } from "./auth";
+import { z } from "zod";
 
 function isAuthenticated(req: Request, res: Response, next: NextFunction) {
   if (req.isAuthenticated()) {
@@ -111,6 +113,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ id: req.user.id, email: req.user.email });
     } else {
       res.status(401).json({ error: "Not authenticated" });
+    }
+  });
+
+  // Password reset routes
+  const passwordResetRequestSchema = z.object({
+    email: z.string().email("Please enter a valid email address"),
+  });
+
+  const passwordResetConfirmSchema = z.object({
+    tokenId: z.string(),
+    token: z.string(),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+  });
+
+  app.post("/api/auth/password-reset-request", async (req, res) => {
+    try {
+      const { email } = passwordResetRequestSchema.parse(req.body);
+      
+      const user = await storage.getUserByEmail(email);
+      
+      // Always return success to prevent email enumeration
+      if (!user) {
+        return res.json({ success: true, message: "If an account exists with this email, you will receive a password reset link" });
+      }
+
+      // Invalidate any existing tokens for this user
+      await storage.invalidateUserTokens(user.id);
+
+      // Generate a secure random token (32 bytes = 64 hex characters)
+      const rawToken = randomBytes(32).toString('hex');
+      const tokenHash = await bcrypt.hash(rawToken, 10);
+
+      // Token expires in 30 minutes
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+      const resetToken = await storage.createPasswordResetToken({
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+        usedAt: null,
+        requestedIp: req.ip || req.socket.remoteAddress || null,
+      });
+
+      // In development, log the reset URL to console
+      const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?tokenId=${resetToken.id}&token=${rawToken}`;
+      console.log('\n📧 Password Reset Request');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`Email: ${email}`);
+      console.log(`Reset URL: ${resetUrl}`);
+      console.log('Token expires in 30 minutes');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+      res.json({ success: true, message: "If an account exists with this email, you will receive a password reset link" });
+    } catch (error) {
+      res.status(400).json({ error: "Invalid request" });
+    }
+  });
+
+  app.get("/api/auth/password-reset/:tokenId", async (req, res) => {
+    try {
+      const { tokenId } = req.params;
+      const { token } = req.query;
+
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ error: "Invalid reset link" });
+      }
+
+      const resetToken = await storage.getPasswordResetToken(tokenId);
+
+      if (!resetToken) {
+        return res.status(400).json({ error: "Invalid or expired reset link" });
+      }
+
+      // Check if token is already used
+      if (resetToken.usedAt) {
+        return res.status(400).json({ error: "This reset link has already been used" });
+      }
+
+      // Check if token is expired
+      if (new Date() > resetToken.expiresAt) {
+        return res.status(400).json({ error: "This reset link has expired" });
+      }
+
+      // Verify the token hash matches
+      const isValidToken = await bcrypt.compare(token, resetToken.tokenHash);
+      if (!isValidToken) {
+        return res.status(400).json({ error: "Invalid reset link" });
+      }
+
+      res.json({ valid: true });
+    } catch (error) {
+      res.status(400).json({ error: "Invalid reset link" });
+    }
+  });
+
+  app.post("/api/auth/password-reset/confirm", async (req, res) => {
+    try {
+      const { tokenId, token, password } = passwordResetConfirmSchema.parse(req.body);
+
+      const resetToken = await storage.getPasswordResetToken(tokenId);
+
+      if (!resetToken) {
+        return res.status(400).json({ error: "Invalid or expired reset link" });
+      }
+
+      // Check if token is already used
+      if (resetToken.usedAt) {
+        return res.status(400).json({ error: "This reset link has already been used" });
+      }
+
+      // Check if token is expired
+      if (new Date() > resetToken.expiresAt) {
+        return res.status(400).json({ error: "This reset link has expired" });
+      }
+
+      // Verify the token hash matches
+      const isValidToken = await bcrypt.compare(token, resetToken.tokenHash);
+      if (!isValidToken) {
+        return res.status(400).json({ error: "Invalid reset link" });
+      }
+
+      // Hash the new password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Update the user's password
+      await storage.updateUserPassword(resetToken.userId, hashedPassword);
+
+      // Mark the token as used
+      await storage.markTokenUsed(tokenId);
+
+      // Invalidate all other tokens for this user
+      await storage.invalidateUserTokens(resetToken.userId);
+
+      res.json({ success: true, message: "Password has been reset successfully" });
+    } catch (error) {
+      res.status(400).json({ error: "Invalid request" });
     }
   });
 
