@@ -4,7 +4,32 @@ import { storage } from "./storage";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema } from "@shared/schema";
 import { STANDARD_FILTERS, STANDARD_BELTS } from "./seed-data";
 
+async function seedStandardParts() {
+  try {
+    const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
+    let created = 0;
+    let skipped = 0;
+    
+    for (const partData of allSeedParts) {
+      const existingPart = await storage.findDuplicatePart(partData);
+      
+      if (!existingPart) {
+        await storage.createPart(partData);
+        created++;
+      } else {
+        skipped++;
+      }
+    }
+    
+    console.log(`✓ Parts inventory seeded: ${created} created, ${skipped} already existed (${allSeedParts.length} total)`);
+  } catch (error) {
+    console.error('✗ Failed to seed parts inventory:', error);
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Automatically seed standard parts inventory on server startup
+  await seedStandardParts();
   // Client routes
   app.get("/api/clients", async (_req, res) => {
     try {

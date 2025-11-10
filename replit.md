@@ -25,13 +25,15 @@ The application uses a Material Design-inspired typography hierarchy with the In
 ### Technical Implementations
 
 - **Data Integrity**: Foreign key constraints with CASCADE delete ensure referential integrity in the database.
-- **Parts Inventory**: A comprehensive, seeded parts inventory (244 standard parts including belts and filters) is available, with support for custom parts and idempotent seeding. Parts are categorized for easier selection.
+- **Automatic Parts Seeding**: The application automatically seeds 244 standard parts (106 belts A/B sizes 18-70, 138 filters with Media/Pleated/Throwaway types in various sizes with x1/x2 thickness variants) on every server startup. The seeding is idempotent, safely skipping parts that already exist. This ensures production deployments have the complete parts inventory immediately available.
+- **Parts Inventory**: Comprehensive parts inventory with support for custom parts. Parts are categorized for easier selection (Filters, Belts, Other).
 - **Persistent Storage**: Migration from in-memory storage to PostgreSQL ensures data persistence across server restarts.
 - **Editable Client Parts**: Clients' associated parts can be viewed, quantities edited, and parts deleted directly within the edit interface.
 - **Monthly PM Schedule Report**: A dedicated report tab allows viewing of preventive maintenance schedules for any given month, showing client details and visual schedule indicators.
 - **Recently Completed Maintenance**: A section for recently completed maintenance with an "undo" (reopen) option and accurate completion tracking.
 - **Categorized Parts Selection**: Parts selection is organized into categories (Filters, Belts, Other) with distinct dropdowns and bulk addition capabilities for improved UX.
-- **Client Management**: Chronological ordering for client and parts lists, client deletion with confirmation, and robust state management for forms and dialogs.
+- **Client Management**: Alphabetical sorting by company name across all client lists, maintenance schedules, and search results. Client deletion with confirmation and robust state management for forms and dialogs.
+- **Inactive Clients**: Clients can be marked as "Inactive" for on-call/as-needed service. Inactive clients are completely excluded from all reports (parts order reports, PM schedule reports) and scheduling displays.
 - **Maintenance Completion**: Toggle functionality to mark maintenance as complete, recording completion in `maintenanceRecords`, with options to reopen and adjust next due dates.
 - **UI Compaction**: Redesigned maintenance cards to increase client density on screen by reducing padding, consolidating information, and using icon-only buttons.
 - **Parts System Redesign**: A complete overhaul of the parts inventory system, introducing type-specific fields for filters, belts, and other parts, a tabbed management interface, and updated duplicate prevention logic.
