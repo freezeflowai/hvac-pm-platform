@@ -1,8 +1,17 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import bcrypt from "bcryptjs";
 import { storage } from "./storage";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema } from "@shared/schema";
 import { STANDARD_FILTERS, STANDARD_BELTS } from "./seed-data";
+import { passport } from "./auth";
+
+function isAuthenticated(req: Request, res: Response, next: NextFunction) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  res.status(401).json({ error: "Not authenticated" });
+}
 
 async function seedStandardParts() {
   try {
@@ -30,6 +39,65 @@ async function seedStandardParts() {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Automatically seed standard parts inventory on server startup
   await seedStandardParts();
+  
+  // Authentication routes
+  app.post("/api/auth/signup", async (req, res) => {
+    try {
+      const { username, password } = insertUserSchema.parse(req.body);
+      
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+      
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({ username, password: hashedPassword });
+      
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ error: "Failed to login after signup" });
+        }
+        res.json({ id: user.id, username: user.username });
+      });
+    } catch (error) {
+      res.status(400).json({ error: "Invalid signup data" });
+    }
+  });
+
+  app.post("/api/auth/login", (req, res, next) => {
+    passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
+      if (err) {
+        return res.status(500).json({ error: "Internal server error" });
+      }
+      if (!user) {
+        return res.status(401).json({ error: info?.message || "Invalid credentials" });
+      }
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ error: "Failed to login" });
+        }
+        res.json({ id: user.id, username: user.username });
+      });
+    })(req, res, next);
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.logout((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Failed to logout" });
+      }
+      res.json({ success: true });
+    });
+  });
+
+  app.get("/api/auth/user", (req, res) => {
+    if (req.isAuthenticated() && req.user) {
+      res.json({ id: req.user.id, username: req.user.username });
+    } else {
+      res.status(401).json({ error: "Not authenticated" });
+    }
+  });
+
   // Client routes
   app.get("/api/clients", async (_req, res) => {
     try {
