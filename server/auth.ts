@@ -5,18 +5,18 @@ import { storage } from "./storage";
 import type { User } from "@shared/schema";
 
 passport.use(
-  new LocalStrategy(async (username, password, done) => {
+  new LocalStrategy({ usernameField: 'email' }, async (email, password, done) => {
     try {
-      const user = await storage.getUserByUsername(username);
+      const user = await storage.getUserByEmail(email);
       
       if (!user) {
-        return done(null, false, { message: "Invalid username or password" });
+        return done(null, false, { message: "Invalid email or password" });
       }
 
       const isValidPassword = await bcrypt.compare(password, user.password);
       
       if (!isValidPassword) {
-        return done(null, false, { message: "Invalid username or password" });
+        return done(null, false, { message: "Invalid email or password" });
       }
 
       return done(null, user);

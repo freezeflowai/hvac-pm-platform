@@ -43,15 +43,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { username, password } = insertUserSchema.parse(req.body);
+      const { email, password } = insertUserSchema.parse(req.body);
       
-      const existingUser = await storage.getUserByUsername(username);
+      const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
-        return res.status(400).json({ error: "Username already exists" });
+        return res.status(400).json({ error: "Email already exists" });
       }
       
       const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await storage.createUser({ username, password: hashedPassword });
+      const user = await storage.createUser({ email, password: hashedPassword });
       
       req.session.regenerate((err) => {
         if (err) {
@@ -61,7 +61,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (err) {
             return res.status(500).json({ error: "Failed to login after signup" });
           }
-          res.json({ id: user.id, username: user.username });
+          res.json({ id: user.id, email: user.email });
         });
       });
     } catch (error) {
@@ -85,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (err) {
             return res.status(500).json({ error: "Failed to login" });
           }
-          res.json({ id: user.id, username: user.username });
+          res.json({ id: user.id, email: user.email });
         });
       });
     })(req, res, next);
@@ -108,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/user", (req, res) => {
     if (req.isAuthenticated() && req.user) {
-      res.json({ id: req.user.id, username: req.user.username });
+      res.json({ id: req.user.id, email: req.user.email });
     } else {
       res.status(401).json({ error: "Not authenticated" });
     }
