@@ -8,7 +8,9 @@ import {
   type ClientPart,
   type InsertClientPart,
   type MaintenanceRecord,
-  type InsertMaintenanceRecord
+  type InsertMaintenanceRecord,
+  type PasswordResetToken,
+  type InsertPasswordResetToken
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -17,6 +19,14 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserPassword(id: string, hashedPassword: string): Promise<void>;
+  
+  // Password reset token methods
+  createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getPasswordResetToken(id: string): Promise<PasswordResetToken | undefined>;
+  getPasswordResetTokenByHash(tokenHash: string): Promise<PasswordResetToken | undefined>;
+  markTokenUsed(id: string): Promise<void>;
+  invalidateUserTokens(userId: string): Promise<void>;
   
   // Client methods
   getClient(id: string): Promise<Client | undefined>;
@@ -59,6 +69,7 @@ export class MemStorage implements IStorage {
   private parts: Map<string, Part>;
   private clientParts: Map<string, ClientPart>;
   private maintenanceRecords: Map<string, MaintenanceRecord>;
+  private passwordResetTokens: Map<string, PasswordResetToken>;
 
   constructor() {
     this.users = new Map();
@@ -66,6 +77,7 @@ export class MemStorage implements IStorage {
     this.parts = new Map();
     this.clientParts = new Map();
     this.maintenanceRecords = new Map();
+    this.passwordResetTokens = new Map();
   }
 
   // User methods
@@ -84,6 +96,51 @@ export class MemStorage implements IStorage {
     const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
+  }
+
+  async updateUserPassword(id: string, hashedPassword: string): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      this.users.set(id, { ...user, password: hashedPassword });
+    }
+  }
+
+  // Password reset token methods
+  async createPasswordResetToken(insertToken: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const id = randomUUID();
+    const token: PasswordResetToken = {
+      ...insertToken,
+      id,
+      createdAt: new Date(),
+      usedAt: null,
+    };
+    this.passwordResetTokens.set(id, token);
+    return token;
+  }
+
+  async getPasswordResetToken(id: string): Promise<PasswordResetToken | undefined> {
+    return this.passwordResetTokens.get(id);
+  }
+
+  async getPasswordResetTokenByHash(tokenHash: string): Promise<PasswordResetToken | undefined> {
+    return Array.from(this.passwordResetTokens.values()).find(
+      (token) => token.tokenHash === tokenHash
+    );
+  }
+
+  async markTokenUsed(id: string): Promise<void> {
+    const token = this.passwordResetTokens.get(id);
+    if (token) {
+      this.passwordResetTokens.set(id, { ...token, usedAt: new Date() });
+    }
+  }
+
+  async invalidateUserTokens(userId: string): Promise<void> {
+    for (const [id, token] of this.passwordResetTokens.entries()) {
+      if (token.userId === userId && !token.usedAt) {
+        this.passwordResetTokens.set(id, { ...token, usedAt: new Date() });
+      }
+    }
   }
 
   // Client methods
@@ -343,7 +400,7 @@ export class MemStorage implements IStorage {
 }
 
 import { db } from './db';
-import { users, clients, parts, clientParts, maintenanceRecords } from '@shared/schema';
+import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens } from '@shared/schema';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
@@ -361,6 +418,41 @@ export class DbStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const result = await db.insert(users).values(insertUser).returning();
     return result[0];
+  }
+
+  async updateUserPassword(id: string, hashedPassword: string): Promise<void> {
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, id));
+  }
+
+  // Password reset token methods
+  async createPasswordResetToken(insertToken: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const result = await db.insert(passwordResetTokens).values(insertToken).returning();
+    return result[0];
+  }
+
+  async getPasswordResetToken(id: string): Promise<PasswordResetToken | undefined> {
+    const result = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getPasswordResetTokenByHash(tokenHash: string): Promise<PasswordResetToken | undefined> {
+    const result = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.tokenHash, tokenHash)).limit(1);
+    return result[0];
+  }
+
+  async markTokenUsed(id: string): Promise<void> {
+    await db.update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(passwordResetTokens.id, id));
+  }
+
+  async invalidateUserTokens(userId: string): Promise<void> {
+    await db.update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(and(
+        eq(passwordResetTokens.userId, userId),
+        sql`${passwordResetTokens.usedAt} IS NULL`
+      ));
   }
 
   // Client methods
