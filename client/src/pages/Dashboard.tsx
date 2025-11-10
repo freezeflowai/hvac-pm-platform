@@ -208,14 +208,16 @@ export default function Dashboard() {
     },
   });
 
-  const clients: Client[] = dbClients.map(c => ({
-    id: c.id,
-    companyName: c.companyName,
-    location: c.location,
-    selectedMonths: c.selectedMonths,
-    inactive: c.inactive,
-    nextDue: new Date(c.nextDue),
-  }));
+  const clients: Client[] = dbClients
+    .map(c => ({
+      id: c.id,
+      companyName: c.companyName,
+      location: c.location,
+      selectedMonths: c.selectedMonths,
+      inactive: c.inactive,
+      nextDue: new Date(c.nextDue),
+    }))
+    .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
   const maintenanceItems: MaintenanceItem[] = clients
     .filter(c => !c.inactive)
@@ -225,8 +227,9 @@ export default function Dashboard() {
       location: c.location,
       selectedMonths: c.selectedMonths,
       nextDue: c.nextDue,
-      status: c.nextDue < new Date() ? "overdue" : "upcoming",
-    }));
+      status: (c.nextDue < new Date() ? "overdue" : "upcoming") as "overdue" | "upcoming",
+    }))
+    .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
   const overdueItems = maintenanceItems.filter(item => item.status === "overdue");
   const thisMonthItems = maintenanceItems.filter(item => {

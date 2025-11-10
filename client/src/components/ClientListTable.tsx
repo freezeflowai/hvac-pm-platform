@@ -62,11 +62,13 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
     }
   };
 
-  const filteredClients = clients.filter(
-    (client) =>
-      client.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.location.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredClients = clients
+    .filter(
+      (client) =>
+        client.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client.location.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
   const getMonthsDisplay = (selectedMonths: number[]) => {
     return selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
