@@ -104,14 +104,14 @@ export default function Login() {
           </Form>
           <div className="mt-4 text-center text-sm">
             Don't have an account?{" "}
-            <Button
+            <button
               data-testid="link-signup"
-              variant="link"
-              className="p-0"
+              type="button"
+              className="text-primary underline-offset-4 hover:underline"
               onClick={() => setLocation("/signup")}
             >
               Sign up
-            </Button>
+            </button>
           </div>
         </CardContent>
       </Card>

@@ -1,13 +1,34 @@
 import { Button } from "@/components/ui/button";
-import { Plus, LayoutDashboard, FileText } from "lucide-react";
+import { Plus, LayoutDashboard, FileText, LogOut, User } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 
 interface HeaderProps {
   onAddClient?: () => void;
 }
 
 export default function Header({ onAddClient }: HeaderProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const { user, logout } = useAuth();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setLocation("/login");
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Logout failed",
+        description: "Could not log out. Please try again.",
+      });
+    }
+  };
 
   return (
     <header className="border-b bg-background sticky top-0 z-50">
@@ -43,16 +64,34 @@ export default function Header({ onAddClient }: HeaderProps) {
               </Link>
             </nav>
           </div>
-          {onAddClient && (
-            <Button 
-              onClick={onAddClient}
-              data-testid="button-add-client"
+          <div className="flex items-center gap-3">
+            {user && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="h-4 w-4" />
+                <span data-testid="text-username">{user.username}</span>
+              </div>
+            )}
+            {onAddClient && (
+              <Button 
+                onClick={onAddClient}
+                data-testid="button-add-client"
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Client
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              data-testid="button-logout"
               className="gap-2"
             >
-              <Plus className="h-4 w-4" />
-              Add Client
+              <LogOut className="h-4 w-4" />
+              Logout
             </Button>
-          )}
+          </div>
         </div>
       </div>
     </header>

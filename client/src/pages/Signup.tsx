@@ -127,14 +127,14 @@ export default function Signup() {
           </Form>
           <div className="mt-4 text-center text-sm">
             Already have an account?{" "}
-            <Button
+            <button
               data-testid="link-login"
-              variant="link"
-              className="p-0"
+              type="button"
+              className="text-primary underline-offset-4 hover:underline"
               onClick={() => setLocation("/login")}
             >
               Login
-            </Button>
+            </button>
           </div>
         </CardContent>
       </Card>
