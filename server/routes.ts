@@ -53,11 +53,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = await storage.createUser({ username, password: hashedPassword });
       
-      req.login(user, (err) => {
+      req.session.regenerate((err) => {
         if (err) {
-          return res.status(500).json({ error: "Failed to login after signup" });
+          return res.status(500).json({ error: "Failed to regenerate session" });
         }
-        res.json({ id: user.id, username: user.username });
+        req.login(user, (err) => {
+          if (err) {
+            return res.status(500).json({ error: "Failed to login after signup" });
+          }
+          res.json({ id: user.id, username: user.username });
+        });
       });
     } catch (error) {
       res.status(400).json({ error: "Invalid signup data" });
@@ -72,11 +77,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(401).json({ error: info?.message || "Invalid credentials" });
       }
-      req.login(user, (err) => {
+      req.session.regenerate((err) => {
         if (err) {
-          return res.status(500).json({ error: "Failed to login" });
+          return res.status(500).json({ error: "Failed to regenerate session" });
         }
-        res.json({ id: user.id, username: user.username });
+        req.login(user, (err) => {
+          if (err) {
+            return res.status(500).json({ error: "Failed to login" });
+          }
+          res.json({ id: user.id, username: user.username });
+        });
       });
     })(req, res, next);
   });
@@ -86,7 +96,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (err) {
         return res.status(500).json({ error: "Failed to logout" });
       }
-      res.json({ success: true });
+      req.session.destroy((err) => {
+        if (err) {
+          return res.status(500).json({ error: "Failed to destroy session" });
+        }
+        res.clearCookie('connect.sid');
+        res.json({ success: true });
+      });
     });
   });
 
@@ -99,7 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Client routes
-  app.get("/api/clients", async (_req, res) => {
+  app.get("/api/clients", isAuthenticated, async (_req, res) => {
     try {
       const clients = await storage.getAllClients();
       res.json(clients);
@@ -108,7 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/clients", async (req, res) => {
+  app.post("/api/clients", isAuthenticated, async (req, res) => {
     try {
       const validated = insertClientSchema.parse(req.body);
       const client = await storage.createClient(validated);
@@ -118,7 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/clients/:id", async (req, res) => {
+  app.put("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertClientSchema.partial().parse(req.body);
       const client = await storage.updateClient(req.params.id, validated);
@@ -131,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/clients/:id", async (req, res) => {
+  app.delete("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
       await storage.deleteAllClientParts(req.params.id);
       const deleted = await storage.deleteClient(req.params.id);
@@ -145,7 +161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Part routes
-  app.get("/api/parts", async (_req, res) => {
+  app.get("/api/parts", isAuthenticated, async (_req, res) => {
     try {
       const parts = await storage.getAllParts();
       res.json(parts);
@@ -154,7 +170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/parts", async (req, res) => {
+  app.post("/api/parts", isAuthenticated, async (req, res) => {
     try {
       const validated = insertPartSchema.parse(req.body);
       
@@ -181,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/parts/bulk", async (req, res) => {
+  app.post("/api/parts/bulk", isAuthenticated, async (req, res) => {
     try {
       const parts = Array.isArray(req.body) ? req.body : [req.body];
       const validated = parts.map(p => insertPartSchema.parse(p));
@@ -220,7 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/parts/:id", async (req, res) => {
+  app.put("/api/parts/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertPartSchema.partial().parse(req.body);
       const part = await storage.updatePart(req.params.id, validated);
@@ -233,7 +249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/parts/seed", async (_req, res) => {
+  app.post("/api/parts/seed", isAuthenticated, async (_req, res) => {
     try {
       const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
       const createdParts = [];
@@ -262,7 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/parts/:id", async (req, res) => {
+  app.delete("/api/parts/:id", isAuthenticated, async (req, res) => {
     try {
       const deleted = await storage.deletePart(req.params.id);
       if (!deleted) {
@@ -275,7 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Client-Part routes
-  app.get("/api/clients/:id/parts", async (req, res) => {
+  app.get("/api/clients/:id/parts", isAuthenticated, async (req, res) => {
     try {
       const clientParts = await storage.getClientParts(req.params.id);
       res.json(clientParts);
@@ -284,7 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/clients/:id/parts", async (req, res) => {
+  app.post("/api/clients/:id/parts", isAuthenticated, async (req, res) => {
     try {
       const parts = req.body.parts as Array<{ partId: string; quantity: number }>;
       
@@ -306,7 +322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/client-parts/:id", async (req, res) => {
+  app.delete("/api/client-parts/:id", isAuthenticated, async (req, res) => {
     try {
       const deleted = await storage.deleteClientPart(req.params.id);
       if (!deleted) {
@@ -319,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reports route
-  app.get("/api/reports/parts/:month", async (req, res) => {
+  app.get("/api/reports/parts/:month", isAuthenticated, async (req, res) => {
     try {
       const month = parseInt(req.params.month);
       if (isNaN(month) || month < 0 || month > 11) {
@@ -333,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Schedule report - get all clients scheduled for a particular month
-  app.get("/api/reports/schedule/:month", async (req, res) => {
+  app.get("/api/reports/schedule/:month", isAuthenticated, async (req, res) => {
     try {
       const month = parseInt(req.params.month);
       if (isNaN(month) || month < 0 || month > 11) {
@@ -354,7 +370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all completed maintenance statuses
-  app.get("/api/maintenance/statuses", async (req, res) => {
+  app.get("/api/maintenance/statuses", isAuthenticated, async (req, res) => {
     try {
       const clients = await storage.getAllClients();
       const statuses: Record<string, { completed: boolean; completedDueDate?: string }> = {};
@@ -380,7 +396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get recently completed maintenance (this month)
-  app.get("/api/maintenance/recently-completed", async (req, res) => {
+  app.get("/api/maintenance/recently-completed", isAuthenticated, async (req, res) => {
     try {
       const now = new Date();
       const currentMonth = now.getMonth();
@@ -412,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Maintenance completion routes
-  app.post("/api/maintenance/:clientId/toggle", async (req, res) => {
+  app.post("/api/maintenance/:clientId/toggle", isAuthenticated, async (req, res) => {
     try {
       const { clientId } = req.params;
       const { dueDate } = req.body;  // Frontend sends the dueDate it's displaying
