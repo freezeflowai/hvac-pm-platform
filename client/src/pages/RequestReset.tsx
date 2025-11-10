@@ -3,56 +3,84 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
-const loginSchema = z.object({
+const requestResetSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
 });
 
-type LoginFormData = z.infer<typeof loginSchema>;
+type RequestResetFormData = z.infer<typeof requestResetSchema>;
 
-export default function Login() {
+export default function RequestReset() {
   const [, setLocation] = useLocation();
-  const { login } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
-  const form = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<RequestResetFormData>({
+    resolver: zodResolver(requestResetSchema),
     defaultValues: {
       email: "",
-      password: "",
     },
   });
 
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (data: RequestResetFormData) => {
     setIsLoading(true);
     try {
-      await login(data.email, data.password);
-      setLocation("/");
+      const response = await apiRequest("POST", "/api/auth/password-reset-request", data);
+      const result = await response.json();
+      
+      setIsSuccess(true);
+      toast({
+        title: "Request sent",
+        description: result.message || "Check your email for a password reset link",
+      });
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Login failed",
-        description: error.message || "Invalid email or password",
+        title: "Request failed",
+        description: error.message || "Could not send reset request",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Check Your Email</CardTitle>
+            <CardDescription>
+              If an account exists with the email you provided, you will receive a password reset link.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              data-testid="button-back-to-login"
+              onClick={() => setLocation("/login")}
+              className="w-full"
+            >
+              Back to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Login</CardTitle>
-          <CardDescription>Enter your credentials to access your account</CardDescription>
+          <CardTitle>Reset Password</CardTitle>
+          <CardDescription>Enter your email to receive a password reset link</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -64,28 +92,10 @@ export default function Login() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
                         data-testid="input-email"
                         type="email"
-                        placeholder="Enter your email" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        data-testid="input-password"
-                        type="password"
-                        placeholder="Enter your password"
+                        placeholder="Enter your email"
                         {...field}
                       />
                     </FormControl>
@@ -94,34 +104,24 @@ export default function Login() {
                 )}
               />
               <Button
-                data-testid="button-login"
+                data-testid="button-request-reset"
                 type="submit"
                 className="w-full"
                 disabled={isLoading}
               >
-                {isLoading ? "Logging in..." : "Login"}
+                {isLoading ? "Sending..." : "Send Reset Link"}
               </Button>
             </form>
           </Form>
           <div className="mt-4 text-center text-sm">
+            Remember your password?{" "}
             <button
-              data-testid="link-forgot-password"
+              data-testid="link-back-to-login"
               type="button"
               className="text-primary underline-offset-4 hover:underline"
-              onClick={() => setLocation("/request-reset")}
+              onClick={() => setLocation("/login")}
             >
-              Forgot password?
-            </button>
-          </div>
-          <div className="mt-2 text-center text-sm">
-            Don't have an account?{" "}
-            <button
-              data-testid="link-signup"
-              type="button"
-              className="text-primary underline-offset-4 hover:underline"
-              onClick={() => setLocation("/signup")}
-            >
-              Sign up
+              Back to Login
             </button>
           </div>
         </CardContent>

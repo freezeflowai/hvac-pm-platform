@@ -9,6 +9,8 @@ import Dashboard from "@/pages/Dashboard";
 import Reports from "@/pages/Reports";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
+import RequestReset from "@/pages/RequestReset";
+import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,6 +18,8 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
+      <Route path="/request-reset" component={RequestReset} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/">
         <ProtectedRoute>
           <Dashboard />
