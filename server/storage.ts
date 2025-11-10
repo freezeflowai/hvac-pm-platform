@@ -113,6 +113,7 @@ export class MemStorage implements IStorage {
       id,
       createdAt: new Date(),
       usedAt: null,
+      requestedIp: insertToken.requestedIp ?? null,
     };
     this.passwordResetTokens.set(id, token);
     return token;
@@ -136,7 +137,8 @@ export class MemStorage implements IStorage {
   }
 
   async invalidateUserTokens(userId: string): Promise<void> {
-    for (const [id, token] of this.passwordResetTokens.entries()) {
+    const entries = Array.from(this.passwordResetTokens.entries());
+    for (const [id, token] of entries) {
       if (token.userId === userId && !token.usedAt) {
         this.passwordResetTokens.set(id, { ...token, usedAt: new Date() });
       }

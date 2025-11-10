@@ -156,14 +156,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         requestedIp: req.ip || req.socket.remoteAddress || null,
       });
 
-      // In development, log the reset URL to console
-      const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?tokenId=${resetToken.id}&token=${rawToken}`;
-      console.log('\n📧 Password Reset Request');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`Email: ${email}`);
-      console.log(`Reset URL: ${resetUrl}`);
-      console.log('Token expires in 30 minutes');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      // SECURITY NOTE: In development mode only, log reset URL to console for testing
+      // IMPORTANT: This should NEVER be enabled in production as it exposes secrets in logs
+      if (process.env.NODE_ENV === 'development') {
+        const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?tokenId=${resetToken.id}&token=${rawToken}`;
+        console.log('\n📧 [DEV ONLY] Password Reset Request');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log(`Email: ${email}`);
+        console.log(`Reset URL: ${resetUrl}`);
+        console.log('Token expires in 30 minutes');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      }
+
+      // In production, this would send an email with the reset link
+      // For now, the reset link is only logged in development mode
 
       res.json({ success: true, message: "If an account exists with this email, you will receive a password reset link" });
     } catch (error) {
