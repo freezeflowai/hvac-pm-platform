@@ -39,6 +39,7 @@ export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   companyName: text("company_name").notNull(),
   location: text("location").notNull(),
   selectedMonths: integer("selected_months").array().notNull(),
@@ -57,6 +58,7 @@ export type Client = typeof clients.$inferSelect;
 
 export const parts = pgTable("parts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(), // "filter", "belt", or "other"
   // Filter-specific fields
   filterType: text("filter_type"), // "Pleated", "Media", "Ecology", "Throwaway", "Other"
@@ -80,6 +82,7 @@ export type Part = typeof parts.$inferSelect;
 
 export const clientParts = pgTable("client_parts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   partId: varchar("part_id").notNull().references(() => parts.id, { onDelete: "cascade" }),
   quantity: integer("quantity").notNull(),
@@ -94,6 +97,7 @@ export type ClientPart = typeof clientParts.$inferSelect;
 
 export const maintenanceRecords = pgTable("maintenance_records", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   dueDate: text("due_date").notNull(),
   completedAt: text("completed_at"),
