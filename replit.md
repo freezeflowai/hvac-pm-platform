@@ -40,6 +40,8 @@ The application uses a Material Design-inspired typography hierarchy with the In
 - **Client Portal Authentication**: Dual authentication system with separate Passport strategies for contractors ("contractor-local") and clients ("client-local"). Uses discriminated union types (BaseAuthUser, ContractorAuthUser, ClientPortalAuthUser) with type guards (isContractor, isClient) for type-safe authentication flows.
 - **Client Portal Access**: Contractors can enable portal access for clients. Portal login requires clients.portalEnabled = true. Client users (client_users table) authenticate separately from contractors with clientId-scoped access.
 - **Client Portal API**: Dedicated portal endpoints (/api/portal/*) for client login, maintenance records, equipment, and parts. All endpoints use isClientAuthenticated middleware and bypass userId validation for client-scoped data access.
+- **Client Portal Management UI**: Contractors can manage client portal access via the AddClientDialog. Features include: portal enable/disable toggle, create/delete portal users with email/password, confirmation dialogs for destructive actions, and comprehensive error handling (403 portal disabled, 409 duplicate email). Client users list shows email and creation date.
+- **Client Portal Frontend**: Separate authentication context (PortalAuthProvider) and protected routes for client portal. Login page at /portal/login with email/password authentication. Dashboard at /portal/dashboard features three tabs: Maintenance (completed service history), Equipment (registered HVAC/R equipment), and Parts (parts inventory with quantities). All data views are read-only with loading and empty states.
 
 ## External Dependencies
 
