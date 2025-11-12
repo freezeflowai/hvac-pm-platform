@@ -35,15 +35,22 @@ export default function AddClientPage() {
     const today = new Date();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
+    const currentDay = today.getDate();
     
-    if (selectedMonths.includes(currentMonth)) {
+    // Sort months to ensure consistent behavior
+    const sortedMonths = [...selectedMonths].sort((a, b) => a - b);
+    
+    // If current month is selected and we haven't passed the 15th, use current month
+    if (sortedMonths.includes(currentMonth) && currentDay < 15) {
       return new Date(currentYear, currentMonth, 15);
     }
     
-    let nextMonth = selectedMonths.find(m => m > currentMonth);
+    // Otherwise find the next scheduled month
+    let nextMonth = sortedMonths.find(m => m > currentMonth);
     
     if (nextMonth === undefined) {
-      nextMonth = selectedMonths[0];
+      // Wrap to next year
+      nextMonth = sortedMonths[0];
       return new Date(currentYear + 1, nextMonth, 15);
     }
     
@@ -152,7 +159,7 @@ export default function AddClientPage() {
     }
   };
 
-  const editData = client && clientParts ? {
+  const editData = client ? {
     id: client.id,
     companyName: client.companyName,
     location: client.location,
@@ -168,7 +175,7 @@ export default function AddClientPage() {
     selectedMonths: client.selectedMonths,
     inactive: client.inactive,
     parts: clientParts.map((cp: any) => ({
-      partId: cp.partId,
+      partId: cp.part?.id || cp.partId,
       quantity: cp.quantity,
     })),
   } : undefined;
