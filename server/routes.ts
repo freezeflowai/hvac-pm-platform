@@ -305,6 +305,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Client user management routes
+  app.get("/api/clients/:clientId/users", isAuthenticated, async (req, res) => {
+    try {
+      if (!isContractor(req.user!)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const clientUsers = await storage.getAllClientUsers(req.user!.id, req.params.clientId);
+      // Don't send password hashes to the frontend
+      const sanitized = clientUsers.map(({ password, ...rest }) => rest);
+      res.json(sanitized);
+    } catch (error) {
+      console.error('Get client users error:', error);
+      res.status(500).json({ error: "Failed to fetch client users" });
+    }
+  });
+
+  app.post("/api/clients/:clientId/users", isAuthenticated, async (req, res) => {
+    try {
+      if (!isContractor(req.user!)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      // Verify the client exists and belongs to this contractor
+      const client = await storage.getClient(req.user!.id, req.params.clientId);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      // Verify portal is enabled for this client
+      if (!client.portalEnabled) {
+        return res.status(403).json({ error: "Portal access is not enabled for this client" });
+      }
+
+      const validated = insertClientUserSchema.parse(req.body);
+
+      // Check if email already exists
+      const existingUser = await storage.getClientUserByEmail(validated.email);
+      if (existingUser) {
+        return res.status(409).json({ error: "A user with this email already exists" });
+      }
+
+      // Hash the password
+      const hashedPassword = await bcrypt.hash(validated.password, 10);
+
+      const clientUser = await storage.createClientUser({
+        ...validated,
+        clientId: req.params.clientId,
+        password: hashedPassword
+      });
+
+      // Don't send password hash to the frontend
+      const { password, ...sanitized } = clientUser;
+      res.json(sanitized);
+    } catch (error) {
+      console.error('Create client user error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid user data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create client user" });
+    }
+  });
+
+  app.delete("/api/clients/:clientId/users/:id", isAuthenticated, async (req, res) => {
+    try {
+      if (!isContractor(req.user!)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const deleted = await storage.deleteClientUser(req.user!.id, req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Client user not found or access denied" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete client user error:', error);
+      res.status(500).json({ error: "Failed to delete client user" });
+    }
+  });
+
   // Part routes
   app.get("/api/parts", isAuthenticated, async (req, res) => {
     try {

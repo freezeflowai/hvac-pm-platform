@@ -50,8 +50,10 @@ export interface IStorage {
   getClientUser(id: string): Promise<ClientUser | undefined>;
   getClientUserByEmail(email: string): Promise<ClientUser | undefined>;
   getClientUserByClientId(clientId: string): Promise<ClientUser | undefined>;
+  getAllClientUsers(userId: string, clientId: string): Promise<ClientUser[]>;
   createClientUser(clientUser: InsertClientUser): Promise<ClientUser>;
   updateClientUser(id: string, updates: Partial<InsertClientUser>): Promise<ClientUser | undefined>;
+  deleteClientUser(userId: string, id: string): Promise<boolean>;
   
   // Part methods
   getPart(userId: string, id: string): Promise<Part | undefined>;
@@ -287,6 +289,27 @@ export class MemStorage implements IStorage {
     const updated: ClientUser = { ...existing, ...updates };
     this.clientUsers.set(id, updated);
     return updated;
+  }
+
+  async getAllClientUsers(userId: string, clientId: string): Promise<ClientUser[]> {
+    // Verify the client belongs to this user
+    const client = await this.getClient(userId, clientId);
+    if (!client) return [];
+    
+    return Array.from(this.clientUsers.values())
+      .filter(cu => cu.clientId === clientId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  async deleteClientUser(userId: string, id: string): Promise<boolean> {
+    const existing = this.clientUsers.get(id);
+    if (!existing) return false;
+    
+    // Verify the client belongs to this user
+    const client = await this.getClient(userId, existing.clientId);
+    if (!client) return false;
+    
+    return this.clientUsers.delete(id);
   }
 
   // Part methods
@@ -786,6 +809,38 @@ export class DbStorage implements IStorage {
   async updateClientUser(id: string, updates: Partial<InsertClientUser>): Promise<ClientUser | undefined> {
     const result = await db.update(clientUsers).set(updates).where(eq(clientUsers.id, id)).returning();
     return result[0];
+  }
+
+  async getAllClientUsers(userId: string, clientId: string): Promise<ClientUser[]> {
+    // Verify the client belongs to this user by joining with clients table
+    const result = await db
+      .select({
+        id: clientUsers.id,
+        clientId: clientUsers.clientId,
+        email: clientUsers.email,
+        password: clientUsers.password,
+        createdAt: clientUsers.createdAt
+      })
+      .from(clientUsers)
+      .innerJoin(clients, eq(clientUsers.clientId, clients.id))
+      .where(and(eq(clientUsers.clientId, clientId), eq(clients.userId, userId)))
+      .orderBy(clientUsers.createdAt);
+    
+    return result;
+  }
+
+  async deleteClientUser(userId: string, id: string): Promise<boolean> {
+    // Verify the client belongs to this user before deleting
+    const clientUser = await db.select().from(clientUsers).where(eq(clientUsers.id, id)).limit(1);
+    if (!clientUser[0]) return false;
+    
+    const client = await db.select().from(clients)
+      .where(and(eq(clients.id, clientUser[0].clientId), eq(clients.userId, userId)))
+      .limit(1);
+    if (!client[0]) return false;
+    
+    const result = await db.delete(clientUsers).where(eq(clientUsers.id, id)).returning();
+    return result.length > 0;
   }
 
   // Part methods

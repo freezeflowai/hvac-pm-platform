@@ -139,7 +139,7 @@ export type Equipment = typeof equipment.$inferSelect;
 
 export const clientUsers = pgTable("client_users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }).unique(),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -147,6 +147,7 @@ export const clientUsers = pgTable("client_users", {
 
 export const insertClientUserSchema = createInsertSchema(clientUsers).omit({
   id: true,
+  clientId: true,
   createdAt: true,
 }).extend({
   email: z.string().email("Please enter a valid email address"),

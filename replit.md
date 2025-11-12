@@ -37,6 +37,9 @@ The application uses a Material Design-inspired typography hierarchy with the In
 - **Maintenance Completion**: Toggle functionality to mark maintenance as complete, recording completion in `maintenanceRecords`, with options to reopen and adjust next due dates.
 - **UI Compaction**: Redesigned maintenance cards to increase client density on screen by reducing padding, consolidating information, and using icon-only buttons.
 - **Parts System Redesign**: A complete overhaul of the parts inventory system, introducing type-specific fields for filters, belts, and other parts, a tabbed management interface, and updated duplicate prevention logic.
+- **Client Portal Authentication**: Dual authentication system with separate Passport strategies for contractors ("contractor-local") and clients ("client-local"). Uses discriminated union types (BaseAuthUser, ContractorAuthUser, ClientPortalAuthUser) with type guards (isContractor, isClient) for type-safe authentication flows.
+- **Client Portal Access**: Contractors can enable portal access for clients. Portal login requires clients.portalEnabled = true. Client users (client_users table) authenticate separately from contractors with clientId-scoped access.
+- **Client Portal API**: Dedicated portal endpoints (/api/portal/*) for client login, maintenance records, equipment, and parts. All endpoints use isClientAuthenticated middleware and bypass userId validation for client-scoped data access.
 
 ## External Dependencies
 

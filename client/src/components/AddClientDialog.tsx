@@ -5,18 +5,31 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect, useRef } from "react";
 import { Separator } from "@/components/ui/separator";
-import { Plus, X, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, X, Check, ChevronsUpDown, Trash2, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export interface ClientFormData {
   companyName: string;
   location: string;
   selectedMonths: number[];
   inactive: boolean;
+  portalEnabled: boolean;
   parts: Array<{ partId: string; quantity: number }>;
 }
 
@@ -175,6 +188,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     location: "",
     selectedMonths: [] as number[],
     inactive: false,
+    portalEnabled: false,
   });
 
   const [clientParts, setClientParts] = useState<ClientPart[]>([]);
@@ -182,6 +196,14 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
   const [pendingParts, setPendingParts] = useState<PendingPart[]>([]);
   const addPartFormRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
+  
+  // Client users state
+  const [clientUsers, setClientUsers] = useState<Array<{ id: string; email: string; createdAt: Date }>>([]);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+
+  const { toast } = useToast();
 
   const { data: availableParts = [] } = useQuery<Array<{ 
     id: string; 
@@ -194,6 +216,72 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
   }>>({
     queryKey: ["/api/parts"],
   });
+
+  // Fetch client users when editing
+  const { data: fetchedClientUsers = [] } = useQuery<Array<{ id: string; email: string; createdAt: string }>>({
+    queryKey: ['/api/clients', editData?.id, 'users'],
+    enabled: !!editData?.id && open,
+  });
+
+  useEffect(() => {
+    if (fetchedClientUsers.length > 0) {
+      setClientUsers(fetchedClientUsers.map(u => ({ ...u, createdAt: new Date(u.createdAt) })));
+    } else {
+      setClientUsers([]);
+    }
+  }, [fetchedClientUsers]);
+
+  // Mutation for creating client user
+  const createUserMutation = useMutation({
+    mutationFn: async (userData: { email: string; password: string }) => {
+      const res = await apiRequest('POST', `/api/clients/${editData!.id}/users`, userData);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', editData!.id, 'users'] });
+      setShowAddUser(false);
+      setNewUserEmail("");
+      setNewUserPassword("");
+      toast({ title: "Portal user created successfully" });
+    },
+    onError: (error: any) => {
+      const message = error.message || "Failed to create portal user";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    },
+  });
+
+  // Mutation for deleting client user
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest('DELETE', `/api/clients/${editData!.id}/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', editData!.id, 'users'] });
+      toast({ title: "Portal user deleted successfully" });
+    },
+    onError: (error: any) => {
+      const message = error.message || "Failed to delete portal user";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    },
+  });
+
+  const handleCreateUser = () => {
+    if (!newUserEmail || !newUserPassword) {
+      toast({ title: "Error", description: "Please enter both email and password", variant: "destructive" });
+      return;
+    }
+    if (newUserPassword.length < 8) {
+      toast({ title: "Error", description: "Password must be at least 8 characters", variant: "destructive" });
+      return;
+    }
+    createUserMutation.mutate({ email: newUserEmail, password: newUserPassword });
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    if (confirm("Are you sure you want to delete this portal user?")) {
+      deleteUserMutation.mutate(userId);
+    }
+  };
 
   // Group and sort parts by category
   const filterParts = availableParts
@@ -224,6 +312,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
           location: editData.location,
           selectedMonths: editData.selectedMonths,
           inactive: editData.inactive,
+          portalEnabled: editData.portalEnabled ?? false,
         });
 
         // Always fetch fresh parts data for this client from API
@@ -254,9 +343,11 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
           location: "",
           selectedMonths: [],
           inactive: false,
+          portalEnabled: false,
         });
         setClientParts([]);
         setPendingParts([]);
+        setClientUsers([]);
       }
     };
 
@@ -358,8 +449,9 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
         parts: partsWithIds,
       });
 
-      setFormData({ companyName: "", location: "", selectedMonths: [], inactive: false });
+      setFormData({ companyName: "", location: "", selectedMonths: [], inactive: false, portalEnabled: false });
       setClientParts([]);
+      setClientUsers([]);
       onClose();
     } catch (error) {
       console.error('Error saving client:', error);
@@ -443,6 +535,134 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
                 {!formData.inactive && formData.selectedMonths.length === 0 && (
                   <p className="text-sm text-destructive">Please select at least one month or mark as Inactive</p>
+                )}
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label>Client Portal Access</Label>
+                <p className="text-sm text-muted-foreground">
+                  Enable portal access to allow this client to view their maintenance records, equipment, and parts online.
+                </p>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="portalEnabled"
+                    data-testid="checkbox-portal-enabled"
+                    checked={formData.portalEnabled}
+                    onCheckedChange={(checked) => {
+                      if (!checked && clientUsers.length > 0) {
+                        if (confirm(`This client has ${clientUsers.length} portal user(s). Disabling portal access will prevent them from logging in. Continue?`)) {
+                          setFormData({ ...formData, portalEnabled: false });
+                        }
+                      } else {
+                        setFormData({ ...formData, portalEnabled: checked === true });
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor="portalEnabled"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Enable Portal Access
+                  </label>
+                </div>
+
+                {formData.portalEnabled && editData && (
+                  <div className="border rounded-md p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Portal Users</Label>
+                      {!showAddUser && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowAddUser(true)}
+                          data-testid="button-add-portal-user"
+                          className="gap-2"
+                        >
+                          <UserPlus className="h-3 w-3" />
+                          Add User
+                        </Button>
+                      )}
+                    </div>
+
+                    {clientUsers.length === 0 && !showAddUser && (
+                      <p className="text-sm text-muted-foreground text-center py-2">
+                        No portal users yet. Click "Add User" to create one.
+                      </p>
+                    )}
+
+                    {clientUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        className="flex items-center justify-between p-2 border rounded hover-elevate"
+                        data-testid={`portal-user-${user.id}`}
+                      >
+                        <div>
+                          <p className="text-sm font-medium" data-testid={`text-user-email-${user.id}`}>{user.email}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Created {new Date(user.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteUser(user.id)}
+                          data-testid={`button-delete-user-${user.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+
+                    {showAddUser && (
+                      <div className="border rounded-md p-3 space-y-3" data-testid="form-add-portal-user">
+                        <Label className="text-sm font-medium">Create Portal User</Label>
+                        <div className="space-y-2">
+                          <Input
+                            type="email"
+                            placeholder="Email address"
+                            value={newUserEmail}
+                            onChange={(e) => setNewUserEmail(e.target.value)}
+                            data-testid="input-portal-user-email"
+                          />
+                          <Input
+                            type="password"
+                            placeholder="Password (min 8 characters)"
+                            value={newUserPassword}
+                            onChange={(e) => setNewUserPassword(e.target.value)}
+                            data-testid="input-portal-user-password"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleCreateUser}
+                            disabled={createUserMutation.isPending}
+                            data-testid="button-create-portal-user"
+                          >
+                            {createUserMutation.isPending ? "Creating..." : "Create User"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setShowAddUser(false);
+                              setNewUserEmail("");
+                              setNewUserPassword("");
+                            }}
+                            data-testid="button-cancel-add-user"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
