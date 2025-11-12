@@ -10,6 +10,7 @@ import Reports from "@/pages/Reports";
 import Admin from "@/pages/Admin";
 import EquipmentPage from "@/pages/EquipmentPage";
 import ClientReportPage from "@/pages/ClientReportPage";
+import AddClientPage from "@/pages/AddClientPage";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import RequestReset from "@/pages/RequestReset";
@@ -36,6 +37,16 @@ function Router() {
       <Route path="/admin">
         <ProtectedRoute>
           <Admin />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/add-client">
+        <ProtectedRoute>
+          <AddClientPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/edit-client/:id">
+        <ProtectedRoute>
+          <AddClientPage />
         </ProtectedRoute>
       </Route>
       <Route path="/equipment/:clientId">

@@ -4,7 +4,6 @@ import Header from "@/components/Header";
 import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
-import AddClientDialog, { ClientFormData } from "@/components/AddClientDialog";
 import PartsManagementDialog from "@/components/PartsManagementDialog";
 import { AlertCircle, Calendar, CheckCircle, Clock, Package } from "lucide-react";
 import { MaintenanceItem } from "@/components/MaintenanceCard";
@@ -63,9 +62,7 @@ interface ClientPart {
 export default function Dashboard() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const [showPartsDialog, setShowPartsDialog] = useState(false);
-  const [editingClient, setEditingClient] = useState<(Client & { parts: Array<{ partId: string; quantity: number }> }) | null>(null);
 
   // Read tab from URL query parameter using window.location.search
   const urlParams = new URLSearchParams(window.location.search);
@@ -255,6 +252,15 @@ export default function Dashboard() {
       id: c.id,
       companyName: c.companyName,
       location: c.location,
+      address: c.address,
+      city: c.city,
+      province: c.province,
+      postalCode: c.postalCode,
+      contactName: c.contactName,
+      email: c.email,
+      phone: c.phone,
+      roofLadderCode: c.roofLadderCode,
+      notes: c.notes,
       selectedMonths: c.selectedMonths,
       inactive: c.inactive,
       nextDue: new Date(c.nextDue),
@@ -294,16 +300,7 @@ export default function Dashboard() {
   const handleEditClient = async (id: string) => {
     // Extract clientId from composite ID if needed (for recently completed items)
     const clientId = id.includes('|') ? id.split('|')[0] : id;
-    
-    const client = clients.find(c => c.id === clientId);
-    if (client) {
-      const parts = clientParts[clientId] || [];
-      setEditingClient({
-        ...client,
-        parts: parts.map(cp => ({ partId: cp.partId, quantity: cp.quantity })),
-      });
-      setShowAddDialog(true);
-    }
+    setLocation(`/edit-client/${clientId}`);
   };
 
   const handleDeleteClient = async (id: string) => {
@@ -392,7 +389,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onAddClient={() => setShowAddDialog(true)} />
+      <Header onAddClient={() => setLocation("/add-client")} />
       
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <div className="flex justify-end">
