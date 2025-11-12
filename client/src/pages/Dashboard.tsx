@@ -41,7 +41,16 @@ function calculateNextDueDate(selectedMonths: number[], inactive: boolean): Date
 interface DBClient {
   id: string;
   companyName: string;
-  location: string;
+  location?: string | null;
+  address?: string | null;
+  city?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
+  contactName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  roofLadderCode?: string | null;
+  notes?: string | null;
   selectedMonths: number[];
   inactive: boolean;
   nextDue: string;
@@ -132,98 +141,6 @@ export default function Dashboard() {
     }
   }, [dbClients]);
 
-  const createClientMutation = useMutation({
-    mutationFn: async (data: ClientFormData) => {
-      const nextDue = calculateNextDueDate(data.selectedMonths, data.inactive);
-      const clientData = {
-        companyName: data.companyName,
-        location: data.location,
-        address: data.address,
-        city: data.city,
-        province: data.province,
-        postalCode: data.postalCode,
-        contactName: data.contactName,
-        email: data.email,
-        phone: data.phone,
-        roofLadderCode: data.roofLadderCode,
-        notes: data.notes,
-        selectedMonths: data.selectedMonths,
-        inactive: data.inactive,
-        nextDue: nextDue ? nextDue.toISOString() : new Date('9999-12-31').toISOString(),
-      };
-      
-      const res = await apiRequest("POST", "/api/clients", clientData);
-      const newClient = await res.json();
-      
-      if (data.parts.length > 0) {
-        await apiRequest("POST", `/api/clients/${newClient.id}/parts`, { parts: data.parts });
-      }
-      
-      return newClient;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/reports/parts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/reports/schedule"] });
-      toast({
-        title: "Client added",
-        description: "The client has been added successfully.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to add client.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateClientMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: ClientFormData }) => {
-      const nextDue = calculateNextDueDate(data.selectedMonths, data.inactive);
-      const clientData = {
-        companyName: data.companyName,
-        location: data.location,
-        address: data.address,
-        city: data.city,
-        province: data.province,
-        postalCode: data.postalCode,
-        contactName: data.contactName,
-        email: data.email,
-        phone: data.phone,
-        roofLadderCode: data.roofLadderCode,
-        notes: data.notes,
-        selectedMonths: data.selectedMonths,
-        inactive: data.inactive,
-        nextDue: nextDue ? nextDue.toISOString() : new Date('9999-12-31').toISOString(),
-      };
-      
-      const res = await apiRequest("PUT", `/api/clients/${id}`, clientData);
-      const updatedClient = await res.json();
-      
-      await apiRequest("POST", `/api/clients/${id}/parts`, { parts: data.parts });
-      
-      return updatedClient;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/reports/parts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/reports/schedule"] });
-      toast({
-        title: "Client updated",
-        description: "The client has been updated successfully.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update client.",
-        variant: "destructive",
-      });
-    },
-  });
-
   const deleteClientMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiRequest("DELETE", `/api/clients/${id}`);
@@ -287,15 +204,6 @@ export default function Dashboard() {
   });
 
   const completedCount = recentlyCompleted.length;
-
-  const handleAddClient = (data: ClientFormData) => {
-    if (editingClient) {
-      updateClientMutation.mutate({ id: editingClient.id, data });
-      setEditingClient(null);
-    } else {
-      createClientMutation.mutate(data);
-    }
-  };
 
   const handleEditClient = async (id: string) => {
     // Extract clientId from composite ID if needed (for recently completed items)
@@ -372,11 +280,6 @@ export default function Dashboard() {
         variant: "destructive",
       });
     }
-  };
-
-  const handleCloseDialog = () => {
-    setShowAddDialog(false);
-    setEditingClient(null);
   };
 
   if (isLoading) {
@@ -461,30 +364,6 @@ export default function Dashboard() {
           </TabsContent>
         </Tabs>
       </main>
-
-      <AddClientDialog
-        key={editingClient ? `edit-${editingClient.id}` : 'new-client'}
-        open={showAddDialog}
-        onClose={handleCloseDialog}
-        onSubmit={handleAddClient}
-        editData={editingClient ? {
-          id: editingClient.id,
-          companyName: editingClient.companyName,
-          location: editingClient.location,
-          address: editingClient.address,
-          city: editingClient.city,
-          province: editingClient.province,
-          postalCode: editingClient.postalCode,
-          contactName: editingClient.contactName,
-          email: editingClient.email,
-          phone: editingClient.phone,
-          roofLadderCode: editingClient.roofLadderCode,
-          notes: editingClient.notes,
-          selectedMonths: editingClient.selectedMonths,
-          inactive: editingClient.inactive,
-          parts: editingClient.parts,
-        } : undefined}
-      />
 
       <PartsManagementDialog
         open={showPartsDialog}

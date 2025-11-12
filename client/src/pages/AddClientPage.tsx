@@ -24,7 +24,7 @@ export default function AddClientPage() {
     },
   });
 
-  const { data: clientParts } = useQuery({
+  const { data: clientParts = [] } = useQuery<any[]>({
     queryKey: id ? [`/api/clients/${id}/parts`] : [],
     enabled: Boolean(id),
   });
