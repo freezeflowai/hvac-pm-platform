@@ -23,6 +23,7 @@ export interface Client {
   location: string;
   selectedMonths: number[];
   inactive: boolean;
+  portalEnabled: boolean;
   nextDue: Date;
 }
 
