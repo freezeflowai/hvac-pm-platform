@@ -81,7 +81,7 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
   };
 
   const handleRowClick = (clientId: string) => {
-    window.open(`/client-report/${clientId}`, '_blank');
+    setLocation(`/client-report/${clientId}`);
   };
 
   return (

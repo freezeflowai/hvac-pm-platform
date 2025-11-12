@@ -1,8 +1,8 @@
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Printer } from "lucide-react";
+import { Printer, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 
 interface Part {
@@ -65,6 +65,7 @@ const getPartDisplayName = (part: Part): string => {
 
 export default function ClientReportPage() {
   const [, params] = useRoute("/client-report/:clientId");
+  const [, setLocation] = useLocation();
   const clientId = params?.clientId || "";
 
   const { data: reportData, isLoading } = useQuery<ClientReportData>({
@@ -83,6 +84,10 @@ export default function ClientReportPage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleBack = () => {
+    setLocation("/");
   };
 
   if (isLoading) {
@@ -108,7 +113,18 @@ export default function ClientReportPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-5xl mx-auto p-8 space-y-6">
         <div className="flex items-center justify-between print:hidden">
-          <h1 className="text-3xl font-bold">Client Report</h1>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBack}
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+            <h1 className="text-3xl font-bold">Client Report</h1>
+          </div>
           <Button onClick={handlePrint} data-testid="button-print" className="gap-2">
             <Printer className="h-4 w-4" />
             Print Report
