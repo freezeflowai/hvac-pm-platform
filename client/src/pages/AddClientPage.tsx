@@ -31,13 +31,23 @@ export default function AddClientPage() {
 
   const calculateNextDueDate = (selectedMonths: number[], inactive: boolean) => {
     if (inactive || selectedMonths.length === 0) return null;
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const sortedMonths = [...selectedMonths].sort((a, b) => a - b);
-    const nextMonth = sortedMonths.find(m => m >= currentMonth) ?? sortedMonths[0];
-    const year = nextMonth >= currentMonth ? currentYear : currentYear + 1;
-    return new Date(year, nextMonth, 1);
+    
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    
+    if (selectedMonths.includes(currentMonth)) {
+      return new Date(currentYear, currentMonth, 15);
+    }
+    
+    let nextMonth = selectedMonths.find(m => m > currentMonth);
+    
+    if (nextMonth === undefined) {
+      nextMonth = selectedMonths[0];
+      return new Date(currentYear + 1, nextMonth, 15);
+    }
+    
+    return new Date(currentYear, nextMonth, 15);
   };
 
   const createClientMutation = useMutation({
