@@ -178,6 +178,14 @@ export default function AddClientPage() {
     );
   }
 
+  if (isEditing && !client) {
+    return (
+      <div className="container mx-auto p-6">
+        <p className="text-muted-foreground">Client not found</p>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 max-w-5xl">
       <div className="mb-6 flex items-center gap-4">
@@ -199,12 +207,14 @@ export default function AddClientPage() {
         </div>
       </div>
 
-      <AddClientDialog
-        open={true}
-        onClose={() => setLocation("/")}
-        onSubmit={handleSubmit}
-        editData={editData}
-      />
+      {!isEditing || editData ? (
+        <AddClientDialog
+          open={true}
+          onClose={() => setLocation("/")}
+          onSubmit={handleSubmit}
+          editData={editData}
+        />
+      ) : null}
     </div>
   );
 }
