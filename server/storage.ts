@@ -65,6 +65,7 @@ export interface IStorage {
   
   // Client-Part relationship methods
   getClientParts(userId: string, clientId: string): Promise<(ClientPart & { part: Part })[]>;
+  getClientPartsForPortal(clientId: string): Promise<(ClientPart & { part: Part })[]>;
   addClientPart(userId: string, clientPart: InsertClientPart): Promise<ClientPart>;
   updateClientPart(userId: string, id: string, quantity: number): Promise<ClientPart | undefined>;
   deleteClientPart(userId: string, id: string): Promise<boolean>;
@@ -77,6 +78,7 @@ export interface IStorage {
   getMaintenanceRecord(userId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined>;
   getLatestCompletedMaintenanceRecord(userId: string, clientId: string): Promise<MaintenanceRecord | undefined>;
   getRecentlyCompletedMaintenance(userId: string, month: number, year: number): Promise<MaintenanceRecord[]>;
+  getClientMaintenanceRecords(clientId: string): Promise<MaintenanceRecord[]>;
   createMaintenanceRecord(userId: string, record: InsertMaintenanceRecord): Promise<MaintenanceRecord>;
   updateMaintenanceRecord(userId: string, id: string, record: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined>;
   deleteMaintenanceRecord(userId: string, id: string): Promise<boolean>;
@@ -84,6 +86,7 @@ export interface IStorage {
   // Equipment methods
   getAllEquipment(userId: string): Promise<Equipment[]>;
   getClientEquipment(userId: string, clientId: string): Promise<Equipment[]>;
+  getClientEquipmentForPortal(clientId: string): Promise<Equipment[]>;
   getEquipment(userId: string, id: string): Promise<Equipment | undefined>;
   createEquipment(userId: string, equipment: InsertEquipment): Promise<Equipment>;
   updateEquipment(userId: string, id: string, equipment: Partial<InsertEquipment>): Promise<Equipment | undefined>;
@@ -101,6 +104,7 @@ export class MemStorage implements IStorage {
   private maintenanceRecords: Map<string, MaintenanceRecord>;
   private passwordResetTokens: Map<string, PasswordResetToken>;
   private clientUsers: Map<string, ClientUser>;
+  private equipment: Map<string, Equipment>;
 
   constructor() {
     this.users = new Map();
@@ -110,6 +114,7 @@ export class MemStorage implements IStorage {
     this.maintenanceRecords = new Map();
     this.passwordResetTokens = new Map();
     this.clientUsers = new Map();
+    this.equipment = new Map();
   }
 
   // User methods
@@ -388,6 +393,20 @@ export class MemStorage implements IStorage {
       .filter((cp): cp is (ClientPart & { part: Part }) => cp !== null);
   }
 
+  async getClientPartsForPortal(clientId: string): Promise<(ClientPart & { part: Part })[]> {
+    const clientPartsList = Array.from(this.clientParts.values())
+      .filter(cp => cp.clientId === clientId);
+    
+    // Filter out any client-parts where the part no longer exists
+    return clientPartsList
+      .map(cp => {
+        const part = this.parts.get(cp.partId);
+        if (!part) return null;
+        return { ...cp, part };
+      })
+      .filter((cp): cp is (ClientPart & { part: Part }) => cp !== null);
+  }
+
   async addClientPart(userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
     // Verify that the client belongs to the userId
     const client = this.clients.get(insertClientPart.clientId);
@@ -517,6 +536,15 @@ export class MemStorage implements IStorage {
       });
   }
 
+  async getClientMaintenanceRecords(clientId: string): Promise<MaintenanceRecord[]> {
+    return Array.from(this.maintenanceRecords.values())
+      .filter(record => record.clientId === clientId)
+      .sort((a, b) => {
+        // Sort by dueDate descending (most recent first)
+        return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+      });
+  }
+
   async createMaintenanceRecord(userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
     // Verify that the client belongs to the userId
     const client = this.clients.get(insertRecord.clientId);
@@ -552,39 +580,57 @@ export class MemStorage implements IStorage {
 
   // Equipment methods
   async getAllEquipment(userId: string): Promise<Equipment[]> {
-    return [];
+    return Array.from(this.equipment.values())
+      .filter(eq => eq.userId === userId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }
 
   async getClientEquipment(userId: string, clientId: string): Promise<Equipment[]> {
-    return Array.from(this.maintenanceRecords.values()).filter(
-      (eq) => eq.userId === userId && eq.clientId === clientId
-    ) as unknown as Equipment[];
+    return Array.from(this.equipment.values())
+      .filter(eq => eq.userId === userId && eq.clientId === clientId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  async getClientEquipmentForPortal(clientId: string): Promise<Equipment[]> {
+    return Array.from(this.equipment.values())
+      .filter(eq => eq.clientId === clientId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }
 
   async getEquipment(userId: string, id: string): Promise<Equipment | undefined> {
-    return undefined;
+    const eq = this.equipment.get(id);
+    if (!eq || eq.userId !== userId) return undefined;
+    return eq;
   }
 
-  async createEquipment(userId: string, equipment: InsertEquipment): Promise<Equipment> {
+  async createEquipment(userId: string, insertEquipment: InsertEquipment): Promise<Equipment> {
     const id = randomUUID();
     const newEquipment: Equipment = { 
-      ...equipment,
+      ...insertEquipment,
       userId,
       id,
       createdAt: new Date().toISOString(),
-      modelNumber: equipment.modelNumber ?? null,
-      serialNumber: equipment.serialNumber ?? null,
-      notes: equipment.notes ?? null
+      modelNumber: insertEquipment.modelNumber ?? null,
+      serialNumber: insertEquipment.serialNumber ?? null,
+      notes: insertEquipment.notes ?? null
     };
+    this.equipment.set(id, newEquipment);
     return newEquipment;
   }
 
-  async updateEquipment(userId: string, id: string, equipment: Partial<InsertEquipment>): Promise<Equipment | undefined> {
-    return undefined;
+  async updateEquipment(userId: string, id: string, equipmentUpdate: Partial<InsertEquipment>): Promise<Equipment | undefined> {
+    const existing = this.equipment.get(id);
+    if (!existing || existing.userId !== userId) return undefined;
+    
+    const updated: Equipment = { ...existing, ...equipmentUpdate };
+    this.equipment.set(id, updated);
+    return updated;
   }
 
   async deleteEquipment(userId: string, id: string): Promise<boolean> {
-    return false;
+    const existing = this.equipment.get(id);
+    if (!existing || existing.userId !== userId) return false;
+    return this.equipment.delete(id);
   }
 
   async getClientReport(userId: string, clientId: string): Promise<{ client: Client; parts: (ClientPart & { part: Part })[]; equipment: Equipment[] } | null> {
@@ -834,6 +880,20 @@ export class DbStorage implements IStorage {
       }));
   }
 
+  async getClientPartsForPortal(clientId: string): Promise<(ClientPart & { part: Part })[]> {
+    const result = await db.select()
+      .from(clientParts)
+      .leftJoin(parts, eq(clientParts.partId, parts.id))
+      .where(eq(clientParts.clientId, clientId));
+    
+    return result
+      .filter(row => row.parts !== null)
+      .map(row => ({
+        ...row.client_parts,
+        part: row.parts!
+      }));
+  }
+
   async addClientPart(userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
     // Verify that the client belongs to the userId
     const client = await this.getClient(userId, insertClientPart.clientId);
@@ -969,6 +1029,13 @@ export class DbStorage implements IStorage {
       .orderBy(desc(maintenanceRecords.completedAt));
   }
 
+  async getClientMaintenanceRecords(clientId: string): Promise<MaintenanceRecord[]> {
+    return db.select()
+      .from(maintenanceRecords)
+      .where(eq(maintenanceRecords.clientId, clientId))
+      .orderBy(desc(maintenanceRecords.dueDate));
+  }
+
   async createMaintenanceRecord(userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
     // Verify that the client belongs to the userId
     const client = await this.getClient(userId, insertRecord.clientId);
@@ -1005,6 +1072,13 @@ export class DbStorage implements IStorage {
         eq(equipment.userId, userId),
         eq(equipment.clientId, clientId)
       ))
+      .orderBy(equipment.createdAt);
+  }
+
+  async getClientEquipmentForPortal(clientId: string): Promise<Equipment[]> {
+    return db.select()
+      .from(equipment)
+      .where(eq(equipment.clientId, clientId))
       .orderBy(equipment.createdAt);
   }
 
