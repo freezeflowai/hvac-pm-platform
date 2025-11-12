@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, CheckCircle, Pencil } from "lucide-react";
+import { useLocation } from "wouter";
 
 export interface MaintenanceItem {
   id: string;
@@ -38,13 +39,19 @@ const MONTH_NAMES = [
 ];
 
 export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = [], isCompleted = false }: MaintenanceCardProps) {
+  const [, setLocation] = useLocation();
   const isOverdue = item.status === "overdue";
   const monthsDisplay = item.selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
 
+  const handleCardClick = () => {
+    setLocation(`/client-report/${item.id}`);
+  };
+
   return (
     <Card 
-      className={`hover-elevate ${isOverdue ? 'border-destructive' : ''}`}
+      className={`hover-elevate cursor-pointer ${isOverdue ? 'border-destructive' : ''}`}
       data-testid={`card-maintenance-${item.id}`}
+      onClick={handleCardClick}
     >
       <CardContent className="p-3">
         <div className="flex items-start justify-between gap-3">
@@ -79,7 +86,10 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
             <Button
               size="icon"
               variant="outline"
-              onClick={() => onEdit(item.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(item.id);
+              }}
               data-testid={`button-edit-${item.id}`}
               className="h-8 w-8"
             >
@@ -88,7 +98,10 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
             <Button
               size="sm"
               variant={isCompleted ? "default" : "outline"}
-              onClick={() => onMarkComplete(item.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMarkComplete(item.id);
+              }}
               data-testid={`button-complete-${item.id}`}
               className="gap-1.5"
             >
