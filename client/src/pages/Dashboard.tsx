@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import Header from "@/components/Header";
 import StatsCard from "@/components/StatsCard";
@@ -45,7 +45,6 @@ interface DBClient {
   location: string;
   selectedMonths: number[];
   inactive: boolean;
-  portalEnabled: boolean;
   nextDue: string;
 }
 
@@ -231,7 +230,6 @@ export default function Dashboard() {
       location: c.location,
       selectedMonths: c.selectedMonths,
       inactive: c.inactive,
-      portalEnabled: c.portalEnabled ?? false,
       nextDue: new Date(c.nextDue),
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
@@ -445,7 +443,14 @@ export default function Dashboard() {
         open={showAddDialog}
         onClose={handleCloseDialog}
         onSubmit={handleAddClient}
-        editData={editingClient || undefined}
+        editData={editingClient ? {
+          id: editingClient.id,
+          companyName: editingClient.companyName,
+          location: editingClient.location,
+          selectedMonths: editingClient.selectedMonths,
+          inactive: editingClient.inactive,
+          parts: editingClient.parts,
+        } : undefined}
       />
 
       <PartsManagementDialog

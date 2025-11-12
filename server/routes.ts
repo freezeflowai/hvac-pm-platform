@@ -4,8 +4,7 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema } from "@shared/schema";
-import { passport, isAdmin, isClientAuthenticated } from "./auth";
-import { isContractor, isClient, type ContractorAuthUser, type ClientPortalAuthUser } from "./auth-types";
+import { passport, isAdmin } from "./auth";
 import { z } from "zod";
 
 function isAuthenticated(req: Request, res: Response, next: NextFunction) {
@@ -37,9 +36,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (err) {
           return res.status(500).json({ error: "Failed to regenerate session" });
         }
-        // Add userType for BaseAuthUser compatibility
-        const contractorUser: ContractorAuthUser = { ...user, userType: 'contractor' };
-        req.login(contractorUser, (err) => {
+        req.login(user, (err) => {
           if (err) {
             return res.status(500).json({ error: "Failed to login after signup" });
           }
@@ -52,7 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/auth/login", (req, res, next) => {
-    passport.authenticate("contractor-local", (err: any, user: Express.User | false, info: any) => {
+    passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
       if (err) {
         return res.status(500).json({ error: "Internal server error" });
       }
@@ -67,11 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (err) {
             return res.status(500).json({ error: "Failed to login" });
           }
-          if (isContractor(user)) {
-            res.json({ id: user.id, email: user.email, isAdmin: user.isAdmin });
-          } else {
-            res.status(400).json({ error: "Invalid user type" });
-          }
+          res.json({ id: user.id, email: user.email, isAdmin: user.isAdmin });
         });
       });
     })(req, res, next);
@@ -94,12 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/user", (req, res) => {
     if (req.isAuthenticated() && req.user) {
-      const user = req.user;
-      if (isContractor(user)) {
-        res.json({ id: user.id, email: user.email, isAdmin: user.isAdmin });
-      } else {
-        res.status(401).json({ error: "Not a contractor user" });
-      }
+      res.json({ id: req.user.id, email: req.user.email, isAdmin: req.user.isAdmin });
     } else {
       res.status(401).json({ error: "Not authenticated" });
     }
@@ -302,86 +290,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete client" });
-    }
-  });
-
-  // Client user management routes
-  app.get("/api/clients/:clientId/users", isAuthenticated, async (req, res) => {
-    try {
-      if (!isContractor(req.user!)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
-      const clientUsers = await storage.getAllClientUsers(req.user!.id, req.params.clientId);
-      // Don't send password hashes to the frontend
-      const sanitized = clientUsers.map(({ password, ...rest }) => rest);
-      res.json(sanitized);
-    } catch (error) {
-      console.error('Get client users error:', error);
-      res.status(500).json({ error: "Failed to fetch client users" });
-    }
-  });
-
-  app.post("/api/clients/:clientId/users", isAuthenticated, async (req, res) => {
-    try {
-      if (!isContractor(req.user!)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
-      // Verify the client exists and belongs to this contractor
-      const client = await storage.getClient(req.user!.id, req.params.clientId);
-      if (!client) {
-        return res.status(404).json({ error: "Client not found" });
-      }
-
-      // Verify portal is enabled for this client
-      if (!client.portalEnabled) {
-        return res.status(403).json({ error: "Portal access is not enabled for this client" });
-      }
-
-      const validated = insertClientUserSchema.parse(req.body);
-
-      // Check if email already exists
-      const existingUser = await storage.getClientUserByEmail(validated.email);
-      if (existingUser) {
-        return res.status(409).json({ error: "A user with this email already exists" });
-      }
-
-      // Hash the password
-      const hashedPassword = await bcrypt.hash(validated.password, 10);
-
-      const clientUser = await storage.createClientUser({
-        ...validated,
-        clientId: req.params.clientId,
-        password: hashedPassword
-      });
-
-      // Don't send password hash to the frontend
-      const { password, ...sanitized } = clientUser;
-      res.json(sanitized);
-    } catch (error) {
-      console.error('Create client user error:', error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: "Invalid user data", details: error.errors });
-      }
-      res.status(500).json({ error: "Failed to create client user" });
-    }
-  });
-
-  app.delete("/api/clients/:clientId/users/:id", isAuthenticated, async (req, res) => {
-    try {
-      if (!isContractor(req.user!)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
-      const deleted = await storage.deleteClientUser(req.user!.id, req.params.id);
-      if (!deleted) {
-        return res.status(404).json({ error: "Client user not found or access denied" });
-      }
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Delete client user error:', error);
-      res.status(500).json({ error: "Failed to delete client user" });
     }
   });
 
@@ -846,151 +754,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Seed parts error:', error);
       res.status(500).json({ error: "Failed to seed parts" });
-    }
-  });
-
-  // ============================================================
-  // CLIENT PORTAL ROUTES
-  // ============================================================
-
-  // Client portal authentication
-  app.post("/api/portal/login", (req, res, next) => {
-    passport.authenticate("client-local", (err: any, user: Express.User | false, info: any) => {
-      if (err) {
-        return res.status(500).json({ error: "Internal server error" });
-      }
-      if (!user) {
-        return res.status(401).json({ error: info?.message || "Invalid credentials" });
-      }
-      req.session.regenerate((err) => {
-        if (err) {
-          return res.status(500).json({ error: "Failed to regenerate session" });
-        }
-        req.login(user, (err) => {
-          if (err) {
-            return res.status(500).json({ error: "Failed to login" });
-          }
-          // Return client portal user info
-          if (isClient(user)) {
-            res.json({ 
-              id: user.id, 
-              email: user.email,
-              clientId: user.clientId,
-              userType: 'client'
-            });
-          } else {
-            res.status(400).json({ error: "Invalid user type for portal" });
-          }
-        });
-      });
-    })(req, res, next);
-  });
-
-  app.post("/api/portal/logout", (req, res) => {
-    req.logout((err) => {
-      if (err) {
-        return res.status(500).json({ error: "Failed to logout" });
-      }
-      req.session.destroy((err) => {
-        if (err) {
-          return res.status(500).json({ error: "Failed to destroy session" });
-        }
-        res.clearCookie('connect.sid');
-        res.json({ success: true });
-      });
-    });
-  });
-
-  app.get("/api/portal/auth/user", (req, res) => {
-    if (req.isAuthenticated() && req.user) {
-      const user = req.user;
-      if (isClient(user)) {
-        res.json({ 
-          id: user.id, 
-          email: user.email,
-          clientId: user.clientId,
-          userType: 'client'
-        });
-      } else {
-        res.status(401).json({ error: "Not a client user" });
-      }
-    } else {
-      res.status(401).json({ error: "Not authenticated" });
-    }
-  });
-
-  // Client portal data endpoints
-  // NOTE: These endpoints MUST only be used with isClientAuthenticated middleware
-  // They access client-scoped data without userId validation
-  app.get("/api/portal/client", isClientAuthenticated, async (req, res) => {
-    try {
-      const user = req.user!;
-      if (!isClient(user)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
-      const client = await storage.getClientById(user.clientId);
-      if (!client) {
-        return res.status(404).json({ error: "Client not found" });
-      }
-
-      // Return client info without userId (security)
-      res.json({
-        id: client.id,
-        companyName: client.companyName,
-        location: client.location,
-        selectedMonths: client.selectedMonths,
-        nextDue: client.nextDue,
-        inactive: client.inactive
-      });
-    } catch (error) {
-      console.error('Get client error:', error);
-      res.status(500).json({ error: "Failed to fetch client" });
-    }
-  });
-
-  app.get("/api/portal/maintenance", isClientAuthenticated, async (req, res) => {
-    try {
-      const user = req.user!;
-      if (!isClient(user)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
-      const records = await storage.getClientMaintenanceRecords(user.clientId);
-      res.json(records);
-    } catch (error) {
-      console.error('Get maintenance error:', error);
-      res.status(500).json({ error: "Failed to fetch maintenance records" });
-    }
-  });
-
-  app.get("/api/portal/equipment", isClientAuthenticated, async (req, res) => {
-    try {
-      const user = req.user!;
-      if (!isClient(user)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
-      const equipment = await storage.getClientEquipmentForPortal(user.clientId);
-      res.json(equipment);
-    } catch (error) {
-      console.error('Get equipment error:', error);
-      res.status(500).json({ error: "Failed to fetch equipment" });
-    }
-  });
-
-  app.get("/api/portal/parts", isClientAuthenticated, async (req, res) => {
-    try {
-      const user = req.user!;
-      if (!isClient(user)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
-      const clientParts = await storage.getClientPartsForPortal(user.clientId);
-      res.json(clientParts);
-    } catch (error) {
-      console.error('Get parts error:', error);
-      res.status(500).json({ error: "Failed to fetch parts" });
     }
   });
 

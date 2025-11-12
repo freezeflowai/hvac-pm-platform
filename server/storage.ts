@@ -12,9 +12,7 @@ import {
   type PasswordResetToken,
   type InsertPasswordResetToken,
   type Equipment,
-  type InsertEquipment,
-  type ClientUser,
-  type InsertClientUser
+  type InsertEquipment
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -39,21 +37,10 @@ export interface IStorage {
   
   // Client methods
   getClient(userId: string, id: string): Promise<Client | undefined>;
-  getClientById(id: string): Promise<Client | undefined>;
   getAllClients(userId: string): Promise<Client[]>;
   createClient(userId: string, client: InsertClient): Promise<Client>;
   updateClient(userId: string, id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(userId: string, id: string): Promise<boolean>;
-  updateClientLastPortalLogin(clientId: string): Promise<void>;
-  
-  // Client user methods
-  getClientUser(id: string): Promise<ClientUser | undefined>;
-  getClientUserByEmail(email: string): Promise<ClientUser | undefined>;
-  getClientUserByClientId(clientId: string): Promise<ClientUser | undefined>;
-  getAllClientUsers(userId: string, clientId: string): Promise<ClientUser[]>;
-  createClientUser(clientUser: InsertClientUser): Promise<ClientUser>;
-  updateClientUser(id: string, updates: Partial<InsertClientUser>): Promise<ClientUser | undefined>;
-  deleteClientUser(userId: string, id: string): Promise<boolean>;
   
   // Part methods
   getPart(userId: string, id: string): Promise<Part | undefined>;
@@ -67,7 +54,6 @@ export interface IStorage {
   
   // Client-Part relationship methods
   getClientParts(userId: string, clientId: string): Promise<(ClientPart & { part: Part })[]>;
-  getClientPartsForPortal(clientId: string): Promise<(ClientPart & { part: Part })[]>;
   addClientPart(userId: string, clientPart: InsertClientPart): Promise<ClientPart>;
   updateClientPart(userId: string, id: string, quantity: number): Promise<ClientPart | undefined>;
   deleteClientPart(userId: string, id: string): Promise<boolean>;
@@ -80,7 +66,6 @@ export interface IStorage {
   getMaintenanceRecord(userId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined>;
   getLatestCompletedMaintenanceRecord(userId: string, clientId: string): Promise<MaintenanceRecord | undefined>;
   getRecentlyCompletedMaintenance(userId: string, month: number, year: number): Promise<MaintenanceRecord[]>;
-  getClientMaintenanceRecords(clientId: string): Promise<MaintenanceRecord[]>;
   createMaintenanceRecord(userId: string, record: InsertMaintenanceRecord): Promise<MaintenanceRecord>;
   updateMaintenanceRecord(userId: string, id: string, record: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined>;
   deleteMaintenanceRecord(userId: string, id: string): Promise<boolean>;
@@ -88,7 +73,6 @@ export interface IStorage {
   // Equipment methods
   getAllEquipment(userId: string): Promise<Equipment[]>;
   getClientEquipment(userId: string, clientId: string): Promise<Equipment[]>;
-  getClientEquipmentForPortal(clientId: string): Promise<Equipment[]>;
   getEquipment(userId: string, id: string): Promise<Equipment | undefined>;
   createEquipment(userId: string, equipment: InsertEquipment): Promise<Equipment>;
   updateEquipment(userId: string, id: string, equipment: Partial<InsertEquipment>): Promise<Equipment | undefined>;
@@ -105,8 +89,6 @@ export class MemStorage implements IStorage {
   private clientParts: Map<string, ClientPart>;
   private maintenanceRecords: Map<string, MaintenanceRecord>;
   private passwordResetTokens: Map<string, PasswordResetToken>;
-  private clientUsers: Map<string, ClientUser>;
-  private equipment: Map<string, Equipment>;
 
   constructor() {
     this.users = new Map();
@@ -115,8 +97,6 @@ export class MemStorage implements IStorage {
     this.clientParts = new Map();
     this.maintenanceRecords = new Map();
     this.passwordResetTokens = new Map();
-    this.clientUsers = new Map();
-    this.equipment = new Map();
   }
 
   // User methods
@@ -207,10 +187,6 @@ export class MemStorage implements IStorage {
     return client;
   }
 
-  async getClientById(id: string): Promise<Client | undefined> {
-    return this.clients.get(id);
-  }
-
   async getAllClients(userId: string): Promise<Client[]> {
     return Array.from(this.clients.values())
       .filter(client => client.userId === userId)
@@ -223,8 +199,6 @@ export class MemStorage implements IStorage {
       ...insertClient,
       userId,
       inactive: insertClient.inactive ?? false,
-      portalEnabled: insertClient.portalEnabled ?? false,
-      lastPortalLogin: insertClient.lastPortalLogin ?? null,
       id,
       createdAt: new Date().toISOString()
     };
@@ -245,71 +219,6 @@ export class MemStorage implements IStorage {
     const existing = this.clients.get(id);
     if (!existing || existing.userId !== userId) return false;
     return this.clients.delete(id);
-  }
-
-  async updateClientLastPortalLogin(clientId: string): Promise<void> {
-    const client = this.clients.get(clientId);
-    if (client) {
-      this.clients.set(clientId, { ...client, lastPortalLogin: new Date() });
-    }
-  }
-
-  // Client user methods
-  async getClientUser(id: string): Promise<ClientUser | undefined> {
-    return this.clientUsers.get(id);
-  }
-
-  async getClientUserByEmail(email: string): Promise<ClientUser | undefined> {
-    return Array.from(this.clientUsers.values()).find(
-      (clientUser) => clientUser.email === email
-    );
-  }
-
-  async getClientUserByClientId(clientId: string): Promise<ClientUser | undefined> {
-    return Array.from(this.clientUsers.values()).find(
-      (clientUser) => clientUser.clientId === clientId
-    );
-  }
-
-  async createClientUser(insertClientUser: InsertClientUser): Promise<ClientUser> {
-    const id = randomUUID();
-    const clientUser: ClientUser = {
-      ...insertClientUser,
-      id,
-      createdAt: new Date()
-    };
-    this.clientUsers.set(id, clientUser);
-    return clientUser;
-  }
-
-  async updateClientUser(id: string, updates: Partial<InsertClientUser>): Promise<ClientUser | undefined> {
-    const existing = this.clientUsers.get(id);
-    if (!existing) return undefined;
-    
-    const updated: ClientUser = { ...existing, ...updates };
-    this.clientUsers.set(id, updated);
-    return updated;
-  }
-
-  async getAllClientUsers(userId: string, clientId: string): Promise<ClientUser[]> {
-    // Verify the client belongs to this user
-    const client = await this.getClient(userId, clientId);
-    if (!client) return [];
-    
-    return Array.from(this.clientUsers.values())
-      .filter(cu => cu.clientId === clientId)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }
-
-  async deleteClientUser(userId: string, id: string): Promise<boolean> {
-    const existing = this.clientUsers.get(id);
-    if (!existing) return false;
-    
-    // Verify the client belongs to this user
-    const client = await this.getClient(userId, existing.clientId);
-    if (!client) return false;
-    
-    return this.clientUsers.delete(id);
   }
 
   // Part methods
@@ -405,20 +314,6 @@ export class MemStorage implements IStorage {
   async getClientParts(userId: string, clientId: string): Promise<(ClientPart & { part: Part })[]> {
     const clientPartsList = Array.from(this.clientParts.values())
       .filter(cp => cp.userId === userId && cp.clientId === clientId);
-    
-    // Filter out any client-parts where the part no longer exists
-    return clientPartsList
-      .map(cp => {
-        const part = this.parts.get(cp.partId);
-        if (!part) return null;
-        return { ...cp, part };
-      })
-      .filter((cp): cp is (ClientPart & { part: Part }) => cp !== null);
-  }
-
-  async getClientPartsForPortal(clientId: string): Promise<(ClientPart & { part: Part })[]> {
-    const clientPartsList = Array.from(this.clientParts.values())
-      .filter(cp => cp.clientId === clientId);
     
     // Filter out any client-parts where the part no longer exists
     return clientPartsList
@@ -559,15 +454,6 @@ export class MemStorage implements IStorage {
       });
   }
 
-  async getClientMaintenanceRecords(clientId: string): Promise<MaintenanceRecord[]> {
-    return Array.from(this.maintenanceRecords.values())
-      .filter(record => record.clientId === clientId)
-      .sort((a, b) => {
-        // Sort by dueDate descending (most recent first)
-        return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
-      });
-  }
-
   async createMaintenanceRecord(userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
     // Verify that the client belongs to the userId
     const client = this.clients.get(insertRecord.clientId);
@@ -603,57 +489,39 @@ export class MemStorage implements IStorage {
 
   // Equipment methods
   async getAllEquipment(userId: string): Promise<Equipment[]> {
-    return Array.from(this.equipment.values())
-      .filter(eq => eq.userId === userId)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return [];
   }
 
   async getClientEquipment(userId: string, clientId: string): Promise<Equipment[]> {
-    return Array.from(this.equipment.values())
-      .filter(eq => eq.userId === userId && eq.clientId === clientId)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }
-
-  async getClientEquipmentForPortal(clientId: string): Promise<Equipment[]> {
-    return Array.from(this.equipment.values())
-      .filter(eq => eq.clientId === clientId)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return Array.from(this.maintenanceRecords.values()).filter(
+      (eq) => eq.userId === userId && eq.clientId === clientId
+    ) as unknown as Equipment[];
   }
 
   async getEquipment(userId: string, id: string): Promise<Equipment | undefined> {
-    const eq = this.equipment.get(id);
-    if (!eq || eq.userId !== userId) return undefined;
-    return eq;
+    return undefined;
   }
 
-  async createEquipment(userId: string, insertEquipment: InsertEquipment): Promise<Equipment> {
+  async createEquipment(userId: string, equipment: InsertEquipment): Promise<Equipment> {
     const id = randomUUID();
     const newEquipment: Equipment = { 
-      ...insertEquipment,
+      ...equipment,
       userId,
       id,
       createdAt: new Date().toISOString(),
-      modelNumber: insertEquipment.modelNumber ?? null,
-      serialNumber: insertEquipment.serialNumber ?? null,
-      notes: insertEquipment.notes ?? null
+      modelNumber: equipment.modelNumber ?? null,
+      serialNumber: equipment.serialNumber ?? null,
+      notes: equipment.notes ?? null
     };
-    this.equipment.set(id, newEquipment);
     return newEquipment;
   }
 
-  async updateEquipment(userId: string, id: string, equipmentUpdate: Partial<InsertEquipment>): Promise<Equipment | undefined> {
-    const existing = this.equipment.get(id);
-    if (!existing || existing.userId !== userId) return undefined;
-    
-    const updated: Equipment = { ...existing, ...equipmentUpdate };
-    this.equipment.set(id, updated);
-    return updated;
+  async updateEquipment(userId: string, id: string, equipment: Partial<InsertEquipment>): Promise<Equipment | undefined> {
+    return undefined;
   }
 
   async deleteEquipment(userId: string, id: string): Promise<boolean> {
-    const existing = this.equipment.get(id);
-    if (!existing || existing.userId !== userId) return false;
-    return this.equipment.delete(id);
+    return false;
   }
 
   async getClientReport(userId: string, clientId: string): Promise<{ client: Client; parts: (ClientPart & { part: Part })[]; equipment: Equipment[] } | null> {
@@ -674,7 +542,7 @@ export class MemStorage implements IStorage {
 }
 
 import { db } from './db';
-import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, clientUsers } from '@shared/schema';
+import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment } from '@shared/schema';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
@@ -751,11 +619,6 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getClientById(id: string): Promise<Client | undefined> {
-    const result = await db.select().from(clients).where(eq(clients.id, id)).limit(1);
-    return result[0];
-  }
-
   async getAllClients(userId: string): Promise<Client[]> {
     return db.select().from(clients).where(eq(clients.userId, userId)).orderBy(desc(clients.createdAt));
   }
@@ -776,70 +639,6 @@ export class DbStorage implements IStorage {
     await this.deleteAllClientParts(userId, id);
     await db.delete(maintenanceRecords).where(and(eq(maintenanceRecords.clientId, id), eq(maintenanceRecords.userId, userId)));
     const result = await db.delete(clients).where(and(eq(clients.id, id), eq(clients.userId, userId))).returning();
-    return result.length > 0;
-  }
-
-  async updateClientLastPortalLogin(clientId: string): Promise<void> {
-    await db.update(clients)
-      .set({ lastPortalLogin: new Date() })
-      .where(eq(clients.id, clientId));
-  }
-
-  // Client user methods
-  async getClientUser(id: string): Promise<ClientUser | undefined> {
-    const result = await db.select().from(clientUsers).where(eq(clientUsers.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getClientUserByEmail(email: string): Promise<ClientUser | undefined> {
-    const result = await db.select().from(clientUsers).where(eq(clientUsers.email, email)).limit(1);
-    return result[0];
-  }
-
-  async getClientUserByClientId(clientId: string): Promise<ClientUser | undefined> {
-    const result = await db.select().from(clientUsers).where(eq(clientUsers.clientId, clientId)).limit(1);
-    return result[0];
-  }
-
-  async createClientUser(insertClientUser: InsertClientUser): Promise<ClientUser> {
-    const result = await db.insert(clientUsers).values(insertClientUser).returning();
-    return result[0];
-  }
-
-  async updateClientUser(id: string, updates: Partial<InsertClientUser>): Promise<ClientUser | undefined> {
-    const result = await db.update(clientUsers).set(updates).where(eq(clientUsers.id, id)).returning();
-    return result[0];
-  }
-
-  async getAllClientUsers(userId: string, clientId: string): Promise<ClientUser[]> {
-    // Verify the client belongs to this user by joining with clients table
-    const result = await db
-      .select({
-        id: clientUsers.id,
-        clientId: clientUsers.clientId,
-        email: clientUsers.email,
-        password: clientUsers.password,
-        createdAt: clientUsers.createdAt
-      })
-      .from(clientUsers)
-      .innerJoin(clients, eq(clientUsers.clientId, clients.id))
-      .where(and(eq(clientUsers.clientId, clientId), eq(clients.userId, userId)))
-      .orderBy(clientUsers.createdAt);
-    
-    return result;
-  }
-
-  async deleteClientUser(userId: string, id: string): Promise<boolean> {
-    // Verify the client belongs to this user before deleting
-    const clientUser = await db.select().from(clientUsers).where(eq(clientUsers.id, id)).limit(1);
-    if (!clientUser[0]) return false;
-    
-    const client = await db.select().from(clients)
-      .where(and(eq(clients.id, clientUser[0].clientId), eq(clients.userId, userId)))
-      .limit(1);
-    if (!client[0]) return false;
-    
-    const result = await db.delete(clientUsers).where(eq(clientUsers.id, id)).returning();
     return result.length > 0;
   }
 
@@ -926,20 +725,6 @@ export class DbStorage implements IStorage {
       .from(clientParts)
       .leftJoin(parts, eq(clientParts.partId, parts.id))
       .where(and(eq(clientParts.clientId, clientId), eq(clientParts.userId, userId)));
-    
-    return result
-      .filter(row => row.parts !== null)
-      .map(row => ({
-        ...row.client_parts,
-        part: row.parts!
-      }));
-  }
-
-  async getClientPartsForPortal(clientId: string): Promise<(ClientPart & { part: Part })[]> {
-    const result = await db.select()
-      .from(clientParts)
-      .leftJoin(parts, eq(clientParts.partId, parts.id))
-      .where(eq(clientParts.clientId, clientId));
     
     return result
       .filter(row => row.parts !== null)
@@ -1084,13 +869,6 @@ export class DbStorage implements IStorage {
       .orderBy(desc(maintenanceRecords.completedAt));
   }
 
-  async getClientMaintenanceRecords(clientId: string): Promise<MaintenanceRecord[]> {
-    return db.select()
-      .from(maintenanceRecords)
-      .where(eq(maintenanceRecords.clientId, clientId))
-      .orderBy(desc(maintenanceRecords.dueDate));
-  }
-
   async createMaintenanceRecord(userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
     // Verify that the client belongs to the userId
     const client = await this.getClient(userId, insertRecord.clientId);
@@ -1127,13 +905,6 @@ export class DbStorage implements IStorage {
         eq(equipment.userId, userId),
         eq(equipment.clientId, clientId)
       ))
-      .orderBy(equipment.createdAt);
-  }
-
-  async getClientEquipmentForPortal(clientId: string): Promise<Equipment[]> {
-    return db.select()
-      .from(equipment)
-      .where(eq(equipment.clientId, clientId))
       .orderBy(equipment.createdAt);
   }
 

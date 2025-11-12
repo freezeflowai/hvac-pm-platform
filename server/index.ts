@@ -5,7 +5,6 @@ import { Pool } from "@neondatabase/serverless";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { passport } from "./auth";
-import type { AuthUser, BaseAuthUser } from "./auth-types";
 
 const app = express();
 
@@ -48,8 +47,12 @@ declare module 'express-session' {
 
 declare global {
   namespace Express {
-    // Base user interface with common fields
-    interface User extends BaseAuthUser {}
+    interface User {
+      id: string;
+      email: string;
+      password: string;
+      isAdmin: boolean;
+    }
   }
 }
 app.use(express.json({
