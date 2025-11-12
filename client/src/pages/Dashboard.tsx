@@ -70,7 +70,7 @@ export default function Dashboard() {
   // Read tab from URL query parameter
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const tabParam = urlParams.get('tab');
-  const initialTab = tabParam === 'clients' ? 'clients' : 'schedule';
+  const activeTab = tabParam === 'clients' ? 'clients' : 'schedule';
 
   const { data: dbClients = [], isLoading } = useQuery<DBClient[]>({
     queryKey: ["/api/clients"],
@@ -378,7 +378,7 @@ export default function Dashboard() {
           <StatsCard title="Completed" value={completedCount} icon={CheckCircle} variant="default" />
         </div>
 
-        <Tabs defaultValue={initialTab} className="space-y-4">
+        <Tabs value={activeTab} className="space-y-4">
           <TabsList data-testid="tabs-main-nav">
             <TabsTrigger value="schedule" data-testid="tab-schedule">
               Schedule
