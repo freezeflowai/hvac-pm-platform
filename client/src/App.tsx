@@ -53,6 +53,7 @@ function ContractorRoutes() {
             <ClientReportPage />
           </ProtectedRoute>
         </Route>
+        <Route component={NotFound} />
       </Switch>
     </AuthProvider>
   );
