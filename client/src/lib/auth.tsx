@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (userData) => {
       setUser(userData);
+      queryClient.setQueryData(["/api/auth/user"], userData);
     },
   });
 
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (userData) => {
       setUser(userData);
+      queryClient.setQueryData(["/api/auth/user"], userData);
     },
   });
 

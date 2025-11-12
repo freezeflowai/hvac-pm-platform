@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Trash2, ShieldCheck, ShieldOff } from "lucide-react";
+import Header from "@/components/Header";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -77,24 +78,29 @@ export default function Admin() {
 
   if (!currentUser?.isAdmin) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Access Denied</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              You don't have permission to access this page. Admin privileges are required.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <>
+        <Header />
+        <div className="flex items-center justify-center h-screen">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Access Denied</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                You don't have permission to access this page. Admin privileges are required.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">User Management</h1>
+    <>
+      <Header />
+      <div className="p-6 max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6">User Management</h1>
       
       <Card>
         <CardHeader>
@@ -208,6 +214,7 @@ export default function Admin() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </>
   );
 }
