@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Pencil, Trash2, Wrench } from "lucide-react";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { format } from "date-fns";
 import {
   AlertDialog,
@@ -15,7 +16,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import EquipmentDialog from "@/components/EquipmentDialog";
 
 export interface Client {
   id: string;
@@ -38,12 +38,11 @@ const MONTH_NAMES = [
 ];
 
 export default function ClientListTable({ clients, onEdit, onDelete }: ClientListTableProps) {
+  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [equipmentDialogOpen, setEquipmentDialogOpen] = useState(false);
-  const [equipmentClient, setEquipmentClient] = useState<Client | null>(null);
 
   const handleDeleteClick = (client: Client) => {
     setClientToDelete(client);
@@ -77,9 +76,8 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
     return selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
   };
 
-  const handleEquipmentClick = (client: Client) => {
-    setEquipmentClient(client);
-    setEquipmentDialogOpen(true);
+  const handleEquipmentClick = (clientId: string) => {
+    setLocation(`/equipment/${clientId}`);
   };
 
   return (
@@ -139,7 +137,7 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleEquipmentClick(client)}
+                        onClick={() => handleEquipmentClick(client.id)}
                         data-testid={`button-equipment-${client.id}`}
                         title="Manage Equipment"
                       >
@@ -182,7 +180,7 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleEquipmentClick(client)}
+                        onClick={() => handleEquipmentClick(client.id)}
                         data-testid={`button-equipment-${client.id}`}
                         title="Manage Equipment"
                       >
@@ -251,18 +249,6 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {equipmentClient && (
-        <EquipmentDialog
-          open={equipmentDialogOpen}
-          onClose={() => {
-            setEquipmentDialogOpen(false);
-            setEquipmentClient(null);
-          }}
-          clientId={equipmentClient.id}
-          clientName={equipmentClient.companyName}
-        />
-      )}
     </Card>
   );
 }
