@@ -71,6 +71,7 @@ export interface IStorage {
   deleteMaintenanceRecord(userId: string, id: string): Promise<boolean>;
   
   // Equipment methods
+  getAllEquipment(userId: string): Promise<Equipment[]>;
   getClientEquipment(userId: string, clientId: string): Promise<Equipment[]>;
   getEquipment(userId: string, id: string): Promise<Equipment | undefined>;
   createEquipment(userId: string, equipment: InsertEquipment): Promise<Equipment>;
@@ -484,6 +485,10 @@ export class MemStorage implements IStorage {
   }
 
   // Equipment methods
+  async getAllEquipment(userId: string): Promise<Equipment[]> {
+    return [];
+  }
+
   async getClientEquipment(userId: string, clientId: string): Promise<Equipment[]> {
     return Array.from(this.maintenanceRecords.values()).filter(
       (eq) => eq.userId === userId && eq.clientId === clientId
@@ -867,6 +872,13 @@ export class DbStorage implements IStorage {
   }
 
   // Equipment methods
+  async getAllEquipment(userId: string): Promise<Equipment[]> {
+    return db.select()
+      .from(equipment)
+      .where(eq(equipment.userId, userId))
+      .orderBy(equipment.createdAt);
+  }
+
   async getClientEquipment(userId: string, clientId: string): Promise<Equipment[]> {
     return db.select()
       .from(equipment)

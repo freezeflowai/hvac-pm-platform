@@ -5,7 +5,8 @@ import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
 import AddClientDialog, { ClientFormData } from "@/components/AddClientDialog";
 import PartsManagementDialog from "@/components/PartsManagementDialog";
-import { AlertCircle, Calendar, CheckCircle, Clock, Package } from "lucide-react";
+import EquipmentList from "@/components/EquipmentList";
+import { AlertCircle, Calendar, CheckCircle, Clock, Package, Wrench } from "lucide-react";
 import { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -379,6 +380,10 @@ export default function Dashboard() {
             <TabsTrigger value="clients" data-testid="tab-clients">
               All Clients
             </TabsTrigger>
+            <TabsTrigger value="equipment" data-testid="tab-equipment">
+              <Wrench className="h-4 w-4 mr-2" />
+              Equipment
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="schedule" className="space-y-6">
@@ -419,6 +424,10 @@ export default function Dashboard() {
 
           <TabsContent value="clients">
             <ClientListTable clients={clients} onEdit={handleEditClient} onDelete={handleDeleteClient} />
+          </TabsContent>
+
+          <TabsContent value="equipment">
+            <EquipmentList />
           </TabsContent>
         </Tabs>
       </main>

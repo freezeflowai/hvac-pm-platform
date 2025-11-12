@@ -595,6 +595,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Equipment routes
+  app.get("/api/equipment", isAuthenticated, async (req, res) => {
+    try {
+      const equipment = await storage.getAllEquipment(req.user!.id);
+      res.json(equipment);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch equipment" });
+    }
+  });
+
   app.get("/api/clients/:clientId/equipment", isAuthenticated, async (req, res) => {
     try {
       const equipment = await storage.getClientEquipment(req.user!.id, req.params.clientId);
