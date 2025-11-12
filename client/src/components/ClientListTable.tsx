@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Pencil, Trash2 } from "lucide-react";
+import { Search, Pencil, Trash2, Wrench } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import {
@@ -15,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import EquipmentDialog from "@/components/EquipmentDialog";
 
 export interface Client {
   id: string;
@@ -41,6 +42,8 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [equipmentDialogOpen, setEquipmentDialogOpen] = useState(false);
+  const [equipmentClient, setEquipmentClient] = useState<Client | null>(null);
 
   const handleDeleteClick = (client: Client) => {
     setClientToDelete(client);
@@ -72,6 +75,11 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
 
   const getMonthsDisplay = (selectedMonths: number[]) => {
     return selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
+  };
+
+  const handleEquipmentClick = (client: Client) => {
+    setEquipmentClient(client);
+    setEquipmentDialogOpen(true);
   };
 
   return (
@@ -131,6 +139,15 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => handleEquipmentClick(client)}
+                        data-testid={`button-equipment-${client.id}`}
+                        title="Manage Equipment"
+                      >
+                        <Wrench className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => onEdit(client.id)}
                         data-testid={`button-edit-client-${client.id}`}
                       >
@@ -162,6 +179,15 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                       <div className="text-sm text-muted-foreground">{client.location}</div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEquipmentClick(client)}
+                        data-testid={`button-equipment-${client.id}`}
+                        title="Manage Equipment"
+                      >
+                        <Wrench className="h-3 w-3" />
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
@@ -225,6 +251,18 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {equipmentClient && (
+        <EquipmentDialog
+          open={equipmentDialogOpen}
+          onClose={() => {
+            setEquipmentDialogOpen(false);
+            setEquipmentClient(null);
+          }}
+          clientId={equipmentClient.id}
+          clientName={equipmentClient.companyName}
+        />
+      )}
     </Card>
   );
 }

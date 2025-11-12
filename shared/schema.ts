@@ -119,7 +119,7 @@ export const equipment = pgTable("equipment", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
-  equipmentName: text("equipment_name").notNull(),
+  name: text("name").notNull(),
   modelNumber: text("model_number"),
   serialNumber: text("serial_number"),
   notes: text("notes"),
