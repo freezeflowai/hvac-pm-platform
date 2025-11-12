@@ -80,6 +80,10 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
     setLocation(`/equipment/${clientId}`);
   };
 
+  const handleRowClick = (clientId: string) => {
+    window.open(`/client-report/${clientId}`, '_blank');
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -113,8 +117,9 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
               {filteredClients.map((client) => (
                 <tr 
                   key={client.id} 
-                  className="border-b hover-elevate"
+                  className="border-b hover-elevate cursor-pointer"
                   data-testid={`row-client-${client.id}`}
+                  onClick={() => handleRowClick(client.id)}
                 >
                   <td className="py-3 px-4 text-sm font-medium" data-testid={`text-company-${client.id}`}>
                     {client.companyName}
@@ -132,7 +137,7 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                       format(client.nextDue, "MMM d, yyyy")
                     )}
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-2">
                       <Button
                         size="sm"
@@ -168,7 +173,7 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
         </div>
         <div className="md:hidden space-y-4">
           {filteredClients.map((client) => (
-            <Card key={client.id} data-testid={`card-client-${client.id}`}>
+            <Card key={client.id} data-testid={`card-client-${client.id}`} className="cursor-pointer" onClick={() => handleRowClick(client.id)}>
               <CardContent className="p-4">
                 <div className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
@@ -176,7 +181,7 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                       <div className="font-medium">{client.companyName}</div>
                       <div className="text-sm text-muted-foreground">{client.location}</div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <Button
                         size="sm"
                         variant="outline"

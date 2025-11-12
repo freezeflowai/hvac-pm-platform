@@ -9,6 +9,7 @@ import Dashboard from "@/pages/Dashboard";
 import Reports from "@/pages/Reports";
 import Admin from "@/pages/Admin";
 import EquipmentPage from "@/pages/EquipmentPage";
+import ClientReportPage from "@/pages/ClientReportPage";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import RequestReset from "@/pages/RequestReset";
@@ -40,6 +41,11 @@ function Router() {
       <Route path="/equipment/:clientId">
         <ProtectedRoute>
           <EquipmentPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/client-report/:clientId">
+        <ProtectedRoute>
+          <ClientReportPage />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />

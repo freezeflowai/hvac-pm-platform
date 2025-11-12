@@ -255,6 +255,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/clients/:id/report", isAuthenticated, async (req, res) => {
+    try {
+      const report = await storage.getClientReport(req.user!.id, req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      res.json(report);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to generate client report" });
+    }
+  });
+
   app.put("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertClientSchema.partial().parse(req.body);
