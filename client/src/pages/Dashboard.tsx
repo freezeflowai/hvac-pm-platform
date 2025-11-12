@@ -62,21 +62,30 @@ interface ClientPart {
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showPartsDialog, setShowPartsDialog] = useState(false);
   const [editingClient, setEditingClient] = useState<(Client & { parts: Array<{ partId: string; quantity: number }> }) | null>(null);
 
-  // Read tab from URL query parameter
-  const urlParams = new URLSearchParams(location.split('?')[1] || '');
+  // Read tab from URL query parameter using window.location.search
+  const urlParams = new URLSearchParams(window.location.search);
   const tabParam = urlParams.get('tab');
-  const activeTab = tabParam === 'clients' ? 'clients' : 'schedule';
+  const [activeTab, setActiveTab] = useState(tabParam === 'clients' ? 'clients' : 'schedule');
+
+  // Update activeTab when URL changes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    setActiveTab(tab === 'clients' ? 'clients' : 'schedule');
+  }, [window.location.search]);
 
   const handleTabChange = (value: string) => {
     if (value === 'clients') {
       setLocation('/?tab=clients');
+      setActiveTab('clients');
     } else {
       setLocation('/');
+      setActiveTab('schedule');
     }
   };
 
