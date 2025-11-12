@@ -14,16 +14,16 @@ import { cn } from "@/lib/utils";
 
 export interface ClientFormData {
   companyName: string;
-  location?: string;
-  address?: string;
-  city?: string;
-  province?: string;
-  postalCode?: string;
-  contactName?: string;
-  email?: string;
-  phone?: string;
-  roofLadderCode?: string;
-  notes?: string;
+  location?: string | null;
+  address?: string | null;
+  city?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
+  contactName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  roofLadderCode?: string | null;
+  notes?: string | null;
   selectedMonths: number[];
   inactive: boolean;
   parts: Array<{ partId: string; quantity: number }>;
@@ -239,7 +239,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
       if (editData) {
         setFormData({
           companyName: editData.companyName,
-          location: editData.location,
+          location: editData.location || "",
           address: editData.address || "",
           city: editData.city || "",
           province: editData.province || "",

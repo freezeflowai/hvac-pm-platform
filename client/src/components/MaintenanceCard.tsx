@@ -7,7 +7,7 @@ import { useLocation } from "wouter";
 export interface MaintenanceItem {
   id: string;
   companyName: string;
-  location: string;
+  location?: string | null;
   selectedMonths: number[];
   nextDue: Date;
   status: "overdue" | "upcoming" | "completed";
@@ -60,10 +60,12 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
               <h3 className="font-semibold text-base" data-testid={`text-company-${item.id}`}>
                 {item.companyName}
               </h3>
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <MapPin className="h-3 w-3 flex-shrink-0" />
-                <span data-testid={`text-location-${item.id}`}>{item.location}</span>
-              </span>
+              {item.location && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <MapPin className="h-3 w-3 flex-shrink-0" />
+                  <span data-testid={`text-location-${item.id}`}>{item.location}</span>
+                </span>
+              )}
             </div>
             <div className="flex flex-col gap-1 text-xs">
               <div className="text-muted-foreground">
