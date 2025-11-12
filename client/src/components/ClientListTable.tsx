@@ -22,6 +22,15 @@ export interface Client {
   id: string;
   companyName: string;
   location: string;
+  address?: string | null;
+  city?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
+  contactName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  roofLadderCode?: string | null;
+  notes?: string | null;
   selectedMonths: number[];
   inactive: boolean;
   nextDue: Date;
@@ -106,17 +115,26 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
 
       const csvRows: string[] = [];
       
-      csvRows.push('Company Name,Location,Status,Maintenance Months,Next Due,Part Name,Part Quantity,Equipment Name,Model Number,Serial Number');
+      csvRows.push('Company Name,Location,Address,City,Province/State,Postal Code,Contact Name,Email,Phone,Roof/Ladder Code,Notes,Status,Maintenance Months,Next Due,Part Name,Part Quantity,Equipment Name,Model Number,Serial Number');
       
       allData.forEach(({ client, parts, equipment }) => {
         const companyName = `"${client.companyName.replace(/"/g, '""')}"`;
         const location = `"${client.location.replace(/"/g, '""')}"`;
+        const address = client.address ? `"${client.address.replace(/"/g, '""')}"` : '';
+        const city = client.city ? `"${client.city.replace(/"/g, '""')}"` : '';
+        const province = client.province ? `"${client.province.replace(/"/g, '""')}"` : '';
+        const postalCode = client.postalCode ? `"${client.postalCode.replace(/"/g, '""')}"` : '';
+        const contactName = client.contactName ? `"${client.contactName.replace(/"/g, '""')}"` : '';
+        const email = client.email ? `"${client.email.replace(/"/g, '""')}"` : '';
+        const phone = client.phone ? `"${client.phone.replace(/"/g, '""')}"` : '';
+        const roofLadderCode = client.roofLadderCode ? `"${client.roofLadderCode.replace(/"/g, '""')}"` : '';
+        const notes = client.notes ? `"${client.notes.replace(/"/g, '""')}"` : '';
         const status = client.inactive ? 'Inactive' : 'Active';
         const maintenanceMonths = `"${getMonthsDisplay(client.selectedMonths)}"`;
         const nextDue = client.inactive ? 'N/A' : format(new Date(client.nextDue), 'MMM d, yyyy');
         
         if (parts.length === 0 && equipment.length === 0) {
-          csvRows.push(`${companyName},${location},${status},${maintenanceMonths},${nextDue},,,,,`);
+          csvRows.push(`${companyName},${location},${address},${city},${province},${postalCode},${contactName},${email},${phone},${roofLadderCode},${notes},${status},${maintenanceMonths},${nextDue},,,,,`);
         } else {
           const maxRows = Math.max(parts.length, equipment.length);
           for (let i = 0; i < maxRows; i++) {
@@ -129,7 +147,7 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
             const modelNum = equip?.modelNumber ? `"${equip.modelNumber.replace(/"/g, '""')}"` : '';
             const serialNum = equip?.serialNumber ? `"${equip.serialNumber.replace(/"/g, '""')}"` : '';
             
-            csvRows.push(`${companyName},${location},${status},${maintenanceMonths},${nextDue},${partName},${partQty},${equipName},${modelNum},${serialNum}`);
+            csvRows.push(`${companyName},${location},${address},${city},${province},${postalCode},${contactName},${email},${phone},${roofLadderCode},${notes},${status},${maintenanceMonths},${nextDue},${partName},${partQty},${equipName},${modelNum},${serialNum}`);
           }
         }
       });

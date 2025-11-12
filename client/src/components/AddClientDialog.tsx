@@ -15,6 +15,15 @@ import { cn } from "@/lib/utils";
 export interface ClientFormData {
   companyName: string;
   location: string;
+  address?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  roofLadderCode?: string;
+  notes?: string;
   selectedMonths: number[];
   inactive: boolean;
   parts: Array<{ partId: string; quantity: number }>;
@@ -173,6 +182,15 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
   const [formData, setFormData] = useState({
     companyName: "",
     location: "",
+    address: "",
+    city: "",
+    province: "",
+    postalCode: "",
+    contactName: "",
+    email: "",
+    phone: "",
+    roofLadderCode: "",
+    notes: "",
     selectedMonths: [] as number[],
     inactive: false,
   });
@@ -222,6 +240,15 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
         setFormData({
           companyName: editData.companyName,
           location: editData.location,
+          address: editData.address || "",
+          city: editData.city || "",
+          province: editData.province || "",
+          postalCode: editData.postalCode || "",
+          contactName: editData.contactName || "",
+          email: editData.email || "",
+          phone: editData.phone || "",
+          roofLadderCode: editData.roofLadderCode || "",
+          notes: editData.notes || "",
           selectedMonths: editData.selectedMonths,
           inactive: editData.inactive,
         });
@@ -252,6 +279,15 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
         setFormData({
           companyName: "",
           location: "",
+          address: "",
+          city: "",
+          province: "",
+          postalCode: "",
+          contactName: "",
+          email: "",
+          phone: "",
+          roofLadderCode: "",
+          notes: "",
           selectedMonths: [],
           inactive: false,
         });
@@ -358,7 +394,21 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
         parts: partsWithIds,
       });
 
-      setFormData({ companyName: "", location: "", selectedMonths: [], inactive: false });
+      setFormData({ 
+        companyName: "", 
+        location: "", 
+        address: "",
+        city: "",
+        province: "",
+        postalCode: "",
+        contactName: "",
+        email: "",
+        phone: "",
+        roofLadderCode: "",
+        notes: "",
+        selectedMonths: [], 
+        inactive: false 
+      });
       setClientParts([]);
       onClose();
     } catch (error) {
@@ -400,6 +450,119 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                   placeholder="Enter location or address"
                   required
                 />
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Contact Information</Label>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Address</Label>
+                    <Input
+                      id="address"
+                      data-testid="input-address"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      placeholder="Street address"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      data-testid="input-city"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      placeholder="City"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="province">Province/State</Label>
+                    <Input
+                      id="province"
+                      data-testid="input-province"
+                      value={formData.province}
+                      onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                      placeholder="Province or State"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="postalCode">Postal/Zip Code</Label>
+                    <Input
+                      id="postalCode"
+                      data-testid="input-postal-code"
+                      value={formData.postalCode}
+                      onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
+                      placeholder="Postal or Zip Code"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="contactName">Contact Name</Label>
+                  <Input
+                    id="contactName"
+                    data-testid="input-contact-name"
+                    value={formData.contactName}
+                    onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
+                    placeholder="Primary contact person"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      data-testid="input-email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="contact@example.com"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      data-testid="input-phone"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="(555) 123-4567"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="roofLadderCode">Roof/Ladder Code</Label>
+                  <Input
+                    id="roofLadderCode"
+                    data-testid="input-roof-ladder-code"
+                    value={formData.roofLadderCode}
+                    onChange={(e) => setFormData({ ...formData, roofLadderCode: e.target.value })}
+                    placeholder="Access code or instructions"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Input
+                    id="notes"
+                    data-testid="input-notes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="Additional notes or instructions"
+                  />
+                </div>
               </div>
               
               <Separator />

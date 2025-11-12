@@ -36,6 +36,15 @@ interface Client {
   id: string;
   companyName: string;
   location: string;
+  address?: string | null;
+  city?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
+  contactName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  roofLadderCode?: string | null;
+  notes?: string | null;
   selectedMonths: number[];
   inactive: boolean;
   nextDue: string;
@@ -158,6 +167,74 @@ export default function ClientReportPage() {
                     {format(new Date(client.nextDue), "MMMM d, yyyy")}
                   </p>
                 </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">Contact Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {client.address && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Address</p>
+                  <p className="text-base" data-testid="text-address">{client.address}</p>
+                </div>
+              )}
+              {client.city && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">City</p>
+                  <p className="text-base" data-testid="text-city">{client.city}</p>
+                </div>
+              )}
+              {client.province && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Province/State</p>
+                  <p className="text-base" data-testid="text-province">{client.province}</p>
+                </div>
+              )}
+              {client.postalCode && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Postal/Zip Code</p>
+                  <p className="text-base" data-testid="text-postal-code">{client.postalCode}</p>
+                </div>
+              )}
+              {client.contactName && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Contact Name</p>
+                  <p className="text-base" data-testid="text-contact-name">{client.contactName}</p>
+                </div>
+              )}
+              {client.email && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Email</p>
+                  <p className="text-base" data-testid="text-email">{client.email}</p>
+                </div>
+              )}
+              {client.phone && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Phone</p>
+                  <p className="text-base" data-testid="text-phone">{client.phone}</p>
+                </div>
+              )}
+              {client.roofLadderCode && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Roof/Ladder Code</p>
+                  <p className="text-base" data-testid="text-roof-ladder-code">{client.roofLadderCode}</p>
+                </div>
+              )}
+              {client.notes && (
+                <div className="md:col-span-2">
+                  <p className="text-sm font-medium text-muted-foreground">Notes</p>
+                  <p className="text-base" data-testid="text-notes">{client.notes}</p>
+                </div>
+              )}
+              {!client.address && !client.city && !client.province && !client.postalCode && 
+               !client.contactName && !client.email && !client.phone && !client.roofLadderCode && !client.notes && (
+                <p className="text-sm text-muted-foreground md:col-span-2">No contact information available</p>
               )}
             </div>
           </CardContent>
