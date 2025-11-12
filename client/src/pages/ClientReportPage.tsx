@@ -35,7 +35,7 @@ interface Equipment {
 interface Client {
   id: string;
   companyName: string;
-  location: string;
+  location?: string | null;
   address?: string | null;
   city?: string | null;
   province?: string | null;
@@ -150,10 +150,12 @@ export default function ClientReportPage() {
                 <p className="text-sm font-medium text-muted-foreground">Company Name</p>
                 <p className="text-lg font-semibold" data-testid="text-company-name">{client.companyName}</p>
               </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Location</p>
-                <p className="text-lg" data-testid="text-location">{client.location}</p>
-              </div>
+              {client.location && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Location Name</p>
+                  <p className="text-lg" data-testid="text-location">{client.location}</p>
+                </div>
+              )}
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Status</p>
                 <p className="text-lg" data-testid="text-status">

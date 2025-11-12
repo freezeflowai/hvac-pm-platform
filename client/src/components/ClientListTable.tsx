@@ -21,7 +21,7 @@ import {
 export interface Client {
   id: string;
   companyName: string;
-  location: string;
+  location?: string | null;
   address?: string | null;
   city?: string | null;
   province?: string | null;
@@ -80,7 +80,8 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
     .filter(
       (client) =>
         client.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.location.toLowerCase().includes(searchTerm.toLowerCase())
+        (client.location && client.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (client.address && client.address.toLowerCase().includes(searchTerm.toLowerCase()))
     )
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
@@ -119,7 +120,7 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
       
       allData.forEach(({ client, parts, equipment }) => {
         const companyName = `"${client.companyName.replace(/"/g, '""')}"`;
-        const location = `"${client.location.replace(/"/g, '""')}"`;
+        const location = client.location ? `"${client.location.replace(/"/g, '""')}"` : '';
         const address = client.address ? `"${client.address.replace(/"/g, '""')}"` : '';
         const city = client.city ? `"${client.city.replace(/"/g, '""')}"` : '';
         const province = client.province ? `"${client.province.replace(/"/g, '""')}"` : '';
@@ -226,6 +227,7 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
               <tr className="border-b">
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Company</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Location</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Address</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Maintenance Months</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Next Due</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
@@ -243,7 +245,10 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                     {client.companyName}
                   </td>
                   <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`text-location-${client.id}`}>
-                    {client.location}
+                    {client.location || '—'}
+                  </td>
+                  <td className="py-3 px-4 text-sm text-muted-foreground" data-testid={`text-address-${client.id}`}>
+                    {client.address || '—'}
                   </td>
                   <td className="py-3 px-4 text-sm">
                     <span className="text-muted-foreground">{getMonthsDisplay(client.selectedMonths)}</span>
@@ -297,7 +302,8 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="font-medium">{client.companyName}</div>
-                      <div className="text-sm text-muted-foreground">{client.location}</div>
+                      {client.location && <div className="text-sm text-muted-foreground">{client.location}</div>}
+                      {client.address && <div className="text-sm text-muted-foreground">{client.address}</div>}
                     </div>
                     <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <Button

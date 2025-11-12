@@ -22,7 +22,7 @@ export interface Equipment {
 interface Client {
   id: string;
   companyName: string;
-  location: string;
+  location?: string | null;
   inactive: boolean;
 }
 

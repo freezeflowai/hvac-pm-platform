@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 export interface ClientFormData {
   companyName: string;
-  location: string;
+  location?: string;
   address?: string;
   city?: string;
   province?: string;
