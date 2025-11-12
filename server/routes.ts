@@ -664,6 +664,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/users/:id/seed-parts", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Verify user exists
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      await storage.seedUserParts(id);
+      const parts = await storage.getAllParts(id);
+      
+      res.json({ 
+        success: true,
+        message: "Standard parts seeded successfully",
+        count: parts.length
+      });
+    } catch (error) {
+      console.error('Seed parts error:', error);
+      res.status(500).json({ error: "Failed to seed parts" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
