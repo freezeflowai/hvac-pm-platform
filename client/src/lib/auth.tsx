@@ -37,9 +37,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await apiRequest("POST", "/api/auth/login", { email, password });
       return await response.json() as User;
     },
-    onSuccess: (data) => {
-      setUser(data);
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    onSuccess: (userData) => {
+      setUser(userData);
     },
   });
 
@@ -48,9 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await apiRequest("POST", "/api/auth/signup", { email, password });
       return await response.json() as User;
     },
-    onSuccess: (data) => {
-      setUser(data);
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    onSuccess: (userData) => {
+      setUser(userData);
     },
   });
 
