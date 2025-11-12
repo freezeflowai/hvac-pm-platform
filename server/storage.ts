@@ -10,7 +10,9 @@ import {
   type MaintenanceRecord,
   type InsertMaintenanceRecord,
   type PasswordResetToken,
-  type InsertPasswordResetToken
+  type InsertPasswordResetToken,
+  type Equipment,
+  type InsertEquipment
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -67,6 +69,13 @@ export interface IStorage {
   createMaintenanceRecord(userId: string, record: InsertMaintenanceRecord): Promise<MaintenanceRecord>;
   updateMaintenanceRecord(userId: string, id: string, record: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined>;
   deleteMaintenanceRecord(userId: string, id: string): Promise<boolean>;
+  
+  // Equipment methods
+  getClientEquipment(userId: string, clientId: string): Promise<Equipment[]>;
+  getEquipment(userId: string, id: string): Promise<Equipment | undefined>;
+  createEquipment(userId: string, equipment: InsertEquipment): Promise<Equipment>;
+  updateEquipment(userId: string, id: string, equipment: Partial<InsertEquipment>): Promise<Equipment | undefined>;
+  deleteEquipment(userId: string, id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -473,10 +482,43 @@ export class MemStorage implements IStorage {
     if (!existing || existing.userId !== userId) return false;
     return this.maintenanceRecords.delete(id);
   }
+
+  // Equipment methods
+  async getClientEquipment(userId: string, clientId: string): Promise<Equipment[]> {
+    return Array.from(this.maintenanceRecords.values()).filter(
+      (eq) => eq.userId === userId && eq.clientId === clientId
+    ) as unknown as Equipment[];
+  }
+
+  async getEquipment(userId: string, id: string): Promise<Equipment | undefined> {
+    return undefined;
+  }
+
+  async createEquipment(userId: string, equipment: InsertEquipment): Promise<Equipment> {
+    const id = randomUUID();
+    const newEquipment: Equipment = { 
+      ...equipment,
+      userId,
+      id,
+      createdAt: new Date().toISOString(),
+      modelNumber: equipment.modelNumber ?? null,
+      serialNumber: equipment.serialNumber ?? null,
+      notes: equipment.notes ?? null
+    };
+    return newEquipment;
+  }
+
+  async updateEquipment(userId: string, id: string, equipment: Partial<InsertEquipment>): Promise<Equipment | undefined> {
+    return undefined;
+  }
+
+  async deleteEquipment(userId: string, id: string): Promise<boolean> {
+    return false;
+  }
 }
 
 import { db } from './db';
-import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens } from '@shared/schema';
+import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment } from '@shared/schema';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
@@ -821,6 +863,46 @@ export class DbStorage implements IStorage {
 
   async deleteMaintenanceRecord(userId: string, id: string): Promise<boolean> {
     const result = await db.delete(maintenanceRecords).where(and(eq(maintenanceRecords.id, id), eq(maintenanceRecords.userId, userId))).returning();
+    return result.length > 0;
+  }
+
+  // Equipment methods
+  async getClientEquipment(userId: string, clientId: string): Promise<Equipment[]> {
+    return db.select()
+      .from(equipment)
+      .where(and(
+        eq(equipment.userId, userId),
+        eq(equipment.clientId, clientId)
+      ))
+      .orderBy(equipment.createdAt);
+  }
+
+  async getEquipment(userId: string, id: string): Promise<Equipment | undefined> {
+    const result = await db.select()
+      .from(equipment)
+      .where(and(eq(equipment.id, id), eq(equipment.userId, userId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createEquipment(userId: string, insertEquipment: InsertEquipment): Promise<Equipment> {
+    // Verify that the client belongs to the userId
+    const client = await this.getClient(userId, insertEquipment.clientId);
+    if (!client) {
+      throw new Error("Client not found or does not belong to user");
+    }
+    
+    const result = await db.insert(equipment).values({ ...insertEquipment, userId }).returning();
+    return result[0];
+  }
+
+  async updateEquipment(userId: string, id: string, equipmentUpdate: Partial<InsertEquipment>): Promise<Equipment | undefined> {
+    const result = await db.update(equipment).set(equipmentUpdate).where(and(eq(equipment.id, id), eq(equipment.userId, userId))).returning();
+    return result[0];
+  }
+
+  async deleteEquipment(userId: string, id: string): Promise<boolean> {
+    const result = await db.delete(equipment).where(and(eq(equipment.id, id), eq(equipment.userId, userId))).returning();
     return result.length > 0;
   }
 }
