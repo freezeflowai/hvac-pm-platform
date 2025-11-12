@@ -441,14 +441,13 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
+                <Label htmlFor="location">Location Name (Optional)</Label>
                 <Input
                   id="location"
                   data-testid="input-location"
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="Enter location or address"
-                  required
+                  placeholder="Enter location name"
                 />
               </div>
               
