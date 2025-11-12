@@ -6,6 +6,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import AddClientDialog, { ClientFormData } from "@/components/AddClientDialog";
+import type { Client } from "@shared/schema";
 
 export default function AddClientPage() {
   const [, setLocation] = useLocation();
@@ -13,15 +14,9 @@ export default function AddClientPage() {
   const { toast } = useToast();
   const isEditing = Boolean(id);
 
-  const {data: client, isLoading} = useQuery({
+  const {data: client, isLoading} = useQuery<Client>({
     queryKey: id ? ["/api/clients", id] : [],
     enabled: Boolean(id),
-    queryFn: async () => {
-      if (!id) return null;
-      const res = await fetch(`/api/clients/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch client");
-      return res.json();
-    },
   });
 
   const { data: clientParts = [] } = useQuery<any[]>({
