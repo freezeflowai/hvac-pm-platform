@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, ShieldCheck, ShieldOff } from "lucide-react";
+import { Trash2, ShieldCheck, ShieldOff, Package } from "lucide-react";
 import Header from "@/components/Header";
 import {
   AlertDialog,
@@ -67,6 +67,26 @@ export default function Admin() {
       toast({
         title: "Error",
         description: error.message || "Failed to update admin status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const seedPartsMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await apiRequest("POST", `/api/admin/users/${userId}/seed-parts`);
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Parts seeded successfully",
+        description: `${data.count} standard parts have been added to the user's inventory.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to seed parts",
         variant: "destructive",
       });
     },
@@ -136,6 +156,17 @@ export default function Admin() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    disabled={seedPartsMutation.isPending}
+                    onClick={() => seedPartsMutation.mutate(user.id)}
+                    data-testid={`button-seed-parts-${user.id}`}
+                    title="Seed standard parts inventory"
+                  >
+                    <Package className="h-4 w-4" />
+                  </Button>
+
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
