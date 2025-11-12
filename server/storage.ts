@@ -632,6 +632,18 @@ export class DbStorage implements IStorage {
   }
 
   async addClientPart(userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
+    // Verify that the client belongs to the userId
+    const client = await this.getClient(userId, insertClientPart.clientId);
+    if (!client) {
+      throw new Error("Client not found or does not belong to user");
+    }
+    
+    // Verify that the part belongs to the userId
+    const part = await this.getPart(userId, insertClientPart.partId);
+    if (!part) {
+      throw new Error("Part not found or does not belong to user");
+    }
+    
     const result = await db.insert(clientParts).values({ ...insertClientPart, userId }).returning();
     return result[0];
   }
@@ -755,6 +767,12 @@ export class DbStorage implements IStorage {
   }
 
   async createMaintenanceRecord(userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
+    // Verify that the client belongs to the userId
+    const client = await this.getClient(userId, insertRecord.clientId);
+    if (!client) {
+      throw new Error("Client not found or does not belong to user");
+    }
+    
     const result = await db.insert(maintenanceRecords).values({ ...insertRecord, userId }).returning();
     return result[0];
   }
