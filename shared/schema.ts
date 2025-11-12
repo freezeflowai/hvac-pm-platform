@@ -46,6 +46,8 @@ export const clients = pgTable("clients", {
   selectedMonths: integer("selected_months").array().notNull(),
   inactive: boolean("inactive").notNull().default(false),
   nextDue: text("next_due").notNull(),
+  portalEnabled: boolean("portal_enabled").notNull().default(false),
+  lastPortalLogin: timestamp("last_portal_login"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -134,3 +136,22 @@ export const insertEquipmentSchema = createInsertSchema(equipment).omit({
 
 export type InsertEquipment = z.infer<typeof insertEquipmentSchema>;
 export type Equipment = typeof equipment.$inferSelect;
+
+export const clientUsers = pgTable("client_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }).unique(),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertClientUserSchema = createInsertSchema(clientUsers).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export type InsertClientUser = z.infer<typeof insertClientUserSchema>;
+export type ClientUser = typeof clientUsers.$inferSelect;
