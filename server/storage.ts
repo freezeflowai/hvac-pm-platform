@@ -292,6 +292,18 @@ export class MemStorage implements IStorage {
   }
 
   async addClientPart(userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
+    // Verify that the client belongs to the userId
+    const client = this.clients.get(insertClientPart.clientId);
+    if (!client || client.userId !== userId) {
+      throw new Error("Client not found or does not belong to user");
+    }
+    
+    // Verify that the part belongs to the userId
+    const part = this.parts.get(insertClientPart.partId);
+    if (!part || part.userId !== userId) {
+      throw new Error("Part not found or does not belong to user");
+    }
+    
     const id = randomUUID();
     const clientPart: ClientPart = { ...insertClientPart, userId, id };
     this.clientParts.set(id, clientPart);
@@ -409,6 +421,12 @@ export class MemStorage implements IStorage {
   }
 
   async createMaintenanceRecord(userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
+    // Verify that the client belongs to the userId
+    const client = this.clients.get(insertRecord.clientId);
+    if (!client || client.userId !== userId) {
+      throw new Error("Client not found or does not belong to user");
+    }
+    
     const id = randomUUID();
     const record: MaintenanceRecord = { 
       ...insertRecord,
