@@ -21,6 +21,11 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserPassword(id: string, hashedPassword: string): Promise<void>;
   
+  // Admin user management methods
+  getAllUsers(): Promise<User[]>;
+  deleteUser(id: string): Promise<boolean>;
+  updateUserAdminStatus(id: string, isAdmin: boolean): Promise<void>;
+  
   // Password reset token methods
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
   getPasswordResetToken(id: string): Promise<PasswordResetToken | undefined>;
@@ -94,7 +99,7 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
+    const user: User = { ...insertUser, id, isAdmin: false };
     this.users.set(id, user);
     return user;
   }
@@ -103,6 +108,22 @@ export class MemStorage implements IStorage {
     const user = this.users.get(id);
     if (user) {
       this.users.set(id, { ...user, password: hashedPassword });
+    }
+  }
+
+  // Admin user management methods
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    return this.users.delete(id);
+  }
+
+  async updateUserAdminStatus(id: string, isAdmin: boolean): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      this.users.set(id, { ...user, isAdmin });
     }
   }
 
@@ -477,6 +498,22 @@ export class DbStorage implements IStorage {
 
   async updateUserPassword(id: string, hashedPassword: string): Promise<void> {
     await db.update(users).set({ password: hashedPassword }).where(eq(users.id, id));
+  }
+
+  // Admin user management methods
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users);
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    // Foreign key constraints with ON DELETE CASCADE will automatically delete
+    // all user data (clients, parts, client_parts, maintenance_records)
+    const result = await db.delete(users).where(eq(users.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async updateUserAdminStatus(id: string, isAdmin: boolean): Promise<void> {
+    await db.update(users).set({ isAdmin }).where(eq(users.id, id));
   }
 
   // Password reset token methods

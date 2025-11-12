@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema } from "@shared/schema";
-import { passport } from "./auth";
+import { passport, isAdmin } from "./auth";
 import { z } from "zod";
 
 function isAuthenticated(req: Request, res: Response, next: NextFunction) {
@@ -40,7 +40,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (err) {
             return res.status(500).json({ error: "Failed to login after signup" });
           }
-          res.json({ id: user.id, email: user.email });
+          res.json({ id: user.id, email: user.email, isAdmin: user.isAdmin });
         });
       });
     } catch (error) {
@@ -64,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (err) {
             return res.status(500).json({ error: "Failed to login" });
           }
-          res.json({ id: user.id, email: user.email });
+          res.json({ id: user.id, email: user.email, isAdmin: user.isAdmin });
         });
       });
     })(req, res, next);
@@ -87,7 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/user", (req, res) => {
     if (req.isAuthenticated() && req.user) {
-      res.json({ id: req.user.id, email: req.user.email });
+      res.json({ id: req.user.id, email: req.user.email, isAdmin: req.user.isAdmin });
     } else {
       res.status(401).json({ error: "Not authenticated" });
     }
@@ -591,6 +591,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Toggle maintenance error:', error);
       res.status(500).json({ error: "Failed to toggle maintenance status" });
+    }
+  });
+
+  // Admin routes - only accessible by admin users
+  app.get("/api/admin/users", isAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      // Don't send passwords to the client
+      const sanitizedUsers = users.map(({ password, ...user }) => user);
+      res.json(sanitizedUsers);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Prevent deleting yourself
+      if (id === req.user!.id) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+      
+      // Check if this is the last admin
+      const users = await storage.getAllUsers();
+      const adminUsers = users.filter(u => u.isAdmin);
+      const userToDelete = users.find(u => u.id === id);
+      
+      if (userToDelete?.isAdmin && adminUsers.length === 1) {
+        return res.status(400).json({ error: "Cannot delete the last admin user" });
+      }
+      
+      const deleted = await storage.deleteUser(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete user error:', error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/admin", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isAdmin: newAdminStatus } = req.body;
+      
+      if (typeof newAdminStatus !== 'boolean') {
+        return res.status(400).json({ error: "Invalid admin status" });
+      }
+      
+      // If demoting from admin, check if this is the last admin
+      if (!newAdminStatus) {
+        const users = await storage.getAllUsers();
+        const adminUsers = users.filter(u => u.isAdmin);
+        const userToUpdate = users.find(u => u.id === id);
+        
+        if (userToUpdate?.isAdmin && adminUsers.length === 1) {
+          return res.status(400).json({ error: "Cannot demote the last admin user" });
+        }
+      }
+      
+      await storage.updateUserAdminStatus(id, newAdminStatus);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Update admin status error:', error);
+      res.status(500).json({ error: "Failed to update admin status" });
     }
   });
 

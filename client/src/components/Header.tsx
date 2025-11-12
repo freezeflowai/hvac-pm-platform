@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Plus, LayoutDashboard, FileText, LogOut, User } from "lucide-react";
+import { Plus, LayoutDashboard, FileText, LogOut, User, Shield } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +62,19 @@ export default function Header({ onAddClient }: HeaderProps) {
                   Reports
                 </Button>
               </Link>
+              {user?.isAdmin && (
+                <Link href="/admin">
+                  <Button
+                    variant={location === "/admin" ? "default" : "ghost"}
+                    size="sm"
+                    className="gap-2"
+                    data-testid="nav-admin"
+                  >
+                    <Shield className="h-4 w-4" />
+                    Admin
+                  </Button>
+                </Link>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-3">

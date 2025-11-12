@@ -40,3 +40,24 @@ passport.deserializeUser(async (id: string, done) => {
 });
 
 export { passport };
+
+// Middleware to check if user is authenticated
+export function isAuthenticated(req: any, res: any, next: any) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  res.status(401).json({ error: "Not authenticated" });
+}
+
+// Middleware to check if user is an admin
+export function isAdmin(req: any, res: any, next: any) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  
+  if (!req.user?.isAdmin) {
+    return res.status(403).json({ error: "Access denied. Admin privileges required." });
+  }
+  
+  next();
+}

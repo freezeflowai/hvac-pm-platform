@@ -7,6 +7,7 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  isAdmin: boolean("is_admin").notNull().default(false),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -50,6 +51,7 @@ export const clients = pgTable("clients", {
 
 export const insertClientSchema = createInsertSchema(clients).omit({
   id: true,
+  userId: true,
   createdAt: true,
 });
 
@@ -74,6 +76,7 @@ export const parts = pgTable("parts", {
 
 export const insertPartSchema = createInsertSchema(parts).omit({
   id: true,
+  userId: true,
   createdAt: true,
 });
 
@@ -90,6 +93,7 @@ export const clientParts = pgTable("client_parts", {
 
 export const insertClientPartSchema = createInsertSchema(clientParts).omit({
   id: true,
+  userId: true,
 });
 
 export type InsertClientPart = z.infer<typeof insertClientPartSchema>;
@@ -105,6 +109,7 @@ export const maintenanceRecords = pgTable("maintenance_records", {
 
 export const insertMaintenanceRecordSchema = createInsertSchema(maintenanceRecords).omit({
   id: true,
+  userId: true,
 });
 
 export type InsertMaintenanceRecord = z.infer<typeof insertMaintenanceRecordSchema>;

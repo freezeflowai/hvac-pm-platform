@@ -7,6 +7,7 @@ import { AuthProvider } from "@/lib/auth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Dashboard from "@/pages/Dashboard";
 import Reports from "@/pages/Reports";
+import Admin from "@/pages/Admin";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import RequestReset from "@/pages/RequestReset";
@@ -28,6 +29,11 @@ function Router() {
       <Route path="/reports">
         <ProtectedRoute>
           <Reports />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin">
+        <ProtectedRoute>
+          <Admin />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />
