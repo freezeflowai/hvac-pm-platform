@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import Header from "@/components/Header";
 import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
@@ -61,9 +62,15 @@ interface ClientPart {
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const [location] = useLocation();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showPartsDialog, setShowPartsDialog] = useState(false);
   const [editingClient, setEditingClient] = useState<(Client & { parts: Array<{ partId: string; quantity: number }> }) | null>(null);
+
+  // Read tab from URL query parameter
+  const urlParams = new URLSearchParams(location.split('?')[1] || '');
+  const tabParam = urlParams.get('tab');
+  const initialTab = tabParam === 'clients' ? 'clients' : 'schedule';
 
   const { data: dbClients = [], isLoading } = useQuery<DBClient[]>({
     queryKey: ["/api/clients"],
@@ -371,7 +378,7 @@ export default function Dashboard() {
           <StatsCard title="Completed" value={completedCount} icon={CheckCircle} variant="default" />
         </div>
 
-        <Tabs defaultValue="schedule" className="space-y-4">
+        <Tabs defaultValue={initialTab} className="space-y-4">
           <TabsList data-testid="tabs-main-nav">
             <TabsTrigger value="schedule" data-testid="tab-schedule">
               Schedule

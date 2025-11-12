@@ -87,7 +87,7 @@ export default function ClientReportPage() {
   };
 
   const handleBack = () => {
-    setLocation("/");
+    setLocation("/?tab=clients");
   };
 
   if (isLoading) {
