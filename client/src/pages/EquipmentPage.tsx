@@ -116,7 +116,7 @@ export default function EquipmentPage() {
     setRows(updatedRows);
   };
 
-  const handleDeleteRow = (index: number) => {
+  const handleDeleteRow = async (index: number) => {
     const row = rows[index];
     
     if (row.isNew) {
@@ -125,7 +125,15 @@ export default function EquipmentPage() {
       setRows(updatedRows);
     } else if (row.id) {
       if (confirm('Are you sure you want to delete this equipment?')) {
-        deleteMutation.mutate(row.id);
+        try {
+          await deleteMutation.mutateAsync(row.id);
+          // Immediately remove from local state
+          const updatedRows = [...rows];
+          updatedRows.splice(index, 1);
+          setRows(updatedRows);
+        } catch (error) {
+          // Error toast is already shown by mutation
+        }
       }
     }
   };
