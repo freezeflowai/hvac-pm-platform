@@ -62,7 +62,7 @@ interface ClientPart {
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showPartsDialog, setShowPartsDialog] = useState(false);
   const [editingClient, setEditingClient] = useState<(Client & { parts: Array<{ partId: string; quantity: number }> }) | null>(null);
@@ -71,6 +71,14 @@ export default function Dashboard() {
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const tabParam = urlParams.get('tab');
   const activeTab = tabParam === 'clients' ? 'clients' : 'schedule';
+
+  const handleTabChange = (value: string) => {
+    if (value === 'clients') {
+      setLocation('/?tab=clients');
+    } else {
+      setLocation('/');
+    }
+  };
 
   const { data: dbClients = [], isLoading } = useQuery<DBClient[]>({
     queryKey: ["/api/clients"],
@@ -378,7 +386,7 @@ export default function Dashboard() {
           <StatsCard title="Completed" value={completedCount} icon={CheckCircle} variant="default" />
         </div>
 
-        <Tabs value={activeTab} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList data-testid="tabs-main-nav">
             <TabsTrigger value="schedule" data-testid="tab-schedule">
               Schedule
