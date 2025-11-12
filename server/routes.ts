@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema } from "@shared/schema";
 import { passport, isAdmin } from "./auth";
 import { z } from "zod";
 
@@ -591,6 +591,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Toggle maintenance error:', error);
       res.status(500).json({ error: "Failed to toggle maintenance status" });
+    }
+  });
+
+  // Equipment routes
+  app.get("/api/clients/:clientId/equipment", isAuthenticated, async (req, res) => {
+    try {
+      const equipment = await storage.getClientEquipment(req.user!.id, req.params.clientId);
+      res.json(equipment);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch equipment" });
+    }
+  });
+
+  app.post("/api/clients/:clientId/equipment", isAuthenticated, async (req, res) => {
+    try {
+      const validated = insertEquipmentSchema.parse(req.body);
+      const equipment = await storage.createEquipment(req.user!.id, {
+        ...validated,
+        clientId: req.params.clientId
+      });
+      res.json(equipment);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid equipment data" });
+    }
+  });
+
+  app.put("/api/equipment/:id", isAuthenticated, async (req, res) => {
+    try {
+      const validated = insertEquipmentSchema.partial().parse(req.body);
+      const equipment = await storage.updateEquipment(req.user!.id, req.params.id, validated);
+      if (!equipment) {
+        return res.status(404).json({ error: "Equipment not found" });
+      }
+      res.json(equipment);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid equipment data" });
+    }
+  });
+
+  app.delete("/api/equipment/:id", isAuthenticated, async (req, res) => {
+    try {
+      const deleted = await storage.deleteEquipment(req.user!.id, req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Equipment not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete equipment" });
     }
   });
 
