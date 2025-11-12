@@ -255,6 +255,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/clients/:id", isAuthenticated, async (req, res) => {
+    try {
+      const client = await storage.getClient(req.user!.id, req.params.id);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      res.json(client);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch client" });
+    }
+  });
+
   app.get("/api/clients/:id/report", isAuthenticated, async (req, res) => {
     try {
       const report = await storage.getClientReport(req.user!.id, req.params.id);
