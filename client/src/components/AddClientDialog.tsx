@@ -5,12 +5,15 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect, useRef } from "react";
 import { Separator } from "@/components/ui/separator";
-import { Plus, X, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, X, Check, ChevronsUpDown, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 export interface ClientFormData {
   companyName: string;
@@ -29,6 +32,14 @@ export interface ClientPart {
   name?: string | null;
   description?: string | null;
   quantity: number;
+}
+
+export interface ClientEquipment {
+  id?: string;
+  name: string;
+  modelNumber?: string;
+  serialNumber?: string;
+  notes?: string;
 }
 
 interface AddClientDialogProps {
@@ -66,6 +77,107 @@ interface PendingPart {
   partId: string;
   quantity: number;
   category: 'filter' | 'belt' | 'other';
+}
+
+interface EquipmentFormProps {
+  equipment: ClientEquipment | null;
+  onSave: (equipment: ClientEquipment) => void;
+  onCancel: () => void;
+}
+
+function EquipmentForm({ equipment, onSave, onCancel }: EquipmentFormProps) {
+  const [formData, setFormData] = useState<ClientEquipment>({
+    id: equipment?.id,
+    name: equipment?.name || '',
+    modelNumber: equipment?.modelNumber || '',
+    serialNumber: equipment?.serialNumber || '',
+    notes: equipment?.notes || '',
+  });
+
+  // Sync form data when equipment prop changes
+  useEffect(() => {
+    setFormData({
+      id: equipment?.id,
+      name: equipment?.name || '',
+      modelNumber: equipment?.modelNumber || '',
+      serialNumber: equipment?.serialNumber || '',
+      notes: equipment?.notes || '',
+    });
+  }, [equipment]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name.trim()) return;
+    onSave(formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="border rounded-md p-3 space-y-3" data-testid="form-equipment">
+      <div className="space-y-2">
+        <Label htmlFor="equipment-name">Equipment Name *</Label>
+        <Input
+          id="equipment-name"
+          data-testid="input-equipment-name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          placeholder="e.g., Rooftop Unit #1"
+          required
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-2">
+          <Label htmlFor="equipment-model">Model #</Label>
+          <Input
+            id="equipment-model"
+            data-testid="input-equipment-model"
+            value={formData.modelNumber || ''}
+            onChange={(e) => setFormData({ ...formData, modelNumber: e.target.value })}
+            placeholder="Model number"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="equipment-serial">Serial #</Label>
+          <Input
+            id="equipment-serial"
+            data-testid="input-equipment-serial"
+            value={formData.serialNumber || ''}
+            onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
+            placeholder="Serial number"
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="equipment-notes">Notes</Label>
+        <Textarea
+          id="equipment-notes"
+          data-testid="input-equipment-notes"
+          value={formData.notes || ''}
+          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          placeholder="Additional notes or details..."
+          rows={2}
+        />
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={onCancel}
+          data-testid="button-cancel-equipment"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          size="sm"
+          data-testid="button-save-equipment"
+          disabled={!formData.name.trim()}
+        >
+          Save Equipment
+        </Button>
+      </div>
+    </form>
+  );
 }
 
 interface PartCommandPickerProps {
@@ -182,6 +294,9 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
   const [pendingParts, setPendingParts] = useState<PendingPart[]>([]);
   const addPartFormRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
+  const [equipment, setEquipment] = useState<ClientEquipment[]>([]);
+  const [editingEquipment, setEditingEquipment] = useState<ClientEquipment | null>(null);
+  const [showAddEquipment, setShowAddEquipment] = useState(false);
 
   const { data: availableParts = [] } = useQuery<Array<{ 
     id: string; 
@@ -217,7 +332,7 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   useEffect(() => {
-    const loadClientParts = async () => {
+    const loadClientData = async () => {
       if (editData) {
         setFormData({
           companyName: editData.companyName,
@@ -248,6 +363,20 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
           console.error('Failed to load client parts', error);
           setClientParts([]);
         }
+
+        // Load equipment data
+        try {
+          const res = await fetch(`/api/clients/${editData.id}/equipment`);
+          if (res.ok) {
+            const equipmentData = await res.json();
+            setEquipment(equipmentData);
+          } else {
+            setEquipment([]);
+          }
+        } catch (error) {
+          console.error('Failed to load client equipment', error);
+          setEquipment([]);
+        }
       } else {
         setFormData({
           companyName: "",
@@ -257,14 +386,17 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
         });
         setClientParts([]);
         setPendingParts([]);
+        setEquipment([]);
       }
     };
 
     if (open) {
-      loadClientParts();
+      loadClientData();
     } else {
       setPendingParts([]);
       setShowAddPart(false);
+      setShowAddEquipment(false);
+      setEditingEquipment(null);
     }
   }, [editData?.id, open]);
 
@@ -339,6 +471,59 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
     setClientParts(prev => prev.map((part, i) => 
       i === index ? { ...part, quantity } : part
     ));
+  };
+
+  // Equipment handlers
+  const handleSaveEquipment = async (equipmentData: ClientEquipment) => {
+    if (!editData) {
+      // For new clients, just add to local state
+      if (editingEquipment && editingEquipment.id) {
+        setEquipment(prev => prev.map(e => e.id === editingEquipment.id ? { ...equipmentData, id: editingEquipment.id } : e));
+      } else {
+        setEquipment(prev => [...prev, { ...equipmentData, id: `temp-${Date.now()}` }]);
+      }
+      setEditingEquipment(null);
+      setShowAddEquipment(false);
+      return;
+    }
+
+    // For existing clients, save to API
+    try {
+      if (editingEquipment && editingEquipment.id && !editingEquipment.id.startsWith('temp-')) {
+        const res = await apiRequest('PUT', `/api/equipment/${editingEquipment.id}`, equipmentData);
+        const updated = await res.json() as ClientEquipment;
+        setEquipment(prev => prev.map(e => e.id === editingEquipment.id ? updated : e));
+      } else {
+        const res = await apiRequest('POST', `/api/clients/${editData.id}/equipment`, equipmentData);
+        const created = await res.json() as ClientEquipment;
+        setEquipment(prev => [...prev.filter(e => e.id !== editingEquipment?.id), created]);
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', editData.id, 'equipment'] });
+      setEditingEquipment(null);
+      setShowAddEquipment(false);
+    } catch (error) {
+      console.error('Failed to save equipment', error);
+    }
+  };
+
+  const handleEditEquipment = (eq: ClientEquipment) => {
+    setEditingEquipment(eq);
+    setShowAddEquipment(true);
+  };
+
+  const handleDeleteEquipment = async (equipmentId: string) => {
+    if (!editData || equipmentId.startsWith('temp-')) {
+      setEquipment(prev => prev.filter(e => e.id !== equipmentId));
+      return;
+    }
+
+    try {
+      await apiRequest('DELETE', `/api/equipment/${equipmentId}`);
+      setEquipment(prev => prev.filter(e => e.id !== equipmentId));
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', editData.id, 'equipment'] });
+    } catch (error) {
+      console.error('Failed to delete equipment', error);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -709,6 +894,91 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
 
                 {clientParts.length === 0 && !showAddPart && (
                   <p className="text-sm text-muted-foreground">No parts added yet. Click "Add Part" to add required parts.</p>
+                )}
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Wrench className="h-4 w-4" />
+                    Equipment
+                  </Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingEquipment({ name: '', modelNumber: '', serialNumber: '', notes: '' });
+                      setShowAddEquipment(true);
+                    }}
+                    data-testid="button-add-equipment"
+                    className="gap-2"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add Equipment
+                  </Button>
+                </div>
+
+                {showAddEquipment && (
+                  <EquipmentForm
+                    equipment={editingEquipment}
+                    onSave={handleSaveEquipment}
+                    onCancel={() => {
+                      setShowAddEquipment(false);
+                      setEditingEquipment(null);
+                    }}
+                  />
+                )}
+
+                {equipment.length > 0 && (
+                  <div className="space-y-2">
+                    {equipment.map((eq, index) => (
+                      <div
+                        key={eq.id || index}
+                        className="flex items-start gap-2 p-3 border rounded-md"
+                        data-testid={`equipment-item-${index}`}
+                      >
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <p className="text-sm font-medium">{eq.name}</p>
+                          {(eq.modelNumber || eq.serialNumber) && (
+                            <div className="text-xs text-muted-foreground space-y-0.5">
+                              {eq.modelNumber && <p>Model: {eq.modelNumber}</p>}
+                              {eq.serialNumber && <p>Serial: {eq.serialNumber}</p>}
+                            </div>
+                          )}
+                          {eq.notes && (
+                            <p className="text-xs text-muted-foreground italic">{eq.notes}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditEquipment(eq)}
+                            data-testid={`button-edit-equipment-${index}`}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteEquipment(eq.id!)}
+                            data-testid={`button-delete-equipment-${index}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {equipment.length === 0 && !showAddEquipment && (
+                  <p className="text-sm text-muted-foreground">No equipment added yet. Click "Add Equipment" to track client equipment.</p>
                 )}
               </div>
             </div>
