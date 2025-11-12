@@ -4,7 +4,6 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema } from "@shared/schema";
-import { STANDARD_FILTERS, STANDARD_BELTS } from "./seed-data";
 import { passport } from "./auth";
 import { z } from "zod";
 
@@ -15,32 +14,7 @@ function isAuthenticated(req: Request, res: Response, next: NextFunction) {
   res.status(401).json({ error: "Not authenticated" });
 }
 
-async function seedStandardParts() {
-  try {
-    const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
-    let created = 0;
-    let skipped = 0;
-    
-    for (const partData of allSeedParts) {
-      const existingPart = await storage.findDuplicatePart(partData);
-      
-      if (!existingPart) {
-        await storage.createPart(partData);
-        created++;
-      } else {
-        skipped++;
-      }
-    }
-    
-    console.log(`✓ Parts inventory seeded: ${created} created, ${skipped} already existed (${allSeedParts.length} total)`);
-  } catch (error) {
-    console.error('✗ Failed to seed parts inventory:', error);
-  }
-}
-
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Automatically seed standard parts inventory on server startup
-  await seedStandardParts();
   
   // Authentication routes
   app.post("/api/auth/signup", async (req, res) => {
@@ -54,6 +28,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = await storage.createUser({ email, password: hashedPassword });
+      
+      // Seed standard parts for the new user
+      await storage.seedUserParts(user.id);
       
       req.session.regenerate((err) => {
         if (err) {
@@ -259,9 +236,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Client routes
-  app.get("/api/clients", isAuthenticated, async (_req, res) => {
+  app.get("/api/clients", isAuthenticated, async (req, res) => {
     try {
-      const clients = await storage.getAllClients();
+      const clients = await storage.getAllClients(req.user!.id);
       res.json(clients);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch clients" });
@@ -271,7 +248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/clients", isAuthenticated, async (req, res) => {
     try {
       const validated = insertClientSchema.parse(req.body);
-      const client = await storage.createClient(validated);
+      const client = await storage.createClient(req.user!.id, validated);
       res.json(client);
     } catch (error) {
       res.status(400).json({ error: "Invalid client data" });
@@ -281,7 +258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertClientSchema.partial().parse(req.body);
-      const client = await storage.updateClient(req.params.id, validated);
+      const client = await storage.updateClient(req.user!.id, req.params.id, validated);
       if (!client) {
         return res.status(404).json({ error: "Client not found" });
       }
@@ -293,8 +270,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
-      await storage.deleteAllClientParts(req.params.id);
-      const deleted = await storage.deleteClient(req.params.id);
+      await storage.deleteAllClientParts(req.user!.id, req.params.id);
+      const deleted = await storage.deleteClient(req.user!.id, req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Client not found" });
       }
@@ -305,9 +282,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Part routes
-  app.get("/api/parts", isAuthenticated, async (_req, res) => {
+  app.get("/api/parts", isAuthenticated, async (req, res) => {
     try {
-      const parts = await storage.getAllParts();
+      const parts = await storage.getAllParts(req.user!.id);
       res.json(parts);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch parts" });
@@ -319,7 +296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = insertPartSchema.parse(req.body);
       
       // Check for duplicate part
-      const existingPart = await storage.findDuplicatePart(validated);
+      const existingPart = await storage.findDuplicatePart(req.user!.id, validated);
       
       if (existingPart) {
         let errorMessage = "A part with these details already exists";
@@ -334,7 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ error: errorMessage });
       }
       
-      const part = await storage.createPart(validated);
+      const part = await storage.createPart(req.user!.id, validated);
       res.json(part);
     } catch (error) {
       res.status(400).json({ error: "Invalid part data" });
@@ -353,7 +330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const partData = validated[i];
         
         // Check for duplicate
-        const existingPart = await storage.findDuplicatePart(partData);
+        const existingPart = await storage.findDuplicatePart(req.user!.id, partData);
         
         if (existingPart) {
           let errorMessage = "Duplicate";
@@ -366,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           errors.push({ index: i, error: errorMessage });
         } else {
-          const part = await storage.createPart(partData);
+          const part = await storage.createPart(req.user!.id, partData);
           createdParts.push(part);
         }
       }
@@ -383,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/parts/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertPartSchema.partial().parse(req.body);
-      const part = await storage.updatePart(req.params.id, validated);
+      const part = await storage.updatePart(req.user!.id, req.params.id, validated);
       if (!part) {
         return res.status(404).json({ error: "Part not found" });
       }
@@ -393,28 +370,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/parts/seed", isAuthenticated, async (_req, res) => {
+  app.post("/api/parts/seed", isAuthenticated, async (req, res) => {
     try {
-      const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
-      const createdParts = [];
-      const skippedParts = [];
-      
-      for (const partData of allSeedParts) {
-        const existingPart = await storage.findDuplicatePart(partData);
-        
-        if (!existingPart) {
-          const part = await storage.createPart(partData);
-          createdParts.push(part);
-        } else {
-          skippedParts.push(partData);
-        }
-      }
-      
+      await storage.seedUserParts(req.user!.id);
       res.json({ 
-        message: "Seed data processed",
-        created: createdParts.length,
-        skipped: skippedParts.length,
-        total: allSeedParts.length
+        message: "Standard parts seeded successfully"
       });
     } catch (error) {
       console.error('Seed error:', error);
@@ -424,7 +384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/parts/:id", isAuthenticated, async (req, res) => {
     try {
-      const deleted = await storage.deletePart(req.params.id);
+      const deleted = await storage.deletePart(req.user!.id, req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Part not found" });
       }
@@ -437,7 +397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Client-Part routes
   app.get("/api/clients/:id/parts", isAuthenticated, async (req, res) => {
     try {
-      const clientParts = await storage.getClientParts(req.params.id);
+      const clientParts = await storage.getClientParts(req.user!.id, req.params.id);
       res.json(clientParts);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch client parts" });
@@ -449,11 +409,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parts = req.body.parts as Array<{ partId: string; quantity: number }>;
       
       // Delete existing parts for this client
-      await storage.deleteAllClientParts(req.params.id);
+      await storage.deleteAllClientParts(req.user!.id, req.params.id);
       
       // Add new parts
       const createdParts = await Promise.all(
-        parts.map(p => storage.addClientPart({
+        parts.map(p => storage.addClientPart(req.user!.id, {
           clientId: req.params.id,
           partId: p.partId,
           quantity: p.quantity
@@ -468,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/client-parts/:id", isAuthenticated, async (req, res) => {
     try {
-      const deleted = await storage.deleteClientPart(req.params.id);
+      const deleted = await storage.deleteClientPart(req.user!.id, req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Client part not found" });
       }
@@ -485,7 +445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(month) || month < 0 || month > 11) {
         return res.status(400).json({ error: "Invalid month. Must be 0-11." });
       }
-      const report = await storage.getPartsReportByMonth(month);
+      const report = await storage.getPartsReportByMonth(req.user!.id, month);
       res.json(report);
     } catch (error) {
       res.status(500).json({ error: "Failed to generate report" });
@@ -500,7 +460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid month. Must be 0-11." });
       }
       
-      const allClients = await storage.getAllClients();
+      const allClients = await storage.getAllClients(req.user!.id);
       
       // Filter clients that have the selected month in their selectedMonths array and are not inactive
       const scheduledClients = allClients.filter(client => 
@@ -516,12 +476,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all completed maintenance statuses
   app.get("/api/maintenance/statuses", isAuthenticated, async (req, res) => {
     try {
-      const clients = await storage.getAllClients();
+      const clients = await storage.getAllClients(req.user!.id);
       const statuses: Record<string, { completed: boolean; completedDueDate?: string }> = {};
       
       for (const client of clients) {
         // Check for the most recent completed maintenance
-        const latestCompleted = await storage.getLatestCompletedMaintenanceRecord(client.id);
+        const latestCompleted = await storage.getLatestCompletedMaintenanceRecord(req.user!.id, client.id);
         
         if (latestCompleted && latestCompleted.completedAt) {
           statuses[client.id] = {
@@ -546,12 +506,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
       
-      const records = await storage.getRecentlyCompletedMaintenance(currentMonth, currentYear);
+      const records = await storage.getRecentlyCompletedMaintenance(req.user!.id, currentMonth, currentYear);
       
       // Fetch client details for each record and format for frontend
       const completedItems = [];
       for (const record of records) {
-        const client = await storage.getClient(record.clientId);
+        const client = await storage.getClient(req.user!.id, record.clientId);
         if (client) {
           // Format to match MaintenanceItem interface expected by frontend
           completedItems.push({
@@ -581,19 +541,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "dueDate is required" });
       }
       
-      const client = await storage.getClient(clientId);
+      const client = await storage.getClient(req.user!.id, clientId);
       
       if (!client) {
         return res.status(404).json({ error: "Client not found" });
       }
 
       // Check if there's a record for the requested dueDate
-      const record = await storage.getMaintenanceRecord(clientId, dueDate);
+      const record = await storage.getMaintenanceRecord(req.user!.id, clientId, dueDate);
 
       if (record && record.completedAt) {
         // This cycle is completed - uncomplete it and restore nextDue
-        await storage.updateClient(clientId, { nextDue: dueDate });
-        await storage.updateMaintenanceRecord(record.id, { completedAt: null });
+        await storage.updateClient(req.user!.id, clientId, { nextDue: dueDate });
+        await storage.updateMaintenanceRecord(req.user!.id, record.id, { completedAt: null });
         res.json({ completed: false, record });
       } else {
         // Mark this maintenance cycle as complete and advance nextDue
@@ -604,9 +564,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Create or update maintenance record for this dueDate
         if (record) {
-          await storage.updateMaintenanceRecord(record.id, { completedAt });
+          await storage.updateMaintenanceRecord(req.user!.id, record.id, { completedAt });
         } else {
-          await storage.createMaintenanceRecord({
+          await storage.createMaintenanceRecord(req.user!.id, {
             clientId,
             dueDate,
             completedAt,
@@ -624,7 +584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Update client's nextDue
-        await storage.updateClient(clientId, { nextDue: nextDue.toISOString() });
+        await storage.updateClient(req.user!.id, clientId, { nextDue: nextDue.toISOString() });
 
         res.json({ completed: true, nextDue: nextDue.toISOString() });
       }

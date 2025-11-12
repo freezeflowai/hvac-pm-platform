@@ -29,38 +29,39 @@ export interface IStorage {
   invalidateUserTokens(userId: string): Promise<void>;
   
   // Client methods
-  getClient(id: string): Promise<Client | undefined>;
-  getAllClients(): Promise<Client[]>;
-  createClient(client: InsertClient): Promise<Client>;
-  updateClient(id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
-  deleteClient(id: string): Promise<boolean>;
+  getClient(userId: string, id: string): Promise<Client | undefined>;
+  getAllClients(userId: string): Promise<Client[]>;
+  createClient(userId: string, client: InsertClient): Promise<Client>;
+  updateClient(userId: string, id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
+  deleteClient(userId: string, id: string): Promise<boolean>;
   
   // Part methods
-  getPart(id: string): Promise<Part | undefined>;
-  getAllParts(): Promise<Part[]>;
-  getPartsByType(type: string): Promise<Part[]>;
-  findDuplicatePart(part: InsertPart): Promise<Part | undefined>;
-  createPart(part: InsertPart): Promise<Part>;
-  updatePart(id: string, part: Partial<InsertPart>): Promise<Part | undefined>;
-  deletePart(id: string): Promise<boolean>;
+  getPart(userId: string, id: string): Promise<Part | undefined>;
+  getAllParts(userId: string): Promise<Part[]>;
+  getPartsByType(userId: string, type: string): Promise<Part[]>;
+  findDuplicatePart(userId: string, part: InsertPart): Promise<Part | undefined>;
+  createPart(userId: string, part: InsertPart): Promise<Part>;
+  updatePart(userId: string, id: string, part: Partial<InsertPart>): Promise<Part | undefined>;
+  deletePart(userId: string, id: string): Promise<boolean>;
+  seedUserParts(userId: string): Promise<void>;
   
   // Client-Part relationship methods
-  getClientParts(clientId: string): Promise<(ClientPart & { part: Part })[]>;
-  addClientPart(clientPart: InsertClientPart): Promise<ClientPart>;
-  updateClientPart(id: string, quantity: number): Promise<ClientPart | undefined>;
-  deleteClientPart(id: string): Promise<boolean>;
-  deleteAllClientParts(clientId: string): Promise<void>;
+  getClientParts(userId: string, clientId: string): Promise<(ClientPart & { part: Part })[]>;
+  addClientPart(userId: string, clientPart: InsertClientPart): Promise<ClientPart>;
+  updateClientPart(userId: string, id: string, quantity: number): Promise<ClientPart | undefined>;
+  deleteClientPart(userId: string, id: string): Promise<boolean>;
+  deleteAllClientParts(userId: string, clientId: string): Promise<void>;
   
   // Reports
-  getPartsReportByMonth(month: number): Promise<Array<{ part: Part; totalQuantity: number }>>;
+  getPartsReportByMonth(userId: string, month: number): Promise<Array<{ part: Part; totalQuantity: number }>>;
   
   // Maintenance record methods
-  getMaintenanceRecord(clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined>;
-  getLatestCompletedMaintenanceRecord(clientId: string): Promise<MaintenanceRecord | undefined>;
-  getRecentlyCompletedMaintenance(month: number, year: number): Promise<MaintenanceRecord[]>;
-  createMaintenanceRecord(record: InsertMaintenanceRecord): Promise<MaintenanceRecord>;
-  updateMaintenanceRecord(id: string, record: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined>;
-  deleteMaintenanceRecord(id: string): Promise<boolean>;
+  getMaintenanceRecord(userId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined>;
+  getLatestCompletedMaintenanceRecord(userId: string, clientId: string): Promise<MaintenanceRecord | undefined>;
+  getRecentlyCompletedMaintenance(userId: string, month: number, year: number): Promise<MaintenanceRecord[]>;
+  createMaintenanceRecord(userId: string, record: InsertMaintenanceRecord): Promise<MaintenanceRecord>;
+  updateMaintenanceRecord(userId: string, id: string, record: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined>;
+  deleteMaintenanceRecord(userId: string, id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -146,19 +147,23 @@ export class MemStorage implements IStorage {
   }
 
   // Client methods
-  async getClient(id: string): Promise<Client | undefined> {
-    return this.clients.get(id);
+  async getClient(userId: string, id: string): Promise<Client | undefined> {
+    const client = this.clients.get(id);
+    if (!client || client.userId !== userId) return undefined;
+    return client;
   }
 
-  async getAllClients(): Promise<Client[]> {
+  async getAllClients(userId: string): Promise<Client[]> {
     return Array.from(this.clients.values())
+      .filter(client => client.userId === userId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  async createClient(insertClient: InsertClient): Promise<Client> {
+  async createClient(userId: string, insertClient: InsertClient): Promise<Client> {
     const id = randomUUID();
     const client: Client = { 
       ...insertClient,
+      userId,
       inactive: insertClient.inactive ?? false,
       id,
       createdAt: new Date().toISOString()
@@ -167,35 +172,42 @@ export class MemStorage implements IStorage {
     return client;
   }
 
-  async updateClient(id: string, clientUpdate: Partial<InsertClient>): Promise<Client | undefined> {
+  async updateClient(userId: string, id: string, clientUpdate: Partial<InsertClient>): Promise<Client | undefined> {
     const existing = this.clients.get(id);
-    if (!existing) return undefined;
+    if (!existing || existing.userId !== userId) return undefined;
     
     const updated: Client = { ...existing, ...clientUpdate };
     this.clients.set(id, updated);
     return updated;
   }
 
-  async deleteClient(id: string): Promise<boolean> {
+  async deleteClient(userId: string, id: string): Promise<boolean> {
+    const existing = this.clients.get(id);
+    if (!existing || existing.userId !== userId) return false;
     return this.clients.delete(id);
   }
 
   // Part methods
-  async getPart(id: string): Promise<Part | undefined> {
-    return this.parts.get(id);
+  async getPart(userId: string, id: string): Promise<Part | undefined> {
+    const part = this.parts.get(id);
+    if (!part || part.userId !== userId) return undefined;
+    return part;
   }
 
-  async getAllParts(): Promise<Part[]> {
+  async getAllParts(userId: string): Promise<Part[]> {
     return Array.from(this.parts.values())
+      .filter(part => part.userId === userId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  async getPartsByType(type: string): Promise<Part[]> {
-    return Array.from(this.parts.values()).filter(part => part.type === type);
+  async getPartsByType(userId: string, type: string): Promise<Part[]> {
+    return Array.from(this.parts.values())
+      .filter(part => part.userId === userId && part.type === type);
   }
 
-  async findDuplicatePart(insertPart: InsertPart): Promise<Part | undefined> {
+  async findDuplicatePart(userId: string, insertPart: InsertPart): Promise<Part | undefined> {
     return Array.from(this.parts.values()).find(part => {
+      if (part.userId !== userId) return false;
       if (part.type !== insertPart.type) return false;
       
       if (insertPart.type === 'filter') {
@@ -210,10 +222,11 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async createPart(insertPart: InsertPart): Promise<Part> {
+  async createPart(userId: string, insertPart: InsertPart): Promise<Part> {
     const id = randomUUID();
     const part: Part = { 
       id,
+      userId,
       type: insertPart.type,
       filterType: insertPart.filterType ?? null,
       beltType: insertPart.beltType ?? null,
@@ -226,19 +239,22 @@ export class MemStorage implements IStorage {
     return part;
   }
 
-  async updatePart(id: string, partUpdate: Partial<InsertPart>): Promise<Part | undefined> {
+  async updatePart(userId: string, id: string, partUpdate: Partial<InsertPart>): Promise<Part | undefined> {
     const existing = this.parts.get(id);
-    if (!existing) return undefined;
+    if (!existing || existing.userId !== userId) return undefined;
     
     const updated: Part = { ...existing, ...partUpdate };
     this.parts.set(id, updated);
     return updated;
   }
 
-  async deletePart(id: string): Promise<boolean> {
+  async deletePart(userId: string, id: string): Promise<boolean> {
+    const existing = this.parts.get(id);
+    if (!existing || existing.userId !== userId) return false;
+    
     // Delete all client-part associations for this part
     const toDelete = Array.from(this.clientParts.entries())
-      .filter(([_, cp]) => cp.partId === id)
+      .filter(([_, cp]) => cp.partId === id && cp.userId === userId)
       .map(([cpId]) => cpId);
     
     toDelete.forEach(cpId => this.clientParts.delete(cpId));
@@ -247,10 +263,23 @@ export class MemStorage implements IStorage {
     return this.parts.delete(id);
   }
 
+  async seedUserParts(userId: string): Promise<void> {
+    const { STANDARD_BELTS, STANDARD_FILTERS } = await import('./seed-data');
+    const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
+    
+    for (const partData of allSeedParts) {
+      const existingPart = await this.findDuplicatePart(userId, partData);
+      
+      if (!existingPart) {
+        await this.createPart(userId, partData);
+      }
+    }
+  }
+
   // Client-Part relationship methods
-  async getClientParts(clientId: string): Promise<(ClientPart & { part: Part })[]> {
+  async getClientParts(userId: string, clientId: string): Promise<(ClientPart & { part: Part })[]> {
     const clientPartsList = Array.from(this.clientParts.values())
-      .filter(cp => cp.clientId === clientId);
+      .filter(cp => cp.userId === userId && cp.clientId === clientId);
     
     // Filter out any client-parts where the part no longer exists
     return clientPartsList
@@ -262,44 +291,46 @@ export class MemStorage implements IStorage {
       .filter((cp): cp is (ClientPart & { part: Part }) => cp !== null);
   }
 
-  async addClientPart(insertClientPart: InsertClientPart): Promise<ClientPart> {
+  async addClientPart(userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
     const id = randomUUID();
-    const clientPart: ClientPart = { ...insertClientPart, id };
+    const clientPart: ClientPart = { ...insertClientPart, userId, id };
     this.clientParts.set(id, clientPart);
     return clientPart;
   }
 
-  async updateClientPart(id: string, quantity: number): Promise<ClientPart | undefined> {
+  async updateClientPart(userId: string, id: string, quantity: number): Promise<ClientPart | undefined> {
     const existing = this.clientParts.get(id);
-    if (!existing) return undefined;
+    if (!existing || existing.userId !== userId) return undefined;
     
     const updated: ClientPart = { ...existing, quantity };
     this.clientParts.set(id, updated);
     return updated;
   }
 
-  async deleteClientPart(id: string): Promise<boolean> {
+  async deleteClientPart(userId: string, id: string): Promise<boolean> {
+    const existing = this.clientParts.get(id);
+    if (!existing || existing.userId !== userId) return false;
     return this.clientParts.delete(id);
   }
 
-  async deleteAllClientParts(clientId: string): Promise<void> {
+  async deleteAllClientParts(userId: string, clientId: string): Promise<void> {
     const toDelete = Array.from(this.clientParts.entries())
-      .filter(([_, cp]) => cp.clientId === clientId)
+      .filter(([_, cp]) => cp.userId === userId && cp.clientId === clientId)
       .map(([id]) => id);
     
     toDelete.forEach(id => this.clientParts.delete(id));
   }
 
-  async getPartsReportByMonth(month: number): Promise<Array<{ part: Part; totalQuantity: number }>> {
+  async getPartsReportByMonth(userId: string, month: number): Promise<Array<{ part: Part; totalQuantity: number }>> {
     const clientsWithMaintenance = Array.from(this.clients.values())
-      .filter(client => client.selectedMonths.includes(month) && !client.inactive);
+      .filter(client => client.userId === userId && client.selectedMonths.includes(month) && !client.inactive);
     
     const clientIds = clientsWithMaintenance.map(c => c.id);
     
     const partsMap = new Map<string, { part: Part; totalQuantity: number }>();
     
     for (const clientId of clientIds) {
-      const clientParts = await this.getClientParts(clientId);
+      const clientParts = await this.getClientParts(userId, clientId);
       
       for (const cp of clientParts) {
         // Generate unique key based on part type
@@ -342,15 +373,15 @@ export class MemStorage implements IStorage {
   }
 
   // Maintenance record methods
-  async getMaintenanceRecord(clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined> {
+  async getMaintenanceRecord(userId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined> {
     return Array.from(this.maintenanceRecords.values()).find(
-      record => record.clientId === clientId && record.dueDate === dueDate
+      record => record.userId === userId && record.clientId === clientId && record.dueDate === dueDate
     );
   }
 
-  async getLatestCompletedMaintenanceRecord(clientId: string): Promise<MaintenanceRecord | undefined> {
+  async getLatestCompletedMaintenanceRecord(userId: string, clientId: string): Promise<MaintenanceRecord | undefined> {
     const records = Array.from(this.maintenanceRecords.values())
-      .filter(record => record.clientId === clientId && record.completedAt);
+      .filter(record => record.userId === userId && record.clientId === clientId && record.completedAt);
     
     if (records.length === 0) return undefined;
     
@@ -362,9 +393,10 @@ export class MemStorage implements IStorage {
     })[0];
   }
 
-  async getRecentlyCompletedMaintenance(month: number, year: number): Promise<MaintenanceRecord[]> {
+  async getRecentlyCompletedMaintenance(userId: string, month: number, year: number): Promise<MaintenanceRecord[]> {
     return Array.from(this.maintenanceRecords.values())
       .filter(record => {
+        if (record.userId !== userId) return false;
         if (!record.completedAt) return false;
         const completedDate = new Date(record.completedAt);
         return completedDate.getMonth() === month && completedDate.getFullYear() === year;
@@ -376,10 +408,11 @@ export class MemStorage implements IStorage {
       });
   }
 
-  async createMaintenanceRecord(insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
+  async createMaintenanceRecord(userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
     const id = randomUUID();
     const record: MaintenanceRecord = { 
-      ...insertRecord, 
+      ...insertRecord,
+      userId,
       id,
       completedAt: insertRecord.completedAt ?? null 
     };
@@ -387,16 +420,18 @@ export class MemStorage implements IStorage {
     return record;
   }
 
-  async updateMaintenanceRecord(id: string, recordUpdate: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined> {
+  async updateMaintenanceRecord(userId: string, id: string, recordUpdate: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined> {
     const existing = this.maintenanceRecords.get(id);
-    if (!existing) return undefined;
+    if (!existing || existing.userId !== userId) return undefined;
     
     const updated: MaintenanceRecord = { ...existing, ...recordUpdate };
     this.maintenanceRecords.set(id, updated);
     return updated;
   }
 
-  async deleteMaintenanceRecord(id: string): Promise<boolean> {
+  async deleteMaintenanceRecord(userId: string, id: string): Promise<boolean> {
+    const existing = this.maintenanceRecords.get(id);
+    if (!existing || existing.userId !== userId) return false;
     return this.maintenanceRecords.delete(id);
   }
 }
@@ -458,52 +493,53 @@ export class DbStorage implements IStorage {
   }
 
   // Client methods
-  async getClient(id: string): Promise<Client | undefined> {
-    const result = await db.select().from(clients).where(eq(clients.id, id)).limit(1);
+  async getClient(userId: string, id: string): Promise<Client | undefined> {
+    const result = await db.select().from(clients).where(and(eq(clients.id, id), eq(clients.userId, userId))).limit(1);
     return result[0];
   }
 
-  async getAllClients(): Promise<Client[]> {
-    return db.select().from(clients).orderBy(desc(clients.createdAt));
+  async getAllClients(userId: string): Promise<Client[]> {
+    return db.select().from(clients).where(eq(clients.userId, userId)).orderBy(desc(clients.createdAt));
   }
 
-  async createClient(insertClient: InsertClient): Promise<Client> {
-    const result = await db.insert(clients).values(insertClient).returning();
+  async createClient(userId: string, insertClient: InsertClient): Promise<Client> {
+    const result = await db.insert(clients).values({ ...insertClient, userId }).returning();
     return result[0];
   }
 
-  async updateClient(id: string, clientUpdate: Partial<InsertClient>): Promise<Client | undefined> {
-    const result = await db.update(clients).set(clientUpdate).where(eq(clients.id, id)).returning();
+  async updateClient(userId: string, id: string, clientUpdate: Partial<InsertClient>): Promise<Client | undefined> {
+    const result = await db.update(clients).set(clientUpdate).where(and(eq(clients.id, id), eq(clients.userId, userId))).returning();
     return result[0];
   }
 
-  async deleteClient(id: string): Promise<boolean> {
+  async deleteClient(userId: string, id: string): Promise<boolean> {
     // Foreign key constraints with ON DELETE CASCADE will automatically delete
     // client_parts and maintenance_records, but we keep manual deletes as defensive fallback
-    await this.deleteAllClientParts(id);
-    await db.delete(maintenanceRecords).where(eq(maintenanceRecords.clientId, id));
-    const result = await db.delete(clients).where(eq(clients.id, id)).returning();
+    await this.deleteAllClientParts(userId, id);
+    await db.delete(maintenanceRecords).where(and(eq(maintenanceRecords.clientId, id), eq(maintenanceRecords.userId, userId)));
+    const result = await db.delete(clients).where(and(eq(clients.id, id), eq(clients.userId, userId))).returning();
     return result.length > 0;
   }
 
   // Part methods
-  async getPart(id: string): Promise<Part | undefined> {
-    const result = await db.select().from(parts).where(eq(parts.id, id)).limit(1);
+  async getPart(userId: string, id: string): Promise<Part | undefined> {
+    const result = await db.select().from(parts).where(and(eq(parts.id, id), eq(parts.userId, userId))).limit(1);
     return result[0];
   }
 
-  async getAllParts(): Promise<Part[]> {
-    return db.select().from(parts).orderBy(desc(parts.createdAt));
+  async getAllParts(userId: string): Promise<Part[]> {
+    return db.select().from(parts).where(eq(parts.userId, userId)).orderBy(desc(parts.createdAt));
   }
 
-  async getPartsByType(type: string): Promise<Part[]> {
-    return db.select().from(parts).where(eq(parts.type, type));
+  async getPartsByType(userId: string, type: string): Promise<Part[]> {
+    return db.select().from(parts).where(and(eq(parts.userId, userId), eq(parts.type, type)));
   }
 
-  async findDuplicatePart(insertPart: InsertPart): Promise<Part | undefined> {
+  async findDuplicatePart(userId: string, insertPart: InsertPart): Promise<Part | undefined> {
     if (insertPart.type === 'filter') {
       const result = await db.select().from(parts)
         .where(and(
+          eq(parts.userId, userId),
           eq(parts.type, 'filter'),
           eq(parts.filterType, insertPart.filterType ?? ''),
           eq(parts.size, insertPart.size ?? '')
@@ -513,6 +549,7 @@ export class DbStorage implements IStorage {
     } else if (insertPart.type === 'belt') {
       const result = await db.select().from(parts)
         .where(and(
+          eq(parts.userId, userId),
           eq(parts.type, 'belt'),
           eq(parts.beltType, insertPart.beltType ?? ''),
           eq(parts.size, insertPart.size ?? '')
@@ -522,6 +559,7 @@ export class DbStorage implements IStorage {
     } else if (insertPart.type === 'other') {
       const result = await db.select().from(parts)
         .where(and(
+          eq(parts.userId, userId),
           eq(parts.type, 'other'),
           eq(parts.name, insertPart.name ?? '')
         ))
@@ -531,28 +569,41 @@ export class DbStorage implements IStorage {
     return undefined;
   }
 
-  async createPart(insertPart: InsertPart): Promise<Part> {
-    const result = await db.insert(parts).values(insertPart).returning();
+  async createPart(userId: string, insertPart: InsertPart): Promise<Part> {
+    const result = await db.insert(parts).values({ ...insertPart, userId }).returning();
     return result[0];
   }
 
-  async updatePart(id: string, partUpdate: Partial<InsertPart>): Promise<Part | undefined> {
-    const result = await db.update(parts).set(partUpdate).where(eq(parts.id, id)).returning();
+  async updatePart(userId: string, id: string, partUpdate: Partial<InsertPart>): Promise<Part | undefined> {
+    const result = await db.update(parts).set(partUpdate).where(and(eq(parts.id, id), eq(parts.userId, userId))).returning();
     return result[0];
   }
 
-  async deletePart(id: string): Promise<boolean> {
-    await db.delete(clientParts).where(eq(clientParts.partId, id));
-    const result = await db.delete(parts).where(eq(parts.id, id)).returning();
+  async deletePart(userId: string, id: string): Promise<boolean> {
+    await db.delete(clientParts).where(and(eq(clientParts.partId, id), eq(clientParts.userId, userId)));
+    const result = await db.delete(parts).where(and(eq(parts.id, id), eq(parts.userId, userId))).returning();
     return result.length > 0;
   }
 
+  async seedUserParts(userId: string): Promise<void> {
+    const { STANDARD_BELTS, STANDARD_FILTERS } = await import('./seed-data');
+    const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
+    
+    for (const partData of allSeedParts) {
+      const existingPart = await this.findDuplicatePart(userId, partData);
+      
+      if (!existingPart) {
+        await this.createPart(userId, partData);
+      }
+    }
+  }
+
   // Client-Part relationship methods
-  async getClientParts(clientId: string): Promise<(ClientPart & { part: Part })[]> {
+  async getClientParts(userId: string, clientId: string): Promise<(ClientPart & { part: Part })[]> {
     const result = await db.select()
       .from(clientParts)
       .leftJoin(parts, eq(clientParts.partId, parts.id))
-      .where(eq(clientParts.clientId, clientId));
+      .where(and(eq(clientParts.clientId, clientId), eq(clientParts.userId, userId)));
     
     return result
       .filter(row => row.parts !== null)
@@ -562,29 +613,30 @@ export class DbStorage implements IStorage {
       }));
   }
 
-  async addClientPart(insertClientPart: InsertClientPart): Promise<ClientPart> {
-    const result = await db.insert(clientParts).values(insertClientPart).returning();
+  async addClientPart(userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
+    const result = await db.insert(clientParts).values({ ...insertClientPart, userId }).returning();
     return result[0];
   }
 
-  async updateClientPart(id: string, quantity: number): Promise<ClientPart | undefined> {
-    const result = await db.update(clientParts).set({ quantity }).where(eq(clientParts.id, id)).returning();
+  async updateClientPart(userId: string, id: string, quantity: number): Promise<ClientPart | undefined> {
+    const result = await db.update(clientParts).set({ quantity }).where(and(eq(clientParts.id, id), eq(clientParts.userId, userId))).returning();
     return result[0];
   }
 
-  async deleteClientPart(id: string): Promise<boolean> {
-    const result = await db.delete(clientParts).where(eq(clientParts.id, id)).returning();
+  async deleteClientPart(userId: string, id: string): Promise<boolean> {
+    const result = await db.delete(clientParts).where(and(eq(clientParts.id, id), eq(clientParts.userId, userId))).returning();
     return result.length > 0;
   }
 
-  async deleteAllClientParts(clientId: string): Promise<void> {
-    await db.delete(clientParts).where(eq(clientParts.clientId, clientId));
+  async deleteAllClientParts(userId: string, clientId: string): Promise<void> {
+    await db.delete(clientParts).where(and(eq(clientParts.clientId, clientId), eq(clientParts.userId, userId)));
   }
 
-  async getPartsReportByMonth(month: number): Promise<Array<{ part: Part; totalQuantity: number }>> {
+  async getPartsReportByMonth(userId: string, month: number): Promise<Array<{ part: Part; totalQuantity: number }>> {
     const clientsWithMaintenance = await db.select()
       .from(clients)
       .where(and(
+        eq(clients.userId, userId),
         sql`${month} = ANY(${clients.selectedMonths})`,
         eq(clients.inactive, false)
       ));
@@ -598,7 +650,10 @@ export class DbStorage implements IStorage {
     const partsData = await db.select()
       .from(clientParts)
       .leftJoin(parts, eq(clientParts.partId, parts.id))
-      .where(inArray(clientParts.clientId, clientIds));
+      .where(and(
+        inArray(clientParts.clientId, clientIds),
+        eq(clientParts.userId, userId)
+      ));
     
     const partsMap = new Map<string, { part: Part; totalQuantity: number }>();
     
@@ -641,10 +696,11 @@ export class DbStorage implements IStorage {
   }
 
   // Maintenance record methods
-  async getMaintenanceRecord(clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined> {
+  async getMaintenanceRecord(userId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined> {
     const result = await db.select()
       .from(maintenanceRecords)
       .where(and(
+        eq(maintenanceRecords.userId, userId),
         eq(maintenanceRecords.clientId, clientId),
         eq(maintenanceRecords.dueDate, dueDate)
       ))
@@ -652,10 +708,11 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getLatestCompletedMaintenanceRecord(clientId: string): Promise<MaintenanceRecord | undefined> {
+  async getLatestCompletedMaintenanceRecord(userId: string, clientId: string): Promise<MaintenanceRecord | undefined> {
     const result = await db.select()
       .from(maintenanceRecords)
       .where(and(
+        eq(maintenanceRecords.userId, userId),
         eq(maintenanceRecords.clientId, clientId),
         sql`${maintenanceRecords.completedAt} IS NOT NULL`
       ))
@@ -664,13 +721,14 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getRecentlyCompletedMaintenance(month: number, year: number): Promise<MaintenanceRecord[]> {
+  async getRecentlyCompletedMaintenance(userId: string, month: number, year: number): Promise<MaintenanceRecord[]> {
     const startDate = new Date(year, month, 1).toISOString();
     const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
     
     return db.select()
       .from(maintenanceRecords)
       .where(and(
+        eq(maintenanceRecords.userId, userId),
         sql`${maintenanceRecords.completedAt} IS NOT NULL`,
         sql`${maintenanceRecords.completedAt} >= ${startDate}`,
         sql`${maintenanceRecords.completedAt} <= ${endDate}`
@@ -678,18 +736,18 @@ export class DbStorage implements IStorage {
       .orderBy(desc(maintenanceRecords.completedAt));
   }
 
-  async createMaintenanceRecord(insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
-    const result = await db.insert(maintenanceRecords).values(insertRecord).returning();
+  async createMaintenanceRecord(userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
+    const result = await db.insert(maintenanceRecords).values({ ...insertRecord, userId }).returning();
     return result[0];
   }
 
-  async updateMaintenanceRecord(id: string, recordUpdate: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined> {
-    const result = await db.update(maintenanceRecords).set(recordUpdate).where(eq(maintenanceRecords.id, id)).returning();
+  async updateMaintenanceRecord(userId: string, id: string, recordUpdate: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined> {
+    const result = await db.update(maintenanceRecords).set(recordUpdate).where(and(eq(maintenanceRecords.id, id), eq(maintenanceRecords.userId, userId))).returning();
     return result[0];
   }
 
-  async deleteMaintenanceRecord(id: string): Promise<boolean> {
-    const result = await db.delete(maintenanceRecords).where(eq(maintenanceRecords.id, id)).returning();
+  async deleteMaintenanceRecord(userId: string, id: string): Promise<boolean> {
+    const result = await db.delete(maintenanceRecords).where(and(eq(maintenanceRecords.id, id), eq(maintenanceRecords.userId, userId))).returning();
     return result.length > 0;
   }
 }
