@@ -26,8 +26,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Email already exists" });
       }
       
+      // Check if this will be the first user
+      const allUsers = await storage.getAllUsers();
+      const isFirstUser = allUsers.length === 0;
+      
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = await storage.createUser({ email, password: hashedPassword });
+      
+      // Make first user an admin
+      if (isFirstUser) {
+        await storage.updateUserAdminStatus(user.id, true);
+        user.isAdmin = true;
+      }
       
       // Seed standard parts for the new user
       await storage.seedUserParts(user.id);
