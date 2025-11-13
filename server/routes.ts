@@ -103,17 +103,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Temporary endpoint to promote current user to admin (for production setup)
-  app.post("/api/auth/make-me-admin", isAuthenticated, async (req, res) => {
+  // Temporary endpoint to promote user to admin using email and secret code
+  app.post("/api/auth/emergency-admin-setup", async (req, res) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: "Not authenticated" });
+      const { email, secretCode } = req.body;
+      
+      // Hardcoded secret code for initial setup only
+      if (secretCode !== "setup-admin-2024") {
+        return res.status(403).json({ error: "Invalid secret code" });
       }
       
-      await storage.updateUserAdminStatus(req.user.id, true);
-      req.user.isAdmin = true;
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       
-      res.json({ success: true, message: "You are now an admin!" });
+      await storage.updateUserAdminStatus(user.id, true);
+      
+      res.json({ success: true, message: "User promoted to admin successfully!" });
     } catch (error) {
       res.status(500).json({ error: "Failed to update admin status" });
     }
