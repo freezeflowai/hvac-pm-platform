@@ -5,8 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Package, Calendar } from "lucide-react";
+import { FileText, Package, Calendar, Printer } from "lucide-react";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -74,6 +75,10 @@ export default function Reports() {
   const currentMonth = activeTab === "parts" ? selectedMonth : scheduleMonth;
   const setCurrentMonth = activeTab === "parts" ? setSelectedMonth : setScheduleMonth;
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -86,21 +91,33 @@ export default function Reports() {
               <p className="text-muted-foreground">View parts orders and maintenance schedules</p>
             </div>
           </div>
-          <Select
-            value={currentMonth.toString()}
-            onValueChange={(value) => setCurrentMonth(parseInt(value))}
-          >
-            <SelectTrigger className="w-48" data-testid={activeTab === "parts" ? "select-report-month" : "select-schedule-month"}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((month, index) => (
-                <SelectItem key={index} value={index.toString()}>
-                  {month}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-3 no-print">
+            {activeTab === "parts" && reportData.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={handlePrint}
+                data-testid="button-print-report"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print
+              </Button>
+            )}
+            <Select
+              value={currentMonth.toString()}
+              onValueChange={(value) => setCurrentMonth(parseInt(value))}
+            >
+              <SelectTrigger className="w-48" data-testid={activeTab === "parts" ? "select-report-month" : "select-schedule-month"}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((month, index) => (
+                  <SelectItem key={index} value={index.toString()}>
+                    {month}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <Tabs defaultValue="parts" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -338,6 +355,62 @@ export default function Reports() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <style>{`
+        @media print {
+          /* Hide navigation and controls */
+          header,
+          .no-print,
+          [role="tablist"] {
+            display: none !important;
+          }
+
+          /* Reset page margins */
+          @page {
+            margin: 0.75in;
+          }
+
+          /* Ensure content fits on page */
+          body {
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+
+          /* Remove background colors for better printing */
+          * {
+            background: white !important;
+          }
+
+          /* Keep borders and text colors */
+          table,
+          th,
+          td {
+            border-color: #000 !important;
+          }
+
+          /* Prevent page breaks inside cards and tables */
+          .grid,
+          [class*="Card"] {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+
+          /* Add print header */
+          main::before {
+            content: "Parts Order Report - ${MONTHS[selectedMonth]}";
+            display: block;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+          }
+
+          /* Ensure proper spacing */
+          main {
+            padding: 0 !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
