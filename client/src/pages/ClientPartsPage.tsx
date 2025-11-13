@@ -1,15 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, ArrowLeft, Save } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { Plus, Trash2, ArrowLeft, Save, Check, ChevronsUpDown } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Client {
   id: string;
@@ -38,6 +41,7 @@ interface PartRow {
   id?: string;
   partId: string;
   quantity: number;
+  type: string;
   isNew?: boolean;
   isModified?: boolean;
 }
@@ -59,6 +63,8 @@ export default function ClientPartsPage() {
   const { toast } = useToast();
   const [rows, setRows] = useState<PartRow[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [activeType, setActiveType] = useState<string>("filter");
+  const [openRowIndex, setOpenRowIndex] = useState<number | null>(null);
 
   const { data: client } = useQuery<Client>({
     queryKey: ['/api/clients', clientId],
@@ -74,12 +80,22 @@ export default function ClientPartsPage() {
     queryKey: ['/api/parts'],
   });
 
+  // Memoize parts by type for efficient filtering
+  const partsByType = useMemo(() => {
+    return {
+      filter: availableParts.filter((p: Part) => p.type === 'filter'),
+      belt: availableParts.filter((p: Part) => p.type === 'belt'),
+      other: availableParts.filter((p: Part) => p.type === 'other'),
+    };
+  }, [availableParts]);
+
   useEffect(() => {
     if (clientParts.length > 0 && rows.length === 0) {
       setRows(clientParts.map((cp: ClientPart) => ({
         id: cp.id,
         partId: cp.partId,
         quantity: cp.quantity,
+        type: cp.part.type,
       })));
     }
   }, [clientParts, rows.length]);
@@ -93,16 +109,31 @@ export default function ClientPartsPage() {
       });
       return;
     }
-    setRows([...rows, { partId: '', quantity: 1, isNew: true }]);
+    setRows([...rows, { partId: '', quantity: 1, type: activeType, isNew: true }]);
   };
 
   const handleUpdateRow = (index: number, field: 'partId' | 'quantity', value: string | number) => {
     const updatedRows = [...rows];
-    updatedRows[index] = { 
-      ...updatedRows[index], 
-      [field]: value,
-      isModified: !updatedRows[index].isNew 
-    };
+    const row = updatedRows[index];
+    
+    if (field === 'partId') {
+      const selectedPart = availableParts.find((p: Part) => p.id === value);
+      if (selectedPart) {
+        updatedRows[index] = { 
+          ...row, 
+          partId: value as string,
+          type: selectedPart.type,
+          isModified: !row.isNew 
+        };
+      }
+    } else {
+      updatedRows[index] = { 
+        ...row, 
+        quantity: value as number,
+        isModified: !row.isNew 
+      };
+    }
+    
     setRows(updatedRows);
   };
 
@@ -162,6 +193,7 @@ export default function ClientPartsPage() {
         id: cp.id,
         partId: cp.partId,
         quantity: cp.quantity,
+        type: cp.part.type,
       })));
       
       toast({ title: "Success", description: "Parts saved successfully" });
@@ -176,14 +208,15 @@ export default function ClientPartsPage() {
     return availableParts.find((p: Part) => p.id === partId);
   };
 
-  const filterByType = (type: string): Part[] => {
-    return availableParts.filter((p: Part) => p.type === type);
-  };
-
   const hasChanges = rows.some(row => row.isNew || row.isModified);
 
+  const getFilteredRowsForType = (type: string) => {
+    return rows.map((row, originalIndex) => ({ row, originalIndex }))
+      .filter(({ row }) => row.type === type);
+  };
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 space-y-4">
       <div className="flex items-center gap-4">
         <Button
           variant="outline"
@@ -194,11 +227,11 @@ export default function ClientPartsPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">
             Manage Parts
           </h1>
           {client && (
-            <p className="text-muted-foreground" data-testid="text-client-name">
+            <p className="text-sm text-muted-foreground" data-testid="text-client-name">
               {client.companyName}
               {client.location && ` - ${client.location}`}
             </p>
@@ -207,122 +240,154 @@ export default function ClientPartsPage() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Client Parts</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-3">
+          <CardTitle className="text-lg">Client Parts</CardTitle>
           <div className="flex gap-2">
             {hasChanges && (
               <Button
                 onClick={handleSaveAll}
                 disabled={isSaving}
                 data-testid="button-save-all"
+                size="sm"
               >
-                <Save className="h-4 w-4 mr-2" />
-                Save All Changes
+                <Save className="h-3.5 w-3.5 mr-1.5" />
+                Save All
               </Button>
             )}
             <Button
               onClick={handleAddRow}
               data-testid="button-add-part"
+              size="sm"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
               Add Part
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading parts...</div>
-          ) : rows.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No parts added yet. Click "Add Part" to get started.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {rows.map((row, index) => {
-                const selectedPart = getPart(row.partId);
-                return (
-                  <div key={index} className="flex gap-3 items-start" data-testid={`row-part-${index}`}>
-                    <div className="flex-1 space-y-2">
-                      <Label htmlFor={`part-${index}`}>Part</Label>
-                      <Select
-                        value={row.partId}
-                        onValueChange={(value) => handleUpdateRow(index, 'partId', value)}
-                      >
-                        <SelectTrigger id={`part-${index}`} data-testid={`select-part-${index}`}>
-                          <SelectValue placeholder="Select a part">
-                            {selectedPart && getPartDisplayName(selectedPart)}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filterByType('filter').length > 0 && (
-                            <>
-                              <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                                Filters
-                              </div>
-                              {filterByType('filter').map((part) => (
-                                <SelectItem key={part.id} value={part.id}>
-                                  {getPartDisplayName(part)}
-                                </SelectItem>
-                              ))}
-                              <Separator className="my-2" />
-                            </>
-                          )}
-                          {filterByType('belt').length > 0 && (
-                            <>
-                              <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                                Belts
-                              </div>
-                              {filterByType('belt').map((part) => (
-                                <SelectItem key={part.id} value={part.id}>
-                                  {getPartDisplayName(part)}
-                                </SelectItem>
-                              ))}
-                              <Separator className="my-2" />
-                            </>
-                          )}
-                          {filterByType('other').length > 0 && (
-                            <>
-                              <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                                Other Parts
-                              </div>
-                              {filterByType('other').map((part) => (
-                                <SelectItem key={part.id} value={part.id}>
-                                  {getPartDisplayName(part)}
-                                </SelectItem>
-                              ))}
-                            </>
-                          )}
-                        </SelectContent>
-                      </Select>
+        <CardContent className="pt-0">
+          <Tabs value={activeType} onValueChange={setActiveType}>
+            <TabsList className="grid w-full grid-cols-3 mb-4" data-testid="tabs-part-type">
+              <TabsTrigger value="filter" data-testid="tab-filters">Filters</TabsTrigger>
+              <TabsTrigger value="belt" data-testid="tab-belts">Belts</TabsTrigger>
+              <TabsTrigger value="other" data-testid="tab-other">Other</TabsTrigger>
+            </TabsList>
+
+            {['filter', 'belt', 'other'].map((type) => {
+              const filteredRows = getFilteredRowsForType(type);
+              
+              return (
+                <TabsContent key={type} value={type} className="mt-0">
+                  {isLoading ? (
+                    <div className="text-center py-6 text-sm text-muted-foreground">Loading parts...</div>
+                  ) : filteredRows.length === 0 ? (
+                    <div className="text-center py-6 text-sm text-muted-foreground">
+                      No {type === 'filter' ? 'filters' : type === 'belt' ? 'belts' : 'other parts'} added yet. Click "Add Part" to get started.
                     </div>
-                    
-                    <div className="w-32 space-y-2">
-                      <Label htmlFor={`quantity-${index}`}>Quantity</Label>
-                      <Input
-                        id={`quantity-${index}`}
-                        type="number"
-                        min="1"
-                        value={row.quantity}
-                        onChange={(e) => handleUpdateRow(index, 'quantity', parseInt(e.target.value) || 1)}
-                        data-testid={`input-quantity-${index}`}
-                      />
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="hidden md:grid grid-cols-[1fr,120px,48px] gap-3 pb-2 text-xs font-medium text-muted-foreground border-b">
+                        <div>Part</div>
+                        <div>Quantity</div>
+                        <div></div>
+                      </div>
+                      {filteredRows.map(({ row, originalIndex }) => {
+                      const selectedPart = getPart(row.partId);
+                      const availablePartsForType = type === 'filter' ? partsByType.filter : 
+                                                    type === 'belt' ? partsByType.belt : 
+                                                    partsByType.other;
+                      
+                      return (
+                        <div 
+                          key={originalIndex} 
+                          className="grid grid-cols-1 md:grid-cols-[1fr,120px,48px] gap-3 items-center" 
+                          data-testid={`row-part-${originalIndex}`}
+                        >
+                          <div className="space-y-1.5 md:space-y-0">
+                            <Label className="md:hidden text-xs">Part</Label>
+                            <Popover 
+                              open={openRowIndex === originalIndex} 
+                              onOpenChange={(open) => setOpenRowIndex(open ? originalIndex : null)}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openRowIndex === originalIndex}
+                                  className="w-full justify-between text-sm h-9"
+                                  data-testid={`button-select-part-${originalIndex}`}
+                                >
+                                  <span className="truncate">
+                                    {selectedPart ? getPartDisplayName(selectedPart) : "Select part..."}
+                                  </span>
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[400px] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder={`Search ${type}s...`} />
+                                  <CommandList>
+                                    <CommandEmpty>No parts found.</CommandEmpty>
+                                    <ScrollArea className="h-[300px]">
+                                      <CommandGroup>
+                                        {availablePartsForType.map((part: Part) => (
+                                          <CommandItem
+                                            key={part.id}
+                                            value={`${getPartDisplayName(part)}-${part.id}`}
+                                            onSelect={() => {
+                                              handleUpdateRow(originalIndex, 'partId', part.id);
+                                              setOpenRowIndex(null);
+                                            }}
+                                            data-testid={`option-part-${part.id}`}
+                                          >
+                                            <Check
+                                              className={cn(
+                                                "mr-2 h-4 w-4",
+                                                row.partId === part.id ? "opacity-100" : "opacity-0"
+                                              )}
+                                            />
+                                            {getPartDisplayName(part)}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </ScrollArea>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          
+                          <div className="space-y-1.5 md:space-y-0">
+                            <Label className="md:hidden text-xs">Quantity</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={row.quantity}
+                              onChange={(e) => handleUpdateRow(originalIndex, 'quantity', parseInt(e.target.value) || 1)}
+                              data-testid={`input-quantity-${originalIndex}`}
+                              className="h-9"
+                            />
+                          </div>
+                          
+                          <div className="flex md:block justify-end">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleDeleteRow(originalIndex)}
+                              data-testid={`button-delete-${originalIndex}`}
+                              className="h-9 w-9"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        );
+                      })}
                     </div>
-                    
-                    <div className="pt-8">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleDeleteRow(index)}
-                        data-testid={`button-delete-${index}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  )}
+                </TabsContent>
+              );
+            })}
+          </Tabs>
         </CardContent>
       </Card>
     </div>
