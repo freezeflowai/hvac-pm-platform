@@ -17,6 +17,7 @@ import {
   type InsertCompanySettings
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { STANDARD_BELTS, STANDARD_FILTERS } from "./seed-data";
 
 export interface IStorage {
   // User methods
@@ -308,7 +309,6 @@ export class MemStorage implements IStorage {
   }
 
   async seedUserParts(userId: string): Promise<void> {
-    const { STANDARD_BELTS, STANDARD_FILTERS } = await import('./seed-data');
     const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
     
     for (const partData of allSeedParts) {
@@ -748,7 +748,6 @@ export class DbStorage implements IStorage {
   }
 
   async seedUserParts(userId: string): Promise<void> {
-    const { STANDARD_BELTS, STANDARD_FILTERS } = await import('./seed-data');
     const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
     
     for (const partData of allSeedParts) {
