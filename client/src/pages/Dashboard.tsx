@@ -386,7 +386,12 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="clients">
-            <ClientListTable clients={clients} onEdit={handleEditClient} onDelete={handleDeleteClient} />
+            <ClientListTable 
+              clients={clients} 
+              onEdit={handleEditClient} 
+              onDelete={handleDeleteClient}
+              onRefresh={() => queryClient.invalidateQueries({ queryKey: ["/api/clients"] })}
+            />
           </TabsContent>
         </Tabs>
       </main>

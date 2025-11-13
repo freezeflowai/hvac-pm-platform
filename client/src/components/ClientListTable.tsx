@@ -2,11 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Pencil, Trash2, Wrench, Download, Package } from "lucide-react";
-import { useState } from "react";
+import { Search, Pencil, Trash2, Wrench, Download, Package, Upload } from "lucide-react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +42,7 @@ interface ClientListTableProps {
   clients: Client[];
   onEdit: (id: string) => void;
   onDelete: (id: string) => Promise<void>;
+  onRefresh?: () => void;
 }
 
 const MONTH_NAMES = [
@@ -48,7 +50,7 @@ const MONTH_NAMES = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
 
-export default function ClientListTable({ clients, onEdit, onDelete }: ClientListTableProps) {
+export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }: ClientListTableProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
@@ -56,6 +58,8 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDeleteClick = (client: Client) => {
     setClientToDelete(client);
@@ -196,6 +200,192 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
     return 'Unknown Part';
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const parseMonthsFromString = (monthsStr: string): number[] => {
+    if (!monthsStr) return [];
+    const monthNames = monthsStr.split(',').map(m => m.trim());
+    return monthNames.map(name => MONTH_NAMES.indexOf(name)).filter(idx => idx !== -1);
+  };
+
+  const calculateNextDue = (selectedMonths: number[]): string => {
+    if (selectedMonths.length === 0) {
+      return format(new Date(), 'yyyy-MM-dd');
+    }
+
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+
+    // Sort months to find the next one
+    const sortedMonths = [...selectedMonths].sort((a, b) => a - b);
+    
+    // Find the next month that's >= current month
+    let nextMonth = sortedMonths.find(m => m >= currentMonth);
+    let year = currentYear;
+    
+    // If no month found in current year, take the first month of next year
+    if (nextMonth === undefined) {
+      nextMonth = sortedMonths[0];
+      year = currentYear + 1;
+    }
+    
+    // Set to 15th of the month
+    const nextDueDate = new Date(year, nextMonth, 15);
+    
+    // If the date is today or in the past, find the next occurrence
+    if (nextDueDate <= today) {
+      const nextMonthIndex = sortedMonths.indexOf(nextMonth) + 1;
+      if (nextMonthIndex < sortedMonths.length) {
+        nextMonth = sortedMonths[nextMonthIndex];
+      } else {
+        nextMonth = sortedMonths[0];
+        year = year + 1;
+      }
+      nextDueDate.setFullYear(year);
+      nextDueDate.setMonth(nextMonth);
+    }
+    
+    return format(nextDueDate, 'yyyy-MM-dd');
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+      
+      if (lines.length < 2) {
+        toast({
+          title: "Import failed",
+          description: "CSV file is empty or has no data rows",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Skip header row
+      const dataLines = lines.slice(1);
+      const clientsToImport: any[] = [];
+      const errors: string[] = [];
+
+      for (let i = 0; i < dataLines.length; i++) {
+        const line = dataLines[i];
+        // Parse CSV properly handling quoted fields
+        const fields: string[] = [];
+        let currentField = '';
+        let inQuotes = false;
+        
+        for (let j = 0; j < line.length; j++) {
+          const char = line[j];
+          if (char === '"') {
+            if (inQuotes && line[j + 1] === '"') {
+              currentField += '"';
+              j++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (char === ',' && !inQuotes) {
+            fields.push(currentField);
+            currentField = '';
+          } else {
+            currentField += char;
+          }
+        }
+        fields.push(currentField);
+
+        const [companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes, status, maintenanceMonths] = fields;
+
+        if (!companyName) {
+          errors.push(`Row ${i + 2}: Company name is required`);
+          continue;
+        }
+
+        if (!maintenanceMonths) {
+          errors.push(`Row ${i + 2}: Maintenance months are required`);
+          continue;
+        }
+
+        const selectedMonths = parseMonthsFromString(maintenanceMonths);
+        if (selectedMonths.length === 0) {
+          errors.push(`Row ${i + 2}: Invalid maintenance months format`);
+          continue;
+        }
+
+        const isInactive = status?.toLowerCase() === 'inactive';
+        const nextDue = isInactive ? format(new Date(), 'yyyy-MM-dd') : calculateNextDue(selectedMonths);
+
+        clientsToImport.push({
+          companyName,
+          location: location || null,
+          address: address || null,
+          city: city || null,
+          province: provinceState || null,
+          postalCode: postalCode || null,
+          contactName: contactName || null,
+          email: email || null,
+          phone: phone || null,
+          roofLadderCode: roofLadderCode || null,
+          notes: notes || null,
+          inactive: isInactive,
+          selectedMonths,
+          nextDue,
+        });
+      }
+
+      if (errors.length > 0 && clientsToImport.length === 0) {
+        toast({
+          title: "Import failed",
+          description: `No valid clients found. Errors: ${errors.join(', ')}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Send to backend
+      const res = await apiRequest('POST', '/api/clients/import', { clients: clientsToImport });
+      const result = await res.json();
+
+      let description = `Successfully imported ${result.imported} of ${result.total} clients`;
+      if (errors.length > 0) {
+        description += `. ${errors.length} rows had validation errors`;
+      }
+      if (result.errors && result.errors.length > 0) {
+        description += `. ${result.errors.length} clients failed to save`;
+      }
+
+      toast({
+        title: result.imported > 0 ? "Import completed" : "Import failed",
+        description,
+        variant: result.imported > 0 ? "default" : "destructive",
+      });
+
+      // Refresh client list
+      if (result.imported > 0 && onRefresh) {
+        onRefresh();
+      } else if (result.imported > 0) {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      toast({
+        title: "Import failed",
+        description: "Failed to import clients. Please check the file format.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -212,6 +402,25 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                 className="pl-9"
               />
             </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".csv"
+              className="hidden"
+              data-testid="input-import-csv-file"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleImportClick}
+              disabled={isImporting}
+              data-testid="button-import-csv"
+              className="gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              {isImporting ? "Importing..." : "Import CSV"}
+            </Button>
             <Button
               variant="outline"
               size="sm"

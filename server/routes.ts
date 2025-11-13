@@ -255,6 +255,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/clients/import", isAuthenticated, async (req, res) => {
+    try {
+      const { clients } = req.body;
+      
+      if (!Array.isArray(clients) || clients.length === 0) {
+        return res.status(400).json({ error: "Invalid import data: clients array is required" });
+      }
+
+      let imported = 0;
+      const errors: string[] = [];
+
+      for (const clientData of clients) {
+        try {
+          const validated = insertClientSchema.parse(clientData);
+          await storage.createClient(req.user!.id, validated);
+          imported++;
+        } catch (error) {
+          errors.push(`Failed to import ${clientData.companyName || 'unknown client'}`);
+        }
+      }
+
+      res.json({ 
+        imported, 
+        errors: errors.length > 0 ? errors : undefined,
+        total: clients.length 
+      });
+    } catch (error) {
+      console.error('Bulk import error:', error);
+      res.status(500).json({ error: "Failed to import clients" });
+    }
+  });
+
   app.get("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
       const client = await storage.getClient(req.user!.id, req.params.id);
