@@ -34,6 +34,7 @@ export interface Client {
   selectedMonths: number[];
   inactive: boolean;
   nextDue: Date;
+  createdAt?: string;
 }
 
 interface ClientListTableProps {

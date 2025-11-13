@@ -2,15 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Separator } from "@/components/ui/separator";
-import { Plus, X, Check, ChevronsUpDown } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export interface ClientFormData {
   companyName: string;
@@ -26,18 +19,6 @@ export interface ClientFormData {
   notes?: string | null;
   selectedMonths: number[];
   inactive: boolean;
-  parts: Array<{ partId: string; quantity: number }>;
-}
-
-export interface ClientPart {
-  partId: string;
-  type: string;
-  filterType?: string | null;
-  beltType?: string | null;
-  size?: string | null;
-  name?: string | null;
-  description?: string | null;
-  quantity: number;
 }
 
 interface AddClientDialogProps {
@@ -50,132 +31,6 @@ const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
 ];
-
-function getPartDisplay(part: Omit<ClientPart, 'quantity' | 'partId'>) {
-  if (part.type === "filter") {
-    return {
-      primary: `${part.filterType} Filter`,
-      secondary: part.size || ""
-    };
-  } else if (part.type === "belt") {
-    return {
-      primary: `${part.beltType} Belt`,
-      secondary: part.size || ""
-    };
-  } else {
-    return {
-      primary: part.name || "",
-      secondary: part.description || ""
-    };
-  }
-}
-
-interface PendingPart {
-  partId: string;
-  quantity: number;
-  category: 'filter' | 'belt' | 'other';
-}
-
-interface PartCommandPickerProps {
-  category: 'filter' | 'belt' | 'other';
-  parts: Array<{ 
-    id: string; 
-    type: string; 
-    filterType?: string | null;
-    beltType?: string | null;
-    size?: string | null;
-    name?: string | null;
-    description?: string | null;
-  }>;
-  value: string;
-  onValueChange: (value: string) => void;
-  testId?: string;
-}
-
-function PartCommandPicker({ category, parts, value, onValueChange, testId }: PartCommandPickerProps) {
-  const [open, setOpen] = useState(false);
-  const selectedPart = parts.find(p => p.id === value);
-  
-  const selectedDisplay = selectedPart ? getPartDisplay(selectedPart) : null;
-
-  const groupedParts = parts.reduce((acc, part) => {
-    let groupKey = '';
-    
-    if (category === 'filter') {
-      groupKey = part.filterType || 'Other';
-    } else if (category === 'belt') {
-      groupKey = part.beltType ? `${part.beltType} Belts` : 'Other';
-    } else {
-      groupKey = 'Parts';
-    }
-    
-    if (!acc[groupKey]) acc[groupKey] = [];
-    acc[groupKey].push(part);
-    return acc;
-  }, {} as Record<string, typeof parts>);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between"
-          data-testid={testId}
-        >
-          {selectedDisplay ? (
-            <span className="truncate">
-              {selectedDisplay.primary} - {selectedDisplay.secondary}
-            </span>
-          ) : (
-            <span className="text-muted-foreground">
-              Search {category === 'filter' ? 'filters' : category === 'belt' ? 'belts' : 'parts'}...
-            </span>
-          )}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0">
-        <Command>
-          <CommandInput placeholder={`Search ${category}...`} />
-          <CommandList>
-            <CommandEmpty>No {category} found.</CommandEmpty>
-            {Object.entries(groupedParts).map(([groupName, groupParts]) => (
-              <CommandGroup key={groupName} heading={groupName}>
-                {groupParts.map((part) => {
-                  const display = getPartDisplay(part);
-                  return (
-                    <CommandItem
-                      key={part.id}
-                      value={`${display.primary} ${display.secondary}`}
-                      onSelect={() => {
-                        onValueChange(part.id);
-                        setOpen(false);
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          value === part.id ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium">{display.primary}</div>
-                        <div className="text-sm text-muted-foreground">{display.secondary}</div>
-                      </div>
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            ))}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 export default function AddClientDialog({ onSubmit, onCancel, editData }: AddClientDialogProps) {
   const [formData, setFormData] = useState({
@@ -193,45 +48,6 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
     selectedMonths: [] as number[],
     inactive: false,
   });
-
-  const [clientParts, setClientParts] = useState<ClientPart[]>([]);
-  const [showAddPart, setShowAddPart] = useState(false);
-  const [pendingParts, setPendingParts] = useState<PendingPart[]>([]);
-  const addPartFormRef = useRef<HTMLDivElement>(null);
-  const initializedRef = useRef(false);
-
-  const { data: availableParts = [] } = useQuery<Array<{ 
-    id: string; 
-    type: string; 
-    filterType?: string | null;
-    beltType?: string | null;
-    size?: string | null;
-    name?: string | null;
-    description?: string | null;
-  }>>({
-    queryKey: ["/api/parts"],
-  });
-
-  // Group and sort parts by category
-  const filterParts = availableParts
-    .filter(p => p.type === 'filter')
-    .sort((a, b) => {
-      const typeCompare = (a.filterType || '').localeCompare(b.filterType || '');
-      if (typeCompare !== 0) return typeCompare;
-      return (a.size || '').localeCompare(b.size || '');
-    });
-  
-  const beltParts = availableParts
-    .filter(p => p.type === 'belt')
-    .sort((a, b) => {
-      const typeCompare = (a.beltType || '').localeCompare(b.beltType || '');
-      if (typeCompare !== 0) return typeCompare;
-      return (a.size || '').localeCompare(b.size || '');
-    });
-  
-  const otherParts = availableParts
-    .filter(p => p.type === 'other')
-    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   useEffect(() => {
     const loadClientData = async () => {
