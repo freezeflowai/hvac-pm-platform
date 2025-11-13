@@ -1,4 +1,3 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export interface ClientFormData {
   companyName: string;
@@ -41,9 +41,8 @@ export interface ClientPart {
 }
 
 interface AddClientDialogProps {
-  open: boolean;
-  onClose: () => void;
   onSubmit: (data: ClientFormData) => void;
+  onCancel: () => void;
   editData?: ClientFormData & { id: string };
 }
 
@@ -178,7 +177,7 @@ function PartCommandPicker({ category, parts, value, onValueChange, testId }: Pa
   );
 }
 
-export default function AddClientDialog({ open, onClose, onSubmit, editData }: AddClientDialogProps) {
+export default function AddClientDialog({ onSubmit, onCancel, editData }: AddClientDialogProps) {
   const [formData, setFormData] = useState({
     companyName: "",
     location: "",
@@ -410,7 +409,6 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
         inactive: false 
       });
       setClientParts([]);
-      onClose();
     } catch (error) {
       console.error('Error saving client:', error);
       alert('Failed to save client. Please try again.');
@@ -418,17 +416,9 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" data-testid="dialog-add-client">
-        <DialogHeader>
-          <DialogTitle>{editData ? 'Edit Client' : 'Add New Client'}</DialogTitle>
-          <DialogDescription>
-            {editData ? 'Update client information and required parts.' : 'Add a new client with their maintenance schedule and required parts.'}
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto pr-4">
-            <div className="space-y-4 py-4">
+    <div className="space-y-6" data-testid="form-add-client">
+      <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="companyName">Company Name</Label>
                 <Input
@@ -875,12 +865,12 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
               </div>
 
             </div>
-          </div>
-          <DialogFooter className="pt-4">
+
+          <div className="flex gap-3 pt-4">
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={onCancel}
               data-testid="button-cancel"
             >
               Cancel
@@ -892,9 +882,8 @@ export default function AddClientDialog({ open, onClose, onSubmit, editData }: A
             >
               {editData ? 'Update Client' : 'Save Client'}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 }

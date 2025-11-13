@@ -221,8 +221,7 @@ export default function AddClientPage() {
 
       {!isEditing || editData ? (
         <AddClientDialog
-          open={true}
-          onClose={() => setLocation("/")}
+          onCancel={() => setLocation("/")}
           onSubmit={handleSubmit}
           editData={editData}
         />
