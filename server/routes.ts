@@ -103,6 +103,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Temporary endpoint to promote current user to admin (for production setup)
+  app.post("/api/auth/make-me-admin", isAuthenticated, async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      await storage.updateUserAdminStatus(req.user.id, true);
+      req.user.isAdmin = true;
+      
+      res.json({ success: true, message: "You are now an admin!" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update admin status" });
+    }
+  });
+
   // Password reset routes
   const passwordResetRequestSchema = z.object({
     email: z.string().email("Please enter a valid email address"),
