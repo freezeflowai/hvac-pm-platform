@@ -19,11 +19,6 @@ export default function AddClientPage() {
     enabled: Boolean(id),
   });
 
-  const { data: clientParts = [] } = useQuery<any[]>({
-    queryKey: id ? [`/api/clients/${id}/parts`] : [],
-    enabled: Boolean(id),
-  });
-
   const calculateNextDueDate = (selectedMonths: number[], inactive: boolean) => {
     if (inactive || selectedMonths.length === 0) return null;
     
@@ -74,11 +69,6 @@ export default function AddClientPage() {
       
       const res = await apiRequest("POST", "/api/clients", clientData);
       const newClient = await res.json();
-      
-      if (data.parts.length > 0) {
-        await apiRequest("POST", `/api/clients/${newClient.id}/parts`, { parts: data.parts });
-      }
-      
       return newClient;
     },
     onSuccess: () => {
@@ -122,9 +112,6 @@ export default function AddClientPage() {
       
       const res = await apiRequest("PUT", `/api/clients/${id}`, clientData);
       const updatedClient = await res.json();
-      
-      await apiRequest("POST", `/api/clients/${id}/parts`, { parts: data.parts });
-      
       return updatedClient;
     },
     onSuccess: () => {
@@ -169,10 +156,6 @@ export default function AddClientPage() {
     notes: client.notes,
     selectedMonths: client.selectedMonths,
     inactive: client.inactive,
-    parts: clientParts.map((cp: any) => ({
-      partId: cp.part?.id || cp.partId,
-      quantity: cp.quantity,
-    })),
   } : undefined;
 
   if (isEditing && isLoading) {
