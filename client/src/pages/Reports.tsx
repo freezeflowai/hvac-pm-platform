@@ -55,6 +55,7 @@ interface ClientScheduleItem {
 export default function Reports() {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [scheduleMonth, setScheduleMonth] = useState<number>(new Date().getMonth());
+  const [activeTab, setActiveTab] = useState<string>("parts");
 
   const { data: reportData = [], isLoading } = useQuery<ReportItem[]>({
     queryKey: ["/api/reports/parts", selectedMonth],
@@ -70,19 +71,39 @@ export default function Reports() {
   const belts = reportData.filter(item => item.part.type === "belt");
   const other = reportData.filter(item => item.part.type === "other");
 
+  const currentMonth = activeTab === "parts" ? selectedMonth : scheduleMonth;
+  const setCurrentMonth = activeTab === "parts" ? setSelectedMonth : setScheduleMonth;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <FileText className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">Reports</h1>
-            <p className="text-muted-foreground">View parts orders and maintenance schedules</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <FileText className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-3xl font-bold">Reports</h1>
+              <p className="text-muted-foreground">View parts orders and maintenance schedules</p>
+            </div>
           </div>
+          <Select
+            value={currentMonth.toString()}
+            onValueChange={(value) => setCurrentMonth(parseInt(value))}
+          >
+            <SelectTrigger className="w-48" data-testid={activeTab === "parts" ? "select-report-month" : "select-schedule-month"}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTHS.map((month, index) => (
+                <SelectItem key={index} value={index.toString()}>
+                  {month}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        <Tabs defaultValue="parts" className="space-y-6">
+        <Tabs defaultValue="parts" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList data-testid="tabs-reports">
             <TabsTrigger value="parts" data-testid="tab-parts-report">
               <Package className="h-4 w-4 mr-2" />
@@ -95,31 +116,6 @@ export default function Reports() {
           </TabsList>
 
           <TabsContent value="parts" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Select Month</CardTitle>
-                    <CardDescription>Choose a month to view parts needed for that month's maintenance</CardDescription>
-                  </div>
-                  <Select
-                    value={selectedMonth.toString()}
-                    onValueChange={(value) => setSelectedMonth(parseInt(value))}
-                  >
-                    <SelectTrigger className="w-48" data-testid="select-report-month">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MONTHS.map((month, index) => (
-                        <SelectItem key={index} value={index.toString()}>
-                          {month}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardHeader>
-            </Card>
 
         {isLoading ? (
           <Card>
@@ -144,13 +140,15 @@ export default function Reports() {
                 {filters.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Package className="h-5 w-5" />
-                        Filters
-                      </CardTitle>
-                      <CardDescription>
-                        Total filters needed for {MONTHS[selectedMonth]}
-                      </CardDescription>
+                      <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="flex items-center gap-2">
+                          <Package className="h-5 w-5" />
+                          Filters
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          Total needed for {MONTHS[selectedMonth]}
+                        </CardDescription>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       <Table>
@@ -185,13 +183,15 @@ export default function Reports() {
                 {belts.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Package className="h-5 w-5" />
-                        Belts
-                      </CardTitle>
-                      <CardDescription>
-                        Total belts needed for {MONTHS[selectedMonth]}
-                      </CardDescription>
+                      <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="flex items-center gap-2">
+                          <Package className="h-5 w-5" />
+                          Belts
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          Total needed for {MONTHS[selectedMonth]}
+                        </CardDescription>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       <Table>
@@ -270,32 +270,6 @@ export default function Reports() {
           </TabsContent>
 
           <TabsContent value="schedule" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Select Month</CardTitle>
-                    <CardDescription>Choose a month to view clients scheduled for maintenance</CardDescription>
-                  </div>
-                  <Select
-                    value={scheduleMonth.toString()}
-                    onValueChange={(value) => setScheduleMonth(parseInt(value))}
-                  >
-                    <SelectTrigger className="w-48" data-testid="select-schedule-month">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MONTHS.map((month, index) => (
-                        <SelectItem key={index} value={index.toString()}>
-                          {month}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardHeader>
-            </Card>
-
             {isLoadingSchedule ? (
               <Card>
                 <CardContent className="p-8">
