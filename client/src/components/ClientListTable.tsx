@@ -137,8 +137,8 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
         const notes = client.notes ? `"${client.notes.replace(/"/g, '""')}"` : '';
         const status = client.inactive ? 'Inactive' : 'Active';
         const maintenanceMonths = `"${getMonthsDisplay(client.selectedMonths)}"`;
-        const nextDue = client.inactive ? 'N/A' : format(new Date(client.nextDue), 'MMM d, yyyy');
-        const createdDate = client.createdAt ? format(new Date(client.createdAt), 'MMM d, yyyy') : '';
+        const nextDue = client.inactive ? 'N/A' : `"${format(new Date(client.nextDue), 'MMM d, yyyy')}"`;
+        const createdDate = client.createdAt ? `"${format(new Date(client.createdAt), 'MMM d, yyyy')}"` : '';
         
         if (parts.length === 0 && equipment.length === 0) {
           csvRows.push(`${companyName},${location},${address},${city},${province},${postalCode},${contactName},${email},${phone},${roofLadderCode},${notes},${status},${maintenanceMonths},${nextDue},${createdDate},,,,,`);
