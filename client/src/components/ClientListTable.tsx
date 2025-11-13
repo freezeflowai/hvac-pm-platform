@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Pencil, Trash2, Wrench, Download } from "lucide-react";
+import { Search, Pencil, Trash2, Wrench, Download, Package } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
@@ -92,6 +92,10 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
 
   const handleEquipmentClick = (clientId: string) => {
     setLocation(`/equipment/${clientId}`);
+  };
+
+  const handlePartsClick = (clientId: string) => {
+    setLocation(`/clients/${clientId}/parts`);
   };
 
   const handleRowClick = (clientId: string) => {
@@ -276,6 +280,15 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => handlePartsClick(client.id)}
+                        data-testid={`button-parts-${client.id}`}
+                        title="Manage Parts"
+                      >
+                        <Package className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => onEdit(client.id)}
                         data-testid={`button-edit-client-${client.id}`}
                       >
@@ -316,6 +329,15 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                         title="Manage Equipment"
                       >
                         <Wrench className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handlePartsClick(client.id)}
+                        data-testid={`button-parts-${client.id}`}
+                        title="Manage Parts"
+                      >
+                        <Package className="h-3 w-3" />
                       </Button>
                       <Button
                         size="sm"
