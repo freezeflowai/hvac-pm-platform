@@ -25,7 +25,8 @@ The application uses a Material Design-inspired typography hierarchy with the In
 ### Technical Implementations
 
 - **Data Integrity**: Foreign key constraints with CASCADE delete ensure referential integrity in the database.
-- **Automatic Parts Seeding**: The application automatically seeds 244 standard parts (106 belts A/B sizes 18-70, 138 filters with Media/Pleated/Throwaway types in various sizes with x1/x2 thickness variants) on every server startup. The seeding is idempotent, safely skipping parts that already exist. This ensures production deployments have the complete parts inventory immediately available.
+- **Automatic Parts Seeding**: The application automatically seeds 244 standard parts (106 belts A/B sizes 18-70, 138 filters with Media/Pleated/Throwaway types in various sizes with x1/x2 thickness variants) when new users sign up. The seeding is idempotent, safely skipping parts that already exist.
+- **Manual Parts Seeding**: A "Seed Standard Parts" button is available in the Parts Management page, allowing existing users to manually seed the 244 standard parts. This is particularly useful after publishing the app or for users who signed up before the seeding feature was added. The operation is idempotent and safe to run multiple times.
 - **Parts Inventory**: Comprehensive parts inventory with support for custom parts. Parts are categorized for easier selection (Filters, Belts, Other).
 - **Persistent Storage**: Migration from in-memory storage to PostgreSQL ensures data persistence across server restarts.
 - **Editable Client Parts**: Clients' associated parts can be viewed, quantities edited, and parts deleted directly within the edit interface.
@@ -37,6 +38,8 @@ The application uses a Material Design-inspired typography hierarchy with the In
 - **Maintenance Completion**: Toggle functionality to mark maintenance as complete, recording completion in `maintenanceRecords`, with options to reopen and adjust next due dates.
 - **UI Compaction**: Redesigned maintenance cards to increase client density on screen by reducing padding, consolidating information, and using icon-only buttons.
 - **Parts System Redesign**: A complete overhaul of the parts inventory system, introducing type-specific fields for filters, belts, and other parts, a tabbed management interface, and updated duplicate prevention logic.
+- **CSV Import**: Clients can be imported via CSV file with an import button in the client list. The import includes basic parsing, validation, automatic nextDue calculation, and detailed import statistics. Note: Best for simple client lists; avoid complex text with line breaks for reliability.
+- **Authentication**: Fixed login bug where users had to enter credentials twice. Login now properly waits for user state to be set before redirecting using useEffect, ensuring smooth single-attempt authentication.
 
 ## External Dependencies
 
