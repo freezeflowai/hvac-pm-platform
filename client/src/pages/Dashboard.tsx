@@ -184,12 +184,23 @@ export default function Dashboard() {
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
-  // Calculate if we're within one week of month end
-  const isWithinOneWeekOfMonthEnd = () => {
+  // Helper to determine if an item is overdue
+  const isOverdue = (nextDue: Date): boolean => {
     const today = new Date();
-    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    const daysUntilMonthEnd = Math.ceil((lastDayOfMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    return daysUntilMonthEnd <= 7;
+    
+    // Already past due date
+    if (nextDue < today) {
+      return true;
+    }
+    
+    // Check if due this month and we're within 7 days of month end
+    if (nextDue.getMonth() === today.getMonth() && nextDue.getFullYear() === today.getFullYear()) {
+      const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const daysUntilMonthEnd = Math.ceil((lastDayOfMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      return daysUntilMonthEnd <= 7;
+    }
+    
+    return false;
   };
 
   const maintenanceItems: MaintenanceItem[] = clients
@@ -200,7 +211,7 @@ export default function Dashboard() {
       location: c.location,
       selectedMonths: c.selectedMonths,
       nextDue: c.nextDue,
-      status: (c.nextDue < new Date() || isWithinOneWeekOfMonthEnd() ? "overdue" : "upcoming") as "overdue" | "upcoming",
+      status: (isOverdue(c.nextDue) ? "overdue" : "upcoming") as "overdue" | "upcoming",
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
