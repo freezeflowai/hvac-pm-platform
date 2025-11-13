@@ -311,7 +311,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <Header onAddClient={() => setLocation("/add-client")} />
       
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 space-y-4">
         <div className="flex justify-end">
           <Button
             variant="outline"
@@ -324,7 +324,7 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <StatsCard title="Overdue" value={overdueItems.length} icon={AlertCircle} variant="danger" />
           <StatsCard title="This Month" value={thisMonthItems.length} icon={Calendar} variant="default" />
           <StatsCard title="Completed" value={completedCount} icon={CheckCircle} variant="default" />

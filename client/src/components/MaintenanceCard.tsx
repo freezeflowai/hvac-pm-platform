@@ -53,29 +53,29 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
       data-testid={`card-maintenance-${item.id}`}
       onClick={handleCardClick}
     >
-      <CardContent className="p-3">
-        <div className="flex items-start justify-between gap-3">
+      <CardContent className="p-2">
+        <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-2 mb-1 flex-wrap">
-              <h3 className="font-semibold text-base" data-testid={`text-company-${item.id}`}>
+            <div className="flex items-baseline gap-1.5 mb-0.5 flex-wrap">
+              <h3 className="font-semibold text-sm" data-testid={`text-company-${item.id}`}>
                 {item.companyName}
               </h3>
               {item.location && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-3 w-3 flex-shrink-0" />
+                <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                  <MapPin className="h-2.5 w-2.5 flex-shrink-0" />
                   <span data-testid={`text-location-${item.id}`}>{item.location}</span>
                 </span>
               )}
             </div>
-            <div className="flex flex-col gap-1 text-xs">
+            <div className="flex flex-col gap-0.5 text-xs">
               <div className="text-muted-foreground">
-                PM Schedule: {monthsDisplay}
+                {monthsDisplay}
               </div>
               {parts.length > 0 && (
-                <div className="mt-1">
+                <div className="mt-0.5">
                   <div className="flex flex-wrap gap-1">
                     {parts.map(cp => (
-                      <Badge key={cp.id} variant="outline" className="text-xs">
+                      <Badge key={cp.id} variant="outline" className="text-[10px] px-1 py-0 h-4">
                         {cp.quantity}x {cp.part.name} ({cp.part.size})
                       </Badge>
                     ))}
@@ -86,18 +86,17 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
           </div>
           <div className="flex gap-1 flex-shrink-0">
             <Button
-              size="sm"
+              size="icon"
               variant={isCompleted ? "default" : "outline"}
               onClick={(e) => {
                 e.stopPropagation();
                 onMarkComplete(item.id);
               }}
               data-testid={`button-complete-${item.id}`}
-              className="gap-1.5"
+              title={isCompleted ? "Reopen" : "Complete"}
+              aria-label={isCompleted ? "Reopen maintenance" : "Mark maintenance complete"}
             >
               <CheckCircle className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{isCompleted ? "Reopen" : "Complete"}</span>
-              <span className="sm:hidden">{isCompleted ? "Undo" : "Done"}</span>
             </Button>
           </div>
         </div>

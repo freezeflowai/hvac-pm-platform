@@ -130,39 +130,41 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
   };
 
   return (
-    <div className="space-y-6" data-testid="form-add-client">
-      <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name</Label>
-                <Input
-                  id="companyName"
-                  data-testid="input-company-name"
-                  value={formData.companyName}
-                  onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                  placeholder="Enter company name"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="location">Location Name (Optional)</Label>
-                <Input
-                  id="location"
-                  data-testid="input-location"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="Enter location name"
-                />
+    <div className="space-y-4" data-testid="form-add-client">
+      <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="companyName">Company Name</Label>
+                  <Input
+                    id="companyName"
+                    data-testid="input-company-name"
+                    value={formData.companyName}
+                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                    placeholder="Enter company name"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="location">Location Name (Optional)</Label>
+                  <Input
+                    id="location"
+                    data-testid="input-location"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    placeholder="Enter location name"
+                  />
+                </div>
               </div>
               
               <Separator />
               
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">Contact Information</Label>
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">Contact Information</Label>
                 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Address</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="address" className="text-xs">Address</Label>
                     <Input
                       id="address"
                       data-testid="input-address"
@@ -172,8 +174,8 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                     />
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="city" className="text-xs">City</Label>
                     <Input
                       id="city"
                       data-testid="input-city"
@@ -183,8 +185,8 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                     />
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="province">Province/State</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="province" className="text-xs">Province/State</Label>
                     <Input
                       id="province"
                       data-testid="input-province"
@@ -194,8 +196,8 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                     />
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="postalCode">Postal Code</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="postalCode" className="text-xs">Postal Code</Label>
                     <Input
                       id="postalCode"
                       data-testid="input-postal-code"
@@ -204,11 +206,9 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                       placeholder="Postal code"
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="contactName">Contact Name</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contactName" className="text-xs">Contact Name</Label>
                     <Input
                       id="contactName"
                       data-testid="input-contact-name"
@@ -218,61 +218,57 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                     />
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        data-testid="input-email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="email@example.com"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone</Label>
-                      <Input
-                        id="phone"
-                        data-testid="input-phone"
-                        type="tel"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        placeholder="Phone number"
-                      />
-                    </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email" className="text-xs">Email</Label>
+                    <Input
+                      id="email"
+                      data-testid="input-email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="email@example.com"
+                    />
                   </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="phone" className="text-xs">Phone</Label>
+                    <Input
+                      id="phone"
+                      data-testid="input-phone"
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="Phone number"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="roofLadderCode" className="text-xs">Roof/Ladder Code</Label>
+                    <Input
+                      id="roofLadderCode"
+                      data-testid="input-roof-ladder-code"
+                      value={formData.roofLadderCode}
+                      onChange={(e) => setFormData({ ...formData, roofLadderCode: e.target.value })}
+                      placeholder="Access code"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <Label htmlFor="notes" className="text-xs">Notes (Optional)</Label>
+                  <Input
+                    id="notes"
+                    data-testid="input-notes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="Additional notes"
+                  />
                 </div>
               </div>
 
               <Separator />
 
               <div className="space-y-2">
-                <Label htmlFor="roofLadderCode">Roof/Ladder Code (Optional)</Label>
-                <Input
-                  id="roofLadderCode"
-                  data-testid="input-roof-ladder-code"
-                  value={formData.roofLadderCode}
-                  onChange={(e) => setFormData({ ...formData, roofLadderCode: e.target.value })}
-                  placeholder="Access code for roof or ladder"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notes (Optional)</Label>
-                <Input
-                  id="notes"
-                  data-testid="input-notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Additional notes"
-                />
-              </div>
-
-              <Separator />
-
-              <div className="space-y-3">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="inactive"
@@ -282,24 +278,24 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                     }
                     data-testid="checkbox-inactive"
                   />
-                  <Label htmlFor="inactive" className="cursor-pointer">
+                  <Label htmlFor="inactive" className="cursor-pointer text-sm">
                     Mark as Inactive (On-Call/As-Needed Only)
                   </Label>
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground pl-6">
                   Inactive clients won't appear in scheduled maintenance reports.
                 </p>
               </div>
 
               {!formData.inactive && (
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">
                     Maintenance Schedule <span className="text-destructive">*</span>
                   </Label>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Select the months when maintenance is required (15th of each month)
                   </p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {MONTHS.map((month, index) => (
                       <div key={index} className="flex items-center space-x-2">
                         <Checkbox
@@ -308,7 +304,7 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                           onCheckedChange={() => toggleMonth(index)}
                           data-testid={`checkbox-month-${index}`}
                         />
-                        <Label htmlFor={`month-${index}`} className="cursor-pointer">
+                        <Label htmlFor={`month-${index}`} className="cursor-pointer text-xs">
                           {month}
                         </Label>
                       </div>
@@ -318,7 +314,7 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
               )}
             </div>
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-3">
             <Button
               type="button"
               variant="outline"

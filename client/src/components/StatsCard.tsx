@@ -17,12 +17,12 @@ export default function StatsCard({ title, value, icon: Icon, variant = "default
 
   return (
     <Card data-testid={`card-stats-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className={`h-4 w-4 ${variantClasses[variant]}`} />
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-1.5">
+        <CardTitle className="text-xs font-medium">{title}</CardTitle>
+        <Icon className={`h-3.5 w-3.5 ${variantClasses[variant]}`} />
       </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold tabular-nums" data-testid={`text-stats-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <CardContent className="pb-2">
+        <div className="text-2xl font-bold tabular-nums" data-testid={`text-stats-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
           {value}
         </div>
       </CardContent>
