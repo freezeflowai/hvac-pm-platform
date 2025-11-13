@@ -4,7 +4,6 @@ import Header from "@/components/Header";
 import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
-import PartsManagementDialog from "@/components/PartsManagementDialog";
 import { AlertCircle, Calendar, CheckCircle, Clock, Package } from "lucide-react";
 import { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
@@ -71,7 +70,6 @@ interface ClientPart {
 export default function Dashboard() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [showPartsDialog, setShowPartsDialog] = useState(false);
 
   // Read tab from URL query parameter using window.location.search
   const urlParams = new URLSearchParams(window.location.search);
@@ -317,7 +315,7 @@ export default function Dashboard() {
         <div className="flex justify-end">
           <Button
             variant="outline"
-            onClick={() => setShowPartsDialog(true)}
+            onClick={() => setLocation("/manage-parts")}
             data-testid="button-manage-parts"
             className="gap-2"
           >
@@ -383,11 +381,6 @@ export default function Dashboard() {
           </TabsContent>
         </Tabs>
       </main>
-
-      <PartsManagementDialog
-        open={showPartsDialog}
-        onClose={() => setShowPartsDialog(false)}
-      />
     </div>
   );
 }

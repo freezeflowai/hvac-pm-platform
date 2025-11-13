@@ -1,4 +1,3 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +21,7 @@ interface Part {
 }
 
 interface PartsManagementDialogProps {
-  open: boolean;
-  onClose: () => void;
+  onCancel?: () => void;
 }
 
 interface FilterRow {
@@ -41,7 +39,7 @@ interface OtherRow {
   description: string;
 }
 
-export default function PartsManagementDialog({ open, onClose }: PartsManagementDialogProps) {
+export default function PartsManagementDialog({ onCancel }: PartsManagementDialogProps) {
   const { toast } = useToast();
   const [filterRows, setFilterRows] = useState<FilterRow[]>([{ filterType: "Pleated", size: "" }]);
   const [beltRows, setBeltRows] = useState<BeltRow[]>([{ beltType: "A", size: "" }]);
@@ -49,7 +47,6 @@ export default function PartsManagementDialog({ open, onClose }: PartsManagement
 
   const { data: parts = [], isLoading } = useQuery<Part[]>({
     queryKey: ["/api/parts"],
-    enabled: open,
   });
 
   const bulkCreateMutation = useMutation({
@@ -177,12 +174,7 @@ export default function PartsManagementDialog({ open, onClose }: PartsManagement
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto" data-testid="dialog-parts-management">
-        <DialogHeader>
-          <DialogTitle>Manage Parts Inventory</DialogTitle>
-        </DialogHeader>
-
+    <div className="space-y-6" data-testid="form-parts-management">
         <Tabs defaultValue="filters" className="w-full">
           <TabsList className="grid w-full grid-cols-3" data-testid="tabs-parts-types">
             <TabsTrigger value="filters" data-testid="tab-filters">Filters</TabsTrigger>
@@ -520,7 +512,6 @@ export default function PartsManagementDialog({ open, onClose }: PartsManagement
             </div>
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 }
