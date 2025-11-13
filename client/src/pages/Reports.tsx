@@ -139,86 +139,90 @@ export default function Reports() {
           </Card>
         ) : (
           <div className="space-y-6">
-            {filters.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Filters
-                  </CardTitle>
-                  <CardDescription>
-                    Total filters needed for {MONTHS[selectedMonth]}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Filter Type</TableHead>
-                        <TableHead>Size</TableHead>
-                        <TableHead className="text-right">Total Quantity</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filters.map((item, index) => {
-                        const display = getPartDisplay(item.part);
-                        return (
-                          <TableRow key={index} data-testid={`filter-row-${index}`}>
-                            <TableCell className="font-medium">{display.name}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{display.details}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Badge data-testid={`filter-quantity-${index}`}>{item.totalQuantity}</Badge>
-                            </TableCell>
+            {(filters.length > 0 || belts.length > 0) && (
+              <div className="grid md:grid-cols-2 gap-6">
+                {filters.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Package className="h-5 w-5" />
+                        Filters
+                      </CardTitle>
+                      <CardDescription>
+                        Total filters needed for {MONTHS[selectedMonth]}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Filter Type</TableHead>
+                            <TableHead>Size</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
                           </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            )}
+                        </TableHeader>
+                        <TableBody>
+                          {filters.map((item, index) => {
+                            const display = getPartDisplay(item.part);
+                            return (
+                              <TableRow key={index} data-testid={`filter-row-${index}`}>
+                                <TableCell className="font-medium">{display.name}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{display.details}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Badge data-testid={`filter-quantity-${index}`}>{item.totalQuantity}</Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
 
-            {belts.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Belts
-                  </CardTitle>
-                  <CardDescription>
-                    Total belts needed for {MONTHS[selectedMonth]}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Belt Type</TableHead>
-                        <TableHead>Size</TableHead>
-                        <TableHead className="text-right">Total Quantity</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {belts.map((item, index) => {
-                        const display = getPartDisplay(item.part);
-                        return (
-                          <TableRow key={index} data-testid={`belt-row-${index}`}>
-                            <TableCell className="font-medium">{display.name}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{display.details}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Badge data-testid={`belt-quantity-${index}`}>{item.totalQuantity}</Badge>
-                            </TableCell>
+                {belts.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Package className="h-5 w-5" />
+                        Belts
+                      </CardTitle>
+                      <CardDescription>
+                        Total belts needed for {MONTHS[selectedMonth]}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Belt Type</TableHead>
+                            <TableHead>Size</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
                           </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+                        </TableHeader>
+                        <TableBody>
+                          {belts.map((item, index) => {
+                            const display = getPartDisplay(item.part);
+                            return (
+                              <TableRow key={index} data-testid={`belt-row-${index}`}>
+                                <TableCell className="font-medium">{display.name}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{display.details}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Badge data-testid={`belt-quantity-${index}`}>{item.totalQuantity}</Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             )}
 
             {other.length > 0 && (
