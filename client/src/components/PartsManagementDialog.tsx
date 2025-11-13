@@ -99,6 +99,27 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
     },
   });
 
+  const seedPartsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/parts/seed");
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
+      toast({
+        title: "Success",
+        description: "Standard parts have been seeded successfully. This includes 244 standard filters and belts.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to seed standard parts.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSaveFilters = () => {
     const validRows = filterRows.filter(row => row.size.trim());
     if (validRows.length === 0) return;
@@ -175,6 +196,27 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
 
   return (
     <div className="space-y-6" data-testid="form-parts-management">
+        <Card className="bg-muted/50">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-semibold">Need Standard Parts?</h3>
+                <p className="text-sm text-muted-foreground">
+                  Seed 244 standard filters and belts (sizes 18-70) to get started quickly.
+                </p>
+              </div>
+              <Button
+                onClick={() => seedPartsMutation.mutate()}
+                disabled={seedPartsMutation.isPending}
+                data-testid="button-seed-parts"
+                variant="default"
+              >
+                {seedPartsMutation.isPending ? "Seeding..." : "Seed Standard Parts"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <Tabs defaultValue="filters" className="w-full">
           <TabsList className="grid w-full grid-cols-3" data-testid="tabs-parts-types">
             <TabsTrigger value="filters" data-testid="tab-filters">Filters</TabsTrigger>
