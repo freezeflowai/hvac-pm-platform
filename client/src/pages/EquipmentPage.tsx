@@ -95,6 +95,7 @@ export default function EquipmentPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'report'] });
       toast({ title: "Success", description: "Equipment deleted successfully" });
     },
     onError: () => {
@@ -161,6 +162,7 @@ export default function EquipmentPage() {
       }
 
       queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'report'] });
       toast({ title: "Success", description: "All changes saved successfully" });
       
       const savedRows = rows.filter(r => r.name.trim()).map(r => ({

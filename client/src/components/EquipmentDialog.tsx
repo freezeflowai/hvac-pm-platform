@@ -88,6 +88,7 @@ export default function EquipmentDialog({ open, onClose, clientId, clientName }:
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'report'] });
       toast({ title: "Success", description: "Equipment deleted successfully" });
     },
     onError: () => {
@@ -148,6 +149,7 @@ export default function EquipmentDialog({ open, onClose, clientId, clientName }:
       }
 
       queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'report'] });
       toast({ title: "Success", description: "All changes saved successfully" });
       
       // Reset rows to remove isNew and isModified flags
