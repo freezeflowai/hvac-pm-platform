@@ -33,16 +33,17 @@ export default function Login() {
 
   // Redirect to dashboard when user becomes authenticated
   useEffect(() => {
-    if (user && !isLoading) {
+    if (user) {
       setLocation("/");
     }
-  }, [user, isLoading, setLocation]);
+  }, [user, setLocation]);
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
       await login(data.email, data.password);
-      // useEffect will handle navigation once user state updates
+      // Don't set isLoading to false here - let useEffect handle navigation
+      // isLoading will be checked in useEffect to ensure user state is set before redirect
     } catch (error: any) {
       toast({
         variant: "destructive",
