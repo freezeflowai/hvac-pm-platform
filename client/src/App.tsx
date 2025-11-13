@@ -12,6 +12,7 @@ import EquipmentPage from "@/pages/EquipmentPage";
 import ClientReportPage from "@/pages/ClientReportPage";
 import AddClientPage from "@/pages/AddClientPage";
 import PartsManagementPage from "@/pages/PartsManagementPage";
+import ClientPartsPage from "@/pages/ClientPartsPage";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import RequestReset from "@/pages/RequestReset";
@@ -58,6 +59,11 @@ function Router() {
       <Route path="/equipment/:clientId">
         <ProtectedRoute>
           <EquipmentPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/clients/:clientId/parts">
+        <ProtectedRoute>
+          <ClientPartsPage />
         </ProtectedRoute>
       </Route>
       <Route path="/client-report/:clientId">
