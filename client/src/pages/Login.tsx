@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,7 +19,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const [, setLocation] = useLocation();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -31,18 +31,24 @@ export default function Login() {
     },
   });
 
+  // Redirect to dashboard when user becomes authenticated
+  useEffect(() => {
+    if (user && !isLoading) {
+      setLocation("/");
+    }
+  }, [user, isLoading, setLocation]);
+
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
       await login(data.email, data.password);
-      setLocation("/");
+      // useEffect will handle navigation once user state updates
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Login failed",
         description: error.message || "Invalid email or password",
       });
-    } finally {
       setIsLoading(false);
     }
   };
