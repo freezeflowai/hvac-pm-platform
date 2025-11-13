@@ -184,6 +184,14 @@ export default function Dashboard() {
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
+  // Calculate if we're within one week of month end
+  const isWithinOneWeekOfMonthEnd = () => {
+    const today = new Date();
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const daysUntilMonthEnd = Math.ceil((lastDayOfMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return daysUntilMonthEnd <= 7;
+  };
+
   const maintenanceItems: MaintenanceItem[] = clients
     .filter(c => !c.inactive)
     .map(c => ({
@@ -192,7 +200,7 @@ export default function Dashboard() {
       location: c.location,
       selectedMonths: c.selectedMonths,
       nextDue: c.nextDue,
-      status: (c.nextDue < new Date() ? "overdue" : "upcoming") as "overdue" | "upcoming",
+      status: (c.nextDue < new Date() || isWithinOneWeekOfMonthEnd() ? "overdue" : "upcoming") as "overdue" | "upcoming",
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
