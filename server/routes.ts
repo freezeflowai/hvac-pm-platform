@@ -769,6 +769,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/users/:id/reset-password", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { password } = req.body;
+      
+      if (!password || typeof password !== 'string' || password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+      
+      // Verify user exists
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Hash the new password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Update the user's password
+      await storage.updateUserPassword(id, hashedPassword);
+      
+      res.json({ 
+        success: true,
+        message: "Password reset successfully"
+      });
+    } catch (error) {
+      console.error('Admin password reset error:', error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

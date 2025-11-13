@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, ShieldCheck, ShieldOff, Package } from "lucide-react";
+import { Trash2, ShieldCheck, ShieldOff, Package, KeyRound } from "lucide-react";
 import Header from "@/components/Header";
 import {
   AlertDialog,
@@ -17,6 +20,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface User {
   id: string;
@@ -27,6 +39,9 @@ interface User {
 export default function Admin() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -91,6 +106,53 @@ export default function Admin() {
       });
     },
   });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
+      const response = await apiRequest("POST", `/api/admin/users/${userId}/reset-password`, { password });
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Password reset successfully",
+        description: "The user's password has been updated.",
+      });
+      setResetPasswordUserId(null);
+      setNewPassword("");
+      setConfirmPassword("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reset password",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleResetPassword = () => {
+    if (!resetPasswordUserId) return;
+    
+    if (newPassword.length < 6) {
+      toast({
+        title: "Invalid password",
+        description: "Password must be at least 6 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Passwords don't match",
+        description: "Please make sure both passwords match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    resetPasswordMutation.mutate({ userId: resetPasswordUserId, password: newPassword });
+  };
 
   if (isLoading) {
     return <div className="p-6">Loading...</div>;
@@ -167,6 +229,77 @@ export default function Admin() {
                     <Package className="h-4 w-4" />
                   </Button>
 
+                  <Dialog open={resetPasswordUserId === user.id} onOpenChange={(open) => {
+                    if (!open) {
+                      setResetPasswordUserId(null);
+                      setNewPassword("");
+                      setConfirmPassword("");
+                    }
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setResetPasswordUserId(user.id)}
+                        data-testid={`button-reset-password-${user.id}`}
+                        aria-label="Reset password"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Reset Password</DialogTitle>
+                        <DialogDescription>
+                          Set a new password for {user.email}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="new-password">New Password</Label>
+                          <Input
+                            id="new-password"
+                            type="password"
+                            placeholder="Enter new password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            data-testid="input-new-password"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="confirm-password">Confirm Password</Label>
+                          <Input
+                            id="confirm-password"
+                            type="password"
+                            placeholder="Confirm new password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            data-testid="input-confirm-password"
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setResetPasswordUserId(null);
+                            setNewPassword("");
+                            setConfirmPassword("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleResetPassword}
+                          disabled={resetPasswordMutation.isPending}
+                          data-testid="button-confirm-reset-password"
+                        >
+                          {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
@@ -174,6 +307,7 @@ export default function Admin() {
                         size="icon"
                         disabled={toggleAdminMutation.isPending}
                         data-testid={`button-toggle-admin-${user.id}`}
+                        aria-label={user.isAdmin ? "Remove admin status" : "Grant admin status"}
                       >
                         {user.isAdmin ? (
                           <ShieldOff className="h-4 w-4" />

@@ -61,7 +61,16 @@ export default function RequestReset() {
               If an account exists with the email you provided, you will receive a password reset link.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {import.meta.env.DEV && (
+              <div className="p-3 bg-muted rounded-md text-sm">
+                <p className="font-medium mb-1">Development Mode</p>
+                <p className="text-muted-foreground text-xs">
+                  In development mode, the password reset link is logged to the server console. 
+                  Check the server logs to find your reset link.
+                </p>
+              </div>
+            )}
             <Button
               data-testid="button-back-to-login"
               onClick={() => setLocation("/login")}
