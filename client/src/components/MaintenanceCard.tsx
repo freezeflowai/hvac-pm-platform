@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, CheckCircle, Pencil } from "lucide-react";
+import { MapPin, CheckCircle } from "lucide-react";
 import { useLocation } from "wouter";
 
 export interface MaintenanceItem {
@@ -85,18 +85,6 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
             </div>
           </div>
           <div className="flex gap-1 flex-shrink-0">
-            <Button
-              size="icon"
-              variant="outline"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit(item.id);
-              }}
-              data-testid={`button-edit-${item.id}`}
-              className="h-8 w-8"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
             <Button
               size="sm"
               variant={isCompleted ? "default" : "outline"}
