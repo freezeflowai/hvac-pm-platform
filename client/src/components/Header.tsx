@@ -3,6 +3,8 @@ import { Plus, LayoutDashboard, FileText, LogOut, User, Shield } from "lucide-re
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import type { CompanySettings } from "@shared/schema";
 
 interface HeaderProps {
   onAddClient?: () => void;
@@ -12,6 +14,15 @@ export default function Header({ onAddClient }: HeaderProps) {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const { toast } = useToast();
+
+  const { data: companySettings } = useQuery<CompanySettings | null>({
+    queryKey: ["/api/company-settings"],
+    enabled: Boolean(user?.id),
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  });
 
   const handleLogout = async () => {
     try {
@@ -36,7 +47,9 @@ export default function Header({ onAddClient }: HeaderProps) {
         <div className="flex items-center justify-between h-16 gap-4">
           <div className="flex items-center gap-6">
             <div>
-              <h1 className="text-2xl font-semibold text-foreground">HVAC/R Scheduler</h1>
+              <h1 className="text-2xl font-semibold text-foreground">
+                {companySettings?.companyName || "HVAC/R Scheduler"}
+              </h1>
               <p className="text-sm text-muted-foreground">Preventive Maintenance Tracking</p>
             </div>
             <nav className="flex gap-2">

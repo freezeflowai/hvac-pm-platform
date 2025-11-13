@@ -13,6 +13,7 @@ import ClientReportPage from "@/pages/ClientReportPage";
 import AddClientPage from "@/pages/AddClientPage";
 import PartsManagementPage from "@/pages/PartsManagementPage";
 import ClientPartsPage from "@/pages/ClientPartsPage";
+import CompanySettingsPage from "@/pages/CompanySettingsPage";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import RequestReset from "@/pages/RequestReset";
@@ -69,6 +70,11 @@ function Router() {
       <Route path="/client-report/:clientId">
         <ProtectedRoute>
           <ClientReportPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/company-settings">
+        <ProtectedRoute>
+          <CompanySettingsPage />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />

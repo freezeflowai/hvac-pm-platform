@@ -12,7 +12,9 @@ import {
   type PasswordResetToken,
   type InsertPasswordResetToken,
   type Equipment,
-  type InsertEquipment
+  type InsertEquipment,
+  type CompanySettings,
+  type InsertCompanySettings
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -80,6 +82,10 @@ export interface IStorage {
   
   // Client report
   getClientReport(userId: string, clientId: string): Promise<{ client: Client; parts: (ClientPart & { part: Part })[]; equipment: Equipment[] } | null>;
+  
+  // Company settings methods
+  getCompanySettings(userId: string): Promise<CompanySettings | undefined>;
+  upsertCompanySettings(userId: string, settings: InsertCompanySettings): Promise<CompanySettings>;
 }
 
 export class MemStorage implements IStorage {
@@ -89,6 +95,8 @@ export class MemStorage implements IStorage {
   private clientParts: Map<string, ClientPart>;
   private maintenanceRecords: Map<string, MaintenanceRecord>;
   private passwordResetTokens: Map<string, PasswordResetToken>;
+  private companySettings: Map<string, CompanySettings>;
+  private equipment: Map<string, Equipment>;
 
   constructor() {
     this.users = new Map();
@@ -97,6 +105,8 @@ export class MemStorage implements IStorage {
     this.clientParts = new Map();
     this.maintenanceRecords = new Map();
     this.passwordResetTokens = new Map();
+    this.companySettings = new Map();
+    this.equipment = new Map();
   }
 
   // User methods
@@ -539,10 +549,41 @@ export class MemStorage implements IStorage {
       equipment: equip
     };
   }
+
+  // Company settings methods
+  async getCompanySettings(userId: string): Promise<CompanySettings | undefined> {
+    return Array.from(this.companySettings.values()).find(
+      (settings) => settings.userId === userId
+    );
+  }
+
+  async upsertCompanySettings(userId: string, settings: InsertCompanySettings): Promise<CompanySettings> {
+    const existing = await this.getCompanySettings(userId);
+    
+    if (existing) {
+      const updated: CompanySettings = {
+        ...existing,
+        ...settings,
+        updatedAt: new Date().toISOString()
+      };
+      this.companySettings.set(existing.id, updated);
+      return updated;
+    }
+    
+    const id = randomUUID();
+    const newSettings: CompanySettings = {
+      ...settings,
+      id,
+      userId,
+      updatedAt: new Date().toISOString()
+    };
+    this.companySettings.set(id, newSettings);
+    return newSettings;
+  }
 }
 
 import { db } from './db';
-import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment } from '@shared/schema';
+import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings } from '@shared/schema';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
@@ -951,6 +992,32 @@ export class DbStorage implements IStorage {
       parts,
       equipment: equip
     };
+  }
+
+  // Company settings methods
+  async getCompanySettings(userId: string): Promise<CompanySettings | undefined> {
+    const result = await db.select()
+      .from(companySettings)
+      .where(eq(companySettings.userId, userId))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertCompanySettings(userId: string, settings: InsertCompanySettings): Promise<CompanySettings> {
+    const existing = await this.getCompanySettings(userId);
+    
+    if (existing) {
+      const result = await db.update(companySettings)
+        .set({ ...settings, updatedAt: sql`CURRENT_TIMESTAMP` })
+        .where(eq(companySettings.userId, userId))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(companySettings)
+        .values({ ...settings, userId })
+        .returning();
+      return result[0];
+    }
   }
 }
 

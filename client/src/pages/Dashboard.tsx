@@ -4,7 +4,7 @@ import Header from "@/components/Header";
 import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
-import { AlertCircle, Calendar, CheckCircle, Clock, Package } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle, Clock, Package, Settings } from "lucide-react";
 import { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -312,7 +312,16 @@ export default function Dashboard() {
       <Header onAddClient={() => setLocation("/add-client")} />
       
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 space-y-4">
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setLocation("/company-settings")}
+            data-testid="button-company-settings"
+            className="gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Company Settings
+          </Button>
           <Button
             variant="outline"
             onClick={() => setLocation("/manage-parts")}

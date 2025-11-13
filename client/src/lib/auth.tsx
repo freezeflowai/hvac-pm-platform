@@ -58,10 +58,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: async () => {
       await apiRequest("POST", "/api/auth/logout");
     },
-    onSuccess: () => {
+    onMutate: () => {
       setUser(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      queryClient.clear();
+      queryClient.cancelQueries({ queryKey: ["/api/company-settings"] });
+    },
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: ["/api/company-settings"] });
+      queryClient.removeQueries({ queryKey: ["/api/auth/user"] });
     },
   });
 

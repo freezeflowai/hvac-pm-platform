@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema } from "@shared/schema";
 import { passport, isAdmin } from "./auth";
 import { z } from "zod";
 
@@ -797,6 +797,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Admin password reset error:', error);
       res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
+  // Company settings routes
+  app.get("/api/company-settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const settings = await storage.getCompanySettings(userId);
+      
+      if (!settings) {
+        return res.json(null);
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error('Get company settings error:', error);
+      res.status(500).json({ error: "Failed to fetch company settings" });
+    }
+  });
+
+  app.post("/api/company-settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const settingsData = insertCompanySettingsSchema.parse(req.body);
+      
+      const settings = await storage.upsertCompanySettings(userId, settingsData);
+      res.json(settings);
+    } catch (error) {
+      console.error('Update company settings error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid settings data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update company settings" });
     }
   });
 
