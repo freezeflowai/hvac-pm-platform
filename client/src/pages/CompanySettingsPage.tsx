@@ -35,6 +35,9 @@ export default function CompanySettingsPage() {
     defaultValues: {
       companyName: "",
       address: "",
+      city: "",
+      provinceState: "",
+      postalCode: "",
       email: "",
       phone: "",
     },
@@ -45,6 +48,9 @@ export default function CompanySettingsPage() {
       form.reset({
         companyName: settings?.companyName || "",
         address: settings?.address || "",
+        city: settings?.city || "",
+        provinceState: settings?.provinceState || "",
+        postalCode: settings?.postalCode || "",
         email: settings?.email || "",
         phone: settings?.phone || "",
       });
@@ -140,12 +146,12 @@ export default function CompanySettingsPage() {
                   name="address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Address</FormLabel>
+                      <FormLabel>Street Address</FormLabel>
                       <FormControl>
                         <Input 
                           {...field}
                           value={field.value || ""}
-                          placeholder="Enter your company address"
+                          placeholder="123 Main Street"
                           data-testid="input-address"
                         />
                       </FormControl>
@@ -153,6 +159,65 @@ export default function CompanySettingsPage() {
                     </FormItem>
                   )}
                 />
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>City</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field}
+                            value={field.value || ""}
+                            placeholder="City"
+                            data-testid="input-city"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="provinceState"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Province/State</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field}
+                            value={field.value || ""}
+                            placeholder="ON"
+                            data-testid="input-province-state"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="postalCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Postal/Zip Code</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field}
+                            value={field.value || ""}
+                            placeholder="A1A 1A1"
+                            data-testid="input-postal-code"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
