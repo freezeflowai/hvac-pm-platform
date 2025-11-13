@@ -108,7 +108,7 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
       queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
       toast({
         title: "Success",
-        description: "Standard parts have been seeded successfully. This includes 244 standard filters and belts.",
+        description: "Standard parts seeded successfully. Missing parts have been restored (244 filters and belts available).",
       });
     },
     onError: () => {
@@ -202,7 +202,7 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
               <div>
                 <h3 className="font-semibold">Need Standard Parts?</h3>
                 <p className="text-sm text-muted-foreground">
-                  Seed 244 standard filters and belts (sizes 18-70) to get started quickly.
+                  Seed 244 standard filters and belts (sizes 18-70). Safe to run multiple times - duplicates are skipped.
                 </p>
               </div>
               <Button
