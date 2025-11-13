@@ -132,21 +132,37 @@ export default function ClientPartsPage() {
   };
 
   const handleSaveAll = async () => {
+    const invalidRows = rows.filter(row => !row.partId || row.quantity <= 0);
+    if (invalidRows.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please ensure all parts have a valid selection and quantity greater than 0.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const validRows = rows.filter(row => row.partId && row.quantity > 0);
-      
-      const partsData = validRows.map(row => ({
+      const partsData = rows.map(row => ({
         partId: row.partId,
         quantity: row.quantity,
       }));
 
       await apiRequest('POST', `/api/clients/${clientId}/parts`, { parts: partsData });
       
-      queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'parts'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/reports/parts'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'parts'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/reports/parts'] });
       
-      setRows([]);
+      const updatedParts = await queryClient.fetchQuery({
+        queryKey: ['/api/clients', clientId, 'parts'],
+      });
+      
+      setRows((updatedParts as ClientPart[]).map((cp: ClientPart) => ({
+        id: cp.id,
+        partId: cp.partId,
+        quantity: cp.quantity,
+      })));
       
       toast({ title: "Success", description: "Parts saved successfully" });
     } catch (error) {

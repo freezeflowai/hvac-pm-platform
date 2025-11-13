@@ -281,7 +281,7 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                         size="sm"
                         variant="outline"
                         onClick={() => handlePartsClick(client.id)}
-                        data-testid={`button-parts-${client.id}`}
+                        data-testid={`button-manage-parts-${client.id}`}
                         title="Manage Parts"
                       >
                         <Package className="h-3 w-3" />
@@ -334,7 +334,7 @@ export default function ClientListTable({ clients, onEdit, onDelete }: ClientLis
                         size="sm"
                         variant="outline"
                         onClick={() => handlePartsClick(client.id)}
-                        data-testid={`button-parts-${client.id}`}
+                        data-testid={`button-manage-parts-${client.id}`}
                         title="Manage Parts"
                       >
                         <Package className="h-3 w-3" />
