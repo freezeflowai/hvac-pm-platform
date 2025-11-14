@@ -65,6 +65,7 @@ export default function AddClientPage() {
         selectedMonths: data.selectedMonths,
         inactive: data.inactive,
         nextDue: nextDue ? nextDue.toISOString() : new Date('9999-12-31').toISOString(),
+        parts: data.parts,
       };
       
       const res = await apiRequest("POST", "/api/clients", clientData);
