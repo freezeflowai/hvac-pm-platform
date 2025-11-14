@@ -103,6 +103,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Diagnostic endpoint to check production environment
+  app.get("/api/diagnostic", async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const userCount = allUsers.length;
+      const adminUsers = allUsers.filter(u => u.isAdmin);
+      
+      res.json({
+        environment: process.env.NODE_ENV || "development",
+        sessionSecret: process.env.SESSION_SECRET ? "SET" : "NOT SET",
+        databaseUrl: process.env.DATABASE_URL ? "SET" : "NOT SET",
+        totalUsers: userCount,
+        adminUsers: adminUsers.length,
+        isAuthenticated: req.isAuthenticated(),
+        currentUser: req.user ? { id: req.user.id, email: req.user.email, isAdmin: req.user.isAdmin } : null
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Diagnostic failed", message: String(error) });
+    }
+  });
+
   // Temporary endpoint to promote user to admin using email and secret code
   app.post("/api/auth/emergency-admin-setup", async (req, res) => {
     try {
