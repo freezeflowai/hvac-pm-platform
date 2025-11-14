@@ -109,15 +109,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allUsers = await storage.getAllUsers();
       const userCount = allUsers.length;
       const adminUsers = allUsers.filter(u => u.isAdmin);
+      const isProduction = process.env.NODE_ENV === "production" || !!process.env.REPLIT_DEPLOYMENT;
       
       res.json({
         environment: process.env.NODE_ENV || "development",
+        replitDeployment: process.env.REPLIT_DEPLOYMENT ? "YES" : "NO",
+        isProductionDetected: isProduction,
         sessionSecret: process.env.SESSION_SECRET ? "SET" : "NOT SET",
         databaseUrl: process.env.DATABASE_URL ? "SET" : "NOT SET",
         totalUsers: userCount,
         adminUsers: adminUsers.length,
         isAuthenticated: req.isAuthenticated(),
-        currentUser: req.user ? { id: req.user.id, email: req.user.email, isAdmin: req.user.isAdmin } : null
+        currentUser: req.user ? { id: req.user.id, email: req.user.email, isAdmin: req.user.isAdmin } : null,
+        sessionCookieSettings: {
+          secure: isProduction,
+          sameSite: "lax"
+        }
       });
     } catch (error) {
       res.status(500).json({ error: "Diagnostic failed", message: String(error) });

@@ -8,10 +8,13 @@ import { passport } from "./auth";
 
 const app = express();
 
+// Detect if running in production (published app)
+const isProduction = process.env.NODE_ENV === "production" || !!process.env.REPLIT_DEPLOYMENT;
+
 const PgSession = ConnectPgSimple(session);
 const pgPool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined
+  ssl: isProduction ? { rejectUnauthorized: false } : undefined
 });
 
 // Log session store errors
@@ -36,7 +39,7 @@ app.use(
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isProduction,
       sameSite: "lax",
     },
   })
