@@ -451,25 +451,36 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                                     <CommandEmpty>No parts found.</CommandEmpty>
                                     <CommandGroup>
                                       <ScrollArea className="h-72">
-                                        {partsByType[type].map((part: Part) => (
-                                          <CommandItem
-                                            key={part.id}
-                                            value={`${part.id}-${getPartDisplayName(part)}`}
-                                            onSelect={() => {
-                                              handleUpdatePart(actualIndex, 'partId', part.id);
-                                              setOpenRowIndex(null);
-                                            }}
-                                            data-testid={`option-part-${part.id}`}
-                                          >
-                                            <Check
-                                              className={cn(
-                                                "mr-2 h-4 w-4",
-                                                row.partId === part.id ? "opacity-100" : "opacity-0"
-                                              )}
-                                            />
-                                            {getPartDisplayName(part)}
-                                          </CommandItem>
-                                        ))}
+                                        {partsByType[type].map((part: Part) => {
+                                          const displayName = getPartDisplayName(part);
+                                          return (
+                                            <CommandItem
+                                              key={part.id}
+                                              value={displayName}
+                                              keywords={[
+                                                part.type,
+                                                part.filterType || '',
+                                                part.beltType || '',
+                                                part.size || '',
+                                                part.name || '',
+                                                displayName
+                                              ]}
+                                              onSelect={() => {
+                                                handleUpdatePart(actualIndex, 'partId', part.id);
+                                                setOpenRowIndex(null);
+                                              }}
+                                              data-testid={`option-part-${part.id}`}
+                                            >
+                                              <Check
+                                                className={cn(
+                                                  "mr-2 h-4 w-4",
+                                                  row.partId === part.id ? "opacity-100" : "opacity-0"
+                                                )}
+                                              />
+                                              {displayName}
+                                            </CommandItem>
+                                          );
+                                        })}
                                       </ScrollArea>
                                     </CommandGroup>
                                   </CommandList>
