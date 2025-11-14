@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -56,12 +58,23 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Login</CardTitle>
-          <CardDescription>Enter your credentials to access your account</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="w-full max-w-md space-y-4">
+        <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+          <AlertDescription className="text-sm text-yellow-800 dark:text-yellow-200">
+            <p className="font-semibold mb-2">Beta Test Mode</p>
+            <p className="mb-2">This is a beta app in test mode, functions are being updated daily.</p>
+            <p className="mb-2">Email password reset does not function and can only be changed by the admin. Also the Import client list is in beta.</p>
+            <p className="mb-2">Recommendation is to export all your data once entered in the system as a precaution.</p>
+            <p>For the completed build please email <a href="mailto:service@samcor.ca" className="underline font-medium">service@samcor.ca</a>.</p>
+          </AlertDescription>
+        </Alert>
+        <Card>
+          <CardHeader>
+            <CardTitle>Login</CardTitle>
+            <CardDescription>Enter your credentials to access your account</CardDescription>
+          </CardHeader>
+          <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
@@ -133,6 +146,7 @@ export default function Login() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
