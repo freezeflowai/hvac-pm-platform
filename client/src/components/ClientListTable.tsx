@@ -199,7 +199,7 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
 
       const csvRows: string[] = [];
       
-      csvRows.push('Row Type,Company Name,Location,Address,City,Province/State,Postal Code,Contact Name,Email,Phone,Roof/Ladder Code,Notes,Status,Maintenance Months,Next Due,Created Date,Part Name,Part Quantity,Equipment Name,Model Number,Serial Number');
+      csvRows.push('Row Type,Company Name,Location,Address,City,Province/State,Postal Code,Contact Name,Email,Phone,Roof/Ladder Code,Notes,Status,Maintenance Months,Part Name,Part Quantity,Equipment Name,Model Number,Serial Number');
       
       allData.forEach(({ client, parts, equipment }) => {
         const companyName = `"${client.companyName.replace(/"/g, '""')}"`;
@@ -215,11 +215,9 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
         const notes = client.notes ? `"${client.notes.replace(/"/g, '""')}"` : '';
         const status = client.inactive ? 'Inactive' : 'Active';
         const maintenanceMonths = `"${getMonthsDisplay(client.selectedMonths)}"`;
-        const nextDue = client.inactive ? 'N/A' : `"${format(new Date(client.nextDue), 'MMM d, yyyy')}"`;
-        const createdDate = client.createdAt ? `"${format(new Date(client.createdAt), 'MMM d, yyyy')}"` : '';
         
         if (parts.length === 0 && equipment.length === 0) {
-          csvRows.push(`MAIN,${companyName},${location},${address},${city},${province},${postalCode},${contactName},${email},${phone},${roofLadderCode},${notes},${status},${maintenanceMonths},${nextDue},${createdDate},,,,,`);
+          csvRows.push(`MAIN,${companyName},${location},${address},${city},${province},${postalCode},${contactName},${email},${phone},${roofLadderCode},${notes},${status},${maintenanceMonths},,,,,`);
         } else {
           const maxRows = Math.max(parts.length, equipment.length);
           for (let i = 0; i < maxRows; i++) {
@@ -233,7 +231,7 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
             const modelNum = equip?.modelNumber ? `"${equip.modelNumber.replace(/"/g, '""')}"` : '';
             const serialNum = equip?.serialNumber ? `"${equip.serialNumber.replace(/"/g, '""')}"` : '';
             
-            csvRows.push(`${rowType},${companyName},${location},${address},${city},${province},${postalCode},${contactName},${email},${phone},${roofLadderCode},${notes},${status},${maintenanceMonths},${nextDue},${createdDate},${partName},${partQty},${equipName},${modelNum},${serialNum}`);
+            csvRows.push(`${rowType},${companyName},${location},${address},${city},${province},${postalCode},${contactName},${email},${phone},${roofLadderCode},${notes},${status},${maintenanceMonths},${partName},${partQty},${equipName},${modelNum},${serialNum}`);
           }
         }
       });
