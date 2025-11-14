@@ -77,18 +77,37 @@ export default function ClientReportPage() {
   const [, setLocation] = useLocation();
   const clientId = params?.clientId || "";
 
-  const { data: reportData, isLoading } = useQuery<ClientReportData>({
+  const { data: reportData, isLoading, error } = useQuery<ClientReportData>({
     queryKey: ['/api/clients', clientId, 'report'],
     queryFn: async () => {
+      console.log('[ClientReport] Fetching report for clientId:', clientId);
       const res = await fetch(`/api/clients/${clientId}/report`, {
         credentials: 'include',
       });
+      console.log('[ClientReport] Response status:', res.status, 'OK:', res.ok);
+      
       if (!res.ok) {
-        throw new Error('Failed to fetch client report');
+        const errorText = await res.text();
+        console.error('[ClientReport] Error response:', res.status, errorText);
+        
+        if (res.status === 401) {
+          const err = new Error('Not authenticated');
+          (err as any).statusCode = 401;
+          throw err;
+        }
+        if (res.status === 404) {
+          const err = new Error('Client not found');
+          (err as any).statusCode = 404;
+          throw err;
+        }
+        throw new Error(`Failed to fetch client report: ${res.status}`);
       }
-      return res.json();
+      const data = await res.json();
+      console.log('[ClientReport] Successfully loaded report for:', data.client?.companyName);
+      return data;
     },
     enabled: !!clientId,
+    retry: false,
   });
 
   const handlePrint = () => {
@@ -115,6 +134,33 @@ export default function ClientReportPage() {
     return (
       <div className="p-8">
         <p className="text-center text-muted-foreground">Loading report...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    const statusCode = (error as any)?.statusCode;
+    console.error('[ClientReport] Displaying error:', statusCode, error.message);
+    
+    if (statusCode === 401) {
+      return (
+        <div className="p-8 text-center space-y-4">
+          <p className="text-muted-foreground">Authentication required</p>
+          <Button onClick={() => setLocation("/login")} data-testid="button-login">
+            Go to Login
+          </Button>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="p-8 text-center space-y-4">
+        <p className="text-muted-foreground">
+          {statusCode === 404 ? 'Client not found' : 'Failed to load report'}
+        </p>
+        <Button onClick={handleBack} variant="outline" data-testid="button-back-error">
+          Back to Dashboard
+        </Button>
       </div>
     );
   }

@@ -362,12 +362,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/clients/:id/report", isAuthenticated, async (req, res) => {
     try {
-      const report = await storage.getClientReport(req.user!.id, req.params.id);
+      const userId = req.user!.id;
+      const clientId = req.params.id;
+      console.log(`[Report] Fetching report for userId: ${userId}, clientId: ${clientId}`);
+      
+      const report = await storage.getClientReport(userId, clientId);
       if (!report) {
+        console.log(`[Report] Client not found - userId: ${userId}, clientId: ${clientId}`);
         return res.status(404).json({ error: "Client not found" });
       }
+      
+      console.log(`[Report] Successfully generated report for: ${report.client.companyName}`);
       res.json(report);
     } catch (error) {
+      console.error('[Report] Error generating report:', error);
       res.status(500).json({ error: "Failed to generate client report" });
     }
   });
