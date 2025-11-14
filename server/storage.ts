@@ -44,6 +44,7 @@ export interface IStorage {
   createClient(userId: string, client: InsertClient): Promise<Client>;
   updateClient(userId: string, id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(userId: string, id: string): Promise<boolean>;
+  deleteClients(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }>;
   
   // Part methods
   getPart(userId: string, id: string): Promise<Part | undefined>;
@@ -53,6 +54,7 @@ export interface IStorage {
   createPart(userId: string, part: InsertPart): Promise<Part>;
   updatePart(userId: string, id: string, part: Partial<InsertPart>): Promise<Part | undefined>;
   deletePart(userId: string, id: string): Promise<boolean>;
+  deleteParts(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }>;
   seedUserParts(userId: string): Promise<void>;
   
   // Client-Part relationship methods
@@ -232,6 +234,41 @@ export class MemStorage implements IStorage {
     return this.clients.delete(id);
   }
 
+  async deleteClients(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }> {
+    const deletedIds: string[] = [];
+    const notFoundIds: string[] = [];
+
+    for (const id of ids) {
+      const existing = this.clients.get(id);
+      if (!existing || existing.userId !== userId) {
+        notFoundIds.push(id);
+        continue;
+      }
+
+      // Delete associated client parts
+      await this.deleteAllClientParts(userId, id);
+      
+      // Delete associated maintenance records
+      const maintenanceToDelete = Array.from(this.maintenanceRecords.entries())
+        .filter(([_, record]) => record.clientId === id && record.userId === userId)
+        .map(([recordId]) => recordId);
+      maintenanceToDelete.forEach(recordId => this.maintenanceRecords.delete(recordId));
+      
+      // Delete associated equipment
+      const equipmentToDelete = Array.from(this.equipment.entries())
+        .filter(([_, eq]) => eq.clientId === id && eq.userId === userId)
+        .map(([eqId]) => eqId);
+      equipmentToDelete.forEach(eqId => this.equipment.delete(eqId));
+
+      // Delete the client
+      if (this.clients.delete(id)) {
+        deletedIds.push(id);
+      }
+    }
+
+    return { deletedIds, notFoundIds };
+  }
+
   // Part methods
   async getPart(userId: string, id: string): Promise<Part | undefined> {
     const part = this.parts.get(id);
@@ -306,6 +343,33 @@ export class MemStorage implements IStorage {
     
     // Delete the part itself
     return this.parts.delete(id);
+  }
+
+  async deleteParts(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }> {
+    const deletedIds: string[] = [];
+    const notFoundIds: string[] = [];
+
+    for (const id of ids) {
+      const existing = this.parts.get(id);
+      if (!existing || existing.userId !== userId) {
+        notFoundIds.push(id);
+        continue;
+      }
+
+      // Delete all client-part associations for this part
+      const toDelete = Array.from(this.clientParts.entries())
+        .filter(([_, cp]) => cp.partId === id && cp.userId === userId)
+        .map(([cpId]) => cpId);
+      
+      toDelete.forEach(cpId => this.clientParts.delete(cpId));
+
+      // Delete the part itself
+      if (this.parts.delete(id)) {
+        deletedIds.push(id);
+      }
+    }
+
+    return { deletedIds, notFoundIds };
   }
 
   async seedUserParts(userId: string): Promise<void> {
@@ -683,6 +747,39 @@ export class DbStorage implements IStorage {
     return result.length > 0;
   }
 
+  async deleteClients(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }> {
+    const deletedIds: string[] = [];
+    const notFoundIds: string[] = [];
+
+    // Verify all IDs belong to the user first
+    const clientChecks = await Promise.all(
+      ids.map(id => this.getClient(userId, id))
+    );
+    
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const existing = clientChecks[i];
+      
+      if (!existing) {
+        notFoundIds.push(id);
+        continue;
+      }
+
+      // Delete associated data (foreign key cascades should handle this, but being defensive)
+      await this.deleteAllClientParts(userId, id);
+      await db.delete(maintenanceRecords).where(and(eq(maintenanceRecords.clientId, id), eq(maintenanceRecords.userId, userId)));
+      await db.delete(equipment).where(and(eq(equipment.clientId, id), eq(equipment.userId, userId)));
+
+      // Delete the client
+      const result = await db.delete(clients).where(and(eq(clients.id, id), eq(clients.userId, userId))).returning();
+      if (result.length > 0) {
+        deletedIds.push(id);
+      }
+    }
+
+    return { deletedIds, notFoundIds };
+  }
+
   // Part methods
   async getPart(userId: string, id: string): Promise<Part | undefined> {
     const result = await db.select().from(parts).where(and(eq(parts.id, id), eq(parts.userId, userId))).limit(1);
@@ -745,6 +842,37 @@ export class DbStorage implements IStorage {
     await db.delete(clientParts).where(and(eq(clientParts.partId, id), eq(clientParts.userId, userId)));
     const result = await db.delete(parts).where(and(eq(parts.id, id), eq(parts.userId, userId))).returning();
     return result.length > 0;
+  }
+
+  async deleteParts(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }> {
+    const deletedIds: string[] = [];
+    const notFoundIds: string[] = [];
+
+    // Verify all IDs belong to the user first
+    const partChecks = await Promise.all(
+      ids.map(id => this.getPart(userId, id))
+    );
+    
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const existing = partChecks[i];
+      
+      if (!existing) {
+        notFoundIds.push(id);
+        continue;
+      }
+
+      // Delete all client-part associations
+      await db.delete(clientParts).where(and(eq(clientParts.partId, id), eq(clientParts.userId, userId)));
+
+      // Delete the part
+      const result = await db.delete(parts).where(and(eq(parts.id, id), eq(parts.userId, userId))).returning();
+      if (result.length > 0) {
+        deletedIds.push(id);
+      }
+    }
+
+    return { deletedIds, notFoundIds };
   }
 
   async seedUserParts(userId: string): Promise<void> {

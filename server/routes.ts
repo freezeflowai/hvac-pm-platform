@@ -398,6 +398,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/clients/bulk-delete", isAuthenticated, async (req, res) => {
+    try {
+      const schema = z.object({
+        ids: z.array(z.string().uuid()).min(1).max(200)
+      });
+      const { ids } = schema.parse(req.body);
+      
+      const result = await storage.deleteClients(req.user!.id, ids);
+      
+      res.json({
+        deletedIds: result.deletedIds,
+        notFoundIds: result.notFoundIds,
+        deletedCount: result.deletedIds.length,
+        notFoundCount: result.notFoundIds.length
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request: must provide 1-200 client IDs" });
+      }
+      res.status(500).json({ error: "Failed to delete clients" });
+    }
+  });
+
   // Part routes
   app.get("/api/parts", isAuthenticated, async (req, res) => {
     try {
@@ -508,6 +531,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete part" });
+    }
+  });
+
+  app.post("/api/parts/bulk-delete", isAuthenticated, async (req, res) => {
+    try {
+      const schema = z.object({
+        ids: z.array(z.string().uuid()).min(1).max(200)
+      });
+      const { ids } = schema.parse(req.body);
+      
+      const result = await storage.deleteParts(req.user!.id, ids);
+      
+      res.json({
+        deletedIds: result.deletedIds,
+        notFoundIds: result.notFoundIds,
+        deletedCount: result.deletedIds.length,
+        notFoundCount: result.notFoundIds.length
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request: must provide 1-200 part IDs" });
+      }
+      res.status(500).json({ error: "Failed to delete parts" });
     }
   });
 

@@ -4,6 +4,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Trash2, Plus } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -44,6 +55,8 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
   const [filterRows, setFilterRows] = useState<FilterRow[]>([{ filterType: "Pleated", size: "" }]);
   const [beltRows, setBeltRows] = useState<BeltRow[]>([{ beltType: "A", size: "" }]);
   const [otherRows, setOtherRows] = useState<OtherRow[]>([{ name: "", description: "" }]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
   const { data: parts = [], isLoading } = useQuery<Part[]>({
     queryKey: ["/api/parts"],
@@ -119,6 +132,71 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
       });
     },
   });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await apiRequest('POST', '/api/parts/bulk-delete', { ids });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const { deletedCount, notFoundCount } = data;
+      
+      // Invalidate all related queries
+      queryClient.invalidateQueries({ queryKey: ['/api/parts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      
+      if (deletedCount > 0) {
+        toast({
+          title: "Parts deleted",
+          description: `Successfully deleted ${deletedCount} part${deletedCount > 1 ? 's' : ''}. All client associations have been removed.`,
+        });
+      }
+      
+      if (notFoundCount > 0) {
+        toast({
+          title: "Warning",
+          description: `${notFoundCount} part${notFoundCount > 1 ? 's were' : ' was'} not found`,
+          variant: "destructive",
+        });
+      }
+      
+      setSelectedIds(new Set());
+      setBulkDeleteDialogOpen(false);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete parts",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSelectAll = (partsToSelect: Part[]) => {
+    setSelectedIds(new Set(partsToSelect.map(p => p.id)));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    const newSelected = new Set(selectedIds);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleBulkDeleteClick = () => {
+    setBulkDeleteDialogOpen(true);
+  };
+
+  const handleBulkDeleteConfirm = () => {
+    bulkDeleteMutation.mutate(Array.from(selectedIds));
+  };
 
   const handleSaveFilters = () => {
     const validRows = filterRows.filter(row => row.size.trim());
@@ -303,7 +381,48 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
             </div>
 
             <div className="space-y-3 pt-4 border-t">
-              <h3 className="font-semibold">Existing Filters</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Existing Filters</h3>
+                {filterParts.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSelectAll(filterParts)}
+                      data-testid="button-select-all-filters"
+                    >
+                      Select All
+                    </Button>
+                    {selectedIds.size > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDeselectAll}
+                        data-testid="button-deselect-all"
+                      >
+                        Deselect All
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+              {selectedIds.size > 0 && (
+                <div className="p-3 bg-muted rounded-md flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    {selectedIds.size} part{selectedIds.size > 1 ? 's' : ''} selected
+                  </span>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleBulkDeleteClick}
+                    disabled={bulkDeleteMutation.isPending}
+                    data-testid="button-bulk-delete-parts"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Selected
+                  </Button>
+                </div>
+              )}
               {isLoading ? (
                 <p className="text-sm text-muted-foreground">Loading...</p>
               ) : filterParts.length > 0 ? (
@@ -312,8 +431,13 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
                     const display = getPartDisplay(part);
                     return (
                       <Card key={part.id} data-testid={`card-part-${part.id}`}>
-                        <CardContent className="p-3 flex items-center justify-between">
-                          <div>
+                        <CardContent className="p-3 flex items-center justify-between gap-3">
+                          <Checkbox
+                            checked={selectedIds.has(part.id)}
+                            onCheckedChange={(checked) => handleSelectOne(part.id, checked as boolean)}
+                            data-testid={`checkbox-select-part-${part.id}`}
+                          />
+                          <div className="flex-1">
                             <p className="font-medium text-sm">{display.primary}</p>
                             <p className="text-xs text-muted-foreground">{display.secondary}</p>
                           </div>
@@ -414,7 +538,48 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
             </div>
 
             <div className="space-y-3 pt-4 border-t">
-              <h3 className="font-semibold">Existing Belts</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Existing Belts</h3>
+                {beltParts.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSelectAll(beltParts)}
+                      data-testid="button-select-all-belts"
+                    >
+                      Select All
+                    </Button>
+                    {selectedIds.size > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDeselectAll}
+                        data-testid="button-deselect-all"
+                      >
+                        Deselect All
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+              {selectedIds.size > 0 && (
+                <div className="p-3 bg-muted rounded-md flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    {selectedIds.size} part{selectedIds.size > 1 ? 's' : ''} selected
+                  </span>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleBulkDeleteClick}
+                    disabled={bulkDeleteMutation.isPending}
+                    data-testid="button-bulk-delete-parts"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Selected
+                  </Button>
+                </div>
+              )}
               {isLoading ? (
                 <p className="text-sm text-muted-foreground">Loading...</p>
               ) : beltParts.length > 0 ? (
@@ -423,8 +588,13 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
                     const display = getPartDisplay(part);
                     return (
                       <Card key={part.id} data-testid={`card-part-${part.id}`}>
-                        <CardContent className="p-3 flex items-center justify-between">
-                          <div>
+                        <CardContent className="p-3 flex items-center justify-between gap-3">
+                          <Checkbox
+                            checked={selectedIds.has(part.id)}
+                            onCheckedChange={(checked) => handleSelectOne(part.id, checked as boolean)}
+                            data-testid={`checkbox-select-part-${part.id}`}
+                          />
+                          <div className="flex-1">
                             <p className="font-medium text-sm">{display.primary}</p>
                             <p className="text-xs text-muted-foreground">{display.secondary}</p>
                           </div>
@@ -518,7 +688,48 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
             </div>
 
             <div className="space-y-3 pt-4 border-t">
-              <h3 className="font-semibold">Existing Other Parts</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Existing Other Parts</h3>
+                {otherParts.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSelectAll(otherParts)}
+                      data-testid="button-select-all-other"
+                    >
+                      Select All
+                    </Button>
+                    {selectedIds.size > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDeselectAll}
+                        data-testid="button-deselect-all"
+                      >
+                        Deselect All
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+              {selectedIds.size > 0 && (
+                <div className="p-3 bg-muted rounded-md flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    {selectedIds.size} part{selectedIds.size > 1 ? 's' : ''} selected
+                  </span>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleBulkDeleteClick}
+                    disabled={bulkDeleteMutation.isPending}
+                    data-testid="button-bulk-delete-parts"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Selected
+                  </Button>
+                </div>
+              )}
               {isLoading ? (
                 <p className="text-sm text-muted-foreground">Loading...</p>
               ) : otherParts.length > 0 ? (
@@ -527,8 +738,13 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
                     const display = getPartDisplay(part);
                     return (
                       <Card key={part.id} data-testid={`card-part-${part.id}`}>
-                        <CardContent className="p-3 flex items-center justify-between">
-                          <div>
+                        <CardContent className="p-3 flex items-center justify-between gap-3">
+                          <Checkbox
+                            checked={selectedIds.has(part.id)}
+                            onCheckedChange={(checked) => handleSelectOne(part.id, checked as boolean)}
+                            data-testid={`checkbox-select-part-${part.id}`}
+                          />
+                          <div className="flex-1">
                             <p className="font-medium text-sm">{display.primary}</p>
                             {display.secondary && (
                               <p className="text-xs text-muted-foreground">{display.secondary}</p>
@@ -554,6 +770,32 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
             </div>
           </TabsContent>
         </Tabs>
+
+        <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+          <AlertDialogContent data-testid="dialog-bulk-delete-parts">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Multiple Parts</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {selectedIds.size} part{selectedIds.size > 1 ? 's' : ''}?
+                This will remove them from all clients that use these parts.
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-bulk-delete-parts" disabled={bulkDeleteMutation.isPending}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleBulkDeleteConfirm}
+                data-testid="button-confirm-bulk-delete-parts"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={bulkDeleteMutation.isPending}
+              >
+                {bulkDeleteMutation.isPending ? "Deleting..." : `Delete ${selectedIds.size} Part${selectedIds.size > 1 ? 's' : ''}`}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 }

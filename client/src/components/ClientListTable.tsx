@@ -2,12 +2,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Pencil, Trash2, Wrench, Download, Package, Upload } from "lucide-react";
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { format, parse } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +62,78 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await apiRequest('POST', '/api/clients/bulk-delete', { ids });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const { deletedCount, notFoundCount, deletedIds } = data;
+      
+      // Invalidate all related queries
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      deletedIds.forEach((id: string) => {
+        queryClient.invalidateQueries({ queryKey: ['/api/clients', id] });
+        queryClient.invalidateQueries({ queryKey: ['/api/clients', id, 'parts'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/clients', id, 'equipment'] });
+      });
+      
+      if (deletedCount > 0) {
+        toast({
+          title: "Clients deleted",
+          description: `Successfully deleted ${deletedCount} client${deletedCount > 1 ? 's' : ''}. All associated parts, equipment, and maintenance records have been removed.`,
+        });
+      }
+      
+      if (notFoundCount > 0) {
+        toast({
+          title: "Warning",
+          description: `${notFoundCount} client${notFoundCount > 1 ? 's were' : ' was'} not found`,
+          variant: "destructive",
+        });
+      }
+      
+      setSelectedIds(new Set());
+      setBulkDeleteDialogOpen(false);
+      if (onRefresh) onRefresh();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete clients",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(filteredClients.map(c => c.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    const newSelected = new Set(selectedIds);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleBulkDeleteClick = () => {
+    setBulkDeleteDialogOpen(true);
+  };
+
+  const handleBulkDeleteConfirm = () => {
+    bulkDeleteMutation.mutate(Array.from(selectedIds));
+  };
 
   const handleDeleteClick = (client: Client) => {
     setClientToDelete(client);
@@ -453,10 +527,34 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
         </div>
       </CardHeader>
       <CardContent>
+        {selectedIds.size > 0 && (
+          <div className="mb-4 p-3 bg-muted rounded-md flex items-center justify-between">
+            <span className="text-sm font-medium">
+              {selectedIds.size} client{selectedIds.size > 1 ? 's' : ''} selected
+            </span>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDeleteClick}
+              disabled={bulkDeleteMutation.isPending}
+              data-testid="button-bulk-delete-clients"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected
+            </Button>
+          </div>
+        )}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b">
+                <th className="w-12 py-3 px-4">
+                  <Checkbox
+                    checked={filteredClients.length > 0 && selectedIds.size === filteredClients.length}
+                    onCheckedChange={handleSelectAll}
+                    data-testid="checkbox-select-all-clients"
+                  />
+                </th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Company</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Location</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Address</th>
@@ -473,6 +571,13 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
                   data-testid={`row-client-${client.id}`}
                   onClick={() => handleRowClick(client.id)}
                 >
+                  <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedIds.has(client.id)}
+                      onCheckedChange={(checked) => handleSelectOne(client.id, checked as boolean)}
+                      data-testid={`checkbox-select-client-${client.id}`}
+                    />
+                  </td>
                   <td className="py-3 px-4 text-sm font-medium" data-testid={`text-company-${client.id}`}>
                     {client.companyName}
                   </td>
@@ -624,6 +729,43 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
               disabled={isDeleting}
             >
               {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent data-testid="dialog-bulk-delete-clients">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Multiple Clients</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.size} client{selectedIds.size > 1 ? 's' : ''}? 
+              This will remove all their maintenance records, equipment, and parts assignments. 
+              This action cannot be undone.
+              {selectedIds.size <= 5 && (
+                <div className="mt-2">
+                  <p className="font-medium">Clients to be deleted:</p>
+                  <ul className="list-disc list-inside mt-1">
+                    {Array.from(selectedIds).map(id => {
+                      const client = clients.find(c => c.id === id);
+                      return client ? <li key={id}>{client.companyName}</li> : null;
+                    })}
+                  </ul>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-bulk-delete" disabled={bulkDeleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleBulkDeleteConfirm}
+              data-testid="button-confirm-bulk-delete"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={bulkDeleteMutation.isPending}
+            >
+              {bulkDeleteMutation.isPending ? "Deleting..." : `Delete ${selectedIds.size} Client${selectedIds.size > 1 ? 's' : ''}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
