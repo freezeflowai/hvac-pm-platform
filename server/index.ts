@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
-import { Pool } from "@neondatabase/serverless";
+import { Pool } from "pg";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { passport } from "./auth";
@@ -9,14 +9,27 @@ import { passport } from "./auth";
 const app = express();
 
 const PgSession = ConnectPgSimple(session);
-const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pgPool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined
+});
+
+// Log session store errors
+pgPool.on('error', (err) => {
+  console.error('Session pool error:', err);
+});
+
+const sessionStore = new PgSession({
+  pool: pgPool,
+  createTableIfMissing: true,
+  errorLog: (err: Error) => {
+    console.error('Session store error:', err);
+  }
+});
 
 app.use(
   session({
-    store: new PgSession({
-      pool: pgPool,
-      createTableIfMissing: true,
-    }),
+    store: sessionStore,
     secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
     resave: false,
     saveUninitialized: false,
