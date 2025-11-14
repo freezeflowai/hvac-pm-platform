@@ -4,11 +4,12 @@ import Header from "@/components/Header";
 import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
-import { AlertCircle, Calendar, CheckCircle, Clock, Package, Settings } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle, Clock, Package, Settings, Search } from "lucide-react";
 import { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -70,6 +71,7 @@ interface ClientPart {
 export default function Dashboard() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Read tab from URL query parameter using window.location.search
   const urlParams = new URLSearchParams(window.location.search);
@@ -162,7 +164,7 @@ export default function Dashboard() {
     },
   });
 
-  const clients: Client[] = dbClients
+  const allClients: Client[] = dbClients
     .map(c => ({
       id: c.id,
       companyName: c.companyName,
@@ -181,6 +183,24 @@ export default function Dashboard() {
       nextDue: new Date(c.nextDue),
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
+  
+  // Filter clients based on search query
+  const clients = allClients.filter(client => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase();
+    return (
+      client.companyName?.toLowerCase().includes(query) ||
+      client.location?.toLowerCase().includes(query) ||
+      client.contactName?.toLowerCase().includes(query) ||
+      client.address?.toLowerCase().includes(query) ||
+      client.city?.toLowerCase().includes(query) ||
+      client.province?.toLowerCase().includes(query) ||
+      client.notes?.toLowerCase().includes(query) ||
+      client.email?.toLowerCase().includes(query) ||
+      client.phone?.toLowerCase().includes(query)
+    );
+  });
 
   // Helper to determine if an item is overdue
   const isOverdue = (nextDue: Date): boolean => {
@@ -312,25 +332,39 @@ export default function Dashboard() {
       <Header onAddClient={() => setLocation("/add-client")} />
       
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 space-y-4">
-        <div className="flex justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setLocation("/company-settings")}
-            data-testid="button-company-settings"
-            className="gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            Company Settings
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setLocation("/manage-parts")}
-            data-testid="button-manage-parts"
-            className="gap-2"
-          >
-            <Package className="h-4 w-4" />
-            Manage Parts
-          </Button>
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+          <div className="relative w-full sm:w-96">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search clients..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-clients"
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setLocation("/company-settings")}
+              data-testid="button-company-settings"
+              className="gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              Company Settings
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setLocation("/manage-parts")}
+              data-testid="button-manage-parts"
+              className="gap-2"
+            >
+              <Package className="h-4 w-4" />
+              Manage Parts
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
