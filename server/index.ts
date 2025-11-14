@@ -11,6 +11,11 @@ const app = express();
 // Detect if running in production (published app)
 const isProduction = process.env.NODE_ENV === "production" || !!process.env.REPLIT_DEPLOYMENT;
 
+// Trust Replit's proxy for secure cookies to work properly
+if (isProduction) {
+  app.set('trust proxy', 1);
+}
+
 const PgSession = ConnectPgSimple(session);
 const pgPool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
