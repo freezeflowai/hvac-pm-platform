@@ -310,9 +310,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { parts, ...clientData } = req.body;
       const validated = insertClientSchema.parse(clientData);
-      const client = await storage.createClient(req.user!.id, validated);
       
-      // If parts are provided, create them atomically with the client
+      let client: Client;
+      
+      // If parts are provided, use transactional method
       if (parts && Array.isArray(parts) && parts.length > 0) {
         const partsSchema = z.array(z.object({
           partId: z.string().uuid(),
@@ -320,15 +321,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }));
         
         const validatedParts = partsSchema.parse(parts);
-        
-        // Create all parts for this client
-        for (const part of validatedParts) {
-          await storage.addClientPart(req.user!.id, {
-            clientId: client.id,
-            partId: part.partId,
-            quantity: part.quantity
-          });
-        }
+        client = await storage.createClientWithParts(req.user!.id, validated, validatedParts);
+      } else {
+        // No parts, use regular client creation
+        client = await storage.createClient(req.user!.id, validated);
       }
       
       res.json(client);

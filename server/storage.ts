@@ -42,6 +42,7 @@ export interface IStorage {
   getClient(userId: string, id: string): Promise<Client | undefined>;
   getAllClients(userId: string): Promise<Client[]>;
   createClient(userId: string, client: InsertClient): Promise<Client>;
+  createClientWithParts(userId: string, client: InsertClient, partsList: Array<{ partId: string; quantity: number }>): Promise<Client>;
   updateClient(userId: string, id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(userId: string, id: string): Promise<boolean>;
   deleteClients(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }>;
@@ -217,6 +218,41 @@ export class MemStorage implements IStorage {
     };
     this.clients.set(id, client);
     return client;
+  }
+
+  async createClientWithParts(userId: string, insertClient: InsertClient, partsList: Array<{ partId: string; quantity: number }>): Promise<Client> {
+    // Validate all parts exist and belong to user before creating client
+    for (const partItem of partsList) {
+      const existingPart = await this.getPart(userId, partItem.partId);
+      if (!existingPart) {
+        throw new Error(`Part with ID ${partItem.partId} not found or does not belong to user`);
+      }
+    }
+    
+    // Create the client
+    const client = await this.createClient(userId, insertClient);
+    const createdClientPartIds: string[] = [];
+    
+    try {
+      // Add all parts to the client
+      for (const partItem of partsList) {
+        const clientPart = await this.addClientPart(userId, {
+          clientId: client.id,
+          partId: partItem.partId,
+          quantity: partItem.quantity
+        });
+        createdClientPartIds.push(clientPart.id);
+      }
+      
+      return client;
+    } catch (error) {
+      // Rollback: delete all created client-parts and the client
+      for (const clientPartId of createdClientPartIds) {
+        this.clientParts.delete(clientPartId);
+      }
+      this.clients.delete(client.id);
+      throw error;
+    }
   }
 
   async updateClient(userId: string, id: string, clientUpdate: Partial<InsertClient>): Promise<Client | undefined> {
@@ -731,6 +767,39 @@ export class DbStorage implements IStorage {
   async createClient(userId: string, insertClient: InsertClient): Promise<Client> {
     const result = await db.insert(clients).values({ ...insertClient, userId }).returning();
     return result[0];
+  }
+
+  async createClientWithParts(userId: string, insertClient: InsertClient, partsList: Array<{ partId: string; quantity: number }>): Promise<Client> {
+    return await db.transaction(async (tx) => {
+      // Validate all parts exist and belong to user
+      for (const partItem of partsList) {
+        const existingPart = await tx.select().from(parts).where(
+          and(eq(parts.id, partItem.partId), eq(parts.userId, userId))
+        ).limit(1);
+        
+        if (!existingPart || existingPart.length === 0) {
+          throw new Error(`Part with ID ${partItem.partId} not found or does not belong to user`);
+        }
+      }
+      
+      // Create the client
+      const clientResult = await tx.insert(clients).values({ ...insertClient, userId }).returning();
+      const client = clientResult[0];
+      
+      // Bulk insert all client-part associations
+      if (partsList.length > 0) {
+        await tx.insert(clientParts).values(
+          partsList.map(partItem => ({
+            clientId: client.id,
+            partId: partItem.partId,
+            quantity: partItem.quantity,
+            userId
+          }))
+        );
+      }
+      
+      return client;
+    });
   }
 
   async updateClient(userId: string, id: string, clientUpdate: Partial<InsertClient>): Promise<Client | undefined> {
