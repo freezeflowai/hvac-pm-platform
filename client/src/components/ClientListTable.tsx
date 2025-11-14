@@ -125,7 +125,7 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
 
       const csvRows: string[] = [];
       
-      csvRows.push('Company Name,Location,Address,City,Province/State,Postal Code,Contact Name,Email,Phone,Roof/Ladder Code,Notes,Status,Maintenance Months,Next Due,Created Date,Part Name,Part Quantity,Equipment Name,Model Number,Serial Number');
+      csvRows.push('Row Type,Company Name,Location,Address,City,Province/State,Postal Code,Contact Name,Email,Phone,Roof/Ladder Code,Notes,Status,Maintenance Months,Next Due,Created Date,Part Name,Part Quantity,Equipment Name,Model Number,Serial Number');
       
       allData.forEach(({ client, parts, equipment }) => {
         const companyName = `"${client.companyName.replace(/"/g, '""')}"`;
@@ -145,20 +145,21 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
         const createdDate = client.createdAt ? `"${format(new Date(client.createdAt), 'MMM d, yyyy')}"` : '';
         
         if (parts.length === 0 && equipment.length === 0) {
-          csvRows.push(`${companyName},${location},${address},${city},${province},${postalCode},${contactName},${email},${phone},${roofLadderCode},${notes},${status},${maintenanceMonths},${nextDue},${createdDate},,,,,`);
+          csvRows.push(`MAIN,${companyName},${location},${address},${city},${province},${postalCode},${contactName},${email},${phone},${roofLadderCode},${notes},${status},${maintenanceMonths},${nextDue},${createdDate},,,,,`);
         } else {
           const maxRows = Math.max(parts.length, equipment.length);
           for (let i = 0; i < maxRows; i++) {
             const part = parts[i];
             const equip = equipment[i];
             
+            const rowType = i === 0 ? 'MAIN' : 'ADDITIONAL';
             const partName = part ? `"${getPartDisplayName(part.part).replace(/"/g, '""')}"` : '';
             const partQty = part ? part.quantity : '';
             const equipName = equip ? `"${equip.name.replace(/"/g, '""')}"` : '';
             const modelNum = equip?.modelNumber ? `"${equip.modelNumber.replace(/"/g, '""')}"` : '';
             const serialNum = equip?.serialNumber ? `"${equip.serialNumber.replace(/"/g, '""')}"` : '';
             
-            csvRows.push(`${companyName},${location},${address},${city},${province},${postalCode},${contactName},${email},${phone},${roofLadderCode},${notes},${status},${maintenanceMonths},${nextDue},${createdDate},${partName},${partQty},${equipName},${modelNum},${serialNum}`);
+            csvRows.push(`${rowType},${companyName},${location},${address},${city},${province},${postalCode},${contactName},${email},${phone},${roofLadderCode},${notes},${status},${maintenanceMonths},${nextDue},${createdDate},${partName},${partQty},${equipName},${modelNum},${serialNum}`);
           }
         }
       });
@@ -299,7 +300,23 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
         }
         fields.push(currentField);
 
-        const [companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes, status, maintenanceMonths] = fields;
+        // Check for Row Type column (new format with MAIN/ADDITIONAL markers)
+        const hasRowType = fields.length > 15 && (fields[0] === 'MAIN' || fields[0] === 'ADDITIONAL');
+        
+        let rowType, companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes, status, maintenanceMonths;
+        
+        if (hasRowType) {
+          // New format with Row Type column
+          [rowType, companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes, status, maintenanceMonths] = fields;
+          
+          // Skip ADDITIONAL rows - only import MAIN rows to avoid duplicates
+          if (rowType === 'ADDITIONAL') {
+            continue;
+          }
+        } else {
+          // Old format without Row Type column (backward compatibility)
+          [companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes, status, maintenanceMonths] = fields;
+        }
 
         if (!companyName) {
           errors.push(`Row ${i + 2}: Company name is required`);
