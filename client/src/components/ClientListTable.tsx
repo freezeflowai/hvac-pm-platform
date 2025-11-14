@@ -373,12 +373,12 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
         fields.push(currentField);
 
         // Check for Row Type column (new format with MAIN/ADDITIONAL markers)
-        const hasRowType = fields.length > 15 && (fields[0] === 'MAIN' || fields[0] === 'ADDITIONAL');
+        const hasRowType = fields[0] === 'MAIN' || fields[0] === 'ADDITIONAL';
         
         let rowType, companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes, status, maintenanceMonths;
         
         if (hasRowType) {
-          // New format with Row Type column
+          // New format with Row Type column (no Next Due or Created Date columns)
           [rowType, companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes, status, maintenanceMonths] = fields;
           
           // Skip ADDITIONAL rows - only import MAIN rows to avoid duplicates
