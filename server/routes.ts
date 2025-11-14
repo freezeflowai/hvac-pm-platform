@@ -308,10 +308,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/clients", isAuthenticated, async (req, res) => {
     try {
-      const validated = insertClientSchema.parse(req.body);
+      const { parts, ...clientData } = req.body;
+      const validated = insertClientSchema.parse(clientData);
       const client = await storage.createClient(req.user!.id, validated);
+      
+      // If parts are provided, create them atomically with the client
+      if (parts && Array.isArray(parts) && parts.length > 0) {
+        const partsSchema = z.array(z.object({
+          partId: z.string().uuid(),
+          quantity: z.number().int().positive()
+        }));
+        
+        const validatedParts = partsSchema.parse(parts);
+        
+        // Create all parts for this client
+        for (const part of validatedParts) {
+          await storage.addClientPart(req.user!.id, {
+            clientId: client.id,
+            partId: part.partId,
+            quantity: part.quantity
+          });
+        }
+      }
+      
       res.json(client);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid client or parts data", details: error.errors });
+      }
       res.status(400).json({ error: "Invalid client data" });
     }
   });
