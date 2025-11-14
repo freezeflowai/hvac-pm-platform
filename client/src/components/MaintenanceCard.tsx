@@ -44,7 +44,8 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
   const monthsDisplay = item.selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
 
   const handleCardClick = () => {
-    setLocation(`/client-report/${item.id}`);
+    const clientId = item.id.includes('|') ? item.id.split('|')[0] : item.id;
+    setLocation(`/client-report/${clientId}`);
   };
 
   return (
