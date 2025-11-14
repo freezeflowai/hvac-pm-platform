@@ -2,8 +2,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus, Trash2, Check, ChevronsUpDown } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
+
+interface Part {
+  id: string;
+  type: string;
+  filterType?: string | null;
+  beltType?: string | null;
+  size?: string | null;
+  name?: string | null;
+  description?: string | null;
+}
+
+interface PartRow {
+  partId: string;
+  quantity: number;
+  type: string;
+}
 
 export interface ClientFormData {
   companyName: string;
@@ -19,6 +42,7 @@ export interface ClientFormData {
   notes?: string | null;
   selectedMonths: number[];
   inactive: boolean;
+  parts?: PartRow[];
 }
 
 interface AddClientDialogProps {
@@ -31,6 +55,16 @@ const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
 ];
+
+const getPartDisplayName = (part: Part): string => {
+  if (part.type === 'filter') {
+    return `${part.filterType || 'Filter'} ${part.size || ''}`.trim();
+  } else if (part.type === 'belt') {
+    return `Belt ${part.beltType || ''} ${part.size || ''}`.trim();
+  } else {
+    return part.name || part.description || 'Other Part';
+  }
+};
 
 export default function AddClientDialog({ onSubmit, onCancel, editData }: AddClientDialogProps) {
   const [formData, setFormData] = useState({
@@ -48,6 +82,22 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
     selectedMonths: [] as number[],
     inactive: false,
   });
+  
+  const [partRows, setPartRows] = useState<PartRow[]>([]);
+  const [activeType, setActiveType] = useState<string>("filter");
+  const [openRowIndex, setOpenRowIndex] = useState<number | null>(null);
+  
+  const { data: availableParts = [] } = useQuery<Part[]>({
+    queryKey: ['/api/parts'],
+  });
+  
+  const partsByType = useMemo(() => {
+    return {
+      filter: availableParts.filter((p: Part) => p.type === 'filter'),
+      belt: availableParts.filter((p: Part) => p.type === 'belt'),
+      other: availableParts.filter((p: Part) => p.type === 'other'),
+    };
+  }, [availableParts]);
 
   useEffect(() => {
     if (editData) {
@@ -98,15 +148,54 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
       });
     }
   };
+  
+  const handleAddPart = () => {
+    setPartRows([...partRows, { partId: '', quantity: 1, type: activeType }]);
+  };
+  
+  const handleUpdatePart = (index: number, field: 'partId' | 'quantity', value: string | number) => {
+    const updatedRows = [...partRows];
+    const row = updatedRows[index];
+    
+    if (field === 'partId') {
+      const selectedPart = availableParts.find((p: Part) => p.id === value);
+      if (selectedPart) {
+        updatedRows[index] = { 
+          ...row, 
+          partId: value as string,
+          type: selectedPart.type
+        };
+      }
+    } else {
+      updatedRows[index] = { 
+        ...row, 
+        quantity: value as number
+      };
+    }
+    
+    setPartRows(updatedRows);
+  };
+  
+  const handleDeletePart = (index: number) => {
+    const updatedRows = [...partRows];
+    updatedRows.splice(index, 1);
+    setPartRows(updatedRows);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.inactive && formData.selectedMonths.length === 0) {
       return;
     }
+    
+    // Validate parts if any are added
+    const validParts = partRows.filter(row => row.partId && row.quantity > 0);
 
     try {
-      onSubmit(formData);
+      onSubmit({
+        ...formData,
+        parts: validParts.length > 0 ? validParts : undefined
+      });
 
       setFormData({ 
         companyName: "", 
@@ -123,6 +212,7 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
         selectedMonths: [], 
         inactive: false 
       });
+      setPartRows([]);
     } catch (error) {
       console.error('Error saving client:', error);
       alert('Failed to save client. Please try again.');
@@ -312,6 +402,118 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                   </div>
                 </div>
               )}
+              
+              <Separator />
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">Parts (Optional)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Add parts required for this client's maintenance
+                </p>
+                
+                <Tabs value={activeType} onValueChange={setActiveType} className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="filter" data-testid="tab-filter">Filters</TabsTrigger>
+                    <TabsTrigger value="belt" data-testid="tab-belt">Belts</TabsTrigger>
+                    <TabsTrigger value="other" data-testid="tab-other">Other</TabsTrigger>
+                  </TabsList>
+                  
+                  {(['filter', 'belt', 'other'] as const).map((type) => (
+                    <TabsContent key={type} value={type} className="space-y-2">
+                      {partRows.filter(row => row.type === type).map((row, globalIndex) => {
+                        const actualIndex = partRows.indexOf(row);
+                        const selectedPart = availableParts.find(p => p.id === row.partId);
+                        
+                        return (
+                          <div key={actualIndex} className="flex gap-2 items-center" data-testid={`row-part-${actualIndex}`}>
+                            <Popover 
+                              open={openRowIndex === actualIndex} 
+                              onOpenChange={(open) => setOpenRowIndex(open ? actualIndex : null)}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className={cn(
+                                    "flex-1 justify-between",
+                                    !row.partId && "text-muted-foreground"
+                                  )}
+                                  data-testid={`button-select-part-${actualIndex}`}
+                                >
+                                  {selectedPart ? getPartDisplayName(selectedPart) : "Select part"}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[300px] p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search parts..." />
+                                  <CommandList>
+                                    <CommandEmpty>No parts found.</CommandEmpty>
+                                    <CommandGroup>
+                                      <ScrollArea className="h-72">
+                                        {partsByType[type].map((part: Part) => (
+                                          <CommandItem
+                                            key={part.id}
+                                            value={`${part.id}-${getPartDisplayName(part)}`}
+                                            onSelect={() => {
+                                              handleUpdatePart(actualIndex, 'partId', part.id);
+                                              setOpenRowIndex(null);
+                                            }}
+                                            data-testid={`option-part-${part.id}`}
+                                          >
+                                            <Check
+                                              className={cn(
+                                                "mr-2 h-4 w-4",
+                                                row.partId === part.id ? "opacity-100" : "opacity-0"
+                                              )}
+                                            />
+                                            {getPartDisplayName(part)}
+                                          </CommandItem>
+                                        ))}
+                                      </ScrollArea>
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                            
+                            <Input
+                              type="number"
+                              min="1"
+                              value={row.quantity}
+                              onChange={(e) => handleUpdatePart(actualIndex, 'quantity', parseInt(e.target.value) || 1)}
+                              className="w-20"
+                              data-testid={`input-quantity-${actualIndex}`}
+                            />
+                            
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeletePart(actualIndex)}
+                              data-testid={`button-delete-part-${actualIndex}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAddPart}
+                        className="w-full"
+                        data-testid={`button-add-${type}`}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add {type === 'filter' ? 'Filter' : type === 'belt' ? 'Belt' : 'Other Part'}
+                      </Button>
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </div>
             </div>
 
           <div className="flex gap-3 pt-3">
