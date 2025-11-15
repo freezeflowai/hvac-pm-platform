@@ -96,7 +96,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove }: {
     >
       <CardContent className="p-2">
         <div className="font-semibold text-sm mb-1">{day}</div>
-        <div className="space-y-1">
+        <div className="space-y-1 max-h-32 overflow-y-auto">
           {assignments.map((assignment: any) => {
             const client = clients.find((c: any) => c.id === assignment.clientId);
             return client ? (
@@ -208,6 +208,30 @@ export default function Calendar() {
       toast({
         title: "Error",
         description: error.message || "Failed to remove assignment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const clearSchedule = useMutation({
+    mutationFn: async () => {
+      // Delete all assignments for this month
+      const deletePromises = assignments.map((assignment: any) => 
+        apiRequest("DELETE", `/api/calendar/assign/${assignment.id}`)
+      );
+      return Promise.all(deletePromises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+      toast({
+        title: "Schedule cleared",
+        description: "All clients have been moved to unscheduled",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to clear schedule",
         variant: "destructive",
       });
     },
@@ -352,26 +376,25 @@ export default function Calendar() {
       const dayAssignments = isCurrentMonth ? (assignmentsByDay[dayNumber] || []) : [];
 
       weekDays.push(
-        <div key={i} className="flex-1 min-w-32">
-          <Card className={`min-h-48 ${!isCurrentMonth ? "bg-muted/20" : "hover-elevate"}`}>
+        isCurrentMonth ? (
+          <DroppableDay
+            key={i}
+            day={dayNumber}
+            year={year}
+            month={month}
+            assignments={dayAssignments}
+            clients={clients}
+            onRemove={handleRemove}
+          />
+        ) : (
+          <Card key={i} className="min-h-48 bg-muted/20">
             <CardContent className="p-2">
-              {isCurrentMonth ? (
-                <DroppableDay
-                  day={dayNumber}
-                  year={year}
-                  month={month}
-                  assignments={dayAssignments}
-                  clients={clients}
-                  onRemove={handleRemove}
-                />
-              ) : (
-                <div className="text-xs text-muted-foreground">
-                  {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </div>
-              )}
+              <div className="text-xs text-muted-foreground">
+                {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </div>
             </CardContent>
           </Card>
-        </div>
+        )
       );
     }
 
@@ -439,6 +462,15 @@ export default function Calendar() {
             </div>
 
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => clearSchedule.mutate()}
+                disabled={clearSchedule.isPending || assignments.length === 0}
+                data-testid="button-clear-schedule"
+              >
+                Clear Schedule
+              </Button>
               <Select value={view} onValueChange={(v) => setView(v as "monthly" | "weekly")}>
                 <SelectTrigger className="w-32" data-testid="select-view">
                   <SelectValue />
