@@ -114,10 +114,10 @@ export default function Dashboard() {
   // Fetch current month's calendar assignments to check who's scheduled
   const today = new Date();
   const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth() + 1;
+  const currentMonth = today.getMonth() + 1; // 1-indexed for API
   
   const { data: calendarData } = useQuery<{ assignments: any[]; clients: any[] }>({
-    queryKey: ["/api/calendar", currentYear, currentMonth],
+    queryKey: [`/api/calendar?year=${currentYear}&month=${currentMonth}`],
   });
 
 
