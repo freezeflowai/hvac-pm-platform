@@ -124,6 +124,32 @@ export const insertMaintenanceRecordSchema = createInsertSchema(maintenanceRecor
 export type InsertMaintenanceRecord = z.infer<typeof insertMaintenanceRecordSchema>;
 export type MaintenanceRecord = typeof maintenanceRecords.$inferSelect;
 
+export const calendarAssignments = pgTable("calendar_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  day: integer("day"),
+  scheduledDate: text("scheduled_date").notNull(),
+  autoDueDate: boolean("auto_due_date").notNull().default(true),
+});
+
+export const insertCalendarAssignmentSchema = createInsertSchema(calendarAssignments).omit({
+  id: true,
+  userId: true,
+});
+
+export const updateCalendarAssignmentSchema = z.object({
+  day: z.number().int().min(1).max(31).nullable().optional(),
+  scheduledDate: z.string().optional(),
+  autoDueDate: z.boolean().optional(),
+});
+
+export type InsertCalendarAssignment = z.infer<typeof insertCalendarAssignmentSchema>;
+export type UpdateCalendarAssignment = z.infer<typeof updateCalendarAssignmentSchema>;
+export type CalendarAssignment = typeof calendarAssignments.$inferSelect;
+
 export const equipment = pgTable("equipment", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

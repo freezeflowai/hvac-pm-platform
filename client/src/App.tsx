@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/lib/auth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Dashboard from "@/pages/Dashboard";
+import Calendar from "@/pages/Calendar";
 import Reports from "@/pages/Reports";
 import Admin from "@/pages/Admin";
 import EquipmentPage from "@/pages/EquipmentPage";
@@ -30,6 +31,11 @@ function Router() {
       <Route path="/">
         <ProtectedRoute>
           <Dashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/calendar">
+        <ProtectedRoute>
+          <Calendar />
         </ProtectedRoute>
       </Route>
       <Route path="/reports">

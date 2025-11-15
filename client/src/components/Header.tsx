@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, LogOut, User, Shield, Settings } from "lucide-react";
+import { LayoutDashboard, LogOut, User, Shield, Settings, Calendar } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -70,6 +70,17 @@ export default function Header({ onAddClient, onDashboardClick }: HeaderProps) {
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
               </Button>
+              <Link href="/calendar">
+                <Button
+                  variant={location === "/calendar" ? "default" : "ghost"}
+                  size="sm"
+                  className="gap-2"
+                  data-testid="nav-calendar"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Calendar
+                </Button>
+              </Link>
               {user?.isAdmin && (
                 <Link href="/admin">
                   <Button

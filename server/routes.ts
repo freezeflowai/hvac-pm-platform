@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema } from "@shared/schema";
 import { passport, isAdmin } from "./auth";
 import { z } from "zod";
 
@@ -964,6 +964,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Admin password reset error:', error);
       res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
+  // Calendar assignment routes
+  app.get("/api/calendar", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { year, month } = req.query;
+      
+      if (!year || !month) {
+        return res.status(400).json({ error: "Year and month are required" });
+      }
+      
+      const yearNum = parseInt(year as string);
+      const monthNum = parseInt(month as string);
+      
+      if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+        return res.status(400).json({ error: "Invalid year or month" });
+      }
+      
+      const assignments = await storage.getCalendarAssignments(userId, yearNum, monthNum);
+      const clients = await storage.getAllClients(userId);
+      
+      res.json({ assignments, clients });
+    } catch (error) {
+      console.error('Get calendar error:', error);
+      res.status(500).json({ error: "Failed to fetch calendar data" });
+    }
+  });
+
+  app.post("/api/calendar/assign", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const assignmentData = insertCalendarAssignmentSchema.parse(req.body);
+      
+      // Check if this client already has an assignment for this month
+      const existingAssignment = await storage.getClientCalendarAssignment(
+        userId,
+        assignmentData.clientId,
+        assignmentData.year,
+        assignmentData.month
+      );
+      
+      if (existingAssignment) {
+        return res.status(400).json({ error: "Client already has an assignment for this month" });
+      }
+      
+      const assignment = await storage.createCalendarAssignment(userId, assignmentData);
+      
+      // Update client's nextDue date
+      const client = await storage.getClient(userId, assignmentData.clientId);
+      if (client) {
+        await storage.updateClient(userId, assignmentData.clientId, {
+          nextDue: assignmentData.scheduledDate
+        });
+      }
+      
+      res.json(assignment);
+    } catch (error) {
+      console.error('Create calendar assignment error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid assignment data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create calendar assignment" });
+    }
+  });
+
+  app.patch("/api/calendar/assign/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { id } = req.params;
+      const assignmentUpdate = updateCalendarAssignmentSchema.parse(req.body);
+      
+      const assignment = await storage.updateCalendarAssignment(userId, id, assignmentUpdate);
+      
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      
+      // Update client's nextDue date if scheduledDate changed
+      if (assignmentUpdate.scheduledDate) {
+        await storage.updateClient(userId, assignment.clientId, {
+          nextDue: assignmentUpdate.scheduledDate
+        });
+      }
+      
+      res.json(assignment);
+    } catch (error) {
+      console.error('Update calendar assignment error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid assignment data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update calendar assignment" });
+    }
+  });
+
+  app.delete("/api/calendar/assign/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { id } = req.params;
+      
+      const assignment = await storage.getCalendarAssignment(userId, id);
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      
+      const deleted = await storage.deleteCalendarAssignment(userId, id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete calendar assignment error:', error);
+      res.status(500).json({ error: "Failed to delete calendar assignment" });
     }
   });
 

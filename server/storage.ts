@@ -14,7 +14,10 @@ import {
   type Equipment,
   type InsertEquipment,
   type CompanySettings,
-  type InsertCompanySettings
+  type InsertCompanySettings,
+  type CalendarAssignment,
+  type InsertCalendarAssignment,
+  type UpdateCalendarAssignment
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { STANDARD_BELTS, STANDARD_FILTERS } from "./seed-data";
@@ -90,6 +93,14 @@ export interface IStorage {
   // Company settings methods
   getCompanySettings(userId: string): Promise<CompanySettings | undefined>;
   upsertCompanySettings(userId: string, settings: InsertCompanySettings): Promise<CompanySettings>;
+  
+  // Calendar assignment methods
+  getCalendarAssignments(userId: string, year: number, month: number): Promise<CalendarAssignment[]>;
+  getCalendarAssignment(userId: string, id: string): Promise<CalendarAssignment | undefined>;
+  createCalendarAssignment(userId: string, assignment: InsertCalendarAssignment): Promise<CalendarAssignment>;
+  updateCalendarAssignment(userId: string, id: string, assignment: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined>;
+  deleteCalendarAssignment(userId: string, id: string): Promise<boolean>;
+  getClientCalendarAssignment(userId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -101,6 +112,7 @@ export class MemStorage implements IStorage {
   private passwordResetTokens: Map<string, PasswordResetToken>;
   private companySettings: Map<string, CompanySettings>;
   private equipment: Map<string, Equipment>;
+  private calendarAssignments: Map<string, CalendarAssignment>;
 
   constructor() {
     this.users = new Map();
@@ -111,6 +123,7 @@ export class MemStorage implements IStorage {
     this.passwordResetTokens = new Map();
     this.companySettings = new Map();
     this.equipment = new Map();
+    this.calendarAssignments = new Map();
   }
 
   // User methods
@@ -680,10 +693,70 @@ export class MemStorage implements IStorage {
     this.companySettings.set(id, newSettings);
     return newSettings;
   }
+
+  // Calendar assignment methods
+  async getCalendarAssignments(userId: string, year: number, month: number): Promise<CalendarAssignment[]> {
+    return Array.from(this.calendarAssignments.values()).filter(
+      (assignment) => assignment.userId === userId && assignment.year === year && assignment.month === month
+    );
+  }
+
+  async getCalendarAssignment(userId: string, id: string): Promise<CalendarAssignment | undefined> {
+    const assignment = this.calendarAssignments.get(id);
+    if (assignment && assignment.userId === userId) {
+      return assignment;
+    }
+    return undefined;
+  }
+
+  async createCalendarAssignment(userId: string, insertAssignment: InsertCalendarAssignment): Promise<CalendarAssignment> {
+    const id = randomUUID();
+    const assignment: CalendarAssignment = {
+      ...insertAssignment,
+      id,
+      userId,
+      day: insertAssignment.day ?? null
+    };
+    this.calendarAssignments.set(id, assignment);
+    return assignment;
+  }
+
+  async updateCalendarAssignment(userId: string, id: string, assignmentUpdate: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined> {
+    const existing = await this.getCalendarAssignment(userId, id);
+    if (!existing) {
+      return undefined;
+    }
+
+    const updated: CalendarAssignment = {
+      ...existing,
+      day: assignmentUpdate.day !== undefined ? assignmentUpdate.day : existing.day,
+      scheduledDate: assignmentUpdate.scheduledDate !== undefined ? assignmentUpdate.scheduledDate : existing.scheduledDate,
+      autoDueDate: assignmentUpdate.autoDueDate !== undefined ? assignmentUpdate.autoDueDate : existing.autoDueDate
+    };
+    this.calendarAssignments.set(id, updated);
+    return updated;
+  }
+
+  async deleteCalendarAssignment(userId: string, id: string): Promise<boolean> {
+    const assignment = await this.getCalendarAssignment(userId, id);
+    if (!assignment) {
+      return false;
+    }
+    return this.calendarAssignments.delete(id);
+  }
+
+  async getClientCalendarAssignment(userId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined> {
+    return Array.from(this.calendarAssignments.values()).find(
+      (assignment) => assignment.userId === userId && 
+                      assignment.clientId === clientId && 
+                      assignment.year === year && 
+                      assignment.month === month
+    );
+  }
 }
 
 import { db } from './db';
-import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings } from '@shared/schema';
+import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments } from '@shared/schema';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
@@ -1214,6 +1287,70 @@ export class DbStorage implements IStorage {
         .returning();
       return result[0];
     }
+  }
+
+  // Calendar assignment methods
+  async getCalendarAssignments(userId: string, year: number, month: number): Promise<CalendarAssignment[]> {
+    return db.select()
+      .from(calendarAssignments)
+      .where(and(
+        eq(calendarAssignments.userId, userId),
+        eq(calendarAssignments.year, year),
+        eq(calendarAssignments.month, month)
+      ));
+  }
+
+  async getCalendarAssignment(userId: string, id: string): Promise<CalendarAssignment | undefined> {
+    const result = await db.select()
+      .from(calendarAssignments)
+      .where(and(eq(calendarAssignments.id, id), eq(calendarAssignments.userId, userId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createCalendarAssignment(userId: string, insertAssignment: InsertCalendarAssignment): Promise<CalendarAssignment> {
+    // Verify that the client belongs to the userId
+    const client = await this.getClient(userId, insertAssignment.clientId);
+    if (!client) {
+      throw new Error("Client not found or does not belong to user");
+    }
+    
+    const result = await db.insert(calendarAssignments).values({ ...insertAssignment, userId }).returning();
+    return result[0];
+  }
+
+  async updateCalendarAssignment(userId: string, id: string, assignmentUpdate: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined> {
+    // Build update object with only provided fields
+    const updateFields: Partial<Pick<CalendarAssignment, 'day' | 'scheduledDate' | 'autoDueDate'>> = {};
+    if (assignmentUpdate.day !== undefined) updateFields.day = assignmentUpdate.day;
+    if (assignmentUpdate.scheduledDate !== undefined) updateFields.scheduledDate = assignmentUpdate.scheduledDate;
+    if (assignmentUpdate.autoDueDate !== undefined) updateFields.autoDueDate = assignmentUpdate.autoDueDate;
+    
+    const result = await db.update(calendarAssignments)
+      .set(updateFields)
+      .where(and(eq(calendarAssignments.id, id), eq(calendarAssignments.userId, userId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCalendarAssignment(userId: string, id: string): Promise<boolean> {
+    const result = await db.delete(calendarAssignments)
+      .where(and(eq(calendarAssignments.id, id), eq(calendarAssignments.userId, userId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getClientCalendarAssignment(userId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined> {
+    const result = await db.select()
+      .from(calendarAssignments)
+      .where(and(
+        eq(calendarAssignments.userId, userId),
+        eq(calendarAssignments.clientId, clientId),
+        eq(calendarAssignments.year, year),
+        eq(calendarAssignments.month, month)
+      ))
+      .limit(1);
+    return result[0];
   }
 }
 
