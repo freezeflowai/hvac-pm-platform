@@ -130,25 +130,25 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <DialogTitle>Client Report</DialogTitle>
-            <div className="flex gap-2">
-              <Button onClick={handleEdit} size="sm" variant="outline" data-testid="button-edit" className="gap-1.5">
-                <Pencil className="h-3.5 w-3.5" />
+            <DialogTitle className="text-base">Client Report</DialogTitle>
+            <div className="flex gap-1">
+              <Button onClick={handleEdit} size="sm" variant="outline" data-testid="button-edit" className="gap-1 h-7 text-xs">
+                <Pencil className="h-3 w-3" />
                 Edit
               </Button>
-              <Button onClick={handleManageParts} size="sm" variant="outline" data-testid="button-manage-parts" className="gap-1.5">
-                <Package className="h-3.5 w-3.5" />
+              <Button onClick={handleManageParts} size="sm" variant="outline" data-testid="button-manage-parts" className="gap-1 h-7 text-xs">
+                <Package className="h-3 w-3" />
                 Parts
               </Button>
-              <Button onClick={handleManageEquipment} size="sm" variant="outline" data-testid="button-manage-equipment" className="gap-1.5">
-                <Wrench className="h-3.5 w-3.5" />
+              <Button onClick={handleManageEquipment} size="sm" variant="outline" data-testid="button-manage-equipment" className="gap-1 h-7 text-xs">
+                <Wrench className="h-3 w-3" />
                 Equipment
               </Button>
-              <Button onClick={handlePrint} data-testid="button-print" size="sm" className="gap-1.5">
-                <Printer className="h-3.5 w-3.5" />
+              <Button onClick={handlePrint} data-testid="button-print" size="sm" className="gap-1 h-7 text-xs">
+                <Printer className="h-3 w-3" />
                 Print
               </Button>
             </div>
@@ -156,174 +156,176 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
         </DialogHeader>
 
         {isLoading ? (
-          <div className="p-8">
-            <p className="text-center text-muted-foreground">Loading report...</p>
+          <div className="p-4">
+            <p className="text-center text-muted-foreground text-sm">Loading report...</p>
           </div>
         ) : client ? (
-          <div className="space-y-4">
+          <div className="space-y-2">
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Client Information</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Client Information</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+              <CardContent className="space-y-2 p-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1.5">
                   <div>
                     <p className="text-xs font-medium text-muted-foreground">Company Name</p>
-                    <p className="text-sm font-semibold" data-testid="text-company-name">{client.companyName}</p>
+                    <p className="text-xs font-semibold" data-testid="text-company-name">{client.companyName}</p>
                   </div>
                   {client.location && (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">Location Name</p>
-                      <p className="text-sm" data-testid="text-location">{client.location}</p>
+                      <p className="text-xs" data-testid="text-location">{client.location}</p>
                     </div>
                   )}
                   <div>
                     <p className="text-xs font-medium text-muted-foreground">Status</p>
-                    <p className="text-sm" data-testid="text-status">
+                    <p className="text-xs" data-testid="text-status">
                       {client.inactive ? "Inactive (On-Call)" : "Active"}
                     </p>
                   </div>
                   {!client.inactive && (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">Next Maintenance Due</p>
-                      <p className="text-sm" data-testid="text-next-due">
+                      <p className="text-xs" data-testid="text-next-due">
                         {format(new Date(client.nextDue), "MMMM d, yyyy")}
                       </p>
                     </div>
                   )}
                 </div>
                 
-                <div className="pt-2 border-t">
-                  <p className="text-xs font-semibold mb-2">Contact Information</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+                <div className="pt-1.5 border-t">
+                  <p className="text-xs font-semibold mb-1.5">Contact Information</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1.5">
                     {client.address && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">Address</p>
-                        <p className="text-sm" data-testid="text-address">{client.address}</p>
+                        <p className="text-xs" data-testid="text-address">{client.address}</p>
                       </div>
                     )}
                     {client.city && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">City</p>
-                        <p className="text-sm" data-testid="text-city">{client.city}</p>
+                        <p className="text-xs" data-testid="text-city">{client.city}</p>
                       </div>
                     )}
                     {client.province && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">Province/State</p>
-                        <p className="text-sm" data-testid="text-province">{client.province}</p>
+                        <p className="text-xs" data-testid="text-province">{client.province}</p>
                       </div>
                     )}
                     {client.postalCode && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">Postal/Zip Code</p>
-                        <p className="text-sm" data-testid="text-postal-code">{client.postalCode}</p>
+                        <p className="text-xs" data-testid="text-postal-code">{client.postalCode}</p>
                       </div>
                     )}
                     {client.contactName && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">Contact Name</p>
-                        <p className="text-sm" data-testid="text-contact-name">{client.contactName}</p>
+                        <p className="text-xs" data-testid="text-contact-name">{client.contactName}</p>
                       </div>
                     )}
                     {client.email && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">Email</p>
-                        <p className="text-sm" data-testid="text-email">{client.email}</p>
+                        <p className="text-xs" data-testid="text-email">{client.email}</p>
                       </div>
                     )}
                     {client.phone && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">Phone</p>
-                        <p className="text-sm" data-testid="text-phone">{client.phone}</p>
+                        <p className="text-xs" data-testid="text-phone">{client.phone}</p>
                       </div>
                     )}
                     {client.roofLadderCode && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">Roof/Ladder Code</p>
-                        <p className="text-sm" data-testid="text-roof-ladder-code">{client.roofLadderCode}</p>
+                        <p className="text-xs" data-testid="text-roof-ladder-code">{client.roofLadderCode}</p>
                       </div>
                     )}
                     {client.notes && (
-                      <div className="md:col-span-2">
+                      <div className="md:col-span-4">
                         <p className="text-xs font-medium text-muted-foreground">Notes</p>
-                        <p className="text-sm" data-testid="text-notes">{client.notes}</p>
+                        <p className="text-xs" data-testid="text-notes">{client.notes}</p>
                       </div>
                     )}
                     {!client.address && !client.city && !client.province && !client.postalCode && 
                      !client.contactName && !client.email && !client.phone && !client.roofLadderCode && !client.notes && (
-                      <p className="text-xs text-muted-foreground md:col-span-2">No contact information available</p>
+                      <p className="text-xs text-muted-foreground md:col-span-4">No contact information available</p>
                     )}
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">PM Schedule</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Scheduled Maintenance Months</p>
-                <p className="text-sm" data-testid="text-pm-months">
-                  {client.inactive ? "On-Call / As-Needed" : pmMonths}
-                </p>
-              </CardContent>
-            </Card>
-
-            {parts.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Parts Inventory</CardTitle>
+                <CardHeader className="pb-1.5">
+                  <CardTitle className="text-sm font-semibold">PM Schedule</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Part Name</th>
-                          <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Type</th>
-                          <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Quantity</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {parts.map((clientPart, index) => (
-                          <tr key={clientPart.id} className="border-b" data-testid={`row-part-${index}`}>
-                            <td className="py-2 px-3 text-sm">{getPartDisplayName(clientPart.part)}</td>
-                            <td className="py-2 px-3 text-sm capitalize">{clientPart.part.type}</td>
-                            <td className="py-2 px-3 text-sm text-right">{clientPart.quantity}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                <CardContent className="p-3 pt-0">
+                  <p className="text-xs font-medium text-muted-foreground mb-0.5">Scheduled Months</p>
+                  <p className="text-xs" data-testid="text-pm-months">
+                    {client.inactive ? "On-Call / As-Needed" : pmMonths}
+                  </p>
                 </CardContent>
               </Card>
-            )}
+
+              {parts.length > 0 && (
+                <Card className="md:col-span-2">
+                  <CardHeader className="pb-1.5">
+                    <CardTitle className="text-sm font-semibold">Parts Inventory</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-1 px-2 text-xs font-medium text-muted-foreground">Part Name</th>
+                            <th className="text-left py-1 px-2 text-xs font-medium text-muted-foreground">Type</th>
+                            <th className="text-right py-1 px-2 text-xs font-medium text-muted-foreground">Qty</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parts.map((clientPart, index) => (
+                            <tr key={clientPart.id} className="border-b" data-testid={`row-part-${index}`}>
+                              <td className="py-1 px-2 text-xs">{getPartDisplayName(clientPart.part)}</td>
+                              <td className="py-1 px-2 text-xs capitalize">{clientPart.part.type}</td>
+                              <td className="py-1 px-2 text-xs text-right">{clientPart.quantity}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
             {equipment.length > 0 && (
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Equipment</CardTitle>
+                <CardHeader className="pb-1.5">
+                  <CardTitle className="text-sm font-semibold">Equipment</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-3 pt-0">
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Equipment Name</th>
-                          <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Model Number</th>
-                          <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Serial Number</th>
-                          <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Notes</th>
+                          <th className="text-left py-1 px-2 text-xs font-medium text-muted-foreground">Equipment Name</th>
+                          <th className="text-left py-1 px-2 text-xs font-medium text-muted-foreground">Model Number</th>
+                          <th className="text-left py-1 px-2 text-xs font-medium text-muted-foreground">Serial Number</th>
+                          <th className="text-left py-1 px-2 text-xs font-medium text-muted-foreground">Notes</th>
                         </tr>
                       </thead>
                       <tbody>
                         {equipment.map((eq, index) => (
                           <tr key={eq.id} className="border-b" data-testid={`row-equipment-${index}`}>
-                            <td className="py-2 px-3 text-sm font-medium">{eq.name}</td>
-                            <td className="py-2 px-3 text-sm">{eq.modelNumber || '—'}</td>
-                            <td className="py-2 px-3 text-sm">{eq.serialNumber || '—'}</td>
-                            <td className="py-2 px-3 text-sm">{eq.notes || '—'}</td>
+                            <td className="py-1 px-2 text-xs font-medium">{eq.name}</td>
+                            <td className="py-1 px-2 text-xs">{eq.modelNumber || '—'}</td>
+                            <td className="py-1 px-2 text-xs">{eq.serialNumber || '—'}</td>
+                            <td className="py-1 px-2 text-xs">{eq.notes || '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -335,15 +337,15 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
 
             {parts.length === 0 && equipment.length === 0 && (
               <Card>
-                <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                <CardContent className="p-3 text-center text-xs text-muted-foreground">
                   No parts or equipment assigned to this client yet.
                 </CardContent>
               </Card>
             )}
           </div>
         ) : (
-          <div className="p-8">
-            <p className="text-center text-muted-foreground">Client not found</p>
+          <div className="p-4">
+            <p className="text-center text-muted-foreground text-sm">Client not found</p>
           </div>
         )}
       </DialogContent>
