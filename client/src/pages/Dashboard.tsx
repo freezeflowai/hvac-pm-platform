@@ -76,6 +76,17 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<{
+    overdue: boolean;
+    upcoming: boolean;
+    thisMonth: boolean;
+    unscheduled: boolean;
+  }>({
+    overdue: false,
+    upcoming: false,
+    thisMonth: false,
+    unscheduled: false,
+  });
   
   const overdueRef = useRef<HTMLDivElement>(null);
   const thisMonthRef = useRef<HTMLDivElement>(null);
@@ -333,16 +344,14 @@ export default function Dashboard() {
   const totalActiveScheduled = allMaintenanceItems.length; // Count ALL with PM this month
   
   const topOverdueClients = overdueItems
-    .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime())
-    .slice(0, 3);
+    .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime());
   const upcomingNextWeek = scheduledMaintenanceItems
     .filter(item => {
       const weekFromNow = new Date();
       weekFromNow.setDate(weekFromNow.getDate() + 7);
       return item.nextDue <= weekFromNow && item.status !== "overdue";
     })
-    .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime())
-    .slice(0, 3);
+    .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime());
   
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
     if (activeTab !== 'schedule') {
@@ -462,7 +471,6 @@ export default function Dashboard() {
                 value={overdueItems.length} 
                 icon={AlertCircle} 
                 variant="danger"
-                total={totalActiveScheduled}
                 subtitle="needs attention"
                 onClick={() => scrollToSection(overdueRef)}
               />
@@ -493,39 +501,7 @@ export default function Dashboard() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-4">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Upcoming
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {upcomingNextWeek.length > 0 ? (
-                      <div className="space-y-2">
-                        {upcomingNextWeek.map((item) => (
-                          <MaintenanceCard
-                            key={item.id}
-                            item={item}
-                            onMarkComplete={handleMarkComplete}
-                            onEdit={handleEditClient}
-                            parts={clientParts[item.id] || []}
-                            isCompleted={completionStatuses[item.id]?.completed || false}
-                            isScheduled={true}
-                            isThisMonthPM={true}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground text-sm">
-                        No upcoming maintenance
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
+              {/* Overdue - moved to left */}
               <div className="space-y-4" ref={overdueRef}>
                 <Card>
                   <CardHeader className="pb-3">
@@ -536,20 +512,33 @@ export default function Dashboard() {
                   </CardHeader>
                   <CardContent>
                     {overdueItems.length > 0 ? (
-                      <div className="space-y-2">
-                        {overdueItems.map((item) => (
-                          <MaintenanceCard
-                            key={item.id}
-                            item={item}
-                            onMarkComplete={handleMarkComplete}
-                            onEdit={handleEditClient}
-                            parts={clientParts[item.id] || []}
-                            isCompleted={completionStatuses[item.id]?.completed || false}
-                            isScheduled={true}
-                            isThisMonthPM={true}
-                          />
-                        ))}
-                      </div>
+                      <>
+                        <div className="space-y-2">
+                          {(expandedSections.overdue ? overdueItems : overdueItems.slice(0, 3)).map((item) => (
+                            <MaintenanceCard
+                              key={item.id}
+                              item={item}
+                              onMarkComplete={handleMarkComplete}
+                              onEdit={handleEditClient}
+                              parts={clientParts[item.id] || []}
+                              isCompleted={completionStatuses[item.id]?.completed || false}
+                              isScheduled={true}
+                              isThisMonthPM={true}
+                            />
+                          ))}
+                        </div>
+                        {overdueItems.length > 3 && (
+                          <Button 
+                            variant="ghost" 
+                            className="w-full mt-2" 
+                            size="sm"
+                            data-testid="button-view-all-overdue"
+                            onClick={() => setExpandedSections(prev => ({ ...prev, overdue: !prev.overdue }))}
+                          >
+                            {expandedSections.overdue ? 'Show Less' : `View All (${overdueItems.length})`}
+                          </Button>
+                        )}
+                      </>
                     ) : (
                       <div className="text-center py-8 text-muted-foreground text-sm">
                         No overdue maintenance
@@ -559,6 +548,54 @@ export default function Dashboard() {
                 </Card>
               </div>
 
+              {/* Upcoming - middle */}
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Upcoming
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {upcomingNextWeek.length > 0 ? (
+                      <>
+                        <div className="space-y-2">
+                          {(expandedSections.upcoming ? upcomingNextWeek : upcomingNextWeek.slice(0, 3)).map((item) => (
+                            <MaintenanceCard
+                              key={item.id}
+                              item={item}
+                              onMarkComplete={handleMarkComplete}
+                              onEdit={handleEditClient}
+                              parts={clientParts[item.id] || []}
+                              isCompleted={completionStatuses[item.id]?.completed || false}
+                              isScheduled={true}
+                              isThisMonthPM={true}
+                            />
+                          ))}
+                        </div>
+                        {upcomingNextWeek.length > 3 && (
+                          <Button 
+                            variant="ghost" 
+                            className="w-full mt-2" 
+                            size="sm"
+                            data-testid="button-view-all-upcoming"
+                            onClick={() => setExpandedSections(prev => ({ ...prev, upcoming: !prev.upcoming }))}
+                          >
+                            {expandedSections.upcoming ? 'Show Less' : `View All (${upcomingNextWeek.length})`}
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        No upcoming maintenance
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Due This Month - right */}
               <div className="space-y-4" ref={thisMonthRef}>
                 <Card>
                   <CardHeader className="pb-3">
@@ -569,20 +606,33 @@ export default function Dashboard() {
                   </CardHeader>
                   <CardContent>
                     {thisMonthItems.length > 0 ? (
-                      <div className="space-y-2">
-                        {thisMonthItems.map((item) => (
-                          <MaintenanceCard
-                            key={item.id}
-                            item={item}
-                            onMarkComplete={handleMarkComplete}
-                            onEdit={handleEditClient}
-                            parts={clientParts[item.id] || []}
-                            isCompleted={completionStatuses[item.id]?.completed || false}
-                            isScheduled={true}
-                            isThisMonthPM={true}
-                          />
-                        ))}
-                      </div>
+                      <>
+                        <div className="space-y-2">
+                          {(expandedSections.thisMonth ? thisMonthItems : thisMonthItems.slice(0, 3)).map((item) => (
+                            <MaintenanceCard
+                              key={item.id}
+                              item={item}
+                              onMarkComplete={handleMarkComplete}
+                              onEdit={handleEditClient}
+                              parts={clientParts[item.id] || []}
+                              isCompleted={completionStatuses[item.id]?.completed || false}
+                              isScheduled={true}
+                              isThisMonthPM={true}
+                            />
+                          ))}
+                        </div>
+                        {thisMonthItems.length > 3 && (
+                          <Button 
+                            variant="ghost" 
+                            className="w-full mt-2" 
+                            size="sm"
+                            data-testid="button-view-all-thismonth"
+                            onClick={() => setExpandedSections(prev => ({ ...prev, thisMonth: !prev.thisMonth }))}
+                          >
+                            {expandedSections.thisMonth ? 'Show Less' : `View All (${thisMonthItems.length})`}
+                          </Button>
+                        )}
+                      </>
                     ) : (
                       <div className="text-center py-8 text-muted-foreground text-sm">
                         No maintenance due this month
@@ -600,20 +650,33 @@ export default function Dashboard() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-2">
-                        {unscheduledItems.map((item) => (
-                          <MaintenanceCard
-                            key={item.id}
-                            item={item}
-                            onMarkComplete={handleMarkComplete}
-                            onEdit={handleEditClient}
-                            parts={clientParts[item.id] || []}
-                            isCompleted={completionStatuses[item.id]?.completed || false}
-                            isScheduled={false}
-                            isThisMonthPM={true}
-                          />
-                        ))}
-                      </div>
+                      <>
+                        <div className="space-y-2">
+                          {(expandedSections.unscheduled ? unscheduledItems : unscheduledItems.slice(0, 3)).map((item) => (
+                            <MaintenanceCard
+                              key={item.id}
+                              item={item}
+                              onMarkComplete={handleMarkComplete}
+                              onEdit={handleEditClient}
+                              parts={clientParts[item.id] || []}
+                              isCompleted={completionStatuses[item.id]?.completed || false}
+                              isScheduled={false}
+                              isThisMonthPM={true}
+                            />
+                          ))}
+                        </div>
+                        {unscheduledItems.length > 3 && (
+                          <Button 
+                            variant="ghost" 
+                            className="w-full mt-2" 
+                            size="sm"
+                            data-testid="button-view-all-unscheduled"
+                            onClick={() => setExpandedSections(prev => ({ ...prev, unscheduled: !prev.unscheduled }))}
+                          >
+                            {expandedSections.unscheduled ? 'Show Less' : `View All (${unscheduledItems.length})`}
+                          </Button>
+                        )}
+                      </>
                     </CardContent>
                   </Card>
                 )}

@@ -51,36 +51,12 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
   };
 
   const getStatusStyles = () => {
-    // Priority order: completed > overdue > unscheduled > upcoming > scheduled > default
-    if (isCompleted) {
-      return 'border-l-4 border-l-primary bg-primary/5';
-    }
-    
-    if (isOverdue) {
-      return 'border-l-4 border-l-status-overdue bg-status-overdue/5';
-    }
-    
-    // Unscheduled: has PM this month but not on calendar
-    if (isThisMonthPM && !isScheduled) {
-      return 'border-l-4 border-l-status-unscheduled bg-status-unscheduled/5';
-    }
-    
-    // Upcoming: within next week (takes priority over general "this month")
-    const weekFromNow = new Date();
-    weekFromNow.setDate(weekFromNow.getDate() + 7);
-    if (item.nextDue <= weekFromNow && !isOverdue) {
-      return 'border-l-4 border-l-status-upcoming bg-status-upcoming/5';
-    }
-    
-    // This month: scheduled on calendar (but not urgent/upcoming)
-    if (isScheduled) {
-      return 'border-l-4 border-l-status-this-month bg-status-this-month/5';
-    }
-    
+    // White background with subtle border for all cards
     return 'border-border';
   };
 
   const getIconColor = () => {
+    // Keep icon colors for status indication
     if (isCompleted) return 'text-primary';
     if (isOverdue) return 'text-status-overdue';
     
@@ -92,7 +68,7 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
     
     if (isScheduled) return 'text-status-this-month';
     
-    return '';
+    return 'text-muted-foreground';
   };
 
   return (
