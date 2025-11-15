@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import Header from "@/components/Header";
 import AddClientDialog, { ClientFormData } from "@/components/AddClientDialog";
 import type { Client } from "@shared/schema";
 
@@ -13,6 +14,10 @@ export default function AddClientPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const isEditing = Boolean(id);
+
+  const { data: allClients = [] } = useQuery<any[]>({
+    queryKey: ["/api/clients"],
+  });
 
   const {data: client, isLoading} = useQuery<Client>({
     queryKey: id ? ["/api/clients", id] : [],
@@ -161,38 +166,46 @@ export default function AddClientPage() {
 
   if (isEditing && isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-muted rounded w-1/4 mb-6"></div>
-          <div className="space-y-4">
-            <div className="h-10 bg-muted rounded"></div>
-            <div className="h-10 bg-muted rounded"></div>
-            <div className="h-10 bg-muted rounded"></div>
+      <div className="min-h-screen bg-background">
+        <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
+        <main className="container mx-auto p-6">
+          <div className="animate-pulse">
+            <div className="h-8 bg-muted rounded w-1/4 mb-6"></div>
+            <div className="space-y-4">
+              <div className="h-10 bg-muted rounded"></div>
+              <div className="h-10 bg-muted rounded"></div>
+              <div className="h-10 bg-muted rounded"></div>
+            </div>
           </div>
-        </div>
+        </main>
       </div>
     );
   }
 
   if (isEditing && !client) {
     return (
-      <div className="container mx-auto p-6">
-        <p className="text-muted-foreground">Client not found</p>
+      <div className="min-h-screen bg-background">
+        <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
+        <main className="container mx-auto p-6">
+          <p className="text-muted-foreground">Client not found</p>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-5xl">
-      <div className="mb-6 flex items-center gap-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setLocation("/")}
-          data-testid="button-back"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+    <div className="min-h-screen bg-background">
+      <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
+      <main className="container mx-auto p-6 max-w-5xl">
+        <div className="mb-6 flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setLocation("/")}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
         <div>
           <h1 className="text-2xl font-bold">
             {isEditing ? 'Edit Client' : 'Add New Client'}
@@ -203,13 +216,14 @@ export default function AddClientPage() {
         </div>
       </div>
 
-      {!isEditing || editData ? (
-        <AddClientDialog
-          onCancel={() => setLocation("/")}
-          onSubmit={handleSubmit}
-          editData={editData}
-        />
-      ) : null}
+        {!isEditing || editData ? (
+          <AddClientDialog
+            onCancel={() => setLocation("/")}
+            onSubmit={handleSubmit}
+            editData={editData}
+          />
+        ) : null}
+      </main>
     </div>
   );
 }

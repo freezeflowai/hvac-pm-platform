@@ -7,6 +7,7 @@ import { Plus, Trash2, ArrowLeft } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import Header from "@/components/Header";
 
 interface Equipment {
   id: string;
@@ -39,6 +40,10 @@ export default function EquipmentPage() {
   const { toast } = useToast();
   const [rows, setRows] = useState<EquipmentRow[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  const { data: allClients = [] } = useQuery<any[]>({
+    queryKey: ["/api/clients"],
+  });
 
   const { data: client } = useQuery<Client>({
     queryKey: ['/api/clients', clientId],
