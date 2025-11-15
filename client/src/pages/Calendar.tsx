@@ -17,14 +17,14 @@ function UnscheduledPanel({ clients }: { clients: any[] }) {
 
   return (
     <div>
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle className="text-sm">Unscheduled ({clients.length})</CardTitle>
+      <Card className="h-full shadow-md rounded-xl">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold">Unscheduled ({clients.length})</CardTitle>
         </CardHeader>
         <CardContent className="h-[calc(100%-4rem)]">
           <div 
             ref={setNodeRef}
-            className="space-y-1 h-full overflow-y-auto"
+            className="space-y-2 h-full overflow-y-auto"
             data-testid="unscheduled-panel"
           >
             {clients.map((client: any) => (
@@ -35,7 +35,7 @@ function UnscheduledPanel({ clients }: { clients: any[] }) {
               />
             ))}
             {clients.length === 0 && (
-              <div className="text-xs text-muted-foreground text-center py-4">
+              <div className="text-sm text-muted-foreground text-center py-8">
                 All clients scheduled
               </div>
             )}
@@ -46,7 +46,7 @@ function UnscheduledPanel({ clients }: { clients: any[] }) {
   );
 }
 
-function DraggableClient({ id, client, inCalendar, onClick, isCompleted }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean }) {
+function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean }) {
   const {
     attributes,
     listeners,
@@ -62,11 +62,19 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted }: { id:
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // Color coding: red = overdue, green = completed, blue = scheduled
+  const getBackgroundColor = () => {
+    if (!inCalendar) return 'bg-card border border-border';
+    if (isCompleted) return 'bg-green-100 dark:bg-green-950/30 border-green-200 dark:border-green-800';
+    if (isOverdue) return 'bg-red-100 dark:bg-red-950/30 border-red-200 dark:border-red-800';
+    return 'bg-blue-100 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800';
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`text-xs p-${inCalendar ? '1' : '2'} ${inCalendar ? 'bg-primary/10' : 'border'} rounded hover:bg-primary/20 transition-colors relative`}
+      className={`text-xs p-2 rounded-lg hover:shadow-md transition-all relative ${getBackgroundColor()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
       <div 
@@ -74,9 +82,9 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted }: { id:
         {...listeners}
         className="cursor-move select-none"
       >
-        <div className={`font-medium ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
+        <div className={`font-semibold ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
         {client.location && (
-          <div className={`text-muted-foreground ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
+          <div className={`text-muted-foreground text-[10px] ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
         )}
       </div>
       {onClick && inCalendar && (
@@ -103,11 +111,16 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   onClientClick: (client: any, assignment: any) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day-${day}` });
+  
+  // Check if day is overdue
+  const today = new Date();
+  const dayDate = new Date(year, month - 1, day);
+  const isOverdue = dayDate < today;
 
   return (
     <Card
       ref={setNodeRef}
-      className={`min-h-24 hover-elevate transition-colors ${isOver ? 'ring-2 ring-primary' : ''}`}
+      className={`min-h-24 bg-muted/20 hover-elevate transition-colors ${isOver ? 'ring-2 ring-primary' : ''}`}
       data-testid={`calendar-day-${day}`}
     >
       <CardContent className="p-2">
@@ -123,6 +136,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
                   inCalendar={true}
                   onClick={() => onClientClick(client, assignment)}
                   isCompleted={assignment.completed}
+                  isOverdue={!assignment.completed && isOverdue}
                 />
                 <button
                   onClick={(e) => {
@@ -523,7 +537,7 @@ export default function Calendar() {
               </Button>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Button
                 variant="outline"
                 size="sm"
@@ -533,22 +547,26 @@ export default function Calendar() {
               >
                 Clear Schedule
               </Button>
-              <Button
-                variant={view === "monthly" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setView("monthly")}
-                data-testid="button-monthly-view"
-              >
-                Monthly
-              </Button>
-              <Button
-                variant={view === "weekly" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setView("weekly")}
-                data-testid="button-weekly-view"
-              >
-                Weekly
-              </Button>
+              <div className="flex gap-1 bg-muted/50 p-1 rounded-full">
+                <Button
+                  variant={view === "monthly" ? "default" : "ghost"}
+                  size="sm"
+                  className={`rounded-full ${view === "monthly" ? "" : "hover:bg-background/60"}`}
+                  onClick={() => setView("monthly")}
+                  data-testid="button-monthly-view"
+                >
+                  Monthly
+                </Button>
+                <Button
+                  variant={view === "weekly" ? "default" : "ghost"}
+                  size="sm"
+                  className={`rounded-full ${view === "weekly" ? "" : "hover:bg-background/60"}`}
+                  onClick={() => setView("weekly")}
+                  data-testid="button-weekly-view"
+                >
+                  Weekly
+                </Button>
+              </div>
             </div>
           </div>
 

@@ -155,38 +155,41 @@ export default function Reports() {
             {(filters.length > 0 || belts.length > 0) && (
               <div className="grid md:grid-cols-2 gap-6">
                 {filters.length > 0 && (
-                  <Card>
+                  <Card className="shadow-md rounded-xl">
                     <CardHeader>
-                      <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="flex items-center gap-2">
-                          <Package className="h-5 w-5" />
-                          Filters
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                          Total needed for {MONTHS[selectedMonth]}
-                        </CardDescription>
-                      </div>
+                      <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                        <Package className="h-5 w-5" />
+                        Filters
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        Total needed for {MONTHS[selectedMonth]}
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>Filter Type</TableHead>
-                            <TableHead>Size</TableHead>
-                            <TableHead className="text-right">Qty</TableHead>
+                          <TableRow className="border-b-2">
+                            <TableHead className="font-bold text-foreground">Filter Type</TableHead>
+                            <TableHead className="font-bold text-foreground">Size</TableHead>
+                            <TableHead className="text-right font-bold text-foreground">Qty</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filters.map((item, index) => {
                             const display = getPartDisplay(item.part);
                             return (
-                              <TableRow key={index} data-testid={`filter-row-${index}`}>
-                                <TableCell className="font-medium">{display.name}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">{display.details}</Badge>
+                              <TableRow key={index} data-testid={`filter-row-${index}`} className="border-b">
+                                <TableCell className="font-medium py-3">{display.name}</TableCell>
+                                <TableCell className="py-3">
+                                  <span className="text-sm text-muted-foreground">{display.details}</span>
                                 </TableCell>
-                                <TableCell className="text-right">
-                                  <Badge data-testid={`filter-quantity-${index}`}>{item.totalQuantity}</Badge>
+                                <TableCell className="text-right py-3">
+                                  <Badge 
+                                    data-testid={`filter-quantity-${index}`}
+                                    className="bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 rounded-full px-2 py-0.5"
+                                  >
+                                    {item.totalQuantity}
+                                  </Badge>
                                 </TableCell>
                               </TableRow>
                             );
@@ -198,38 +201,41 @@ export default function Reports() {
                 )}
 
                 {belts.length > 0 && (
-                  <Card>
+                  <Card className="shadow-md rounded-xl">
                     <CardHeader>
-                      <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="flex items-center gap-2">
-                          <Package className="h-5 w-5" />
-                          Belts
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                          Total needed for {MONTHS[selectedMonth]}
-                        </CardDescription>
-                      </div>
+                      <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                        <Package className="h-5 w-5" />
+                        Belts
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        Total needed for {MONTHS[selectedMonth]}
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>Belt Type</TableHead>
-                            <TableHead>Size</TableHead>
-                            <TableHead className="text-right">Qty</TableHead>
+                          <TableRow className="border-b-2">
+                            <TableHead className="font-bold text-foreground">Belt Type</TableHead>
+                            <TableHead className="font-bold text-foreground">Size</TableHead>
+                            <TableHead className="text-right font-bold text-foreground">Qty</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {belts.map((item, index) => {
                             const display = getPartDisplay(item.part);
                             return (
-                              <TableRow key={index} data-testid={`belt-row-${index}`}>
-                                <TableCell className="font-medium">{display.name}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">{display.details}</Badge>
+                              <TableRow key={index} data-testid={`belt-row-${index}`} className="border-b">
+                                <TableCell className="font-medium py-3">{display.name}</TableCell>
+                                <TableCell className="py-3">
+                                  <span className="text-sm text-muted-foreground">{display.details}</span>
                                 </TableCell>
-                                <TableCell className="text-right">
-                                  <Badge data-testid={`belt-quantity-${index}`}>{item.totalQuantity}</Badge>
+                                <TableCell className="text-right py-3">
+                                  <Badge 
+                                    data-testid={`belt-quantity-${index}`}
+                                    className="bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 rounded-full px-2 py-0.5"
+                                  >
+                                    {item.totalQuantity}
+                                  </Badge>
                                 </TableCell>
                               </TableRow>
                             );
