@@ -315,7 +315,7 @@ export default function Dashboard() {
       location: c.location,
       selectedMonths: c.selectedMonths,
       nextDue: c.nextDue,
-      status: "upcoming" as "overdue" | "upcoming",
+      status: (isOverdue(c.nextDue, c.selectedMonths) ? "overdue" : "upcoming") as "overdue" | "upcoming",
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
@@ -512,6 +512,8 @@ export default function Dashboard() {
                             onEdit={handleEditClient}
                             parts={clientParts[item.id] || []}
                             isCompleted={completionStatuses[item.id]?.completed || false}
+                            isScheduled={true}
+                            isThisMonthPM={true}
                           />
                         ))}
                       </div>
@@ -543,6 +545,8 @@ export default function Dashboard() {
                             onEdit={handleEditClient}
                             parts={clientParts[item.id] || []}
                             isCompleted={completionStatuses[item.id]?.completed || false}
+                            isScheduled={true}
+                            isThisMonthPM={true}
                           />
                         ))}
                       </div>
@@ -574,6 +578,8 @@ export default function Dashboard() {
                             onEdit={handleEditClient}
                             parts={clientParts[item.id] || []}
                             isCompleted={completionStatuses[item.id]?.completed || false}
+                            isScheduled={true}
+                            isThisMonthPM={true}
                           />
                         ))}
                       </div>
@@ -584,6 +590,33 @@ export default function Dashboard() {
                     )}
                   </CardContent>
                 </Card>
+
+                {unscheduledItems.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <CalendarX className="h-4 w-4" />
+                        Unscheduled This Month
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {unscheduledItems.map((item) => (
+                          <MaintenanceCard
+                            key={item.id}
+                            item={item}
+                            onMarkComplete={handleMarkComplete}
+                            onEdit={handleEditClient}
+                            parts={clientParts[item.id] || []}
+                            isCompleted={completionStatuses[item.id]?.completed || false}
+                            isScheduled={false}
+                            isThisMonthPM={true}
+                          />
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
           </>

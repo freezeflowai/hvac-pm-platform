@@ -32,19 +32,19 @@ export default function StatsCard({
       number: "text-foreground"
     },
     warning: {
-      bg: "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900",
-      icon: "text-yellow-600 dark:text-yellow-500",
-      number: "text-yellow-700 dark:text-yellow-400"
+      bg: "bg-status-upcoming/10 border-status-upcoming/30",
+      icon: "text-status-upcoming",
+      number: "text-status-upcoming"
     },
     danger: {
-      bg: "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900",
-      icon: "text-red-600 dark:text-red-500",
-      number: "text-red-700 dark:text-red-400"
+      bg: "bg-status-overdue/10 border-status-overdue/30",
+      icon: "text-status-overdue",
+      number: "text-status-overdue"
     },
     success: {
-      bg: "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900",
-      icon: "text-green-600 dark:text-green-500",
-      number: "text-green-700 dark:text-green-400"
+      bg: "bg-primary/10 border-primary/30",
+      icon: "text-primary",
+      number: "text-primary"
     },
   };
 

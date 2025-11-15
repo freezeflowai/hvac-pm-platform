@@ -68,6 +68,19 @@
 
   --destructive-foreground: 0 84% 98%;
 
+  /* Maintenance status colors */
+  --status-overdue: 0 72% 51%;
+  --status-overdue-foreground: 0 0% 100%;
+  
+  --status-upcoming: 25 90% 53%;
+  --status-upcoming-foreground: 25 20% 15%;
+  
+  --status-this-month: 217 91% 60%;
+  --status-this-month-foreground: 217 91% 98%;
+  
+  --status-unscheduled: 220 8% 46%;
+  --status-unscheduled-foreground: 220 8% 98%;
+
   --input: 220 10% 75%;
   --ring: 217 91% 42%;
   --chart-1: 217 91% 35%;
@@ -120,6 +133,19 @@
   /* Fallback for older browsers */
   --destructive-border: hsl(var(--destructive));
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+
+  /* Status borders */
+  --status-overdue-border: hsl(var(--status-overdue));
+  --status-overdue-border: hsl(from hsl(var(--status-overdue)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  
+  --status-upcoming-border: hsl(var(--status-upcoming));
+  --status-upcoming-border: hsl(from hsl(var(--status-upcoming)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  
+  --status-this-month-border: hsl(var(--status-this-month));
+  --status-this-month-border: hsl(from hsl(var(--status-this-month)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  
+  --status-unscheduled-border: hsl(var(--status-unscheduled));
+  --status-unscheduled-border: hsl(from hsl(var(--status-unscheduled)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
 .dark {
@@ -185,6 +211,19 @@
   --destructive: 0 84% 42%;
 
   --destructive-foreground: 0 84% 98%;
+
+  /* Maintenance status colors - dark mode */
+  --status-overdue: 0 72% 55%;
+  --status-overdue-foreground: 0 0% 100%;
+  
+  --status-upcoming: 25 90% 60%;
+  --status-upcoming-foreground: 25 30% 10%;
+  
+  --status-this-month: 217 91% 65%;
+  --status-this-month-foreground: 217 91% 98%;
+  
+  --status-unscheduled: 220 8% 55%;
+  --status-unscheduled-foreground: 220 8% 98%;
 
   --input: 220 10% 30%;
   --ring: 217 91% 48%;

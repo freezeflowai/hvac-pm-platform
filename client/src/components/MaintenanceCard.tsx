@@ -19,6 +19,8 @@ interface MaintenanceCardProps {
   onEdit: (id: string) => void;
   parts?: ClientPart[];
   isCompleted?: boolean;
+  isScheduled?: boolean;
+  isThisMonthPM?: boolean;
 }
 
 interface ClientPart {
@@ -38,7 +40,7 @@ const MONTH_NAMES = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
 
-export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = [], isCompleted = false }: MaintenanceCardProps) {
+export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = [], isCompleted = false, isScheduled = false, isThisMonthPM = false }: MaintenanceCardProps) {
   const [, setLocation] = useLocation();
   const isOverdue = item.status === "overdue";
   const monthsDisplay = item.selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
@@ -48,9 +50,54 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
     setLocation(`/client-report/${clientId}`);
   };
 
+  const getStatusStyles = () => {
+    // Priority order: completed > overdue > unscheduled > upcoming > scheduled > default
+    if (isCompleted) {
+      return 'border-l-4 border-l-primary bg-primary/5';
+    }
+    
+    if (isOverdue) {
+      return 'border-l-4 border-l-status-overdue bg-status-overdue/5';
+    }
+    
+    // Unscheduled: has PM this month but not on calendar
+    if (isThisMonthPM && !isScheduled) {
+      return 'border-l-4 border-l-status-unscheduled bg-status-unscheduled/5';
+    }
+    
+    // Upcoming: within next week (takes priority over general "this month")
+    const weekFromNow = new Date();
+    weekFromNow.setDate(weekFromNow.getDate() + 7);
+    if (item.nextDue <= weekFromNow && !isOverdue) {
+      return 'border-l-4 border-l-status-upcoming bg-status-upcoming/5';
+    }
+    
+    // This month: scheduled on calendar (but not urgent/upcoming)
+    if (isScheduled) {
+      return 'border-l-4 border-l-status-this-month bg-status-this-month/5';
+    }
+    
+    return 'border-border';
+  };
+
+  const getIconColor = () => {
+    if (isCompleted) return 'text-primary';
+    if (isOverdue) return 'text-status-overdue';
+    
+    if (isThisMonthPM && !isScheduled) return 'text-status-unscheduled';
+    
+    const weekFromNow = new Date();
+    weekFromNow.setDate(weekFromNow.getDate() + 7);
+    if (item.nextDue <= weekFromNow && !isOverdue) return 'text-status-upcoming';
+    
+    if (isScheduled) return 'text-status-this-month';
+    
+    return '';
+  };
+
   return (
     <Card 
-      className={`bg-card hover-elevate cursor-pointer shadow-sm rounded-xl border ${isOverdue ? 'border-l-4 border-l-red-500' : isCompleted ? 'border-l-4 border-l-green-500' : 'border-border'}`}
+      className={`bg-card hover-elevate cursor-pointer shadow-sm rounded-xl border ${getStatusStyles()}`}
       data-testid={`card-maintenance-${item.id}`}
       onClick={handleCardClick}
     >
@@ -91,7 +138,7 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
               data-testid={`button-complete-${item.id}`}
               title={isCompleted ? "Reopen" : "Complete"}
               aria-label={isCompleted ? "Reopen maintenance" : "Mark maintenance complete"}
-              className={`h-7 w-7 rounded-full ${isOverdue ? 'text-red-600' : isCompleted ? 'text-green-600' : ''}`}
+              className={`h-7 w-7 rounded-full ${getIconColor()}`}
             >
               {isOverdue ? (
                 <AlertTriangle className="h-3.5 w-3.5" />

@@ -63,12 +63,12 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     opacity: isDragging ? 0.5 : 1,
   };
 
-  // Color coding: red = overdue, green = completed, blue = scheduled
+  // Color coding: red = overdue, blue = this month (scheduled), primary = completed
   const getBackgroundColor = () => {
-    if (!inCalendar) return 'bg-card border border-border';
-    if (isCompleted) return 'bg-green-100 dark:bg-green-950/30 border-green-200 dark:border-green-800';
-    if (isOverdue) return 'bg-red-100 dark:bg-red-950/30 border-red-200 dark:border-red-800';
-    return 'bg-blue-100 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800';
+    if (!inCalendar) return 'bg-status-unscheduled/10 border border-status-unscheduled/30';
+    if (isCompleted) return 'bg-primary/10 border-primary/30';
+    if (isOverdue) return 'bg-status-overdue/10 border-status-overdue/30';
+    return 'bg-status-this-month/10 border-status-this-month/30';
   };
 
   return (

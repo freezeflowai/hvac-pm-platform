@@ -76,10 +76,26 @@ export default {
           border: "var(--sidebar-accent-border)"
         },
         status: {
-          online: "rgb(34 197 94)",
-          away: "rgb(245 158 11)",
-          busy: "rgb(239 68 68)",
-          offline: "rgb(156 163 175)",
+          overdue: {
+            DEFAULT: "hsl(var(--status-overdue) / <alpha-value>)",
+            foreground: "hsl(var(--status-overdue-foreground) / <alpha-value>)",
+            border: "var(--status-overdue-border)",
+          },
+          upcoming: {
+            DEFAULT: "hsl(var(--status-upcoming) / <alpha-value>)",
+            foreground: "hsl(var(--status-upcoming-foreground) / <alpha-value>)",
+            border: "var(--status-upcoming-border)",
+          },
+          "this-month": {
+            DEFAULT: "hsl(var(--status-this-month) / <alpha-value>)",
+            foreground: "hsl(var(--status-this-month-foreground) / <alpha-value>)",
+            border: "var(--status-this-month-border)",
+          },
+          unscheduled: {
+            DEFAULT: "hsl(var(--status-unscheduled) / <alpha-value>)",
+            foreground: "hsl(var(--status-unscheduled-foreground) / <alpha-value>)",
+            border: "var(--status-unscheduled-border)",
+          },
         },
       },
       fontFamily: {

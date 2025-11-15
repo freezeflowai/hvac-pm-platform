@@ -192,7 +192,8 @@ export default function Reports() {
                                 <TableCell className="text-right py-3">
                                   <Badge 
                                     data-testid={`filter-quantity-${index}`}
-                                    className="bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 rounded-full px-2 py-0.5"
+                                    variant="secondary"
+                                    className="rounded-full px-2 py-0.5"
                                   >
                                     {item.totalQuantity}
                                   </Badge>
@@ -238,7 +239,8 @@ export default function Reports() {
                                 <TableCell className="text-right py-3">
                                   <Badge 
                                     data-testid={`belt-quantity-${index}`}
-                                    className="bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 rounded-full px-2 py-0.5"
+                                    variant="secondary"
+                                    className="rounded-full px-2 py-0.5"
                                   >
                                     {item.totalQuantity}
                                   </Badge>
