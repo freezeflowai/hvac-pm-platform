@@ -372,58 +372,72 @@ export default function Dashboard() {
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 space-y-4">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-              <PopoverTrigger asChild>
-                <div className="relative w-full sm:w-96">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={searchOpen}
-                    className="w-full justify-start text-left font-normal pl-10"
-                    data-testid="button-search-clients"
-                  >
-                    {searchQuery || "Search clients..."}
-                  </Button>
-                </div>
-              </PopoverTrigger>
-              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                <Command shouldFilter={false}>
-                  <CommandInput 
-                    placeholder="Type at least 3 characters..." 
-                    value={searchQuery}
-                    onValueChange={setSearchQuery}
-                    data-testid="input-search-clients"
-                  />
-                  <CommandList>
-                    {searchQuery.trim().length < 3 ? (
-                      <CommandEmpty>Type at least 3 characters to search...</CommandEmpty>
-                    ) : searchMatches.length === 0 ? (
-                      <CommandEmpty>No clients found.</CommandEmpty>
-                    ) : (
-                      <CommandGroup>
-                        {searchMatches.map((client) => (
-                          <CommandItem
-                            key={client.id}
-                            value={client.id}
-                            onSelect={() => handleSelectClient(client.id)}
-                            data-testid={`search-result-${client.id}`}
-                          >
-                            <Building2 className="mr-2 h-4 w-4" />
-                            <div className="flex-1">
-                              <div className="font-medium">{client.companyName}</div>
-                              {client.location && (
-                                <div className="text-xs text-muted-foreground">{client.location}</div>
-                              )}
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    )}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <div className="flex gap-2 items-center">
+              <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+                <PopoverTrigger asChild>
+                  <div className="relative w-full sm:w-96">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={searchOpen}
+                      className="w-full justify-start text-left font-normal pl-10"
+                      data-testid="button-search-clients"
+                    >
+                      {searchQuery || "Search clients..."}
+                    </Button>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput 
+                      placeholder="Type at least 3 characters..." 
+                      value={searchQuery}
+                      onValueChange={setSearchQuery}
+                      data-testid="input-search-clients"
+                    />
+                    <CommandList>
+                      {searchQuery.trim().length < 3 ? (
+                        <CommandEmpty>Type at least 3 characters to search...</CommandEmpty>
+                      ) : searchMatches.length === 0 ? (
+                        <CommandEmpty>No clients found.</CommandEmpty>
+                      ) : (
+                        <CommandGroup>
+                          {searchMatches.map((client) => (
+                            <CommandItem
+                              key={client.id}
+                              value={client.id}
+                              onSelect={() => handleSelectClient(client.id)}
+                              data-testid={`search-result-${client.id}`}
+                            >
+                              <Building2 className="mr-2 h-4 w-4" />
+                              <div className="flex-1">
+                                <div className="font-medium">{client.companyName}</div>
+                                {client.location && (
+                                  <div className="text-xs text-muted-foreground">{client.location}</div>
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setActiveTab('clients');
+                  setLocation('/?tab=clients');
+                }}
+                data-testid="button-all-clients"
+                className="gap-2"
+              >
+                <Users className="h-4 w-4" />
+                All Clients
+              </Button>
+            </div>
             
             <div className="flex flex-wrap gap-2">
               <Button
@@ -539,7 +553,7 @@ export default function Dashboard() {
             {overdueItems.length > 0 && (
               <div ref={overdueRef}>
                 <MaintenanceSection
-                  title="Overdue Maintenance"
+                  title="Needs Attention Coming Due / Past Due"
                   items={overdueItems}
                   onMarkComplete={handleMarkComplete}
                   onEdit={handleEditClient}

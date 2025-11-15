@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, LogOut, User, Shield, Settings } from "lucide-react";
+import { LayoutDashboard, LogOut, User, Shield, Settings, Calendar } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -55,13 +55,24 @@ export default function Header({ onAddClient }: HeaderProps) {
             <nav className="flex gap-2">
               <Link href="/">
                 <Button
-                  variant={location === "/" ? "default" : "ghost"}
+                  variant={location === "/" || location.startsWith("/?") ? "default" : "ghost"}
                   size="sm"
                   className="gap-2"
                   data-testid="nav-dashboard"
                 >
                   <LayoutDashboard className="h-4 w-4" />
                   Dashboard
+                </Button>
+              </Link>
+              <Link href="/">
+                <Button
+                  variant={location === "/" && !location.includes("tab=clients") ? "default" : "ghost"}
+                  size="sm"
+                  className="gap-2"
+                  data-testid="nav-schedule"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Schedule
                 </Button>
               </Link>
               {user?.isAdmin && (
