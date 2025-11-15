@@ -363,9 +363,14 @@ export default function Calendar() {
 
   const { assignments = [], clients = [] } = data || {};
   
-  // Get unscheduled clients (active clients not in assignments for this month)
+  // Get unscheduled clients (active clients with PM this month, not yet scheduled)
   const scheduledClientIds = new Set(assignments.map((a: any) => a.clientId));
-  const unscheduledClients = clients.filter((c: any) => !c.inactive && !scheduledClientIds.has(c.id));
+  const currentMonthIndex = currentDate.getMonth(); // 0-indexed for selectedMonths
+  const unscheduledClients = clients.filter((c: any) => 
+    !c.inactive && 
+    !scheduledClientIds.has(c.id) &&
+    c.selectedMonths?.includes(currentMonthIndex)
+  );
 
   // Create a map of assignments by day
   const assignmentsByDay: Record<number, any[]> = {};

@@ -117,7 +117,14 @@ export default function Dashboard() {
   const currentMonth = today.getMonth() + 1; // 1-indexed for API
   
   const { data: calendarData } = useQuery<{ assignments: any[]; clients: any[] }>({
-    queryKey: [`/api/calendar?year=${currentYear}&month=${currentMonth}`],
+    queryKey: ["/api/calendar", currentYear, currentMonth],
+    queryFn: async () => {
+      const res = await fetch(`/api/calendar?year=${currentYear}&month=${currentMonth}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to fetch calendar data");
+      return res.json();
+    },
   });
 
 
