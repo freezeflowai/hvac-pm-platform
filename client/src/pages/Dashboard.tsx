@@ -262,8 +262,21 @@ export default function Dashboard() {
   // Clients with PM this month
   const clientsWithCurrentMonthPM = clients.filter(c => !c.inactive && hasCurrentMonthPM(c.selectedMonths));
 
-  // ALL maintenance items for this month (both scheduled and unscheduled)
-  const maintenanceItems: MaintenanceItem[] = clientsWithCurrentMonthPM
+  // SCHEDULED clients only (for overdue/upcoming calculations)
+  const scheduledMaintenanceItems: MaintenanceItem[] = clientsWithCurrentMonthPM
+    .filter(c => scheduledClientIds.has(c.id))
+    .map(c => ({
+      id: c.id,
+      companyName: c.companyName,
+      location: c.location,
+      selectedMonths: c.selectedMonths,
+      nextDue: c.nextDue,
+      status: (isOverdue(c.nextDue, c.selectedMonths) ? "overdue" : "upcoming") as "overdue" | "upcoming",
+    }))
+    .sort((a, b) => a.companyName.localeCompare(b.companyName));
+
+  // ALL maintenance items for this month (for "Due This Month" count)
+  const allMaintenanceItems: MaintenanceItem[] = clientsWithCurrentMonthPM
     .map(c => ({
       id: c.id,
       companyName: c.companyName,
@@ -287,8 +300,9 @@ export default function Dashboard() {
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
-  const overdueItems = maintenanceItems.filter(item => item.status === "overdue");
-  const thisMonthItems = maintenanceItems.filter(item => {
+  // Overdue/upcoming only from SCHEDULED clients
+  const overdueItems = scheduledMaintenanceItems.filter(item => item.status === "overdue");
+  const thisMonthItems = scheduledMaintenanceItems.filter(item => {
     const monthFromNow = new Date();
     monthFromNow.setMonth(monthFromNow.getMonth() + 1);
     return item.nextDue <= monthFromNow && item.status !== "overdue";
@@ -297,12 +311,12 @@ export default function Dashboard() {
   const completedCount = recentlyCompleted.length;
   
   const activeClientsCount = clients.filter(c => !c.inactive).length;
-  const totalActiveScheduled = maintenanceItems.length;
+  const totalActiveScheduled = allMaintenanceItems.length; // Count ALL with PM this month
   
   const topOverdueClients = overdueItems
     .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime())
     .slice(0, 3);
-  const upcomingNextWeek = maintenanceItems
+  const upcomingNextWeek = scheduledMaintenanceItems
     .filter(item => {
       const weekFromNow = new Date();
       weekFromNow.setDate(weekFromNow.getDate() + 7);
