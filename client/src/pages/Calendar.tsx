@@ -111,7 +111,7 @@ export default function Calendar() {
 
   const createAssignment = useMutation({
     mutationFn: async ({ clientId, day }: { clientId: string; day: number }) => {
-      return apiRequest("POST", `/api/calendar`, {
+      return apiRequest("POST", `/api/calendar/assign`, {
         clientId,
         year,
         month,
@@ -138,7 +138,7 @@ export default function Calendar() {
 
   const updateAssignment = useMutation({
     mutationFn: async ({ id, day }: { id: string; day: number }) => {
-      return apiRequest("PATCH", `/api/calendar/${id}`, {
+      return apiRequest("PATCH", `/api/calendar/assign/${id}`, {
         day,
         scheduledDate: new Date(year, month - 1, day).toISOString().split('T')[0],
       });
@@ -161,7 +161,7 @@ export default function Calendar() {
 
   const deleteAssignment = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/calendar/${id}`);
+      return apiRequest("DELETE", `/api/calendar/assign/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
