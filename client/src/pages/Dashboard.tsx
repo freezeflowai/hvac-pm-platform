@@ -367,13 +367,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header 
-        onAddClient={() => setLocation("/add-client")}
-        onScheduleClick={() => {
-          setActiveTab('schedule');
-          setLocation('/');
-        }}
-      />
+      <Header onAddClient={() => setLocation("/add-client")} />
       
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 space-y-4">
         <div className="flex flex-col gap-3">

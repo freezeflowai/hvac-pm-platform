@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, LogOut, User, Shield, Settings, Calendar } from "lucide-react";
+import { LayoutDashboard, LogOut, User, Shield, Settings } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -8,10 +8,9 @@ import type { CompanySettings } from "@shared/schema";
 
 interface HeaderProps {
   onAddClient?: () => void;
-  onScheduleClick?: () => void;
 }
 
-export default function Header({ onAddClient, onScheduleClick }: HeaderProps) {
+export default function Header({ onAddClient }: HeaderProps) {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const { toast } = useToast();
@@ -65,22 +64,6 @@ export default function Header({ onAddClient, onScheduleClick }: HeaderProps) {
                   Dashboard
                 </Button>
               </Link>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-2"
-                data-testid="nav-schedule"
-                onClick={() => {
-                  if (onScheduleClick) {
-                    onScheduleClick();
-                  } else {
-                    setLocation('/');
-                  }
-                }}
-              >
-                <Calendar className="h-4 w-4" />
-                Schedule
-              </Button>
               {user?.isAdmin && (
                 <Link href="/admin">
                   <Button
