@@ -111,6 +111,15 @@ export default function Dashboard() {
     queryKey: ["/api/maintenance/recently-completed"],
   });
 
+  // Fetch current month's calendar assignments to check who's scheduled
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+  
+  const { data: calendarData } = useQuery({
+    queryKey: ["/api/calendar", currentYear, currentMonth],
+  });
+
 
   const [clientParts, setClientParts] = useState<Record<string, ClientPart[]>>({});
   const [completionStatuses, setCompletionStatuses] = useState<Record<string, { completed: boolean; completedDueDate?: string }>>({});
@@ -245,8 +254,30 @@ export default function Dashboard() {
     return false;
   };
 
-  const maintenanceItems: MaintenanceItem[] = clients
-    .filter(c => !c.inactive && hasCurrentMonthPM(c.selectedMonths))
+  // Get scheduled client IDs for current month
+  const scheduledClientIds = new Set(
+    (calendarData?.assignments || []).map((a: any) => a.clientId)
+  );
+
+  // Clients with PM this month
+  const clientsWithCurrentMonthPM = clients.filter(c => !c.inactive && hasCurrentMonthPM(c.selectedMonths));
+
+  // Unscheduled: have PM this month but not on calendar
+  const unscheduledItems: MaintenanceItem[] = clientsWithCurrentMonthPM
+    .filter(c => !scheduledClientIds.has(c.id))
+    .map(c => ({
+      id: c.id,
+      companyName: c.companyName,
+      location: c.location,
+      selectedMonths: c.selectedMonths,
+      nextDue: c.nextDue,
+      status: "upcoming" as "overdue" | "upcoming",
+    }))
+    .sort((a, b) => a.companyName.localeCompare(b.companyName));
+
+  // Scheduled clients only
+  const maintenanceItems: MaintenanceItem[] = clientsWithCurrentMonthPM
+    .filter(c => scheduledClientIds.has(c.id))
     .map(c => ({
       id: c.id,
       companyName: c.companyName,
@@ -501,6 +532,14 @@ export default function Dashboard() {
             onClick={() => scrollToSection(overdueRef)}
           />
           <StatsCard 
+            title="Unscheduled" 
+            value={unscheduledItems.length} 
+            icon={Clock} 
+            variant="warning"
+            subtitle="not on calendar"
+            onClick={() => setLocation('/calendar')}
+          />
+          <StatsCard 
             title="Due This Month" 
             value={thisMonthItems.length} 
             icon={Calendar} 
@@ -516,14 +555,6 @@ export default function Dashboard() {
             variant="success"
             subtitle="this month"
             onClick={() => scrollToSection(completedRef)}
-          />
-          <StatsCard 
-            title="Active Clients" 
-            value={activeClientsCount} 
-            icon={Users} 
-            variant="default"
-            subtitle="total clients"
-            total={clients.length}
           />
         </div>
 
