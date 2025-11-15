@@ -262,6 +262,18 @@ export default function Dashboard() {
   // Clients with PM this month
   const clientsWithCurrentMonthPM = clients.filter(c => !c.inactive && hasCurrentMonthPM(c.selectedMonths));
 
+  // ALL maintenance items for this month (both scheduled and unscheduled)
+  const maintenanceItems: MaintenanceItem[] = clientsWithCurrentMonthPM
+    .map(c => ({
+      id: c.id,
+      companyName: c.companyName,
+      location: c.location,
+      selectedMonths: c.selectedMonths,
+      nextDue: c.nextDue,
+      status: (isOverdue(c.nextDue, c.selectedMonths) ? "overdue" : "upcoming") as "overdue" | "upcoming",
+    }))
+    .sort((a, b) => a.companyName.localeCompare(b.companyName));
+
   // Unscheduled: have PM this month but not on calendar
   const unscheduledItems: MaintenanceItem[] = clientsWithCurrentMonthPM
     .filter(c => !scheduledClientIds.has(c.id))
@@ -272,19 +284,6 @@ export default function Dashboard() {
       selectedMonths: c.selectedMonths,
       nextDue: c.nextDue,
       status: "upcoming" as "overdue" | "upcoming",
-    }))
-    .sort((a, b) => a.companyName.localeCompare(b.companyName));
-
-  // Scheduled clients only
-  const maintenanceItems: MaintenanceItem[] = clientsWithCurrentMonthPM
-    .filter(c => scheduledClientIds.has(c.id))
-    .map(c => ({
-      id: c.id,
-      companyName: c.companyName,
-      location: c.location,
-      selectedMonths: c.selectedMonths,
-      nextDue: c.nextDue,
-      status: (isOverdue(c.nextDue, c.selectedMonths) ? "overdue" : "upcoming") as "overdue" | "upcoming",
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
