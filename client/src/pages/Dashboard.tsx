@@ -553,136 +553,140 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <StatsCard 
-            title="Overdue" 
-            value={overdueItems.length} 
-            icon={AlertCircle} 
-            variant="danger"
-            total={totalActiveScheduled}
-            subtitle="needs attention"
-            onClick={() => scrollToSection(overdueRef)}
-          />
-          <StatsCard 
-            title="Upcoming This Week" 
-            value={upcomingNextWeek.length} 
-            icon={Clock} 
-            variant="warning"
-            subtitle="next 7 days"
-            onClick={() => scrollToSection(thisMonthRef)}
-          />
-          <StatsCard 
-            title="Due This Month" 
-            value={totalActiveScheduled} 
-            icon={Calendar} 
-            variant={totalActiveScheduled > 0 ? "warning" : "default"}
-            subtitle="total PMs"
-            onClick={() => scrollToSection(thisMonthRef)}
-          />
-          <StatsCard 
-            title="Unscheduled" 
-            value={unscheduledItems.length} 
-            icon={CalendarX} 
-            variant="warning"
-            subtitle="not on calendar"
-            onClick={() => setLocation('/calendar')}
-          />
-        </div>
+{activeTab === 'schedule' && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <StatsCard 
+                title="Overdue" 
+                value={overdueItems.length} 
+                icon={AlertCircle} 
+                variant="danger"
+                total={totalActiveScheduled}
+                subtitle="needs attention"
+                onClick={() => scrollToSection(overdueRef)}
+              />
+              <StatsCard 
+                title="Upcoming This Week" 
+                value={upcomingNextWeek.length} 
+                icon={Clock} 
+                variant="warning"
+                subtitle="next 7 days"
+                onClick={() => scrollToSection(thisMonthRef)}
+              />
+              <StatsCard 
+                title="Due This Month" 
+                value={totalActiveScheduled} 
+                icon={Calendar} 
+                variant={totalActiveScheduled > 0 ? "warning" : "default"}
+                subtitle="total PMs"
+                onClick={() => scrollToSection(thisMonthRef)}
+              />
+              <StatsCard 
+                title="Unscheduled" 
+                value={unscheduledItems.length} 
+                icon={CalendarX} 
+                variant="warning"
+                subtitle="not on calendar"
+                onClick={() => setLocation('/calendar')}
+              />
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Upcoming
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {upcomingNextWeek.length > 0 ? (
-                  <div className="space-y-2">
-                    {upcomingNextWeek.map((item) => (
-                      <MaintenanceCard
-                        key={item.id}
-                        item={item}
-                        onMarkComplete={handleMarkComplete}
-                        onEdit={handleEditClient}
-                        parts={clientParts[item.id] || []}
-                        isCompleted={completionStatuses[item.id]?.completed || false}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    No upcoming maintenance
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Upcoming
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {upcomingNextWeek.length > 0 ? (
+                      <div className="space-y-2">
+                        {upcomingNextWeek.map((item) => (
+                          <MaintenanceCard
+                            key={item.id}
+                            item={item}
+                            onMarkComplete={handleMarkComplete}
+                            onEdit={handleEditClient}
+                            parts={clientParts[item.id] || []}
+                            isCompleted={completionStatuses[item.id]?.completed || false}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        No upcoming maintenance
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
-          <div className="space-y-4" ref={overdueRef}>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-destructive" />
-                  Overdue
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {overdueItems.length > 0 ? (
-                  <div className="space-y-2">
-                    {overdueItems.map((item) => (
-                      <MaintenanceCard
-                        key={item.id}
-                        item={item}
-                        onMarkComplete={handleMarkComplete}
-                        onEdit={handleEditClient}
-                        parts={clientParts[item.id] || []}
-                        isCompleted={completionStatuses[item.id]?.completed || false}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    No overdue maintenance
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+              <div className="space-y-4" ref={overdueRef}>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                      Overdue
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {overdueItems.length > 0 ? (
+                      <div className="space-y-2">
+                        {overdueItems.map((item) => (
+                          <MaintenanceCard
+                            key={item.id}
+                            item={item}
+                            onMarkComplete={handleMarkComplete}
+                            onEdit={handleEditClient}
+                            parts={clientParts[item.id] || []}
+                            isCompleted={completionStatuses[item.id]?.completed || false}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        No overdue maintenance
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
-          <div className="space-y-4" ref={thisMonthRef}>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Due This Month
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {thisMonthItems.length > 0 ? (
-                  <div className="space-y-2">
-                    {thisMonthItems.map((item) => (
-                      <MaintenanceCard
-                        key={item.id}
-                        item={item}
-                        onMarkComplete={handleMarkComplete}
-                        onEdit={handleEditClient}
-                        parts={clientParts[item.id] || []}
-                        isCompleted={completionStatuses[item.id]?.completed || false}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    No maintenance due this month
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+              <div className="space-y-4" ref={thisMonthRef}>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Due This Month
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {thisMonthItems.length > 0 ? (
+                      <div className="space-y-2">
+                        {thisMonthItems.map((item) => (
+                          <MaintenanceCard
+                            key={item.id}
+                            item={item}
+                            onMarkComplete={handleMarkComplete}
+                            onEdit={handleEditClient}
+                            parts={clientParts[item.id] || []}
+                            isCompleted={completionStatuses[item.id]?.completed || false}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        No maintenance due this month
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </>
+        )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsContent value="schedule" className="space-y-6">
