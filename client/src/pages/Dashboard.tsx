@@ -339,6 +339,7 @@ export default function Dashboard() {
     monthFromNow.setMonth(monthFromNow.getMonth() + 1);
     return item.nextDue <= monthFromNow && item.status !== "overdue";
   });
+  
 
   const completedCount = recentlyCompleted.length;
   
