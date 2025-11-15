@@ -421,15 +421,6 @@ export default function Dashboard() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setLocation("/reports?tab=parts")}
-                data-testid="button-view-reports"
-                className="gap-2"
-              >
-                <FileText className="h-4 w-4" />
-                Reports
-              </Button>
-              <Button
-                variant="outline"
                 onClick={() => setLocation("/manage-parts")}
                 data-testid="button-manage-parts"
                 className="gap-2"
@@ -439,12 +430,12 @@ export default function Dashboard() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setLocation("/company-settings")}
-                data-testid="button-company-settings"
+                onClick={() => setLocation("/reports?tab=parts")}
+                data-testid="button-view-reports"
                 className="gap-2"
               >
-                <Settings className="h-4 w-4" />
-                Settings
+                <FileText className="h-4 w-4" />
+                Reports
               </Button>
             </div>
           </div>

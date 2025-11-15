@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Plus, LayoutDashboard, FileText, LogOut, User, Shield } from "lucide-react";
+import { LayoutDashboard, FileText, LogOut, User, Shield, Settings } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -97,16 +97,17 @@ export default function Header({ onAddClient }: HeaderProps) {
                 <span data-testid="text-email">{user.email}</span>
               </div>
             )}
-            {onAddClient && (
+            <Link href="/company-settings">
               <Button 
-                onClick={onAddClient}
-                data-testid="button-add-client"
+                variant="ghost"
+                size="sm"
+                data-testid="button-settings-header"
                 className="gap-2"
               >
-                <Plus className="h-4 w-4" />
-                Add Client
+                <Settings className="h-4 w-4" />
+                Settings
               </Button>
-            )}
+            </Link>
             <Button
               variant="ghost"
               size="sm"
