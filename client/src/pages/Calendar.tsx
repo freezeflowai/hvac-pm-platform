@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 function UnscheduledPanel({ clients }: { clients: any[] }) {
   const { setNodeRef } = useDroppable({ id: 'unscheduled-panel' });
@@ -164,6 +165,7 @@ export default function Calendar() {
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
@@ -366,10 +368,14 @@ export default function Calendar() {
     },
   });
 
+  const { data: allClients = [] } = useQuery<any[]>({
+    queryKey: ["/api/clients"],
+  });
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
+        <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
         <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
           <div className="text-center py-8">Loading calendar...</div>
         </main>
@@ -506,7 +512,7 @@ export default function Calendar() {
       onDragEnd={handleDragEnd}
     >
       <div className="min-h-screen bg-background">
-        <Header />
+        <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
         
         <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 space-y-4">
           <div className="flex items-center justify-between">

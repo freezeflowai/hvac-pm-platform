@@ -87,10 +87,14 @@ export default function CompanySettingsPage() {
     setLocation("/");
   };
 
+  const { data: allClients = [] } = useQuery<any[]>({
+    queryKey: ["/api/clients"],
+  });
+
   if (isLoading) {
     return (
       <>
-        <Header />
+        <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
         <div className="flex items-center justify-center h-screen">
           <p className="text-muted-foreground">Loading...</p>
         </div>
@@ -100,7 +104,7 @@ export default function CompanySettingsPage() {
 
   return (
     <>
-      <Header />
+      <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
       <div className="p-6 max-w-4xl mx-auto">
         <Button 
           variant="ghost" 

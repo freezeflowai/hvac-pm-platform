@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +43,11 @@ export default function Admin() {
   const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [, setLocation] = useLocation();
+
+  const { data: allClients = [] } = useQuery<any[]>({
+    queryKey: ["/api/clients"],
+  });
 
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -161,7 +167,7 @@ export default function Admin() {
   if (!currentUser?.isAdmin) {
     return (
       <>
-        <Header />
+        <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
         <div className="flex items-center justify-center h-screen">
           <Card className="w-full max-w-md">
             <CardHeader>
@@ -180,7 +186,7 @@ export default function Admin() {
 
   return (
     <>
-      <Header />
+      <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
       <div className="p-6 max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold mb-6">User Management</h1>
       

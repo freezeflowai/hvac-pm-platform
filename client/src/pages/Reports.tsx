@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import Header from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -57,6 +58,7 @@ export default function Reports() {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [scheduleMonth, setScheduleMonth] = useState<number>(new Date().getMonth());
   const [activeTab, setActiveTab] = useState<string>("parts");
+  const [, setLocation] = useLocation();
 
   const { data: reportData = [], isLoading } = useQuery<ReportItem[]>({
     queryKey: ["/api/reports/parts", selectedMonth],
@@ -79,9 +81,13 @@ export default function Reports() {
     window.print();
   };
 
+  const { data: allClients = [] } = useQuery<any[]>({
+    queryKey: ["/api/clients"],
+  });
+
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
       <main className="container mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
