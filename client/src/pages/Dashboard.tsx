@@ -191,12 +191,12 @@ export default function Dashboard() {
     ? clients.filter(client => {
         const query = searchQuery.toLowerCase();
         return (
-          client.companyName?.toLowerCase().includes(query) ||
-          client.location?.toLowerCase().includes(query) ||
-          client.contactName?.toLowerCase().includes(query) ||
-          client.address?.toLowerCase().includes(query) ||
-          client.city?.toLowerCase().includes(query) ||
-          client.province?.toLowerCase().includes(query)
+          (client.companyName || "").toLowerCase().includes(query) ||
+          (client.location || "").toLowerCase().includes(query) ||
+          (client.contactName || "").toLowerCase().includes(query) ||
+          (client.address || "").toLowerCase().includes(query) ||
+          (client.city || "").toLowerCase().includes(query) ||
+          (client.province || "").toLowerCase().includes(query)
         );
       })
     : [];
