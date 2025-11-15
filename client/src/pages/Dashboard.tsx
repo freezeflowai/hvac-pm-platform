@@ -213,9 +213,22 @@ export default function Dashboard() {
     setLocation(`/client-report/${clientId}`);
   };
 
-  // Helper to determine if an item is overdue
-  const isOverdue = (nextDue: Date): boolean => {
+  // Helper to check if client has PM scheduled for current month
+  const hasCurrentMonthPM = (selectedMonths: number[]): boolean => {
     const today = new Date();
+    const currentMonth = today.getMonth(); // 0-11
+    return selectedMonths.includes(currentMonth);
+  };
+
+  // Helper to determine if an item is overdue
+  const isOverdue = (nextDue: Date, selectedMonths: number[]): boolean => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    
+    // Only consider overdue if current month is in their scheduled months
+    if (!selectedMonths.includes(currentMonth)) {
+      return false;
+    }
     
     // Already past due date
     if (nextDue < today) {
@@ -223,7 +236,7 @@ export default function Dashboard() {
     }
     
     // Check if due this month and we're within 7 days of month end
-    if (nextDue.getMonth() === today.getMonth() && nextDue.getFullYear() === today.getFullYear()) {
+    if (nextDue.getMonth() === currentMonth && nextDue.getFullYear() === today.getFullYear()) {
       const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       const daysUntilMonthEnd = Math.ceil((lastDayOfMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       return daysUntilMonthEnd <= 7;
@@ -233,14 +246,14 @@ export default function Dashboard() {
   };
 
   const maintenanceItems: MaintenanceItem[] = clients
-    .filter(c => !c.inactive)
+    .filter(c => !c.inactive && hasCurrentMonthPM(c.selectedMonths))
     .map(c => ({
       id: c.id,
       companyName: c.companyName,
       location: c.location,
       selectedMonths: c.selectedMonths,
       nextDue: c.nextDue,
-      status: (isOverdue(c.nextDue) ? "overdue" : "upcoming") as "overdue" | "upcoming",
+      status: (isOverdue(c.nextDue, c.selectedMonths) ? "overdue" : "upcoming") as "overdue" | "upcoming",
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
