@@ -97,32 +97,21 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, onViewRe
       onClick={handleCardClick}
     >
       <CardContent className="p-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="space-y-0.5">
-              <h3 className="font-bold text-sm leading-tight" data-testid={`text-company-${item.id}`}>
-                {item.companyName}
-              </h3>
-              {item.location && (
-                <p className="text-xs text-muted-foreground" data-testid={`text-location-${item.id}`}>
-                  {item.location}
-                </p>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {monthsDisplay}
-            </p>
-            {parts.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {parts.map(cp => (
-                  <Badge key={cp.id} variant="secondary" className="text-[10px] px-2 py-0.5 rounded-full font-normal">
-                    {cp.quantity}x {getPartDisplayName(cp.part)}
-                  </Badge>
-                ))}
-              </div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0 space-y-0.5">
+            <h3 className="font-bold text-sm leading-tight" data-testid={`text-company-${item.id}`}>
+              {item.companyName}
+            </h3>
+            {item.location && (
+              <p className="text-xs text-muted-foreground" data-testid={`text-location-${item.id}`}>
+                {item.location}
+              </p>
             )}
           </div>
-          <div className="flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <p className="text-xs text-muted-foreground whitespace-nowrap">
+              {monthsDisplay}
+            </p>
             <Button
               size="icon"
               variant={isCompleted ? "default" : "ghost"}
