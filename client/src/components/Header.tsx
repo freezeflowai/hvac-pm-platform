@@ -8,9 +8,10 @@ import type { CompanySettings } from "@shared/schema";
 
 interface HeaderProps {
   onAddClient?: () => void;
+  onScheduleClick?: () => void;
 }
 
-export default function Header({ onAddClient }: HeaderProps) {
+export default function Header({ onAddClient, onScheduleClick }: HeaderProps) {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const { toast } = useToast();
@@ -64,17 +65,22 @@ export default function Header({ onAddClient }: HeaderProps) {
                   Dashboard
                 </Button>
               </Link>
-              <Link href="/">
-                <Button
-                  variant={location === "/" && !location.includes("tab=clients") ? "default" : "ghost"}
-                  size="sm"
-                  className="gap-2"
-                  data-testid="nav-schedule"
-                >
-                  <Calendar className="h-4 w-4" />
-                  Schedule
-                </Button>
-              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2"
+                data-testid="nav-schedule"
+                onClick={() => {
+                  if (onScheduleClick) {
+                    onScheduleClick();
+                  } else {
+                    setLocation('/');
+                  }
+                }}
+              >
+                <Calendar className="h-4 w-4" />
+                Schedule
+              </Button>
               {user?.isAdmin && (
                 <Link href="/admin">
                   <Button

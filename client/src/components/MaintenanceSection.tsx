@@ -44,7 +44,7 @@ export default function MaintenanceSection({
       </CardHeader>
       <CardContent>
         {items.length > 0 ? (
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {items.map((item) => (
               <MaintenanceCard
                 key={item.id}
