@@ -740,11 +740,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if there's a record for the requested dueDate
       const record = await storage.getMaintenanceRecord(req.user!.id, clientId, dueDate);
+      
+      // Check if there's a calendar assignment for this month
+      const dueDateObj = new Date(dueDate);
+      const year = dueDateObj.getFullYear();
+      const month = dueDateObj.getMonth() + 1; // Calendar API uses 1-indexed months
+      const calendarAssignment = await storage.getClientCalendarAssignment(req.user!.id, clientId, year, month);
 
       if (record && record.completedAt) {
         // This cycle is completed - uncomplete it and restore nextDue
         await storage.updateClient(req.user!.id, clientId, { nextDue: dueDate });
         await storage.updateMaintenanceRecord(req.user!.id, record.id, { completedAt: null });
+        
+        // Update calendar assignment to mark as incomplete
+        if (calendarAssignment) {
+          await storage.updateCalendarAssignment(req.user!.id, calendarAssignment.id, { completed: false });
+        }
+        
         res.json({ completed: false, record });
       } else {
         // Mark this maintenance cycle as complete and advance nextDue
@@ -776,6 +788,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Update client's nextDue
         await storage.updateClient(req.user!.id, clientId, { nextDue: nextDue.toISOString() });
+        
+        // Update calendar assignment to mark as complete
+        if (calendarAssignment) {
+          await storage.updateCalendarAssignment(req.user!.id, calendarAssignment.id, { completed: true });
+        }
 
         res.json({ completed: true, nextDue: nextDue.toISOString() });
       }
@@ -1050,26 +1067,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // If marking as complete, advance nextDue to next occurrence
-      if (assignmentUpdate.completed !== undefined && assignmentUpdate.completed === true) {
-        const client = await storage.getClient(userId, assignment.clientId);
-        if (client && client.selectedMonths && client.selectedMonths.length > 0) {
-          const currentDate = new Date(assignment.scheduledDate);
-          const currentMonth = currentDate.getMonth();
-          const currentYear = currentDate.getFullYear();
+      // Handle completion status changes
+      if (assignmentUpdate.completed !== undefined) {
+        const dueDate = assignment.scheduledDate;
+        
+        if (assignmentUpdate.completed === true) {
+          // Marking as complete - create/update maintenanceRecord
+          const record = await storage.getMaintenanceRecord(userId, assignment.clientId, dueDate);
+          const completedAt = new Date().toISOString();
           
-          // Find the next scheduled month after current
-          let nextMonth = client.selectedMonths.find((m: number) => m > currentMonth);
-          let nextYear = currentYear;
-          
-          if (nextMonth === undefined) {
-            nextMonth = client.selectedMonths[0];
-            nextYear = currentYear + 1;
+          if (record) {
+            await storage.updateMaintenanceRecord(userId, record.id, { completedAt });
+          } else {
+            await storage.createMaintenanceRecord(userId, {
+              clientId: assignment.clientId,
+              dueDate,
+              completedAt,
+            });
           }
           
-          const nextDueDate = new Date(nextYear, nextMonth, 15);
+          // Advance nextDue to next occurrence
+          const client = await storage.getClient(userId, assignment.clientId);
+          if (client && client.selectedMonths && client.selectedMonths.length > 0) {
+            const currentDate = new Date(assignment.scheduledDate);
+            const currentMonth = currentDate.getMonth();
+            const currentYear = currentDate.getFullYear();
+            
+            // Find the next scheduled month after current
+            let nextMonth = client.selectedMonths.find((m: number) => m > currentMonth);
+            let nextYear = currentYear;
+            
+            if (nextMonth === undefined) {
+              nextMonth = client.selectedMonths[0];
+              nextYear = currentYear + 1;
+            }
+            
+            const nextDueDate = new Date(nextYear, nextMonth, 15);
+            await storage.updateClient(userId, assignment.clientId, {
+              nextDue: nextDueDate.toISOString().split('T')[0]
+            });
+          }
+        } else {
+          // Marking as incomplete - remove completion from maintenanceRecord
+          const record = await storage.getMaintenanceRecord(userId, assignment.clientId, dueDate);
+          if (record) {
+            await storage.updateMaintenanceRecord(userId, record.id, { completedAt: null });
+          }
+          
+          // Restore client's nextDue to this assignment's date
           await storage.updateClient(userId, assignment.clientId, {
-            nextDue: nextDueDate.toISOString().split('T')[0]
+            nextDue: dueDate
           });
         }
       }

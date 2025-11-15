@@ -348,6 +348,8 @@ export default function Calendar() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance/recently-completed"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance/statuses"] });
       setSelectedClient(null);
       setSelectedAssignment(null);
       toast({
