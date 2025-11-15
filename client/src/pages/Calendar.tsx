@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Header from "@/components/Header";
@@ -10,6 +10,40 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+
+function UnscheduledPanel({ clients }: { clients: any[] }) {
+  const { setNodeRef } = useDroppable({ id: 'unscheduled-panel' });
+
+  return (
+    <div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Unscheduled ({clients.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div 
+            ref={setNodeRef}
+            className="space-y-1 max-h-96 overflow-y-auto min-h-32"
+            data-testid="unscheduled-panel"
+          >
+            {clients.map((client: any) => (
+              <DraggableClient
+                key={client.id}
+                id={client.id}
+                client={client}
+              />
+            ))}
+            {clients.length === 0 && (
+              <div className="text-xs text-muted-foreground text-center py-4">
+                All clients scheduled
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 function DraggableClient({ id, client, inCalendar }: { id: string; client: any; inCalendar?: boolean }) {
   const {
@@ -214,15 +248,21 @@ export default function Calendar() {
     if (overId.startsWith('day-')) {
       const day = parseInt(overId.replace('day-', ''));
       
-      // Check if dragging from unscheduled list (client ID format)
-      const isFromUnscheduled = activeId.length === 36 && activeId.includes('-'); // UUID format
+      // Check if the activeId is an assignment ID (exists in assignments) or a client ID (from unscheduled)
+      const isExistingAssignment = assignments.some((a: any) => a.id === activeId);
       
-      if (isFromUnscheduled) {
-        // Create new assignment
-        createAssignment.mutate({ clientId: activeId, day });
-      } else {
+      if (isExistingAssignment) {
         // Move existing assignment
         updateAssignment.mutate({ id: activeId, day });
+      } else {
+        // Create new assignment from unscheduled client
+        createAssignment.mutate({ clientId: activeId, day });
+      }
+    } else if (overId === 'unscheduled-panel') {
+      // Dropped on unscheduled panel - remove from calendar
+      const isExistingAssignment = assignments.some((a: any) => a.id === activeId);
+      if (isExistingAssignment) {
+        deleteAssignment.mutate(activeId);
       }
     }
   };
@@ -294,6 +334,68 @@ export default function Calendar() {
     }
 
     return days;
+  };
+
+  const renderWeeklyView = () => {
+    // Get current week dates
+    const today = new Date();
+    const currentWeekStart = new Date(today);
+    currentWeekStart.setDate(today.getDate() - today.getDay()); // Start on Sunday
+
+    const weekDays = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(currentWeekStart);
+      date.setDate(currentWeekStart.getDate() + i);
+      
+      const dayNumber = date.getDate();
+      const isCurrentMonth = date.getMonth() === month - 1 && date.getFullYear() === year;
+      const dayAssignments = isCurrentMonth ? (assignmentsByDay[dayNumber] || []) : [];
+
+      weekDays.push(
+        <div key={i} className="flex-1 min-w-32">
+          <Card className={`min-h-48 ${!isCurrentMonth ? "bg-muted/20" : "hover-elevate"}`}>
+            <CardContent className="p-2">
+              {isCurrentMonth ? (
+                <DroppableDay
+                  day={dayNumber}
+                  year={year}
+                  month={month}
+                  assignments={dayAssignments}
+                  clients={clients}
+                  onRemove={handleRemove}
+                />
+              ) : (
+                <div className="text-xs text-muted-foreground">
+                  {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <div className="grid grid-cols-7 gap-2 mb-2">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, i) => {
+            const date = new Date(currentWeekStart);
+            date.setDate(currentWeekStart.getDate() + i);
+            return (
+              <div key={day} className="text-center">
+                <div className="font-semibold text-sm">{day}</div>
+                <div className="text-xs text-muted-foreground">
+                  {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="grid grid-cols-7 gap-2">
+          {weekDays}
+        </div>
+      </>
+    );
   };
 
   return (
@@ -370,38 +472,12 @@ export default function Calendar() {
                       </div>
                     </>
                   )}
-                  {view === "weekly" && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      Weekly view coming soon...
-                    </div>
-                  )}
+                  {view === "weekly" && renderWeeklyView()}
                 </CardContent>
               </Card>
             </div>
 
-            <div>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Unscheduled ({unscheduledClients.length})</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-1 max-h-96 overflow-y-auto">
-                    {unscheduledClients.map((client: any) => (
-                      <DraggableClient
-                        key={client.id}
-                        id={client.id}
-                        client={client}
-                      />
-                    ))}
-                    {unscheduledClients.length === 0 && (
-                      <div className="text-xs text-muted-foreground text-center py-4">
-                        All clients scheduled
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <UnscheduledPanel clients={unscheduledClients} />
           </div>
         </main>
 
