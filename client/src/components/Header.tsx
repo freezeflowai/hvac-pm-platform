@@ -8,9 +8,10 @@ import type { CompanySettings } from "@shared/schema";
 
 interface HeaderProps {
   onAddClient?: () => void;
+  onDashboardClick?: () => void;
 }
 
-export default function Header({ onAddClient }: HeaderProps) {
+export default function Header({ onAddClient, onDashboardClick }: HeaderProps) {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const { toast } = useToast();
@@ -53,17 +54,22 @@ export default function Header({ onAddClient }: HeaderProps) {
               <p className="text-sm text-muted-foreground">Preventive Maintenance Tracking</p>
             </div>
             <nav className="flex gap-2">
-              <Link href="/">
-                <Button
-                  variant={location === "/" || location.startsWith("/?") ? "default" : "ghost"}
-                  size="sm"
-                  className="gap-2"
-                  data-testid="nav-dashboard"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  Dashboard
-                </Button>
-              </Link>
+              <Button
+                variant={location === "/" || location.startsWith("/?") ? "default" : "ghost"}
+                size="sm"
+                className="gap-2"
+                data-testid="nav-dashboard"
+                onClick={() => {
+                  if (onDashboardClick) {
+                    onDashboardClick();
+                  } else {
+                    setLocation('/');
+                  }
+                }}
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                Dashboard
+              </Button>
               {user?.isAdmin && (
                 <Link href="/admin">
                   <Button
