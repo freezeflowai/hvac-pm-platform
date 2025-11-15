@@ -494,7 +494,7 @@ export default function Dashboard() {
                 title="Unscheduled" 
                 value={unscheduledItems.length} 
                 icon={CalendarX} 
-                variant="warning"
+                variant="neutral"
                 subtitle="not on calendar"
                 onClick={() => setLocation('/calendar')}
               />

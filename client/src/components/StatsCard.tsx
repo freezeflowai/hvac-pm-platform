@@ -5,7 +5,7 @@ interface StatsCardProps {
   title: string;
   value: number;
   icon: LucideIcon;
-  variant?: "default" | "warning" | "danger" | "success";
+  variant?: "default" | "warning" | "danger" | "success" | "neutral";
   subtitle?: string;
   onClick?: () => void;
 }
@@ -18,10 +18,18 @@ export default function StatsCard({
   subtitle,
   onClick
 }: StatsCardProps) {
+  const borderColorClass = {
+    danger: 'border-t-status-overdue',
+    warning: 'border-t-status-upcoming',
+    default: 'border-t-status-this-month',
+    success: 'border-t-status-this-month',
+    neutral: 'border-t-status-unscheduled',
+  }[variant];
+
   return (
     <Card 
       data-testid={`card-stats-${title.toLowerCase().replace(/\s+/g, '-')}`} 
-      className={`bg-card shadow-sm ${onClick ? 'cursor-pointer hover-elevate' : ''}`}
+      className={`bg-card shadow-sm border-t-4 ${borderColorClass} ${onClick ? 'cursor-pointer hover-elevate' : ''}`}
       onClick={onClick}
     >
       <CardContent className="p-3">
