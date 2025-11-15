@@ -16,14 +16,14 @@ function UnscheduledPanel({ clients }: { clients: any[] }) {
 
   return (
     <div>
-      <Card>
+      <Card className="h-full">
         <CardHeader>
           <CardTitle className="text-sm">Unscheduled ({clients.length})</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="h-[calc(100%-4rem)]">
           <div 
             ref={setNodeRef}
-            className="space-y-1 max-h-96 overflow-y-auto min-h-32"
+            className="space-y-1 h-full overflow-y-auto"
             data-testid="unscheduled-panel"
           >
             {clients.map((client: any) => (
@@ -483,13 +483,13 @@ export default function Calendar() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            <div className="lg:col-span-3">
-              <Card>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-12rem)]">
+            <div className="lg:col-span-3 overflow-hidden">
+              <Card className="h-full flex flex-col">
                 <CardHeader>
                   <CardTitle className="text-lg">Calendar View</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 overflow-auto">
                   {view === "monthly" && (
                     <>
                       <div className="grid grid-cols-7 gap-2 mb-2">
@@ -509,7 +509,9 @@ export default function Calendar() {
               </Card>
             </div>
 
-            <UnscheduledPanel clients={unscheduledClients} />
+            <div className="h-full">
+              <UnscheduledPanel clients={unscheduledClients} />
+            </div>
           </div>
         </main>
 
