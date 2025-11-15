@@ -76,18 +76,18 @@
   --chart-4: 280 65% 38%;
   --chart-5: 16 90% 40%;
 
-  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Inter", "SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: "SF Mono", Menlo, Monaco, "Courier New", monospace;
-  --radius: .5rem; /* 8px */
-  --shadow-2xs: 0px 1px 2px 0px hsl(220 8% 20% / 0.05);
-  --shadow-xs: 0px 1px 3px 0px hsl(220 8% 20% / 0.08);
-  --shadow-sm: 0px 2px 4px -1px hsl(220 8% 20% / 0.06), 0px 1px 2px -1px hsl(220 8% 20% / 0.04);
-  --shadow: 0px 4px 6px -1px hsl(220 8% 20% / 0.08), 0px 2px 4px -2px hsl(220 8% 20% / 0.05);
-  --shadow-md: 0px 6px 12px -2px hsl(220 8% 20% / 0.10), 0px 3px 6px -3px hsl(220 8% 20% / 0.06);
-  --shadow-lg: 0px 12px 24px -4px hsl(220 8% 20% / 0.12), 0px 6px 12px -6px hsl(220 8% 20% / 0.08);
-  --shadow-xl: 0px 24px 48px -8px hsl(220 8% 20% / 0.14), 0px 12px 24px -12px hsl(220 8% 20% / 0.10);
-  --shadow-2xl: 0px 32px 64px -12px hsl(220 8% 20% / 0.16);
+  --radius: 0.75rem; /* 12px - updated for softer look */
+  --shadow-2xs: 0px 1px 2px 0px hsl(220 8% 20% / 0.04);
+  --shadow-xs: 0px 1px 3px 0px hsl(220 8% 20% / 0.06);
+  --shadow-sm: 0px 2px 4px -1px hsl(220 8% 20% / 0.05), 0px 1px 2px -1px hsl(220 8% 20% / 0.03);
+  --shadow: 0px 4px 6px -1px hsl(220 8% 20% / 0.06), 0px 2px 4px -2px hsl(220 8% 20% / 0.04);
+  --shadow-md: 0px 6px 12px -2px hsl(220 8% 20% / 0.08), 0px 3px 6px -3px hsl(220 8% 20% / 0.05);
+  --shadow-lg: 0px 12px 24px -4px hsl(220 8% 20% / 0.10), 0px 6px 12px -6px hsl(220 8% 20% / 0.06);
+  --shadow-xl: 0px 24px 48px -8px hsl(220 8% 20% / 0.12), 0px 12px 24px -12px hsl(220 8% 20% / 0.08);
+  --shadow-2xl: 0px 32px 64px -12px hsl(220 8% 20% / 0.14);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 

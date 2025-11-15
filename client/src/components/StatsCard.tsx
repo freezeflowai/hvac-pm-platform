@@ -26,70 +26,51 @@ export default function StatsCard({
   onClick
 }: StatsCardProps) {
   const variantClasses = {
-    default: "text-muted-foreground",
-    warning: "text-yellow-600 dark:text-yellow-500",
-    danger: "text-destructive",
-    success: "text-green-600 dark:text-green-500",
+    default: {
+      bg: "bg-card border-border",
+      icon: "text-muted-foreground",
+      number: "text-foreground"
+    },
+    warning: {
+      bg: "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900",
+      icon: "text-yellow-600 dark:text-yellow-500",
+      number: "text-yellow-700 dark:text-yellow-400"
+    },
+    danger: {
+      bg: "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900",
+      icon: "text-red-600 dark:text-red-500",
+      number: "text-red-700 dark:text-red-400"
+    },
+    success: {
+      bg: "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900",
+      icon: "text-green-600 dark:text-green-500",
+      number: "text-green-700 dark:text-green-400"
+    },
   };
 
-  const bgVariantClasses = {
-    default: "bg-muted",
-    warning: "bg-yellow-50 dark:bg-yellow-950/20",
-    danger: "bg-destructive/10",
-    success: "bg-green-50 dark:bg-green-950/20",
-  };
-
-  const getTrendIcon = () => {
-    if (trend === "up") return <TrendingUp className="h-3 w-3" />;
-    if (trend === "down") return <TrendingDown className="h-3 w-3" />;
-    return <Minus className="h-3 w-3" />;
-  };
-
-  const getTrendColor = () => {
-    if (variant === "danger") {
-      return trend === "down" ? "text-green-600 dark:text-green-500" : "text-destructive";
-    }
-    if (trend === "up") return "text-green-600 dark:text-green-500";
-    if (trend === "down") return "text-destructive";
-    return "text-muted-foreground";
-  };
-
-  const percentage = total && total > 0 ? Math.round((value / total) * 100) : null;
+  const currentVariant = variantClasses[variant];
 
   return (
     <Card 
       data-testid={`card-stats-${title.toLowerCase().replace(/\s+/g, '-')}`} 
-      className={`${bgVariantClasses[variant]} ${onClick ? 'cursor-pointer hover-elevate' : ''}`}
+      className={`${currentVariant.bg} shadow-sm ${onClick ? 'cursor-pointer hover-elevate' : ''}`}
       onClick={onClick}
     >
-      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className={`h-4 w-4 ${variantClasses[variant]}`} />
-      </CardHeader>
-      <CardContent className="pb-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <div className="text-3xl font-bold tabular-nums" data-testid={`text-stats-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-            {value}
-          </div>
-          {percentage !== null && (
-            <Badge variant="outline" className="text-xs font-normal">
-              {percentage}%
-            </Badge>
-          )}
-        </div>
-        {(subtitle || trendValue) && (
-          <div className="mt-2 flex items-center gap-2 text-xs">
-            {trendValue && trend && (
-              <span className={`flex items-center gap-1 font-medium ${getTrendColor()}`}>
-                {getTrendIcon()}
-                {trendValue}
-              </span>
-            )}
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">{title}</p>
+            <p className="text-3xl font-bold tabular-nums mb-1" data-testid={`text-stats-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+              {value}
+            </p>
             {subtitle && (
-              <span className="text-muted-foreground">{subtitle}</span>
+              <p className="text-xs text-muted-foreground">{subtitle}</p>
             )}
           </div>
-        )}
+          <div className={`rounded-full p-3 ${currentVariant.bg}`}>
+            <Icon className={`h-5 w-5 ${currentVariant.icon}`} />
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

@@ -43,21 +43,18 @@ export default function Header({ onAddClient, onDashboardClick }: HeaderProps) {
   };
 
   return (
-    <header className="border-b bg-background sticky top-0 z-50">
-      <div className="mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
-          <div className="flex items-center gap-6">
-            <div>
-              <h1 className="text-2xl font-semibold text-foreground">
-                {companySettings?.companyName || "HVAC/R Scheduler"}
-              </h1>
-              <p className="text-sm text-muted-foreground">Preventive Maintenance Tracking</p>
-            </div>
-            <nav className="flex gap-2">
+    <header className="border-b bg-background sticky top-0 z-50 shadow-sm">
+      <div className="mx-auto px-6 lg:px-8">
+        <div className="flex items-center justify-between h-14 gap-4">
+          <div className="flex items-center gap-8">
+            <h1 className="text-lg font-semibold text-foreground">
+              {companySettings?.companyName || "HVAC/R Scheduler"}
+            </h1>
+            <nav className="flex gap-1 bg-muted/50 p-1 rounded-full">
               <Button
                 variant={location === "/" || location.startsWith("/?") ? "default" : "ghost"}
                 size="sm"
-                className="gap-2"
+                className={`rounded-full ${location === "/" || location.startsWith("/?") ? "" : "hover:bg-background/60"}`}
                 data-testid="nav-dashboard"
                 onClick={() => {
                   if (onDashboardClick) {
@@ -67,17 +64,17 @@ export default function Header({ onAddClient, onDashboardClick }: HeaderProps) {
                   }
                 }}
               >
-                <LayoutDashboard className="h-4 w-4" />
+                <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" />
                 Dashboard
               </Button>
               <Link href="/calendar">
                 <Button
                   variant={location === "/calendar" ? "default" : "ghost"}
                   size="sm"
-                  className="gap-2"
+                  className={`rounded-full ${location === "/calendar" ? "" : "hover:bg-background/60"}`}
                   data-testid="nav-calendar"
                 >
-                  <CalendarIcon className="h-4 w-4" />
+                  <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
                   Calendar
                 </Button>
               </Link>
@@ -86,43 +83,41 @@ export default function Header({ onAddClient, onDashboardClick }: HeaderProps) {
                   <Button
                     variant={location === "/admin" ? "default" : "ghost"}
                     size="sm"
-                    className="gap-2"
+                    className={`rounded-full ${location === "/admin" ? "" : "hover:bg-background/60"}`}
                     data-testid="nav-admin"
                   >
-                    <Shield className="h-4 w-4" />
+                    <Shield className="h-3.5 w-3.5 mr-1.5" />
                     Admin
                   </Button>
                 </Link>
               )}
             </nav>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             {user && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <User className="h-4 w-4" />
-                <span data-testid="text-email">{user.email}</span>
+                <span data-testid="text-email" className="font-medium">{user.email}</span>
               </div>
             )}
             <Link href="/company-settings">
               <Button 
                 variant="ghost"
-                size="sm"
+                size="icon"
                 data-testid="button-settings-header"
-                className="gap-2"
+                className="h-8 w-8"
               >
                 <Settings className="h-4 w-4" />
-                Settings
               </Button>
             </Link>
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={handleLogout}
               data-testid="button-logout"
-              className="gap-2"
+              className="h-8 w-8"
             >
               <LogOut className="h-4 w-4" />
-              Logout
             </Button>
           </div>
         </div>
