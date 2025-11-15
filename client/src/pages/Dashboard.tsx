@@ -116,7 +116,7 @@ export default function Dashboard() {
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth() + 1;
   
-  const { data: calendarData } = useQuery({
+  const { data: calendarData } = useQuery<{ assignments: any[]; clients: any[] }>({
     queryKey: ["/api/calendar", currentYear, currentMonth],
   });
 
