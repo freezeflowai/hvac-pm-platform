@@ -5,7 +5,7 @@ import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
 import ClientReportDialog from "@/components/ClientReportDialog";
-import { AlertCircle, Calendar, CalendarX, CheckCircle, Clock, Package, Settings, Search, Building2, FileText, Download, Users } from "lucide-react";
+import { AlertCircle, Calendar, CalendarX, CheckCircle, Clock, Package, Settings, Search, Building2, FileText, Download, Users, ChevronDown } from "lucide-react";
 import MaintenanceCard, { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -78,6 +78,18 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<{
+    overdue: boolean;
+    upcoming: boolean;
+    thisMonth: boolean;
+    unscheduled: boolean;
+  }>({
+    overdue: false,
+    upcoming: false,
+    thisMonth: false,
+    unscheduled: false,
+  });
+  
+  const [minimizedSections, setMinimizedSections] = useState<{
     overdue: boolean;
     upcoming: boolean;
     thisMonth: boolean;
@@ -518,190 +530,255 @@ export default function Dashboard() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Overdue - moved to left */}
-              <div className="space-y-4" ref={overdueRef}>
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-destructive" />
-                      Overdue
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {overdueItems.length > 0 ? (
-                      <>
-                        <div className="space-y-2">
-                          {(expandedSections.overdue ? overdueItems : overdueItems.slice(0, 3)).map((item) => (
-                            <MaintenanceCard
-                              key={item.id}
-                              item={item}
-                              onMarkComplete={handleMarkComplete}
-                              onEdit={handleEditClient}
-                              onViewReport={setReportDialogClientId}
-                              parts={clientParts[item.id] || []}
-                              isCompleted={completionStatuses[item.id]?.completed || false}
-                              isScheduled={true}
-                              isThisMonthPM={true}
-                            />
-                          ))}
-                        </div>
-                        {overdueItems.length > 3 && (
-                          <Button 
-                            variant="ghost" 
-                            className="w-full mt-2" 
-                            size="sm"
-                            data-testid="button-view-all-overdue"
-                            onClick={() => setExpandedSections(prev => ({ ...prev, overdue: !prev.overdue }))}
-                          >
-                            {expandedSections.overdue ? 'Show Less' : `View All (${overdueItems.length})`}
-                          </Button>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground text-sm">
-                        No overdue maintenance
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Upcoming - middle */}
-              <div className="space-y-4">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Upcoming
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {upcomingNextWeek.length > 0 ? (
-                      <>
-                        <div className="space-y-2">
-                          {(expandedSections.upcoming ? upcomingNextWeek : upcomingNextWeek.slice(0, 3)).map((item) => (
-                            <MaintenanceCard
-                              key={item.id}
-                              item={item}
-                              onMarkComplete={handleMarkComplete}
-                              onEdit={handleEditClient}
-                              onViewReport={setReportDialogClientId}
-                              parts={clientParts[item.id] || []}
-                              isCompleted={completionStatuses[item.id]?.completed || false}
-                              isScheduled={true}
-                              isThisMonthPM={true}
-                            />
-                          ))}
-                        </div>
-                        {upcomingNextWeek.length > 3 && (
-                          <Button 
-                            variant="ghost" 
-                            className="w-full mt-2" 
-                            size="sm"
-                            data-testid="button-view-all-upcoming"
-                            onClick={() => setExpandedSections(prev => ({ ...prev, upcoming: !prev.upcoming }))}
-                          >
-                            {expandedSections.upcoming ? 'Show Less' : `View All (${upcomingNextWeek.length})`}
-                          </Button>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground text-sm">
-                        No upcoming maintenance
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Due This Month - right */}
-              <div className="space-y-4" ref={thisMonthRef}>
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Due This Month
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {thisMonthItems.length > 0 ? (
-                      <>
-                        <div className="space-y-2">
-                          {(expandedSections.thisMonth ? thisMonthItems : thisMonthItems.slice(0, 3)).map((item) => (
-                            <MaintenanceCard
-                              key={item.id}
-                              item={item}
-                              onMarkComplete={handleMarkComplete}
-                              onEdit={handleEditClient}
-                              onViewReport={setReportDialogClientId}
-                              parts={clientParts[item.id] || []}
-                              isCompleted={completionStatuses[item.id]?.completed || false}
-                              isScheduled={true}
-                              isThisMonthPM={true}
-                            />
-                          ))}
-                        </div>
-                        {thisMonthItems.length > 3 && (
-                          <Button 
-                            variant="ghost" 
-                            className="w-full mt-2" 
-                            size="sm"
-                            data-testid="button-view-all-thismonth"
-                            onClick={() => setExpandedSections(prev => ({ ...prev, thisMonth: !prev.thisMonth }))}
-                          >
-                            {expandedSections.thisMonth ? 'Show Less' : `View All (${thisMonthItems.length})`}
-                          </Button>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground text-sm">
-                        No maintenance due this month
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {unscheduledItems.length > 0 && (
+            <div className="space-y-4">
+              {/* Row 1: Overdue and Upcoming */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Overdue - Left */}
+                <div ref={overdueRef}>
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <CalendarX className="h-4 w-4" />
-                        Unscheduled This Month
-                      </CardTitle>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                          Overdue
+                        </CardTitle>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          data-testid="button-minimize-overdue"
+                          onClick={() => setMinimizedSections(prev => ({ ...prev, overdue: !prev.overdue }))}
+                        >
+                          <ChevronDown className={`h-4 w-4 transition-transform ${minimizedSections.overdue ? 'rotate-180' : ''}`} />
+                        </Button>
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                      <>
-                        <div className="space-y-2">
-                          {(expandedSections.unscheduled ? unscheduledItems : unscheduledItems.slice(0, 3)).map((item) => (
-                            <MaintenanceCard
-                              key={item.id}
-                              item={item}
-                              onMarkComplete={handleMarkComplete}
-                              onEdit={handleEditClient}
-                              onViewReport={setReportDialogClientId}
-                              parts={clientParts[item.id] || []}
-                              isCompleted={completionStatuses[item.id]?.completed || false}
-                              isScheduled={false}
-                              isThisMonthPM={true}
-                            />
-                          ))}
-                        </div>
-                        {unscheduledItems.length > 3 && (
-                          <Button 
-                            variant="ghost" 
-                            className="w-full mt-2" 
-                            size="sm"
-                            data-testid="button-view-all-unscheduled"
-                            onClick={() => setExpandedSections(prev => ({ ...prev, unscheduled: !prev.unscheduled }))}
-                          >
-                            {expandedSections.unscheduled ? 'Show Less' : `View All (${unscheduledItems.length})`}
-                          </Button>
+                    {!minimizedSections.overdue && (
+                      <CardContent>
+                        {overdueItems.length > 0 ? (
+                          <>
+                            <div className="space-y-2">
+                              {(expandedSections.overdue ? overdueItems : overdueItems.slice(0, 3)).map((item) => (
+                                <MaintenanceCard
+                                  key={item.id}
+                                  item={item}
+                                  onMarkComplete={handleMarkComplete}
+                                  onEdit={handleEditClient}
+                                  onViewReport={setReportDialogClientId}
+                                  parts={clientParts[item.id] || []}
+                                  isCompleted={completionStatuses[item.id]?.completed || false}
+                                  isScheduled={true}
+                                  isThisMonthPM={true}
+                                />
+                              ))}
+                            </div>
+                            {overdueItems.length > 3 && (
+                              <Button 
+                                variant="ghost" 
+                                className="w-full mt-2" 
+                                size="sm"
+                                data-testid="button-view-all-overdue"
+                                onClick={() => setExpandedSections(prev => ({ ...prev, overdue: !prev.overdue }))}
+                              >
+                                {expandedSections.overdue ? 'Show Less' : `View All (${overdueItems.length})`}
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground text-sm">
+                            No overdue maintenance
+                          </div>
                         )}
-                      </>
-                    </CardContent>
+                      </CardContent>
+                    )}
                   </Card>
-                )}
+                </div>
+
+                {/* Upcoming - Right */}
+                <div>
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Upcoming
+                        </CardTitle>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          data-testid="button-minimize-upcoming"
+                          onClick={() => setMinimizedSections(prev => ({ ...prev, upcoming: !prev.upcoming }))}
+                        >
+                          <ChevronDown className={`h-4 w-4 transition-transform ${minimizedSections.upcoming ? 'rotate-180' : ''}`} />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    {!minimizedSections.upcoming && (
+                      <CardContent>
+                        {upcomingNextWeek.length > 0 ? (
+                          <>
+                            <div className="space-y-2">
+                              {(expandedSections.upcoming ? upcomingNextWeek : upcomingNextWeek.slice(0, 3)).map((item) => (
+                                <MaintenanceCard
+                                  key={item.id}
+                                  item={item}
+                                  onMarkComplete={handleMarkComplete}
+                                  onEdit={handleEditClient}
+                                  onViewReport={setReportDialogClientId}
+                                  parts={clientParts[item.id] || []}
+                                  isCompleted={completionStatuses[item.id]?.completed || false}
+                                  isScheduled={true}
+                                  isThisMonthPM={true}
+                                />
+                              ))}
+                            </div>
+                            {upcomingNextWeek.length > 3 && (
+                              <Button 
+                                variant="ghost" 
+                                className="w-full mt-2" 
+                                size="sm"
+                                data-testid="button-view-all-upcoming"
+                                onClick={() => setExpandedSections(prev => ({ ...prev, upcoming: !prev.upcoming }))}
+                              >
+                                {expandedSections.upcoming ? 'Show Less' : `View All (${upcomingNextWeek.length})`}
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground text-sm">
+                            No upcoming maintenance
+                          </div>
+                        )}
+                      </CardContent>
+                    )}
+                  </Card>
+                </div>
+              </div>
+
+              {/* Row 2: Due This Month and Unscheduled */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Due This Month - Left */}
+                <div ref={thisMonthRef}>
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Due This Month
+                        </CardTitle>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          data-testid="button-minimize-thismonth"
+                          onClick={() => setMinimizedSections(prev => ({ ...prev, thisMonth: !prev.thisMonth }))}
+                        >
+                          <ChevronDown className={`h-4 w-4 transition-transform ${minimizedSections.thisMonth ? 'rotate-180' : ''}`} />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    {!minimizedSections.thisMonth && (
+                      <CardContent>
+                        {thisMonthItems.length > 0 ? (
+                          <>
+                            <div className="space-y-2">
+                              {(expandedSections.thisMonth ? thisMonthItems : thisMonthItems.slice(0, 3)).map((item) => (
+                                <MaintenanceCard
+                                  key={item.id}
+                                  item={item}
+                                  onMarkComplete={handleMarkComplete}
+                                  onEdit={handleEditClient}
+                                  onViewReport={setReportDialogClientId}
+                                  parts={clientParts[item.id] || []}
+                                  isCompleted={completionStatuses[item.id]?.completed || false}
+                                  isScheduled={true}
+                                  isThisMonthPM={true}
+                                />
+                              ))}
+                            </div>
+                            {thisMonthItems.length > 3 && (
+                              <Button 
+                                variant="ghost" 
+                                className="w-full mt-2" 
+                                size="sm"
+                                data-testid="button-view-all-thismonth"
+                                onClick={() => setExpandedSections(prev => ({ ...prev, thisMonth: !prev.thisMonth }))}
+                              >
+                                {expandedSections.thisMonth ? 'Show Less' : `View All (${thisMonthItems.length})`}
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground text-sm">
+                            No maintenance due this month
+                          </div>
+                        )}
+                      </CardContent>
+                    )}
+                  </Card>
+                </div>
+
+                {/* Unscheduled - Right */}
+                <div>
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <CalendarX className="h-4 w-4" />
+                          Unscheduled This Month
+                        </CardTitle>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          data-testid="button-minimize-unscheduled"
+                          onClick={() => setMinimizedSections(prev => ({ ...prev, unscheduled: !prev.unscheduled }))}
+                        >
+                          <ChevronDown className={`h-4 w-4 transition-transform ${minimizedSections.unscheduled ? 'rotate-180' : ''}`} />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    {!minimizedSections.unscheduled && (
+                      <CardContent>
+                        {unscheduledItems.length > 0 ? (
+                          <>
+                            <div className="space-y-2">
+                              {(expandedSections.unscheduled ? unscheduledItems : unscheduledItems.slice(0, 3)).map((item) => (
+                                <MaintenanceCard
+                                  key={item.id}
+                                  item={item}
+                                  onMarkComplete={handleMarkComplete}
+                                  onEdit={handleEditClient}
+                                  onViewReport={setReportDialogClientId}
+                                  parts={clientParts[item.id] || []}
+                                  isCompleted={completionStatuses[item.id]?.completed || false}
+                                  isScheduled={false}
+                                  isThisMonthPM={true}
+                                />
+                              ))}
+                            </div>
+                            {unscheduledItems.length > 3 && (
+                              <Button 
+                                variant="ghost" 
+                                className="w-full mt-2" 
+                                size="sm"
+                                data-testid="button-view-all-unscheduled"
+                                onClick={() => setExpandedSections(prev => ({ ...prev, unscheduled: !prev.unscheduled }))}
+                              >
+                                {expandedSections.unscheduled ? 'Show Less' : `View All (${unscheduledItems.length})`}
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground text-sm">
+                            No unscheduled maintenance
+                          </div>
+                        )}
+                      </CardContent>
+                    )}
+                  </Card>
+                </div>
               </div>
             </div>
           </>
