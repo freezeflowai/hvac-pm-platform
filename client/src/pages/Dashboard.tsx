@@ -286,25 +286,37 @@ export default function Dashboard() {
     );
   }
 
-  // Get scheduled client IDs for current month
+  // Get scheduled client IDs and their scheduled dates for current month
   const scheduledClientIds = new Set(
     calendarData.assignments.map((a: any) => a.clientId)
+  );
+  
+  // Map of clientId -> scheduledDate from calendar assignments
+  const clientScheduledDates = new Map(
+    calendarData.assignments.map((a: any) => [a.clientId, new Date(a.scheduledDate)])
   );
 
   // Clients with PM this month
   const clientsWithCurrentMonthPM = clients.filter(c => !c.inactive && hasCurrentMonthPM(c.selectedMonths));
 
   // SCHEDULED clients only (for overdue/upcoming calculations)
+  // Use calendar scheduled date for overdue determination, not nextDue
   const scheduledMaintenanceItems: MaintenanceItem[] = clientsWithCurrentMonthPM
     .filter(c => scheduledClientIds.has(c.id))
-    .map(c => ({
-      id: c.id,
-      companyName: c.companyName,
-      location: c.location,
-      selectedMonths: c.selectedMonths,
-      nextDue: c.nextDue,
-      status: (isOverdue(c.nextDue, c.selectedMonths) ? "overdue" : "upcoming") as "overdue" | "upcoming",
-    }))
+    .map(c => {
+      const scheduledDate = clientScheduledDates.get(c.id) || c.nextDue;
+      const today = new Date();
+      const isOverdueNow = scheduledDate < today;
+      
+      return {
+        id: c.id,
+        companyName: c.companyName,
+        location: c.location,
+        selectedMonths: c.selectedMonths,
+        nextDue: scheduledDate, // Use calendar scheduled date instead of client nextDue
+        status: (isOverdueNow ? "overdue" : "upcoming") as "overdue" | "upcoming",
+      };
+    })
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
   // ALL maintenance items for this month (for "Due This Month" count)
@@ -350,9 +362,12 @@ export default function Dashboard() {
     .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime());
   const upcomingNextWeek = scheduledMaintenanceItems
     .filter(item => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
       const weekFromNow = new Date();
       weekFromNow.setDate(weekFromNow.getDate() + 7);
-      return item.nextDue <= weekFromNow && item.status !== "overdue";
+      weekFromNow.setHours(23, 59, 59, 999);
+      return item.nextDue >= today && item.nextDue <= weekFromNow && item.status !== "overdue";
     })
     .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime());
   
