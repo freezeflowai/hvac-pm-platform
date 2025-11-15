@@ -103,7 +103,7 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, onViewRe
               <div className="flex flex-wrap gap-1">
                 {parts.map(cp => (
                   <Badge key={cp.id} variant="secondary" className="text-[10px] px-2 py-0.5 rounded-full font-normal">
-                    {cp.quantity}x {cp.part.name} {cp.part.size}
+                    {cp.quantity}x {cp.part.name}
                   </Badge>
                 ))}
               </div>
