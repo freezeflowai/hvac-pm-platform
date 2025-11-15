@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, CheckCircle } from "lucide-react";
+import { MapPin, CheckCircle, AlertTriangle } from "lucide-react";
 import { useLocation } from "wouter";
 
 export interface MaintenanceItem {
@@ -50,7 +50,7 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
 
   return (
     <Card 
-      className={`hover-elevate cursor-pointer ${isOverdue ? 'border-destructive' : ''}`}
+      className={`hover-elevate cursor-pointer ${isOverdue ? 'border-l-4 border-l-destructive' : isCompleted ? 'border-l-4 border-l-green-500' : ''}`}
       data-testid={`card-maintenance-${item.id}`}
       onClick={handleCardClick}
     >
@@ -58,9 +58,17 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = 
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-1.5 mb-0.5 flex-wrap">
+              {isOverdue && (
+                <AlertTriangle className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
+              )}
               <h3 className="font-semibold text-sm" data-testid={`text-company-${item.id}`}>
                 {item.companyName}
               </h3>
+              {isOverdue && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4">
+                  OVERDUE
+                </Badge>
+              )}
               {item.location && (
                 <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                   <MapPin className="h-2.5 w-2.5 flex-shrink-0" />

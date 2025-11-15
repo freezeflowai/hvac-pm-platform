@@ -4,16 +4,18 @@ import Header from "@/components/Header";
 import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
-import { AlertCircle, Calendar, CheckCircle, Clock, Package, Settings, Search, Building2 } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle, Clock, Package, Settings, Search, Building2, FileText, Download, Users } from "lucide-react";
 import { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Helper function to calculate next due date based on selected months
 function calculateNextDueDate(selectedMonths: number[], inactive: boolean): Date | null {
@@ -246,6 +248,21 @@ export default function Dashboard() {
   });
 
   const completedCount = recentlyCompleted.length;
+  
+  const activeClientsCount = clients.filter(c => !c.inactive).length;
+  const totalActiveScheduled = maintenanceItems.length;
+  
+  const topOverdueClients = overdueItems
+    .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime())
+    .slice(0, 3);
+  const upcomingNextWeek = maintenanceItems
+    .filter(item => {
+      const weekFromNow = new Date();
+      weekFromNow.setDate(weekFromNow.getDate() + 7);
+      return item.nextDue <= weekFromNow && item.status !== "overdue";
+    })
+    .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime())
+    .slice(0, 3);
 
   const handleEditClient = async (id: string) => {
     // Extract clientId from composite ID if needed (for recently completed items)
@@ -337,87 +354,206 @@ export default function Dashboard() {
       <Header onAddClient={() => setLocation("/add-client")} />
       
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-            <PopoverTrigger asChild>
-              <div className="relative w-full sm:w-96">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={searchOpen}
-                  className="w-full justify-start text-left font-normal pl-10"
-                  data-testid="button-search-clients"
-                >
-                  {searchQuery || "Search clients..."}
-                </Button>
-              </div>
-            </PopoverTrigger>
-            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-              <Command shouldFilter={false}>
-                <CommandInput 
-                  placeholder="Type at least 3 characters..." 
-                  value={searchQuery}
-                  onValueChange={setSearchQuery}
-                  data-testid="input-search-clients"
-                />
-                <CommandList>
-                  {searchQuery.trim().length < 3 ? (
-                    <CommandEmpty>Type at least 3 characters to search...</CommandEmpty>
-                  ) : searchMatches.length === 0 ? (
-                    <CommandEmpty>No clients found.</CommandEmpty>
-                  ) : (
-                    <CommandGroup>
-                      {searchMatches.map((client) => (
-                        <CommandItem
-                          key={client.id}
-                          value={client.id}
-                          onSelect={() => handleSelectClient(client.id)}
-                          data-testid={`search-result-${client.id}`}
-                        >
-                          <Building2 className="mr-2 h-4 w-4" />
-                          <div className="flex-1">
-                            <div className="font-medium">{client.companyName}</div>
-                            {client.location && (
-                              <div className="text-xs text-muted-foreground">{client.location}</div>
-                            )}
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-          
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setLocation("/company-settings")}
-              data-testid="button-company-settings"
-              className="gap-2"
-            >
-              <Settings className="h-4 w-4" />
-              Company Settings
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setLocation("/manage-parts")}
-              data-testid="button-manage-parts"
-              className="gap-2"
-            >
-              <Package className="h-4 w-4" />
-              Manage Parts
-            </Button>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+              <PopoverTrigger asChild>
+                <div className="relative w-full sm:w-96">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={searchOpen}
+                    className="w-full justify-start text-left font-normal pl-10"
+                    data-testid="button-search-clients"
+                  >
+                    {searchQuery || "Search clients..."}
+                  </Button>
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput 
+                    placeholder="Type at least 3 characters..." 
+                    value={searchQuery}
+                    onValueChange={setSearchQuery}
+                    data-testid="input-search-clients"
+                  />
+                  <CommandList>
+                    {searchQuery.trim().length < 3 ? (
+                      <CommandEmpty>Type at least 3 characters to search...</CommandEmpty>
+                    ) : searchMatches.length === 0 ? (
+                      <CommandEmpty>No clients found.</CommandEmpty>
+                    ) : (
+                      <CommandGroup>
+                        {searchMatches.map((client) => (
+                          <CommandItem
+                            key={client.id}
+                            value={client.id}
+                            onSelect={() => handleSelectClient(client.id)}
+                            data-testid={`search-result-${client.id}`}
+                          >
+                            <Building2 className="mr-2 h-4 w-4" />
+                            <div className="flex-1">
+                              <div className="font-medium">{client.companyName}</div>
+                              {client.location && (
+                                <div className="text-xs text-muted-foreground">{client.location}</div>
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="default"
+                onClick={() => setLocation("/add-client")}
+                data-testid="button-quick-add-client"
+                className="gap-2"
+              >
+                <Building2 className="h-4 w-4" />
+                Add Client
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setLocation("/reports?tab=parts")}
+                data-testid="button-view-reports"
+                className="gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                Reports
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setLocation("/manage-parts")}
+                data-testid="button-manage-parts"
+                className="gap-2"
+              >
+                <Package className="h-4 w-4" />
+                Parts
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setLocation("/company-settings")}
+                data-testid="button-company-settings"
+                className="gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                Settings
+              </Button>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <StatsCard title="Overdue" value={overdueItems.length} icon={AlertCircle} variant="danger" />
-          <StatsCard title="This Month" value={thisMonthItems.length} icon={Calendar} variant="default" />
-          <StatsCard title="Completed" value={completedCount} icon={CheckCircle} variant="default" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <StatsCard 
+            title="Overdue" 
+            value={overdueItems.length} 
+            icon={AlertCircle} 
+            variant="danger"
+            total={totalActiveScheduled}
+            subtitle="needs attention"
+          />
+          <StatsCard 
+            title="Due This Month" 
+            value={thisMonthItems.length} 
+            icon={Calendar} 
+            variant={thisMonthItems.length > 0 ? "warning" : "default"}
+            total={totalActiveScheduled}
+            subtitle="scheduled visits"
+          />
+          <StatsCard 
+            title="Completed" 
+            value={completedCount} 
+            icon={CheckCircle} 
+            variant="success"
+            subtitle="this month"
+          />
+          <StatsCard 
+            title="Active Clients" 
+            value={activeClientsCount} 
+            icon={Users} 
+            variant="default"
+            subtitle="total clients"
+            total={clients.length}
+          />
         </div>
+
+        {(topOverdueClients.length > 0 || upcomingNextWeek.length > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {topOverdueClients.length > 0 && (
+              <Card data-testid="card-insights-overdue">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-destructive" />
+                    Priority Attention Required
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {topOverdueClients.map((client) => (
+                    <div 
+                      key={client.id} 
+                      className="flex items-center justify-between p-2 rounded-md bg-destructive/5 hover-elevate cursor-pointer"
+                      onClick={() => setLocation(`/client-report/${client.id}`)}
+                      data-testid={`insight-overdue-${client.id}`}
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{client.companyName}</div>
+                        {client.location && (
+                          <div className="text-xs text-muted-foreground">{client.location}</div>
+                        )}
+                      </div>
+                      <Badge variant="destructive" className="text-xs">
+                        Overdue
+                      </Badge>
+                    </div>
+                  ))}
+                  {overdueItems.length > 3 && (
+                    <div className="text-xs text-muted-foreground text-center pt-1">
+                      + {overdueItems.length - 3} more overdue
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+            
+            {upcomingNextWeek.length > 0 && (
+              <Card data-testid="card-insights-upcoming">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+                    Upcoming This Week
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {upcomingNextWeek.map((client) => (
+                    <div 
+                      key={client.id} 
+                      className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover-elevate cursor-pointer"
+                      onClick={() => setLocation(`/client-report/${client.id}`)}
+                      data-testid={`insight-upcoming-${client.id}`}
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{client.companyName}</div>
+                        {client.location && (
+                          <div className="text-xs text-muted-foreground">{client.location}</div>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {client.nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList data-testid="tabs-main-nav">
