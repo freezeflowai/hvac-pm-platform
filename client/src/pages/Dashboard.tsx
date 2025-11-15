@@ -116,7 +116,7 @@ export default function Dashboard() {
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth() + 1; // 1-indexed for API
   
-  const { data: calendarData } = useQuery<{ assignments: any[]; clients: any[] }>({
+  const { data: calendarData, isLoading: isCalendarLoading } = useQuery<{ assignments: any[]; clients: any[] }>({
     queryKey: ["/api/calendar", currentYear, currentMonth],
     queryFn: async () => {
       const res = await fetch(`/api/calendar?year=${currentYear}&month=${currentMonth}`, {
@@ -261,9 +261,21 @@ export default function Dashboard() {
     return false;
   };
 
+  // Wait for calendar data to load
+  if (isLoading || isCalendarLoading || !calendarData) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
+          <div className="text-center py-8">Loading dashboard...</div>
+        </main>
+      </div>
+    );
+  }
+
   // Get scheduled client IDs for current month
   const scheduledClientIds = new Set(
-    (calendarData?.assignments || []).map((a: any) => a.clientId)
+    calendarData.assignments.map((a: any) => a.clientId)
   );
 
   // Clients with PM this month
