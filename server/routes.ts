@@ -1050,6 +1050,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // If marking as complete, advance nextDue to next occurrence
+      if (assignmentUpdate.completed !== undefined && assignmentUpdate.completed === true) {
+        const client = await storage.getClient(userId, assignment.clientId);
+        if (client && client.selectedMonths && client.selectedMonths.length > 0) {
+          const currentDate = new Date(assignment.scheduledDate);
+          const currentMonth = currentDate.getMonth();
+          const currentYear = currentDate.getFullYear();
+          
+          // Find the next scheduled month after current
+          let nextMonth = client.selectedMonths.find((m: number) => m > currentMonth);
+          let nextYear = currentYear;
+          
+          if (nextMonth === undefined) {
+            nextMonth = client.selectedMonths[0];
+            nextYear = currentYear + 1;
+          }
+          
+          const nextDueDate = new Date(nextYear, nextMonth, 15);
+          await storage.updateClient(userId, assignment.clientId, {
+            nextDue: nextDueDate.toISOString().split('T')[0]
+          });
+        }
+      }
+      
       res.json(assignment);
     } catch (error) {
       console.error('Update calendar assignment error:', error);
@@ -1074,6 +1098,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!deleted) {
         return res.status(404).json({ error: "Assignment not found" });
+      }
+      
+      // Recalculate client's nextDue based on selectedMonths
+      const client = await storage.getClient(userId, assignment.clientId);
+      if (client && client.selectedMonths && client.selectedMonths.length > 0) {
+        const today = new Date();
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+        
+        // Find the next scheduled month
+        let nextMonth = client.selectedMonths.find((m: number) => m > currentMonth);
+        let nextYear = currentYear;
+        
+        if (nextMonth === undefined) {
+          nextMonth = client.selectedMonths[0];
+          nextYear = currentYear + 1;
+        }
+        
+        const nextDueDate = new Date(nextYear, nextMonth, 15);
+        await storage.updateClient(userId, assignment.clientId, {
+          nextDue: nextDueDate.toISOString().split('T')[0]
+        });
       }
       
       res.json({ success: true });
