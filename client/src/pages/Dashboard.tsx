@@ -4,7 +4,7 @@ import Header from "@/components/Header";
 import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
-import { AlertCircle, Calendar, CheckCircle, Clock, Package, Settings, Search, Building2, FileText, Download, Users } from "lucide-react";
+import { AlertCircle, Calendar, CalendarX, CheckCircle, Clock, Package, Settings, Search, Building2, FileText, Download, Users } from "lucide-react";
 import { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -564,29 +564,28 @@ export default function Dashboard() {
             onClick={() => scrollToSection(overdueRef)}
           />
           <StatsCard 
-            title="Unscheduled" 
-            value={unscheduledItems.length} 
+            title="Upcoming This Week" 
+            value={upcomingNextWeek.length} 
             icon={Clock} 
             variant="warning"
-            subtitle="not on calendar"
-            onClick={() => setLocation('/calendar')}
-          />
-          <StatsCard 
-            title="Due This Month" 
-            value={thisMonthItems.length} 
-            icon={Calendar} 
-            variant={thisMonthItems.length > 0 ? "warning" : "default"}
-            total={totalActiveScheduled}
-            subtitle="scheduled visits"
+            subtitle="next 7 days"
             onClick={() => scrollToSection(thisMonthRef)}
           />
           <StatsCard 
-            title="Completed" 
-            value={completedCount} 
-            icon={CheckCircle} 
-            variant="success"
-            subtitle="this month"
-            onClick={() => scrollToSection(completedRef)}
+            title="Due This Month" 
+            value={totalActiveScheduled} 
+            icon={Calendar} 
+            variant={totalActiveScheduled > 0 ? "warning" : "default"}
+            subtitle="total PMs"
+            onClick={() => scrollToSection(thisMonthRef)}
+          />
+          <StatsCard 
+            title="Unscheduled" 
+            value={unscheduledItems.length} 
+            icon={CalendarX} 
+            variant="warning"
+            subtitle="not on calendar"
+            onClick={() => setLocation('/calendar')}
           />
         </div>
 
