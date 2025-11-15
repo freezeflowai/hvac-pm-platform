@@ -54,6 +54,9 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, client
     client.location?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Check if we're on the clients tab
+  const isClientsTab = location === "/" && window.location.search.includes("tab=clients");
+
   return (
     <header className="border-b bg-background sticky top-0 z-50 shadow-sm">
       <div className="mx-auto px-6 lg:px-8">
@@ -64,9 +67,9 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, client
             </h1>
             <nav className="flex gap-1 bg-muted/50 p-1 rounded-full">
               <Button
-                variant={location === "/" && !location.includes("tab=clients") ? "default" : "ghost"}
+                variant={location === "/" && !isClientsTab ? "default" : "ghost"}
                 size="sm"
-                className={`rounded-full ${location === "/" && !location.includes("tab=clients") ? "" : "hover:bg-background/60"}`}
+                className={`rounded-full ${location === "/" && !isClientsTab ? "" : "hover:bg-background/60"}`}
                 data-testid="nav-dashboard"
                 onClick={() => {
                   if (onDashboardClick) {
@@ -92,20 +95,20 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, client
               </Link>
               <Link href="/?tab=clients">
                 <Button
-                  variant={location.includes("tab=clients") ? "default" : "ghost"}
+                  variant={isClientsTab ? "default" : "ghost"}
                   size="sm"
-                  className={`rounded-full ${location.includes("tab=clients") ? "" : "hover:bg-background/60"}`}
+                  className={`rounded-full ${isClientsTab ? "" : "hover:bg-background/60"}`}
                   data-testid="nav-all-clients"
                 >
                   <Users className="h-3.5 w-3.5 mr-1.5" />
                   All Clients
                 </Button>
               </Link>
-              <Link href="/parts">
+              <Link href="/manage-parts">
                 <Button
-                  variant={location === "/parts" ? "default" : "ghost"}
+                  variant={location === "/manage-parts" ? "default" : "ghost"}
                   size="sm"
-                  className={`rounded-full ${location === "/parts" ? "" : "hover:bg-background/60"}`}
+                  className={`rounded-full ${location === "/manage-parts" ? "" : "hover:bg-background/60"}`}
                   data-testid="nav-parts"
                 >
                   <Package className="h-3.5 w-3.5 mr-1.5" />
