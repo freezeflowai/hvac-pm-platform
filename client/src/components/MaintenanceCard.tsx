@@ -41,6 +41,17 @@ const MONTH_NAMES = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
 
+const getPartDisplayName = (part: ClientPart['part']): string => {
+  if (part.type === 'filter' && part.filterType) {
+    return `${part.filterType} Filter`;
+  } else if (part.type === 'belt') {
+    return 'Belt';
+  } else if (part.name) {
+    return part.name;
+  }
+  return 'Part';
+};
+
 export default function MaintenanceCard({ item, onMarkComplete, onEdit, onViewReport, parts = [], isCompleted = false, isScheduled = false, isThisMonthPM = false }: MaintenanceCardProps) {
   const [, setLocation] = useLocation();
   const isOverdue = item.status === "overdue";
