@@ -17,6 +17,7 @@ interface MaintenanceCardProps {
   item: MaintenanceItem;
   onMarkComplete: (id: string) => void;
   onEdit: (id: string) => void;
+  onViewReport?: (clientId: string) => void;
   parts?: ClientPart[];
   isCompleted?: boolean;
   isScheduled?: boolean;
@@ -40,14 +41,19 @@ const MONTH_NAMES = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
 
-export default function MaintenanceCard({ item, onMarkComplete, onEdit, parts = [], isCompleted = false, isScheduled = false, isThisMonthPM = false }: MaintenanceCardProps) {
+export default function MaintenanceCard({ item, onMarkComplete, onEdit, onViewReport, parts = [], isCompleted = false, isScheduled = false, isThisMonthPM = false }: MaintenanceCardProps) {
   const [, setLocation] = useLocation();
   const isOverdue = item.status === "overdue";
   const monthsDisplay = item.selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
 
   const handleCardClick = () => {
     const clientId = item.id.includes('|') ? item.id.split('|')[0] : item.id;
-    setLocation(`/client-report/${clientId}`);
+    if (onViewReport) {
+      onViewReport(clientId);
+    } else {
+      // Fallback to navigation if callback not provided
+      setLocation(`/client-report/${clientId}`);
+    }
   };
 
   const getStatusStyles = () => {

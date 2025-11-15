@@ -4,6 +4,7 @@ import Header from "@/components/Header";
 import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
+import ClientReportDialog from "@/components/ClientReportDialog";
 import { AlertCircle, Calendar, CalendarX, CheckCircle, Clock, Package, Settings, Search, Building2, FileText, Download, Users } from "lucide-react";
 import MaintenanceCard, { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
@@ -87,6 +88,7 @@ export default function Dashboard() {
     thisMonth: false,
     unscheduled: false,
   });
+  const [reportDialogClientId, setReportDialogClientId] = useState<string | null>(null);
   
   const overdueRef = useRef<HTMLDivElement>(null);
   const thisMonthRef = useRef<HTMLDivElement>(null);
@@ -520,6 +522,7 @@ export default function Dashboard() {
                               item={item}
                               onMarkComplete={handleMarkComplete}
                               onEdit={handleEditClient}
+                              onViewReport={setReportDialogClientId}
                               parts={clientParts[item.id] || []}
                               isCompleted={completionStatuses[item.id]?.completed || false}
                               isScheduled={true}
@@ -567,6 +570,7 @@ export default function Dashboard() {
                               item={item}
                               onMarkComplete={handleMarkComplete}
                               onEdit={handleEditClient}
+                              onViewReport={setReportDialogClientId}
                               parts={clientParts[item.id] || []}
                               isCompleted={completionStatuses[item.id]?.completed || false}
                               isScheduled={true}
@@ -614,6 +618,7 @@ export default function Dashboard() {
                               item={item}
                               onMarkComplete={handleMarkComplete}
                               onEdit={handleEditClient}
+                              onViewReport={setReportDialogClientId}
                               parts={clientParts[item.id] || []}
                               isCompleted={completionStatuses[item.id]?.completed || false}
                               isScheduled={true}
@@ -658,6 +663,7 @@ export default function Dashboard() {
                               item={item}
                               onMarkComplete={handleMarkComplete}
                               onEdit={handleEditClient}
+                              onViewReport={setReportDialogClientId}
                               parts={clientParts[item.id] || []}
                               isCompleted={completionStatuses[item.id]?.completed || false}
                               isScheduled={false}
@@ -712,6 +718,12 @@ export default function Dashboard() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <ClientReportDialog 
+        clientId={reportDialogClientId}
+        open={!!reportDialogClientId}
+        onOpenChange={(open) => !open && setReportDialogClientId(null)}
+      />
     </div>
   );
 }
