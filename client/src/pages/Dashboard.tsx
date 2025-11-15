@@ -5,7 +5,7 @@ import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
 import { AlertCircle, Calendar, CalendarX, CheckCircle, Clock, Package, Settings, Search, Building2, FileText, Download, Users } from "lucide-react";
-import { MaintenanceItem } from "@/components/MaintenanceCard";
+import MaintenanceCard, { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -589,65 +589,103 @@ export default function Dashboard() {
           />
         </div>
 
-        {upcomingNextWeek.length > 0 && (
-          <Card data-testid="card-insights-upcoming">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
-                Upcoming This Week
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {upcomingNextWeek.map((client) => (
-                <div 
-                  key={client.id} 
-                  className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover-elevate cursor-pointer"
-                  onClick={() => setLocation(`/client-report/${client.id}`)}
-                  data-testid={`insight-upcoming-${client.id}`}
-                >
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">{client.companyName}</div>
-                    {client.location && (
-                      <div className="text-xs text-muted-foreground">{client.location}</div>
-                    )}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Upcoming
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {upcomingNextWeek.length > 0 ? (
+                  <div className="space-y-2">
+                    {upcomingNextWeek.map((item) => (
+                      <MaintenanceCard
+                        key={item.id}
+                        item={item}
+                        onMarkComplete={handleMarkComplete}
+                        onEdit={handleEditClient}
+                        parts={clientParts[item.id] || []}
+                        isCompleted={completionStatuses[item.id]?.completed || false}
+                      />
+                    ))}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {client.nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No upcoming maintenance
                   </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-4" ref={overdueRef}>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                  Overdue
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {overdueItems.length > 0 ? (
+                  <div className="space-y-2">
+                    {overdueItems.map((item) => (
+                      <MaintenanceCard
+                        key={item.id}
+                        item={item}
+                        onMarkComplete={handleMarkComplete}
+                        onEdit={handleEditClient}
+                        parts={clientParts[item.id] || []}
+                        isCompleted={completionStatuses[item.id]?.completed || false}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No overdue maintenance
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-4" ref={thisMonthRef}>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Due This Month
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {thisMonthItems.length > 0 ? (
+                  <div className="space-y-2">
+                    {thisMonthItems.map((item) => (
+                      <MaintenanceCard
+                        key={item.id}
+                        item={item}
+                        onMarkComplete={handleMarkComplete}
+                        onEdit={handleEditClient}
+                        parts={clientParts[item.id] || []}
+                        isCompleted={completionStatuses[item.id]?.completed || false}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No maintenance due this month
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsContent value="schedule" className="space-y-6">
-            {overdueItems.length > 0 && (
-              <div ref={overdueRef}>
-                <MaintenanceSection
-                  title="Requires Attention coming due/past due"
-                  items={overdueItems}
-                  onMarkComplete={handleMarkComplete}
-                  onEdit={handleEditClient}
-                  emptyMessage="No overdue maintenance"
-                  clientParts={clientParts}
-                  completionStatuses={completionStatuses}
-                />
-              </div>
-            )}
-
-            <div ref={thisMonthRef}>
-              <MaintenanceSection
-                title="Due This Month"
-                items={thisMonthItems}
-                onMarkComplete={handleMarkComplete}
-                onEdit={handleEditClient}
-                emptyMessage="No maintenance due this month"
-                clientParts={clientParts}
-                completionStatuses={completionStatuses}
-              />
-            </div>
-
             {recentlyCompleted.length > 0 && (
               <div ref={completedRef}>
                 <MaintenanceSection
