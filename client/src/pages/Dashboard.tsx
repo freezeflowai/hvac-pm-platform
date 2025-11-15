@@ -4,12 +4,13 @@ import Header from "@/components/Header";
 import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
-import { AlertCircle, Calendar, CheckCircle, Clock, Package, Settings, Search } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle, Clock, Package, Settings, Search, Building2 } from "lucide-react";
 import { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -72,6 +73,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Read tab from URL query parameter using window.location.search
   const urlParams = new URLSearchParams(window.location.search);
@@ -164,7 +166,7 @@ export default function Dashboard() {
     },
   });
 
-  const allClients: Client[] = dbClients
+  const clients: Client[] = dbClients
     .map(c => ({
       id: c.id,
       companyName: c.companyName,
@@ -184,23 +186,26 @@ export default function Dashboard() {
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
   
-  // Filter clients based on search query
-  const clients = allClients.filter(client => {
-    if (!searchQuery.trim()) return true;
-    
-    const query = searchQuery.toLowerCase();
-    return (
-      client.companyName?.toLowerCase().includes(query) ||
-      client.location?.toLowerCase().includes(query) ||
-      client.contactName?.toLowerCase().includes(query) ||
-      client.address?.toLowerCase().includes(query) ||
-      client.city?.toLowerCase().includes(query) ||
-      client.province?.toLowerCase().includes(query) ||
-      client.notes?.toLowerCase().includes(query) ||
-      client.email?.toLowerCase().includes(query) ||
-      client.phone?.toLowerCase().includes(query)
-    );
-  });
+  // Filter clients for autocomplete (only when 3+ characters)
+  const searchMatches = searchQuery.trim().length >= 3
+    ? clients.filter(client => {
+        const query = searchQuery.toLowerCase();
+        return (
+          client.companyName?.toLowerCase().includes(query) ||
+          client.location?.toLowerCase().includes(query) ||
+          client.contactName?.toLowerCase().includes(query) ||
+          client.address?.toLowerCase().includes(query) ||
+          client.city?.toLowerCase().includes(query) ||
+          client.province?.toLowerCase().includes(query)
+        );
+      })
+    : [];
+  
+  const handleSelectClient = (clientId: string) => {
+    setSearchQuery("");
+    setSearchOpen(false);
+    setLocation(`/client-report/${clientId}`);
+  };
 
   // Helper to determine if an item is overdue
   const isOverdue = (nextDue: Date): boolean => {
@@ -333,17 +338,58 @@ export default function Dashboard() {
       
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 space-y-4">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative w-full sm:w-96">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search clients..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-clients"
-            />
-          </div>
+          <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+            <PopoverTrigger asChild>
+              <div className="relative w-full sm:w-96">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={searchOpen}
+                  className="w-full justify-start text-left font-normal pl-10"
+                  data-testid="button-search-clients"
+                >
+                  {searchQuery || "Search clients..."}
+                </Button>
+              </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+              <Command shouldFilter={false}>
+                <CommandInput 
+                  placeholder="Type at least 3 characters..." 
+                  value={searchQuery}
+                  onValueChange={setSearchQuery}
+                  data-testid="input-search-clients"
+                />
+                <CommandList>
+                  {searchQuery.trim().length < 3 ? (
+                    <CommandEmpty>Type at least 3 characters to search...</CommandEmpty>
+                  ) : searchMatches.length === 0 ? (
+                    <CommandEmpty>No clients found.</CommandEmpty>
+                  ) : (
+                    <CommandGroup>
+                      {searchMatches.map((client) => (
+                        <CommandItem
+                          key={client.id}
+                          value={client.id}
+                          onSelect={() => handleSelectClient(client.id)}
+                          data-testid={`search-result-${client.id}`}
+                        >
+                          <Building2 className="mr-2 h-4 w-4" />
+                          <div className="flex-1">
+                            <div className="font-medium">{client.companyName}</div>
+                            {client.location && (
+                              <div className="text-xs text-muted-foreground">{client.location}</div>
+                            )}
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  )}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
           
           <div className="flex gap-2">
             <Button
