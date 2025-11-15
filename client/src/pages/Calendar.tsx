@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -45,7 +46,7 @@ function UnscheduledPanel({ clients }: { clients: any[] }) {
   );
 }
 
-function DraggableClient({ id, client, inCalendar }: { id: string; client: any; inCalendar?: boolean }) {
+function DraggableClient({ id, client, inCalendar, onClick }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void }) {
   const {
     attributes,
     listeners,
@@ -67,36 +68,43 @@ function DraggableClient({ id, client, inCalendar }: { id: string; client: any; 
       style={style}
       {...attributes}
       {...listeners}
-      className={`text-xs p-${inCalendar ? '1' : '2'} ${inCalendar ? 'bg-primary/10' : 'border'} rounded hover-elevate cursor-move`}
+      onClick={(e) => {
+        if (onClick && inCalendar) {
+          e.stopPropagation();
+          onClick();
+        }
+      }}
+      className={`text-xs p-${inCalendar ? '1' : '2'} ${inCalendar ? 'bg-primary/10' : 'border'} rounded hover:bg-primary/20 transition-colors cursor-pointer`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
       <div className="font-medium">{client.companyName}</div>
-      {!inCalendar && client.location && (
+      {client.location && (
         <div className="text-muted-foreground">{client.location}</div>
       )}
     </div>
   );
 }
 
-function DroppableDay({ day, year, month, assignments, clients, onRemove }: { 
+function DroppableDay({ day, year, month, assignments, clients, onRemove, onClientClick }: { 
   day: number; 
   year: number; 
   month: number; 
   assignments: any[]; 
   clients: any[];
   onRemove: (assignmentId: string) => void;
+  onClientClick: (client: any) => void;
 }) {
-  const { setNodeRef } = useSortable({ id: `day-${day}` });
+  const { setNodeRef, isOver } = useDroppable({ id: `day-${day}` });
 
   return (
     <Card
       ref={setNodeRef}
-      className="min-h-24 hover-elevate"
+      className={`min-h-24 hover-elevate transition-colors ${isOver ? 'ring-2 ring-primary' : ''}`}
       data-testid={`calendar-day-${day}`}
     >
       <CardContent className="p-2">
         <div className="font-semibold text-sm mb-1">{day}</div>
-        <div className="space-y-1 max-h-32 overflow-y-auto">
+        <div className="space-y-1">
           {assignments.map((assignment: any) => {
             const client = clients.find((c: any) => c.id === assignment.clientId);
             return client ? (
@@ -105,13 +113,14 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove }: {
                   id={assignment.id} 
                   client={client}
                   inCalendar={true}
+                  onClick={() => onClientClick(client)}
                 />
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onRemove(assignment.id);
                   }}
-                  className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10"
                   data-testid={`remove-assignment-${assignment.id}`}
                 >
                   <X className="h-3 w-3" />
@@ -129,6 +138,7 @@ export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"monthly" | "weekly">("monthly");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const { toast } = useToast();
   
   const year = currentDate.getFullYear();
@@ -295,6 +305,10 @@ export default function Calendar() {
     deleteAssignment.mutate(assignmentId);
   };
 
+  const handleClientClick = (client: any) => {
+    setSelectedClient(client);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -348,6 +362,7 @@ export default function Calendar() {
             assignments={dayAssignments}
             clients={clients}
             onRemove={handleRemove}
+            onClientClick={handleClientClick}
           />
         ) : (
           <Card key={i} className="min-h-24 bg-muted/20">
@@ -385,6 +400,7 @@ export default function Calendar() {
             assignments={dayAssignments}
             clients={clients}
             onRemove={handleRemove}
+            onClientClick={handleClientClick}
           />
         ) : (
           <Card key={i} className="min-h-48 bg-muted/20">
@@ -483,8 +499,8 @@ export default function Calendar() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-12rem)]">
-            <div className="lg:col-span-3 overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4" style={{ height: 'calc(100vh - 12rem)' }}>
+            <div className="lg:col-span-3 flex flex-col overflow-hidden">
               <Card className="h-full flex flex-col">
                 <CardHeader>
                   <CardTitle className="text-lg">Calendar View</CardTitle>
@@ -524,6 +540,40 @@ export default function Calendar() {
             </div>
           ) : null}
         </DragOverlay>
+
+        <Dialog open={!!selectedClient} onOpenChange={() => setSelectedClient(null)}>
+          <DialogContent data-testid="client-detail-dialog">
+            <DialogHeader>
+              <DialogTitle>Client Details</DialogTitle>
+            </DialogHeader>
+            {selectedClient && (
+              <div className="space-y-3">
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground">Company Name</div>
+                  <div className="text-base font-semibold" data-testid="dialog-company-name">
+                    {selectedClient.companyName}
+                  </div>
+                </div>
+                {selectedClient.location && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Location</div>
+                    <div className="text-base" data-testid="dialog-location">
+                      {selectedClient.location}
+                    </div>
+                  </div>
+                )}
+                {selectedClient.address && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Address</div>
+                    <div className="text-base" data-testid="dialog-address">
+                      {selectedClient.address}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DndContext>
   );
