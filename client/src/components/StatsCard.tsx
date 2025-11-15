@@ -11,6 +11,7 @@ interface StatsCardProps {
   trend?: "up" | "down" | "neutral";
   trendValue?: string;
   total?: number;
+  onClick?: () => void;
 }
 
 export default function StatsCard({ 
@@ -21,7 +22,8 @@ export default function StatsCard({
   subtitle,
   trend,
   trendValue,
-  total
+  total,
+  onClick
 }: StatsCardProps) {
   const variantClasses = {
     default: "text-muted-foreground",
@@ -55,7 +57,11 @@ export default function StatsCard({
   const percentage = total && total > 0 ? Math.round((value / total) * 100) : null;
 
   return (
-    <Card data-testid={`card-stats-${title.toLowerCase().replace(/\s+/g, '-')}`} className={bgVariantClasses[variant]}>
+    <Card 
+      data-testid={`card-stats-${title.toLowerCase().replace(/\s+/g, '-')}`} 
+      className={`${bgVariantClasses[variant]} ${onClick ? 'cursor-pointer hover-elevate' : ''}`}
+      onClick={onClick}
+    >
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         <Icon className={`h-4 w-4 ${variantClasses[variant]}`} />

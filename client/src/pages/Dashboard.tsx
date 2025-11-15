@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import Header from "@/components/Header";
 import StatsCard from "@/components/StatsCard";
@@ -76,6 +76,10 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  
+  const overdueRef = useRef<HTMLDivElement>(null);
+  const thisMonthRef = useRef<HTMLDivElement>(null);
+  const completedRef = useRef<HTMLDivElement>(null);
 
   // Read tab from URL query parameter using window.location.search
   const urlParams = new URLSearchParams(window.location.search);
@@ -263,6 +267,18 @@ export default function Dashboard() {
     })
     .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime())
     .slice(0, 3);
+  
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
+    if (activeTab !== 'schedule') {
+      setActiveTab('schedule');
+      setLocation('/');
+      setTimeout(() => {
+        ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } else {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const handleEditClient = async (id: string) => {
     // Extract clientId from composite ID if needed (for recently completed items)
@@ -449,6 +465,7 @@ export default function Dashboard() {
             variant="danger"
             total={totalActiveScheduled}
             subtitle="needs attention"
+            onClick={() => scrollToSection(overdueRef)}
           />
           <StatsCard 
             title="Due This Month" 
@@ -457,6 +474,7 @@ export default function Dashboard() {
             variant={thisMonthItems.length > 0 ? "warning" : "default"}
             total={totalActiveScheduled}
             subtitle="scheduled visits"
+            onClick={() => scrollToSection(thisMonthRef)}
           />
           <StatsCard 
             title="Completed" 
@@ -464,6 +482,7 @@ export default function Dashboard() {
             icon={CheckCircle} 
             variant="success"
             subtitle="this month"
+            onClick={() => scrollToSection(completedRef)}
           />
           <StatsCard 
             title="Active Clients" 
@@ -475,75 +494,35 @@ export default function Dashboard() {
           />
         </div>
 
-        {(topOverdueClients.length > 0 || upcomingNextWeek.length > 0) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {topOverdueClients.length > 0 && (
-              <Card data-testid="card-insights-overdue">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-destructive" />
-                    Priority Attention Required
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {topOverdueClients.map((client) => (
-                    <div 
-                      key={client.id} 
-                      className="flex items-center justify-between p-2 rounded-md bg-destructive/5 hover-elevate cursor-pointer"
-                      onClick={() => setLocation(`/client-report/${client.id}`)}
-                      data-testid={`insight-overdue-${client.id}`}
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{client.companyName}</div>
-                        {client.location && (
-                          <div className="text-xs text-muted-foreground">{client.location}</div>
-                        )}
-                      </div>
-                      <Badge variant="destructive" className="text-xs">
-                        Overdue
-                      </Badge>
-                    </div>
-                  ))}
-                  {overdueItems.length > 3 && (
-                    <div className="text-xs text-muted-foreground text-center pt-1">
-                      + {overdueItems.length - 3} more overdue
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-            
-            {upcomingNextWeek.length > 0 && (
-              <Card data-testid="card-insights-upcoming">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
-                    Upcoming This Week
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {upcomingNextWeek.map((client) => (
-                    <div 
-                      key={client.id} 
-                      className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover-elevate cursor-pointer"
-                      onClick={() => setLocation(`/client-report/${client.id}`)}
-                      data-testid={`insight-upcoming-${client.id}`}
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{client.companyName}</div>
-                        {client.location && (
-                          <div className="text-xs text-muted-foreground">{client.location}</div>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {client.nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-          </div>
+        {upcomingNextWeek.length > 0 && (
+          <Card data-testid="card-insights-upcoming">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+                Upcoming This Week
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {upcomingNextWeek.map((client) => (
+                <div 
+                  key={client.id} 
+                  className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover-elevate cursor-pointer"
+                  onClick={() => setLocation(`/client-report/${client.id}`)}
+                  data-testid={`insight-upcoming-${client.id}`}
+                >
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{client.companyName}</div>
+                    {client.location && (
+                      <div className="text-xs text-muted-foreground">{client.location}</div>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {client.nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
@@ -558,37 +537,43 @@ export default function Dashboard() {
 
           <TabsContent value="schedule" className="space-y-6">
             {overdueItems.length > 0 && (
-              <MaintenanceSection
-                title="Overdue Maintenance"
-                items={overdueItems}
-                onMarkComplete={handleMarkComplete}
-                onEdit={handleEditClient}
-                emptyMessage="No overdue maintenance"
-                clientParts={clientParts}
-                completionStatuses={completionStatuses}
-              />
+              <div ref={overdueRef}>
+                <MaintenanceSection
+                  title="Overdue Maintenance"
+                  items={overdueItems}
+                  onMarkComplete={handleMarkComplete}
+                  onEdit={handleEditClient}
+                  emptyMessage="No overdue maintenance"
+                  clientParts={clientParts}
+                  completionStatuses={completionStatuses}
+                />
+              </div>
             )}
 
-            <MaintenanceSection
-              title="Due This Month"
-              items={thisMonthItems}
-              onMarkComplete={handleMarkComplete}
-              onEdit={handleEditClient}
-              emptyMessage="No maintenance due this month"
-              clientParts={clientParts}
-              completionStatuses={completionStatuses}
-            />
-
-            {recentlyCompleted.length > 0 && (
+            <div ref={thisMonthRef}>
               <MaintenanceSection
-                title="Recently Completed (This Month)"
-                items={recentlyCompleted}
+                title="Due This Month"
+                items={thisMonthItems}
                 onMarkComplete={handleMarkComplete}
                 onEdit={handleEditClient}
-                emptyMessage="No recently completed maintenance"
+                emptyMessage="No maintenance due this month"
                 clientParts={clientParts}
                 completionStatuses={completionStatuses}
               />
+            </div>
+
+            {recentlyCompleted.length > 0 && (
+              <div ref={completedRef}>
+                <MaintenanceSection
+                  title="Recently Completed (This Month)"
+                  items={recentlyCompleted}
+                  onMarkComplete={handleMarkComplete}
+                  onEdit={handleEditClient}
+                  emptyMessage="No recently completed maintenance"
+                  clientParts={clientParts}
+                  completionStatuses={completionStatuses}
+                />
+              </div>
             )}
           </TabsContent>
 
