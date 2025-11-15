@@ -46,7 +46,7 @@ function UnscheduledPanel({ clients }: { clients: any[] }) {
   );
 }
 
-function DraggableClient({ id, client, inCalendar, onClick }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void }) {
+function DraggableClient({ id, client, inCalendar, onClick, isCompleted }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean }) {
   const {
     attributes,
     listeners,
@@ -66,20 +66,28 @@ function DraggableClient({ id, client, inCalendar, onClick }: { id: string; clie
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      onClick={(e) => {
-        if (onClick && inCalendar) {
-          e.stopPropagation();
-          onClick();
-        }
-      }}
-      className={`text-xs p-${inCalendar ? '1' : '2'} ${inCalendar ? 'bg-primary/10' : 'border'} rounded hover:bg-primary/20 transition-colors cursor-pointer`}
+      className={`text-xs p-${inCalendar ? '1' : '2'} ${inCalendar ? 'bg-primary/10' : 'border'} rounded hover:bg-primary/20 transition-colors relative`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
-      <div className="font-medium">{client.companyName}</div>
-      {client.location && (
-        <div className="text-muted-foreground">{client.location}</div>
+      <div 
+        {...attributes}
+        {...listeners}
+        className="cursor-move select-none"
+      >
+        <div className={`font-medium ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
+        {client.location && (
+          <div className={`text-muted-foreground ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
+        )}
+      </div>
+      {onClick && inCalendar && (
+        <div 
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          className="absolute inset-0 cursor-pointer"
+          style={{ zIndex: 1 }}
+        />
       )}
     </div>
   );
@@ -92,7 +100,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   assignments: any[]; 
   clients: any[];
   onRemove: (assignmentId: string) => void;
-  onClientClick: (client: any) => void;
+  onClientClick: (client: any, assignment: any) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day-${day}` });
 
@@ -113,7 +121,8 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
                   id={assignment.id} 
                   client={client}
                   inCalendar={true}
-                  onClick={() => onClientClick(client)}
+                  onClick={() => onClientClick(client, assignment)}
+                  isCompleted={assignment.completed}
                 />
                 <button
                   onClick={(e) => {
@@ -139,6 +148,7 @@ export default function Calendar() {
   const [view, setView] = useState<"monthly" | "weekly">("monthly");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
   const { toast } = useToast();
   
   const year = currentDate.getFullYear();
@@ -305,9 +315,35 @@ export default function Calendar() {
     deleteAssignment.mutate(assignmentId);
   };
 
-  const handleClientClick = (client: any) => {
+  const handleClientClick = (client: any, assignment: any) => {
     setSelectedClient(client);
+    setSelectedAssignment(assignment);
   };
+
+  const toggleComplete = useMutation({
+    mutationFn: async () => {
+      if (!selectedAssignment) return;
+      return apiRequest("PATCH", `/api/calendar/assign/${selectedAssignment.id}`, {
+        completed: !selectedAssignment.completed
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+      setSelectedClient(null);
+      setSelectedAssignment(null);
+      toast({
+        title: "Updated",
+        description: selectedAssignment?.completed ? "Marked as incomplete" : "Marked as complete",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update completion status",
+        variant: "destructive",
+      });
+    },
+  });
 
   if (isLoading) {
     return (
@@ -487,15 +523,22 @@ export default function Calendar() {
               >
                 Clear Schedule
               </Button>
-              <Select value={view} onValueChange={(v) => setView(v as "monthly" | "weekly")}>
-                <SelectTrigger className="w-32" data-testid="select-view">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                </SelectContent>
-              </Select>
+              <Button
+                variant={view === "monthly" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setView("monthly")}
+                data-testid="button-monthly-view"
+              >
+                Monthly
+              </Button>
+              <Button
+                variant={view === "weekly" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setView("weekly")}
+                data-testid="button-weekly-view"
+              >
+                Weekly
+              </Button>
             </div>
           </div>
 
@@ -541,34 +584,50 @@ export default function Calendar() {
           ) : null}
         </DragOverlay>
 
-        <Dialog open={!!selectedClient} onOpenChange={() => setSelectedClient(null)}>
+        <Dialog open={!!selectedClient} onOpenChange={() => {
+          setSelectedClient(null);
+          setSelectedAssignment(null);
+        }}>
           <DialogContent data-testid="client-detail-dialog">
             <DialogHeader>
               <DialogTitle>Client Details</DialogTitle>
             </DialogHeader>
             {selectedClient && (
-              <div className="space-y-3">
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground">Company Name</div>
-                  <div className="text-base font-semibold" data-testid="dialog-company-name">
-                    {selectedClient.companyName}
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Company Name</div>
+                    <div className="text-base font-semibold" data-testid="dialog-company-name">
+                      {selectedClient.companyName}
+                    </div>
                   </div>
+                  {selectedClient.location && (
+                    <div>
+                      <div className="text-sm font-medium text-muted-foreground">Location</div>
+                      <div className="text-base" data-testid="dialog-location">
+                        {selectedClient.location}
+                      </div>
+                    </div>
+                  )}
+                  {selectedClient.address && (
+                    <div>
+                      <div className="text-sm font-medium text-muted-foreground">Address</div>
+                      <div className="text-base" data-testid="dialog-address">
+                        {selectedClient.address}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {selectedClient.location && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Location</div>
-                    <div className="text-base" data-testid="dialog-location">
-                      {selectedClient.location}
-                    </div>
-                  </div>
-                )}
-                {selectedClient.address && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Address</div>
-                    <div className="text-base" data-testid="dialog-address">
-                      {selectedClient.address}
-                    </div>
-                  </div>
+                {selectedAssignment && (
+                  <Button
+                    onClick={() => toggleComplete.mutate()}
+                    disabled={toggleComplete.isPending}
+                    variant={selectedAssignment.completed ? "outline" : "default"}
+                    className="w-full"
+                    data-testid="button-toggle-complete"
+                  >
+                    {selectedAssignment.completed ? "Mark as Incomplete" : "Mark as Complete"}
+                  </Button>
                 )}
               </div>
             )}

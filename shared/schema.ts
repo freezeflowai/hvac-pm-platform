@@ -133,6 +133,7 @@ export const calendarAssignments = pgTable("calendar_assignments", {
   day: integer("day"),
   scheduledDate: text("scheduled_date").notNull(),
   autoDueDate: boolean("auto_due_date").notNull().default(true),
+  completed: boolean("completed").notNull().default(false),
 });
 
 export const insertCalendarAssignmentSchema = createInsertSchema(calendarAssignments).omit({
@@ -144,6 +145,7 @@ export const updateCalendarAssignmentSchema = z.object({
   day: z.number().int().min(1).max(31).nullable().optional(),
   scheduledDate: z.string().optional(),
   autoDueDate: z.boolean().optional(),
+  completed: z.boolean().optional(),
 });
 
 export type InsertCalendarAssignment = z.infer<typeof insertCalendarAssignmentSchema>;
