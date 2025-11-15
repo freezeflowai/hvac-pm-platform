@@ -486,7 +486,7 @@ export default function Dashboard() {
                 title="Due This Month" 
                 value={totalActiveScheduled} 
                 icon={Calendar} 
-                variant={totalActiveScheduled > 0 ? "warning" : "default"}
+                variant="default"
                 subtitle="total PMs"
                 onClick={() => scrollToSection(thisMonthRef)}
               />
