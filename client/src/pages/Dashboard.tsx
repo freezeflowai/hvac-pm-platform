@@ -405,6 +405,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance/recently-completed"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/schedule"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
       
       // Refetch completion statuses
       const statusRes = await fetch(`/api/maintenance/statuses`);
