@@ -10,6 +10,8 @@ import { format, parse } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
+import EditClientDialog from "./EditClientDialog";
+import ClientReportDialog from "./ClientReportDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,6 +75,10 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportClientId, setReportClientId] = useState<string | null>(null);
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -187,6 +193,18 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
 
   const handleRowClick = (clientId: string) => {
     setLocation(`/client-report/${clientId}`);
+  };
+
+  const handleEditClick = (client: Client) => {
+    setClientToEdit(client);
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSaved = (clientId: string) => {
+    setEditDialogOpen(false);
+    setClientToEdit(null);
+    setReportClientId(clientId);
+    setReportDialogOpen(true);
   };
 
   const handleExportCSV = async () => {
@@ -608,7 +626,7 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => onEdit(client.id)}
+                        onClick={() => handleEditClick(client)}
                         data-testid={`button-edit-client-${client.id}`}
                       >
                         <Pencil className="h-3 w-3" />
@@ -661,7 +679,7 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => onEdit(client.id)}
+                        onClick={() => handleEditClick(client)}
                         data-testid={`button-edit-client-${client.id}`}
                       >
                         <Pencil className="h-3 w-3" />
@@ -820,6 +838,23 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {clientToEdit && (
+        <EditClientDialog
+          client={clientToEdit}
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          onSaved={handleEditSaved}
+        />
+      )}
+
+      {reportClientId && (
+        <ClientReportDialog
+          clientId={reportClientId}
+          open={reportDialogOpen}
+          onOpenChange={setReportDialogOpen}
+        />
+      )}
     </Card>
   );
 }
