@@ -183,16 +183,9 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
     return selectedMonths.map(m => MONTH_NAMES[m]).join(", ");
   };
 
-  const handleEquipmentClick = (clientId: string) => {
-    setLocation(`/equipment/${clientId}`);
-  };
-
-  const handlePartsClick = (clientId: string) => {
-    setLocation(`/clients/${clientId}/parts`);
-  };
-
   const handleRowClick = (clientId: string) => {
-    setLocation(`/client-report/${clientId}`);
+    setReportClientId(clientId);
+    setReportDialogOpen(true);
   };
 
   const handleEditClick = (client: Client) => {
@@ -608,24 +601,6 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleEquipmentClick(client.id)}
-                        data-testid={`button-equipment-${client.id}`}
-                        title="Manage Equipment"
-                      >
-                        <Wrench className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handlePartsClick(client.id)}
-                        data-testid={`button-manage-parts-${client.id}`}
-                        title="Manage Parts"
-                      >
-                        <Package className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
                         onClick={() => handleEditClick(client)}
                         data-testid={`button-edit-client-${client.id}`}
                       >
@@ -658,24 +633,6 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
                       {client.address && <div className="text-sm text-muted-foreground">{client.address}</div>}
                     </div>
                     <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEquipmentClick(client.id)}
-                        data-testid={`button-equipment-${client.id}`}
-                        title="Manage Equipment"
-                      >
-                        <Wrench className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handlePartsClick(client.id)}
-                        data-testid={`button-manage-parts-${client.id}`}
-                        title="Manage Parts"
-                      >
-                        <Package className="h-3 w-3" />
-                      </Button>
                       <Button
                         size="sm"
                         variant="outline"

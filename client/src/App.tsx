@@ -9,11 +9,8 @@ import Dashboard from "@/pages/Dashboard";
 import Calendar from "@/pages/Calendar";
 import Reports from "@/pages/Reports";
 import Admin from "@/pages/Admin";
-import EquipmentPage from "@/pages/EquipmentPage";
-import ClientReportPage from "@/pages/ClientReportPage";
 import AddClientPage from "@/pages/AddClientPage";
 import PartsManagementPage from "@/pages/PartsManagementPage";
-import ClientPartsPage from "@/pages/ClientPartsPage";
 import CompanySettingsPage from "@/pages/CompanySettingsPage";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
@@ -53,29 +50,9 @@ function Router() {
           <AddClientPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/edit-client/:id">
-        <ProtectedRoute>
-          <AddClientPage />
-        </ProtectedRoute>
-      </Route>
       <Route path="/manage-parts">
         <ProtectedRoute>
           <PartsManagementPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/equipment/:clientId">
-        <ProtectedRoute>
-          <EquipmentPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/clients/:clientId/parts">
-        <ProtectedRoute>
-          <ClientPartsPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/client-report/:clientId">
-        <ProtectedRoute>
-          <ClientReportPage />
         </ProtectedRoute>
       </Route>
       <Route path="/company-settings">

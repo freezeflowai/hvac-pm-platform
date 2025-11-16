@@ -13,10 +13,11 @@ interface HeaderProps {
   onAddClient?: () => void;
   onDashboardClick?: () => void;
   onSearch?: (query: string) => void;
+  onClientSelect?: (clientId: string) => void;
   clients?: any[];
 }
 
-export default function Header({ onAddClient, onDashboardClick, onSearch, clients = [] }: HeaderProps) {
+export default function Header({ onAddClient, onDashboardClick, onSearch, onClientSelect, clients = [] }: HeaderProps) {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const { toast } = useToast();
@@ -169,10 +170,9 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, client
                           key={client.id}
                           value={client.companyName}
                           onSelect={() => {
-                            if (onSearch) {
-                              onSearch(client.companyName);
+                            if (onClientSelect) {
+                              onClientSelect(client.id);
                             }
-                            setLocation(`/edit-client/${client.id}`);
                             setSearchOpen(false);
                             setSearchQuery("");
                           }}
