@@ -71,8 +71,11 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isImportingSimple, setIsImportingSimple] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [simpleImportDialogOpen, setSimpleImportDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const simpleFileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -302,6 +305,15 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
     fileInputRef.current?.click();
   };
 
+  const handleSimpleImportClick = () => {
+    setSimpleImportDialogOpen(true);
+  };
+
+  const handleProceedWithSimpleImport = () => {
+    setSimpleImportDialogOpen(false);
+    simpleFileInputRef.current?.click();
+  };
+
   const parseMonthsFromString = (monthsStr: string): number[] => {
     if (!monthsStr) return [];
     const monthNames = monthsStr.split(',').map(m => m.trim());
@@ -509,6 +521,137 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
     }
   };
 
+  const handleSimpleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImportingSimple(true);
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+      
+      if (lines.length < 2) {
+        toast({
+          title: "Import failed",
+          description: "CSV file is empty or has no data rows",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Skip header row
+      const dataLines = lines.slice(1);
+      const clientsToImport: any[] = [];
+      const errors: string[] = [];
+
+      // Parse CSV helper function
+      const parseCSVLine = (line: string): string[] => {
+        const fields: string[] = [];
+        let currentField = '';
+        let inQuotes = false;
+        
+        for (let j = 0; j < line.length; j++) {
+          const char = line[j];
+          if (char === '"') {
+            if (inQuotes && line[j + 1] === '"') {
+              currentField += '"';
+              j++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (char === ',' && !inQuotes) {
+            fields.push(currentField);
+            currentField = '';
+          } else {
+            currentField += char;
+          }
+        }
+        fields.push(currentField);
+        return fields;
+      };
+
+      for (let i = 0; i < dataLines.length; i++) {
+        const line = dataLines[i];
+        const fields = parseCSVLine(line);
+
+        // Expected format: Company Name,Location,Address,City,Province/State,Postal/Zip,Contact,Phone,Email,Roof/Ladder Code,Notes
+        const [companyName, location, address, city, provinceState, postalCode, contactName, phone, email, roofLadderCode, notes] = fields;
+
+        if (!companyName || !companyName.trim()) {
+          errors.push(`Row ${i + 2}: Company name is required`);
+          continue;
+        }
+
+        // Default to empty month selection and inactive status for new imports
+        const selectedMonths: number[] = [];
+        const nextDue = format(new Date(), 'yyyy-MM-dd');
+
+        clientsToImport.push({
+          companyName: companyName.trim(),
+          location: location?.trim() || null,
+          address: address?.trim() || null,
+          city: city?.trim() || null,
+          province: provinceState?.trim() || null,
+          postalCode: postalCode?.trim() || null,
+          contactName: contactName?.trim() || null,
+          email: email?.trim() || null,
+          phone: phone?.trim() || null,
+          roofLadderCode: roofLadderCode?.trim() || null,
+          notes: notes?.trim() || null,
+          inactive: true,
+          selectedMonths,
+          nextDue,
+        });
+      }
+
+      if (errors.length > 0 && clientsToImport.length === 0) {
+        toast({
+          title: "Import failed",
+          description: `No valid clients found. Errors: ${errors.join(', ')}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Send to backend - use simple import without parts/equipment
+      const res = await apiRequest('POST', '/api/clients/import-simple', { clients: clientsToImport });
+      const result = await res.json();
+
+      let description = `Successfully imported ${result.imported} of ${result.total} clients`;
+      if (errors.length > 0) {
+        description += `. ${errors.length} rows had validation errors`;
+      }
+      if (result.errors && result.errors.length > 0) {
+        description += `. ${result.errors.length} clients failed to save`;
+      }
+
+      toast({
+        title: result.imported > 0 ? "Import completed" : "Import failed",
+        description,
+        variant: result.imported > 0 ? "default" : "destructive",
+      });
+
+      // Refresh client list
+      if (result.imported > 0 && onRefresh) {
+        onRefresh();
+      } else if (result.imported > 0) {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      toast({
+        title: "Import failed",
+        description: "Failed to import clients. Please check the file format.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImportingSimple(false);
+      if (simpleFileInputRef.current) {
+        simpleFileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -531,8 +674,27 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
               onChange={handleFileChange}
               accept=".csv"
               className="hidden"
-              data-testid="input-import-csv-file"
+              data-testid="input-restore-backup-file"
             />
+            <input
+              type="file"
+              ref={simpleFileInputRef}
+              onChange={handleSimpleFileChange}
+              accept=".csv"
+              className="hidden"
+              data-testid="input-import-clients-file"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSimpleImportClick}
+              disabled={isImportingSimple}
+              data-testid="button-import-clients"
+              className="gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              {isImportingSimple ? "Importing..." : "Import Clients"}
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -768,21 +930,61 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
       </AlertDialog>
 
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-xl max-h-[85vh]" data-testid="dialog-import-format">
+        <DialogContent className="max-w-xl" data-testid="dialog-restore-backup">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Info className="h-5 w-5" />
-              CSV Import Format
+              Restore Backup
             </DialogTitle>
             <DialogDescription>
-              Your CSV file should include these columns in order
+              This will restore client data, parts, and equipment from a backup file created using "Backup Client List"
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3">
+            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3 rounded-md">
+              <p className="text-sm text-amber-900 dark:text-amber-100">
+                <strong>Warning:</strong> Only use backup files created by this application's "Backup Client List" feature.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setImportDialogOpen(false)}
+              data-testid="button-cancel-restore"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleProceedWithImport}
+              data-testid="button-proceed-restore"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Select Backup File
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={simpleImportDialogOpen} onOpenChange={setSimpleImportDialogOpen}>
+        <DialogContent className="max-w-xl max-h-[85vh]" data-testid="dialog-import-clients">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5" />
+              Import Clients - CSV Format
+            </DialogTitle>
+            <DialogDescription>
+              Import new client data from a CSV file
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-3 overflow-y-auto max-h-[50vh] pr-2">
             <div className="bg-muted p-3 rounded-md">
+              <p className="text-xs font-medium mb-2">Required CSV Format:</p>
               <code className="text-xs block bg-background p-2 rounded border overflow-x-auto whitespace-pre">
-{`Company Name,Location,Address,City,Province/State,Postal,Contact,Email,Phone,Roof/Ladder,Notes`}
+{`Company Name,Location,Address,City,Province/State,Postal/Zip,Contact,Phone,Email,Roof/Ladder Code,Notes`}
               </code>
             </div>
 
@@ -795,32 +997,38 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
             <div className="space-y-1.5">
               <p className="text-xs font-medium">Field Descriptions:</p>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                <div><strong>Company Name*</strong></div>
-                <div><strong>Location</strong></div>
-                <div><strong>Address</strong></div>
-                <div><strong>City</strong></div>
-                <div><strong>Province/State</strong></div>
-                <div><strong>Postal</strong></div>
-                <div><strong>Contact</strong></div>
-                <div><strong>Email</strong></div>
-                <div><strong>Phone</strong></div>
-                <div><strong>Roof/Ladder</strong></div>
-                <div className="col-span-2"><strong>Notes</strong></div>
+                <div><strong>Company Name*</strong> - Required</div>
+                <div><strong>Location</strong> - Optional</div>
+                <div><strong>Address</strong> - Optional</div>
+                <div><strong>City</strong> - Optional</div>
+                <div><strong>Province/State</strong> - Optional</div>
+                <div><strong>Postal/Zip</strong> - Optional</div>
+                <div><strong>Contact</strong> - Optional</div>
+                <div><strong>Phone</strong> - Optional</div>
+                <div><strong>Email</strong> - Optional</div>
+                <div><strong>Roof/Ladder Code</strong> - Optional</div>
+                <div className="col-span-2"><strong>Notes</strong> - Optional</div>
               </div>
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-2.5 rounded-md">
+              <p className="text-xs text-blue-900 dark:text-blue-100">
+                <strong>Note:</strong> Imported clients will be set to inactive status by default. You can configure their maintenance schedule and activate them later.
+              </p>
             </div>
           </div>
 
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
-              onClick={() => setImportDialogOpen(false)}
-              data-testid="button-cancel-import"
+              onClick={() => setSimpleImportDialogOpen(false)}
+              data-testid="button-cancel-import-clients"
             >
               Cancel
             </Button>
             <Button
-              onClick={handleProceedWithImport}
-              data-testid="button-proceed-import"
+              onClick={handleProceedWithSimpleImport}
+              data-testid="button-proceed-import-clients"
             >
               <Upload className="h-4 w-4 mr-2" />
               Select CSV File
