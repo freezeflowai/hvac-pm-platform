@@ -115,7 +115,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   return (
     <div
       ref={setNodeRef}
-      className={`h-full p-2 border transition-all ${
+      className={`min-h-24 p-2 border transition-all ${
         isOver 
           ? 'bg-primary/10 border-primary border-2 ring-2 ring-primary/30 shadow-md' 
           : 'bg-background'
@@ -583,7 +583,7 @@ export default function Calendar() {
                           </div>
                         ))}
                       </div>
-                      <div className="grid grid-cols-7 grid-rows-6 flex-1">
+                      <div className="grid grid-cols-7 auto-rows-fr flex-1">
                         {renderMonthlyView()}
                       </div>
                     </div>
