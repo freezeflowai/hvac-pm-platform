@@ -71,32 +71,26 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     return 'bg-status-this-month/10 border-status-this-month/30';
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (onClick && inCalendar && !isDragging) {
+      e.stopPropagation();
+      onClick();
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`text-xs p-2 rounded-lg hover:shadow-md transition-all relative ${getBackgroundColor()}`}
+      {...attributes}
+      {...listeners}
+      onClick={handleClick}
+      className={`text-xs p-2 rounded-lg hover:shadow-md transition-all relative cursor-move select-none ${getBackgroundColor()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
-      <div 
-        {...attributes}
-        {...listeners}
-        className="cursor-move select-none"
-      >
-        <div className={`font-semibold ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
-        {client.location && (
-          <div className={`text-muted-foreground text-[10px] ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
-        )}
-      </div>
-      {onClick && inCalendar && (
-        <div 
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-          }}
-          className="absolute inset-0 cursor-pointer"
-          style={{ zIndex: 1 }}
-        />
+      <div className={`font-semibold ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
+      {client.location && (
+        <div className={`text-muted-foreground text-[10px] ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
       )}
     </div>
   );
