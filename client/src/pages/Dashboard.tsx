@@ -497,8 +497,8 @@ export default function Dashboard() {
       />
       
       <main className="mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
-{activeTab === 'schedule' && (
-          <>
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
+          <TabsContent value="schedule" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <StatsCard 
                 title="Overdue" 
@@ -802,11 +802,6 @@ export default function Dashboard() {
                 </Card>
               )}
             </div>
-          </>
-        )}
-
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsContent value="schedule" className="space-y-6">
           </TabsContent>
 
           <TabsContent value="clients">
