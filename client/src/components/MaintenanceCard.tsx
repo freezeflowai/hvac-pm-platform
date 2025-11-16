@@ -69,20 +69,9 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, onViewRe
     }
   };
 
-  const getBorderColor = () => {
-    // Colored top border based on status
-    if (isCompleted) return 'border-t-4 border-t-primary';
-    if (isOverdue) return 'border-t-4 border-t-status-overdue';
-    
-    if (isThisMonthPM && !isScheduled) return 'border-t-4 border-t-status-unscheduled';
-    
-    const weekFromNow = new Date();
-    weekFromNow.setDate(weekFromNow.getDate() + 7);
-    if (item.nextDue <= weekFromNow && !isOverdue) return 'border-t-4 border-t-status-upcoming';
-    
-    if (isScheduled) return 'border-t-4 border-t-status-this-month';
-    
-    return 'border-t-4 border-t-border';
+  const getStatusStyles = () => {
+    // White background with subtle border for all cards
+    return 'border-border';
   };
 
   const getIconColor = () => {
@@ -103,7 +92,7 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, onViewRe
 
   return (
     <Card 
-      className={`bg-card hover-elevate cursor-pointer shadow-sm rounded-xl border ${getBorderColor()}`}
+      className={`bg-card hover-elevate cursor-pointer shadow-sm rounded-xl border ${getStatusStyles()}`}
       data-testid={`card-maintenance-${item.id}`}
       onClick={handleCardClick}
     >
