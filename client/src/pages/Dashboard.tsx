@@ -531,30 +531,31 @@ export default function Dashboard() {
             </div>
 
             <div className="space-y-4">
-              {/* Row 1: Overdue and Upcoming */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Overdue - Left */}
-                <div ref={overdueRef}>
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+              {/* Scheduled Maintenance */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-medium">Scheduled Maintenance</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      data-testid="button-minimize-scheduled"
+                      onClick={() => setMinimizedSections(prev => ({ ...prev, scheduled: !prev.scheduled }))}
+                    >
+                      <ChevronDown className={`h-4 w-4 transition-transform ${minimizedSections.scheduled ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </div>
+                </CardHeader>
+                {!minimizedSections.scheduled && (
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Overdue */}
+                      <div ref={overdueRef}>
+                        <div className="flex items-center gap-2 mb-3">
                           <AlertCircle className="h-4 w-4 text-destructive" />
-                          Overdue
-                        </CardTitle>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          data-testid="button-minimize-overdue"
-                          onClick={() => setMinimizedSections(prev => ({ ...prev, overdue: !prev.overdue }))}
-                        >
-                          <ChevronDown className={`h-4 w-4 transition-transform ${minimizedSections.overdue ? 'rotate-180' : ''}`} />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    {!minimizedSections.overdue && (
-                      <CardContent>
+                          <h3 className="text-sm font-medium">Overdue</h3>
+                        </div>
                         {overdueItems.length > 0 ? (
                           <>
                             <div className="space-y-2">
@@ -589,33 +590,14 @@ export default function Dashboard() {
                             No overdue maintenance
                           </div>
                         )}
-                      </CardContent>
-                    )}
-                  </Card>
-                </div>
-
-                {/* Upcoming - Right */}
-                <div>
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          Upcoming
-                        </CardTitle>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          data-testid="button-minimize-upcoming"
-                          onClick={() => setMinimizedSections(prev => ({ ...prev, upcoming: !prev.upcoming }))}
-                        >
-                          <ChevronDown className={`h-4 w-4 transition-transform ${minimizedSections.upcoming ? 'rotate-180' : ''}`} />
-                        </Button>
                       </div>
-                    </CardHeader>
-                    {!minimizedSections.upcoming && (
-                      <CardContent>
+
+                      {/* Upcoming */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Clock className="h-4 w-4 text-status-upcoming" />
+                          <h3 className="text-sm font-medium">Upcoming</h3>
+                        </div>
                         {upcomingNextWeek.length > 0 ? (
                           <>
                             <div className="space-y-2">
@@ -650,36 +632,37 @@ export default function Dashboard() {
                             No upcoming maintenance
                           </div>
                         )}
-                      </CardContent>
-                    )}
-                  </Card>
-                </div>
-              </div>
-
-              {/* Row 2: Due This Month and Unscheduled */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Due This Month - Left */}
-                <div ref={thisMonthRef}>
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          Due This Month
-                        </CardTitle>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          data-testid="button-minimize-thismonth"
-                          onClick={() => setMinimizedSections(prev => ({ ...prev, thisMonth: !prev.thisMonth }))}
-                        >
-                          <ChevronDown className={`h-4 w-4 transition-transform ${minimizedSections.thisMonth ? 'rotate-180' : ''}`} />
-                        </Button>
                       </div>
-                    </CardHeader>
-                    {!minimizedSections.thisMonth && (
-                      <CardContent>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+
+              {/* This Month's Maintenance */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-medium">This Month's Maintenance</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      data-testid="button-minimize-thismonthall"
+                      onClick={() => setMinimizedSections(prev => ({ ...prev, thisMonthAll: !prev.thisMonthAll }))}
+                    >
+                      <ChevronDown className={`h-4 w-4 transition-transform ${minimizedSections.thisMonthAll ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </div>
+                </CardHeader>
+                {!minimizedSections.thisMonthAll && (
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Due This Month */}
+                      <div ref={thisMonthRef}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Calendar className="h-4 w-4 text-status-this-month" />
+                          <h3 className="text-sm font-medium">Due This Month</h3>
+                        </div>
                         {thisMonthItems.length > 0 ? (
                           <>
                             <div className="space-y-2">
@@ -714,33 +697,14 @@ export default function Dashboard() {
                             No maintenance due this month
                           </div>
                         )}
-                      </CardContent>
-                    )}
-                  </Card>
-                </div>
-
-                {/* Unscheduled - Right */}
-                <div>
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <CalendarX className="h-4 w-4" />
-                          Unscheduled This Month
-                        </CardTitle>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          data-testid="button-minimize-unscheduled"
-                          onClick={() => setMinimizedSections(prev => ({ ...prev, unscheduled: !prev.unscheduled }))}
-                        >
-                          <ChevronDown className={`h-4 w-4 transition-transform ${minimizedSections.unscheduled ? 'rotate-180' : ''}`} />
-                        </Button>
                       </div>
-                    </CardHeader>
-                    {!minimizedSections.unscheduled && (
-                      <CardContent>
+
+                      {/* Unscheduled */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <CalendarX className="h-4 w-4 text-status-unscheduled" />
+                          <h3 className="text-sm font-medium">Unscheduled</h3>
+                        </div>
                         {unscheduledItems.length > 0 ? (
                           <>
                             <div className="space-y-2">
@@ -775,11 +739,11 @@ export default function Dashboard() {
                             No unscheduled maintenance
                           </div>
                         )}
-                      </CardContent>
-                    )}
-                  </Card>
-                </div>
-              </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
             </div>
           </>
         )}
