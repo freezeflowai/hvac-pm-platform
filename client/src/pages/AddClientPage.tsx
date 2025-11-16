@@ -81,6 +81,7 @@ export default function AddClientPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/parts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/schedule"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
       toast({
         title: "Client added",
         description: "The client has been added successfully.",
@@ -124,6 +125,7 @@ export default function AddClientPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/parts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/schedule"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
       toast({
         title: "Client updated",
         description: "The client has been updated successfully.",
