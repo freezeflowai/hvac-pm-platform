@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash2, Check, ChevronsUpDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Plus, Trash2, Check, ChevronsUpDown, ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +87,7 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
   const [partRows, setPartRows] = useState<PartRow[]>([]);
   const [activeType, setActiveType] = useState<string>("filter");
   const [openRowIndex, setOpenRowIndex] = useState<number | null>(null);
+  const [isAdditionalOptionsOpen, setIsAdditionalOptionsOpen] = useState(false);
   
   const { data: availableParts = [] } = useQuery<Part[]>({
     queryKey: ['/api/parts'],
@@ -223,7 +225,7 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
     <div className="space-y-4" data-testid="form-add-client">
       <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="companyName">Company Name</Label>
                   <Input
@@ -231,36 +233,74 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                     data-testid="input-company-name"
                     value={formData.companyName}
                     onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                    placeholder="Enter company name"
+                    placeholder="Company Name"
                     required
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="location">Location Name (Optional)</Label>
+                  <Label htmlFor="location">Location</Label>
                   <Input
                     id="location"
                     data-testid="input-location"
                     value={formData.location}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    placeholder="Enter location name"
+                    placeholder="Location"
                   />
                 </div>
               </div>
               
-              <Separator />
-              
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold">Contact Information</Label>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold">Contact Details</Label>
+                  
                   <div className="space-y-1.5">
-                    <Label htmlFor="address" className="text-xs">Address</Label>
+                    <Label htmlFor="contactName" className="text-xs">Contact Name</Label>
+                    <Input
+                      id="contactName"
+                      data-testid="input-contact-name"
+                      value={formData.contactName}
+                      onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
+                      placeholder="Contact Name"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <Label htmlFor="phone" className="text-xs">Phone</Label>
+                    <Input
+                      id="phone"
+                      data-testid="input-phone"
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="Phone"
+                      maxLength={14}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email" className="text-xs">Email</Label>
+                    <Input
+                      id="email"
+                      data-testid="input-email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="email@example.com"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold">Address</Label>
+                  
+                  <div className="space-y-1.5">
+                    <Label htmlFor="address" className="text-xs">Street Address</Label>
                     <Input
                       id="address"
                       data-testid="input-address"
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      placeholder="Street address"
+                      placeholder="Street Address"
                     />
                   </div>
                   
@@ -282,53 +322,20 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                       data-testid="input-province"
                       value={formData.province}
                       onChange={(e) => setFormData({ ...formData, province: e.target.value })}
-                      placeholder="Province or state"
+                      placeholder="Province"
+                      maxLength={2}
                     />
                   </div>
                   
                   <div className="space-y-1.5">
-                    <Label htmlFor="postalCode" className="text-xs">Postal Code</Label>
+                    <Label htmlFor="postalCode" className="text-xs">Postal/Code</Label>
                     <Input
                       id="postalCode"
                       data-testid="input-postal-code"
                       value={formData.postalCode}
                       onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
-                      placeholder="Postal code"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="contactName" className="text-xs">Contact Name</Label>
-                    <Input
-                      id="contactName"
-                      data-testid="input-contact-name"
-                      value={formData.contactName}
-                      onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
-                      placeholder="Contact person's name"
-                    />
-                  </div>
-                  
-                  <div className="space-y-1.5">
-                    <Label htmlFor="email" className="text-xs">Email</Label>
-                    <Input
-                      id="email"
-                      data-testid="input-email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="email@example.com"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="phone" className="text-xs">Phone</Label>
-                    <Input
-                      id="phone"
-                      data-testid="input-phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="Phone number"
+                      placeholder="Code"
+                      maxLength={10}
                     />
                   </div>
 
@@ -339,20 +346,9 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                       data-testid="input-roof-ladder-code"
                       value={formData.roofLadderCode}
                       onChange={(e) => setFormData({ ...formData, roofLadderCode: e.target.value })}
-                      placeholder="Access code"
+                      placeholder="Roof/Ladder Code"
                     />
                   </div>
-                </div>
-
-                <div className="space-y-1.5 pt-1">
-                  <Label htmlFor="notes" className="text-xs">Notes (Optional)</Label>
-                  <Input
-                    id="notes"
-                    data-testid="input-notes"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Additional notes"
-                  />
                 </div>
               </div>
 
@@ -378,38 +374,35 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
               </div>
 
               {!formData.inactive && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold">
-                    Maintenance Schedule <span className="text-destructive">*</span>
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Select the months when maintenance is required (15th of each month)
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    {MONTHS.map((month, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`month-${index}`}
-                          checked={formData.selectedMonths.includes(index)}
-                          onCheckedChange={() => toggleMonth(index)}
-                          data-testid={`checkbox-month-${index}`}
-                        />
-                        <Label htmlFor={`month-${index}`} className="cursor-pointer text-xs">
-                          {month}
-                        </Label>
-                      </div>
-                    ))}
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">
+                      Maintenance Months <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {MONTHS.map((month, index) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`month-${index}`}
+                            checked={formData.selectedMonths.includes(index)}
+                            onCheckedChange={() => toggleMonth(index)}
+                            data-testid={`checkbox-month-${index}`}
+                          />
+                          <Label htmlFor={`month-${index}`} className="cursor-pointer text-xs">
+                            {month}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                </>
               )}
               
               <Separator />
               
               <div className="space-y-2">
-                <Label className="text-sm font-semibold">Parts (Optional)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Add parts required for this client's maintenance
-                </p>
+                <Label className="text-sm font-semibold">Required Parts</Label>
                 
                 <Tabs value={activeType} onValueChange={setActiveType} className="w-full">
                   <TabsList className="grid w-full grid-cols-3">
@@ -525,6 +518,35 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                   ))}
                 </Tabs>
               </div>
+
+              <Collapsible open={isAdditionalOptionsOpen} onOpenChange={setIsAdditionalOptionsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="flex items-center gap-2 px-0 hover:bg-transparent"
+                    data-testid="button-toggle-additional-options"
+                  >
+                    <Label className="text-sm font-semibold cursor-pointer">Additional Options</Label>
+                    <ChevronDown className={cn(
+                      "h-4 w-4 transition-transform",
+                      isAdditionalOptionsOpen && "rotate-180"
+                    )} />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3 pt-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="notes" className="text-xs">Notes</Label>
+                    <Input
+                      id="notes"
+                      data-testid="input-notes"
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      placeholder="Additional notes"
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
 
           <div className="flex gap-3 pt-3">
