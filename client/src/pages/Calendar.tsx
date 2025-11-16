@@ -383,9 +383,6 @@ export default function Calendar() {
 
   const { assignments = [], clients = [] } = data || {};
   
-  // Get completed assignments
-  const completedAssignments = assignments.filter((a: any) => a.completed);
-  
   // Get unscheduled clients (active clients with PM this month, not yet scheduled)
   const scheduledClientIds = new Set(assignments.map((a: any) => a.clientId));
   const currentMonthIndex = currentDate.getMonth(); // 0-indexed for selectedMonths
@@ -598,47 +595,8 @@ export default function Calendar() {
               </Card>
             </div>
 
-            <div className="h-full flex flex-col gap-4">
-              <Card className="flex-1 overflow-hidden flex flex-col">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Completed</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-auto">
-                  {completedAssignments.length === 0 ? (
-                    <div className="text-sm text-muted-foreground text-center py-4">
-                      No completed maintenance this month
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {completedAssignments.map((assignment: any) => {
-                        const client = clients.find((c: any) => c.id === assignment.clientId);
-                        return client ? (
-                          <div
-                            key={assignment.id}
-                            onClick={() => handleClientClick(client, assignment)}
-                            className="p-2 border rounded bg-background cursor-pointer hover-elevate active-elevate-2 border-l-4 border-l-green-500"
-                            data-testid={`completed-client-${assignment.id}`}
-                          >
-                            <div className="font-medium text-sm">{client.companyName}</div>
-                            {client.location && (
-                              <div className="text-xs text-muted-foreground">{client.location}</div>
-                            )}
-                            {assignment.day && (
-                              <div className="text-xs text-muted-foreground">
-                                Completed on {monthNames[month - 1]} {assignment.day}
-                              </div>
-                            )}
-                          </div>
-                        ) : null;
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <div className="flex-1 overflow-hidden">
-                <UnscheduledPanel clients={unscheduledClients} />
-              </div>
+            <div className="h-full">
+              <UnscheduledPanel clients={unscheduledClients} />
             </div>
           </div>
         </main>
