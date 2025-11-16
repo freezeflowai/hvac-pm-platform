@@ -349,10 +349,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const clientData of clients) {
         try {
-          const validated = insertClientSchema.parse(clientData);
-          await storage.createClient(req.user!.id, validated);
+          const { parts, equipment, ...clientInfo } = clientData;
+          const validated = insertClientSchema.parse(clientInfo);
+          const client = await storage.createClient(req.user!.id, validated);
           imported++;
+          
+          // Import parts if present
+          if (parts && Array.isArray(parts) && parts.length > 0) {
+            for (const partData of parts) {
+              try {
+                // Create part as "other" type with the name from backup
+                const part = await storage.createPart(req.user!.id, {
+                  type: 'other',
+                  name: partData.name,
+                  filterType: null,
+                  beltType: null,
+                  size: null,
+                  description: null,
+                });
+                
+                // Link part to client
+                await storage.addClientPart(req.user!.id, {
+                  clientId: client.id,
+                  partId: part.id,
+                  quantity: partData.quantity || 1,
+                });
+              } catch (partError) {
+                console.error(`Failed to import part for ${client.companyName}:`, partError);
+              }
+            }
+          }
+          
+          // Import equipment if present
+          if (equipment && Array.isArray(equipment) && equipment.length > 0) {
+            for (const equipData of equipment) {
+              try {
+                await storage.createEquipment(req.user!.id, {
+                  clientId: client.id,
+                  name: equipData.name,
+                  modelNumber: equipData.modelNumber || null,
+                  serialNumber: equipData.serialNumber || null,
+                  notes: null,
+                });
+              } catch (equipError) {
+                console.error(`Failed to import equipment for ${client.companyName}:`, equipError);
+              }
+            }
+          }
         } catch (error) {
+          console.error('Import client error:', error);
           errors.push(`Failed to import ${clientData.companyName || 'unknown client'}`);
         }
       }

@@ -261,20 +261,20 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `clients-export-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      link.setAttribute('download', `client-backup-${format(new Date(), 'yyyy-MM-dd')}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
       toast({
-        title: "Export successful",
-        description: `Exported ${clients.length} clients to CSV`,
+        title: "Backup successful",
+        description: `Backed up ${clients.length} clients with parts and equipment`,
       });
     } catch (error) {
       toast({
-        title: "Export failed",
-        description: "Failed to export client data",
+        title: "Backup failed",
+        description: "Failed to backup client data",
         variant: "destructive",
       });
     } finally {
@@ -360,8 +360,8 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
       
       if (lines.length < 2) {
         toast({
-          title: "Import failed",
-          description: "CSV file is empty or has no data rows",
+          title: "Restore failed",
+          description: "Backup file is empty or has no data rows",
           variant: "destructive",
         });
         return;
@@ -369,12 +369,11 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
 
       // Skip header row
       const dataLines = lines.slice(1);
-      const clientsToImport: any[] = [];
+      const clientsMap = new Map<string, any>();
       const errors: string[] = [];
 
-      for (let i = 0; i < dataLines.length; i++) {
-        const line = dataLines[i];
-        // Parse CSV properly handling quoted fields
+      // Parse CSV helper function
+      const parseCSVLine = (line: string): string[] => {
         const fields: string[] = [];
         let currentField = '';
         let inQuotes = false;
@@ -396,41 +395,75 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
           }
         }
         fields.push(currentField);
+        return fields;
+      };
 
-        // Expected format: Company Name, Location, Address, City, Province/State, Postal, Contact, Email, Phone, Roof/Ladder, Notes
-        const [companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes] = fields;
+      // Process each line
+      for (let i = 0; i < dataLines.length; i++) {
+        const line = dataLines[i];
+        const fields = parseCSVLine(line);
+
+        // Expected format: Row Type,Company Name,Location,Address,City,Province/State,Postal Code,Contact Name,Email,Phone,Roof/Ladder Code,Notes,Status,Maintenance Months,Part Name,Part Quantity,Equipment Name,Model Number,Serial Number
+        const [rowType, companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes, status, maintenanceMonths, partName, partQty, equipName, modelNum, serialNum] = fields;
 
         if (!companyName || !companyName.trim()) {
           errors.push(`Row ${i + 2}: Company name is required`);
           continue;
         }
 
-        // Default to empty month selection and inactive status for new imports
-        // Users can set these later via the UI
-        const selectedMonths: number[] = [];
-        const nextDue = format(new Date(), 'yyyy-MM-dd');
+        const clientKey = companyName.trim();
 
-        clientsToImport.push({
-          companyName: companyName.trim(),
-          location: location?.trim() || null,
-          address: address?.trim() || null,
-          city: city?.trim() || null,
-          province: provinceState?.trim() || null,
-          postalCode: postalCode?.trim() || null,
-          contactName: contactName?.trim() || null,
-          email: email?.trim() || null,
-          phone: phone?.trim() || null,
-          roofLadderCode: roofLadderCode?.trim() || null,
-          notes: notes?.trim() || null,
-          inactive: true,
-          selectedMonths,
-          nextDue,
-        });
+        // If this is the first row for this client (MAIN row), create the client entry
+        if (!clientsMap.has(clientKey)) {
+          const selectedMonths = parseMonthsFromString(maintenanceMonths || '');
+          const inactive = status?.toLowerCase() === 'inactive';
+          const nextDue = selectedMonths.length > 0 ? calculateNextDue(selectedMonths) : format(new Date(), 'yyyy-MM-dd');
+
+          clientsMap.set(clientKey, {
+            companyName: companyName.trim(),
+            location: location?.trim() || null,
+            address: address?.trim() || null,
+            city: city?.trim() || null,
+            province: provinceState?.trim() || null,
+            postalCode: postalCode?.trim() || null,
+            contactName: contactName?.trim() || null,
+            email: email?.trim() || null,
+            phone: phone?.trim() || null,
+            roofLadderCode: roofLadderCode?.trim() || null,
+            notes: notes?.trim() || null,
+            inactive,
+            selectedMonths,
+            nextDue,
+            parts: [],
+            equipment: [],
+          });
+        }
+
+        const clientData = clientsMap.get(clientKey);
+
+        // Add part if present
+        if (partName && partName.trim()) {
+          clientData.parts.push({
+            name: partName.trim(),
+            quantity: parseInt(partQty) || 1,
+          });
+        }
+
+        // Add equipment if present
+        if (equipName && equipName.trim()) {
+          clientData.equipment.push({
+            name: equipName.trim(),
+            modelNumber: modelNum?.trim() || null,
+            serialNumber: serialNum?.trim() || null,
+          });
+        }
       }
+
+      const clientsToImport = Array.from(clientsMap.values());
 
       if (errors.length > 0 && clientsToImport.length === 0) {
         toast({
-          title: "Import failed",
+          title: "Restore failed",
           description: `No valid clients found. Errors: ${errors.join(', ')}`,
           variant: "destructive",
         });
@@ -441,7 +474,7 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
       const res = await apiRequest('POST', '/api/clients/import', { clients: clientsToImport });
       const result = await res.json();
 
-      let description = `Successfully imported ${result.imported} of ${result.total} clients`;
+      let description = `Successfully restored ${result.imported} of ${result.total} clients`;
       if (errors.length > 0) {
         description += `. ${errors.length} rows had validation errors`;
       }
@@ -450,7 +483,7 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
       }
 
       toast({
-        title: result.imported > 0 ? "Import completed" : "Import failed",
+        title: result.imported > 0 ? "Restore completed" : "Restore failed",
         description,
         variant: result.imported > 0 ? "default" : "destructive",
       });
@@ -462,10 +495,10 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
         window.location.reload();
       }
     } catch (error) {
-      console.error('Import error:', error);
+      console.error('Restore error:', error);
       toast({
-        title: "Import failed",
-        description: "Failed to import clients. Please check the file format.",
+        title: "Restore failed",
+        description: "Failed to restore backup. Please check the file format.",
         variant: "destructive",
       });
     } finally {
@@ -503,24 +536,24 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
             <Button
               variant="outline"
               size="sm"
-              onClick={handleImportClick}
-              disabled={isImporting}
-              data-testid="button-import-csv"
+              onClick={handleExportCSV}
+              disabled={isExporting || clients.length === 0}
+              data-testid="button-backup-clients"
               className="gap-2"
             >
-              <Upload className="h-4 w-4" />
-              {isImporting ? "Importing..." : "Import CSV"}
+              <Download className="h-4 w-4" />
+              {isExporting ? "Backing up..." : "Backup Client List"}
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={handleExportCSV}
-              disabled={isExporting || clients.length === 0}
-              data-testid="button-export-csv"
+              onClick={handleImportClick}
+              disabled={isImporting}
+              data-testid="button-restore-backup"
               className="gap-2"
             >
-              <Download className="h-4 w-4" />
-              Export CSV
+              <Upload className="h-4 w-4" />
+              {isImporting ? "Restoring..." : "Restore Backup"}
             </Button>
           </div>
         </div>
