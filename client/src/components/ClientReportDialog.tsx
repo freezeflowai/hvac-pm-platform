@@ -3,9 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Printer, Pencil, Package, Wrench } from "lucide-react";
+import { Printer, Pencil } from "lucide-react";
 import { format } from "date-fns";
-import { useLocation } from "wouter";
 import EditClientDialog from "./EditClientDialog";
 
 interface Part {
@@ -82,7 +81,6 @@ const getPartDisplayName = (part: Part): string => {
 };
 
 export default function ClientReportDialog({ clientId, open, onOpenChange }: ClientReportDialogProps) {
-  const [, setLocation] = useLocation();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const { data: reportData, isLoading } = useQuery<ClientReportData>({
@@ -116,20 +114,6 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
     onOpenChange(false);
   };
 
-  const handleManageParts = () => {
-    if (clientId) {
-      onOpenChange(false);
-      setLocation(`/clients/${clientId}/parts`);
-    }
-  };
-
-  const handleManageEquipment = () => {
-    if (clientId) {
-      onOpenChange(false);
-      setLocation(`/clients/${clientId}/equipment`);
-    }
-  };
-
   if (!clientId) return null;
 
   const { client, parts = [], equipment = [] } = reportData || {};
@@ -145,14 +129,6 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
               <Button onClick={handleEdit} size="sm" variant="outline" data-testid="button-edit" className="gap-1 h-7 text-xs">
                 <Pencil className="h-3 w-3" />
                 Edit
-              </Button>
-              <Button onClick={handleManageParts} size="sm" variant="outline" data-testid="button-manage-parts" className="gap-1 h-7 text-xs">
-                <Package className="h-3 w-3" />
-                Parts
-              </Button>
-              <Button onClick={handleManageEquipment} size="sm" variant="outline" data-testid="button-manage-equipment" className="gap-1 h-7 text-xs">
-                <Wrench className="h-3 w-3" />
-                Equipment
               </Button>
               <Button onClick={handlePrint} data-testid="button-print" size="sm" className="gap-1 h-7 text-xs">
                 <Printer className="h-3 w-3" />
