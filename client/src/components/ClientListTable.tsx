@@ -760,60 +760,49 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
       </AlertDialog>
 
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-2xl" data-testid="dialog-import-format">
+        <DialogContent className="max-w-xl max-h-[85vh]" data-testid="dialog-import-format">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Info className="h-5 w-5" />
               CSV Import Format
             </DialogTitle>
             <DialogDescription>
-              For accurate import, your CSV file should follow this structure
+              Your CSV file should include these columns in order
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
-            <div className="bg-muted p-4 rounded-md">
-              <p className="text-sm font-medium mb-2">Required Format:</p>
-              <code className="text-xs block bg-background p-3 rounded border overflow-x-auto whitespace-pre">
+          <div className="space-y-3 overflow-y-auto max-h-[50vh] pr-2">
+            <div className="bg-muted p-3 rounded-md">
+              <code className="text-xs block bg-background p-2 rounded border overflow-x-auto whitespace-pre">
 {`Company Name,Location,Address,City,Province/State,Postal,Contact,Email,Phone,Roof/Ladder,Notes`}
               </code>
             </div>
 
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Field Descriptions:</p>
-              <ul className="text-sm space-y-1 text-muted-foreground">
-                <li><strong>Company Name</strong> (required) - Client company name</li>
-                <li><strong>Location</strong> (optional) - Location or branch name</li>
-                <li><strong>Address</strong> (optional) - Street address</li>
-                <li><strong>City</strong> (optional) - City name</li>
-                <li><strong>Province/State</strong> (optional) - Province or state</li>
-                <li><strong>Postal</strong> (optional) - Postal or ZIP code</li>
-                <li><strong>Contact</strong> (optional) - Contact person name</li>
-                <li><strong>Email</strong> (optional) - Contact email</li>
-                <li><strong>Phone</strong> (optional) - Contact phone number</li>
-                <li><strong>Roof/Ladder</strong> (optional) - Roof/ladder access code</li>
-                <li><strong>Notes</strong> (optional) - Additional notes</li>
-              </ul>
-            </div>
-
-            <div className="bg-muted p-4 rounded-md">
-              <p className="text-sm font-medium mb-2">Example:</p>
-              <code className="text-xs block bg-background p-3 rounded border overflow-x-auto whitespace-pre">
-{`Company Name,Location,Address,City,Province/State,Postal,Contact,Email,Phone,Roof/Ladder,Notes
-"ABC Corp",Downtown,"123 Main St",Toronto,ON,M5V 3A8,"John Doe",john@abc.com,416-555-0100,A-12,"VIP client"
-"XYZ Ltd",,,Montreal,QC,H3B 4W8,,,,B-5,`}
-              </code>
-            </div>
-
-            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3 rounded-md">
-              <p className="text-sm text-amber-900 dark:text-amber-100">
-                <strong>Note:</strong> Only Company Name is mandatory. All other fields are optional. 
-                After import, you can edit clients to set maintenance schedules and add parts/equipment.
+            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-2.5 rounded-md">
+              <p className="text-xs text-amber-900 dark:text-amber-100">
+                <strong>Only Company Name is required.</strong> All other fields are optional and can be left empty.
               </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium">Field Descriptions:</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <div><strong>Company Name*</strong></div>
+                <div><strong>Location</strong></div>
+                <div><strong>Address</strong></div>
+                <div><strong>City</strong></div>
+                <div><strong>Province/State</strong></div>
+                <div><strong>Postal</strong></div>
+                <div><strong>Contact</strong></div>
+                <div><strong>Email</strong></div>
+                <div><strong>Phone</strong></div>
+                <div><strong>Roof/Ladder</strong></div>
+                <div className="col-span-2"><strong>Notes</strong></div>
+              </div>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button
               variant="outline"
               onClick={() => setImportDialogOpen(false)}
