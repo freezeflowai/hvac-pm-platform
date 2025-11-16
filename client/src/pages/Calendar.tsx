@@ -509,74 +509,72 @@ export default function Calendar() {
         <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
         
         <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 space-y-4">
-          <div className="flex items-center justify-end gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => clearSchedule.mutate()}
-              disabled={clearSchedule.isPending || assignments.length === 0}
-              data-testid="button-clear-schedule"
-            >
-              Clear Schedule
-            </Button>
-            <div className="flex gap-1 bg-muted/50 p-1 rounded-full">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <Button
-                variant={view === "monthly" ? "default" : "ghost"}
-                size="sm"
-                className={`rounded-full ${view === "monthly" ? "" : "hover:bg-background/60"}`}
-                onClick={() => setView("monthly")}
-                data-testid="button-monthly-view"
+                variant="outline"
+                size="icon"
+                onClick={previousMonth}
+                data-testid="button-previous-month"
               >
-                Monthly
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <h2 className="text-2xl font-bold">
+                {monthNames[month - 1]} {year}
+              </h2>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={nextMonth}
+                data-testid="button-next-month"
+              >
+                <ChevronRight className="h-4 w-4" />
               </Button>
               <Button
-                variant={view === "weekly" ? "default" : "ghost"}
-                size="sm"
-                className={`rounded-full ${view === "weekly" ? "" : "hover:bg-background/60"}`}
-                onClick={() => setView("weekly")}
-                data-testid="button-weekly-view"
+                variant="outline"
+                onClick={goToToday}
+                data-testid="button-today"
               >
-                Weekly
+                Today
               </Button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => clearSchedule.mutate()}
+                disabled={clearSchedule.isPending || assignments.length === 0}
+                data-testid="button-clear-schedule"
+              >
+                Clear Schedule
+              </Button>
+              <div className="flex gap-1 bg-muted/50 p-1 rounded-full">
+                <Button
+                  variant={view === "monthly" ? "default" : "ghost"}
+                  size="sm"
+                  className={`rounded-full ${view === "monthly" ? "" : "hover:bg-background/60"}`}
+                  onClick={() => setView("monthly")}
+                  data-testid="button-monthly-view"
+                >
+                  Monthly
+                </Button>
+                <Button
+                  variant={view === "weekly" ? "default" : "ghost"}
+                  size="sm"
+                  className={`rounded-full ${view === "weekly" ? "" : "hover:bg-background/60"}`}
+                  onClick={() => setView("weekly")}
+                  data-testid="button-weekly-view"
+                >
+                  Weekly
+                </Button>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4" style={{ height: 'calc(100vh - 10rem)' }}>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4" style={{ height: 'calc(100vh - 12rem)' }}>
             <div className="lg:col-span-3 flex flex-col overflow-hidden">
               <Card className="h-full flex flex-col">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={previousMonth}
-                        data-testid="button-previous-month"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <h2 className="text-xl font-bold">
-                        {monthNames[month - 1]} {year}
-                      </h2>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={nextMonth}
-                        data-testid="button-next-month"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={goToToday}
-                      data-testid="button-today"
-                    >
-                      Today
-                    </Button>
-                  </div>
-                </CardHeader>
                 <CardContent className="flex-1 overflow-auto">
                   {view === "monthly" && (
                     <>
