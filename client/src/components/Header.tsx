@@ -93,17 +93,16 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, client
                   Calendar
                 </Button>
               </Link>
-              <Link href="/?tab=clients">
-                <Button
-                  variant={isClientsTab ? "default" : "ghost"}
-                  size="sm"
-                  className={`rounded-full ${isClientsTab ? "" : "hover:bg-background/60"}`}
-                  data-testid="nav-all-clients"
-                >
-                  <Users className="h-3.5 w-3.5 mr-1.5" />
-                  All Clients
-                </Button>
-              </Link>
+              <Button
+                variant={isClientsTab ? "default" : "ghost"}
+                size="sm"
+                className={`rounded-full ${isClientsTab ? "" : "hover:bg-background/60"}`}
+                data-testid="nav-all-clients"
+                onClick={() => setLocation('/?tab=clients')}
+              >
+                <Users className="h-3.5 w-3.5 mr-1.5" />
+                All Clients
+              </Button>
               <Link href="/manage-parts">
                 <Button
                   variant={location === "/manage-parts" ? "default" : "ghost"}
