@@ -573,9 +573,9 @@ export default function Calendar() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4" style={{ height: 'calc(100vh - 12rem)' }}>
-            <div className="lg:col-span-3 flex flex-col overflow-hidden">
+            <div className="lg:col-span-3 flex flex-col">
               <Card className="h-full flex flex-col">
-                <CardContent className="flex-1 overflow-hidden p-0">
+                <CardContent className="flex-1 overflow-auto p-0">
                   {view === "monthly" && (
                     <div className="h-full flex flex-col">
                       <div className="grid grid-cols-7">
