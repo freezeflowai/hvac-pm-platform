@@ -121,7 +121,11 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   return (
     <div
       ref={setNodeRef}
-      className={`h-full p-2 border bg-background transition-colors ${isOver ? 'bg-accent' : ''}`}
+      className={`h-full p-2 border transition-all ${
+        isOver 
+          ? 'bg-primary/10 border-primary border-2 ring-2 ring-primary/30 shadow-md' 
+          : 'bg-background'
+      }`}
       data-testid={`calendar-day-${day}`}
     >
       <div className="text-sm text-muted-foreground mb-1">{day}</div>
