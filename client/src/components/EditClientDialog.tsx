@@ -238,7 +238,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
 
   const updateClientMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return await apiRequest('PATCH', `/api/clients/${client.id}`, data);
+      return await apiRequest('PUT', `/api/clients/${client.id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
