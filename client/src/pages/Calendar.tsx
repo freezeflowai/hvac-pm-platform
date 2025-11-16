@@ -121,7 +121,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   return (
     <Card
       ref={setNodeRef}
-      className={`min-h-24 bg-muted/20 hover-elevate transition-colors ${isOver ? 'ring-2 ring-primary' : ''}`}
+      className={`min-h-24 bg-muted/20 hover-elevate transition-colors border ${isOver ? 'ring-2 ring-primary' : ''}`}
       data-testid={`calendar-day-${day}`}
     >
       <CardContent className="p-2">
@@ -433,7 +433,7 @@ export default function Calendar() {
             onClientClick={handleClientClick}
           />
         ) : (
-          <Card key={i} className="min-h-24 bg-muted/20">
+          <Card key={i} className="min-h-24 bg-muted/20 border">
             <CardContent className="p-2" />
           </Card>
         )
@@ -471,7 +471,7 @@ export default function Calendar() {
             onClientClick={handleClientClick}
           />
         ) : (
-          <Card key={i} className="min-h-48 bg-muted/20">
+          <Card key={i} className="min-h-48 bg-muted/20 border">
             <CardContent className="p-2">
               <div className="text-xs text-muted-foreground">
                 {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -484,12 +484,12 @@ export default function Calendar() {
 
     return (
       <>
-        <div className="grid grid-cols-7 gap-2 mb-2">
+        <div className="grid grid-cols-7 mb-2">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, i) => {
             const date = new Date(currentWeekStart);
             date.setDate(currentWeekStart.getDate() + i);
             return (
-              <div key={day} className="text-center">
+              <div key={day} className="text-center p-2 border">
                 <div className="font-semibold text-sm">{day}</div>
                 <div className="text-xs text-muted-foreground">
                   {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -498,7 +498,7 @@ export default function Calendar() {
             );
           })}
         </div>
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7">
           {weekDays}
         </div>
       </>
@@ -587,14 +587,14 @@ export default function Calendar() {
                 <CardContent className="flex-1 overflow-auto">
                   {view === "monthly" && (
                     <>
-                      <div className="grid grid-cols-7 gap-2 mb-2">
+                      <div className="grid grid-cols-7 mb-2">
                         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                          <div key={day} className="text-center font-semibold text-sm">
+                          <div key={day} className="text-center font-semibold text-sm p-2 border">
                             {day}
                           </div>
                         ))}
                       </div>
-                      <div className="grid grid-cols-7 gap-2">
+                      <div className="grid grid-cols-7">
                         {renderMonthlyView()}
                       </div>
                     </>
