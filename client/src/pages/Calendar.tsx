@@ -429,7 +429,7 @@ export default function Calendar() {
             onClientClick={handleClientClick}
           />
         ) : (
-          <div key={i} className="h-full p-2 border bg-muted/10" />
+          <div key={i} className="min-h-24 p-2 border bg-muted/10" />
         )
       );
     }
@@ -583,7 +583,7 @@ export default function Calendar() {
                           </div>
                         ))}
                       </div>
-                      <div className="grid grid-cols-7 auto-rows-fr flex-1">
+                      <div className="grid grid-cols-7 auto-rows-[minmax(6rem,max-content)] content-start">
                         {renderMonthlyView()}
                       </div>
                     </div>
