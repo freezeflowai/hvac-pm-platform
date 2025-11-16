@@ -119,42 +119,40 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   const isOverdue = dayDate < today;
 
   return (
-    <Card
+    <div
       ref={setNodeRef}
-      className={`min-h-24 bg-muted/20 hover-elevate transition-colors border ${isOver ? 'ring-2 ring-primary' : ''}`}
+      className={`min-h-24 p-2 border bg-background transition-colors ${isOver ? 'bg-accent' : ''}`}
       data-testid={`calendar-day-${day}`}
     >
-      <CardContent className="p-2">
-        <div className="font-semibold text-sm mb-1">{day}</div>
-        <div className="space-y-1">
-          {assignments.map((assignment: any) => {
-            const client = clients.find((c: any) => c.id === assignment.clientId);
-            return client ? (
-              <div key={assignment.id} className="relative group">
-                <DraggableClient 
-                  id={assignment.id} 
-                  client={client}
-                  inCalendar={true}
-                  onClick={() => onClientClick(client, assignment)}
-                  isCompleted={assignment.completed}
-                  isOverdue={!assignment.completed && isOverdue}
-                />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove(assignment.id);
-                  }}
-                  className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10"
-                  data-testid={`remove-assignment-${assignment.id}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ) : null;
-          })}
-        </div>
-      </CardContent>
-    </Card>
+      <div className="text-sm text-muted-foreground mb-1">{day}</div>
+      <div className="space-y-1">
+        {assignments.map((assignment: any) => {
+          const client = clients.find((c: any) => c.id === assignment.clientId);
+          return client ? (
+            <div key={assignment.id} className="relative group">
+              <DraggableClient 
+                id={assignment.id} 
+                client={client}
+                inCalendar={true}
+                onClick={() => onClientClick(client, assignment)}
+                isCompleted={assignment.completed}
+                isOverdue={!assignment.completed && isOverdue}
+              />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove(assignment.id);
+                }}
+                className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10"
+                data-testid={`remove-assignment-${assignment.id}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : null;
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -433,9 +431,7 @@ export default function Calendar() {
             onClientClick={handleClientClick}
           />
         ) : (
-          <Card key={i} className="min-h-24 bg-muted/20 border">
-            <CardContent className="p-2" />
-          </Card>
+          <div key={i} className="min-h-24 p-2 border bg-muted/10" />
         )
       );
     }
@@ -471,26 +467,24 @@ export default function Calendar() {
             onClientClick={handleClientClick}
           />
         ) : (
-          <Card key={i} className="min-h-48 bg-muted/20 border">
-            <CardContent className="p-2">
-              <div className="text-xs text-muted-foreground">
-                {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </div>
-            </CardContent>
-          </Card>
+          <div key={i} className="min-h-48 p-2 border bg-muted/10">
+            <div className="text-xs text-muted-foreground">
+              {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </div>
+          </div>
         )
       );
     }
 
     return (
       <>
-        <div className="grid grid-cols-7 mb-2">
+        <div className="grid grid-cols-7">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, i) => {
             const date = new Date(currentWeekStart);
             date.setDate(currentWeekStart.getDate() + i);
             return (
-              <div key={day} className="text-center p-2 border">
-                <div className="font-semibold text-sm">{day}</div>
+              <div key={day} className="text-center p-2 border bg-muted/5">
+                <div className="font-medium text-sm">{day}</div>
                 <div className="text-xs text-muted-foreground">
                   {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </div>
@@ -587,9 +581,9 @@ export default function Calendar() {
                 <CardContent className="flex-1 overflow-auto">
                   {view === "monthly" && (
                     <>
-                      <div className="grid grid-cols-7 mb-2">
+                      <div className="grid grid-cols-7">
                         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                          <div key={day} className="text-center font-semibold text-sm p-2 border">
+                          <div key={day} className="text-center font-medium text-sm p-2 border bg-muted/5">
                             {day}
                           </div>
                         ))}
