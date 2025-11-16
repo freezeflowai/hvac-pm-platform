@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Pencil, Trash2, Wrench, Download, Package, Upload } from "lucide-react";
+import { Search, Pencil, Trash2, Wrench, Download, Package, Upload, Info } from "lucide-react";
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { format, parse } from "date-fns";
@@ -20,6 +20,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export interface Client {
   id: string;
@@ -61,6 +69,7 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
@@ -274,6 +283,11 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
   };
 
   const handleImportClick = () => {
+    setImportDialogOpen(true);
+  };
+
+  const handleProceedWithImport = () => {
+    setImportDialogOpen(false);
     fileInputRef.current?.click();
   };
 
@@ -372,56 +386,32 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
         }
         fields.push(currentField);
 
-        // Check for Row Type column (new format with MAIN/ADDITIONAL markers)
-        const hasRowType = fields[0] === 'MAIN' || fields[0] === 'ADDITIONAL';
-        
-        let rowType, companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes, status, maintenanceMonths;
-        
-        if (hasRowType) {
-          // New format with Row Type column (no Next Due or Created Date columns)
-          [rowType, companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes, status, maintenanceMonths] = fields;
-          
-          // Skip ADDITIONAL rows - only import MAIN rows to avoid duplicates
-          if (rowType === 'ADDITIONAL') {
-            continue;
-          }
-        } else {
-          // Old format without Row Type column (backward compatibility)
-          [companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes, status, maintenanceMonths] = fields;
-        }
+        // Expected format: Company Name, Location, Address, City, Province/State, Postal, Contact, Email, Phone, Roof/Ladder, Notes
+        const [companyName, location, address, city, provinceState, postalCode, contactName, email, phone, roofLadderCode, notes] = fields;
 
-        if (!companyName) {
+        if (!companyName || !companyName.trim()) {
           errors.push(`Row ${i + 2}: Company name is required`);
           continue;
         }
 
-        if (!maintenanceMonths) {
-          errors.push(`Row ${i + 2}: Maintenance months are required`);
-          continue;
-        }
-
-        const selectedMonths = parseMonthsFromString(maintenanceMonths);
-        if (selectedMonths.length === 0) {
-          errors.push(`Row ${i + 2}: Invalid maintenance months format`);
-          continue;
-        }
-
-        const isInactive = status?.toLowerCase() === 'inactive';
-        const nextDue = isInactive ? format(new Date(), 'yyyy-MM-dd') : calculateNextDue(selectedMonths);
+        // Default to empty month selection and inactive status for new imports
+        // Users can set these later via the UI
+        const selectedMonths: number[] = [];
+        const nextDue = format(new Date(), 'yyyy-MM-dd');
 
         clientsToImport.push({
-          companyName,
-          location: location || null,
-          address: address || null,
-          city: city || null,
-          province: provinceState || null,
-          postalCode: postalCode || null,
-          contactName: contactName || null,
-          email: email || null,
-          phone: phone || null,
-          roofLadderCode: roofLadderCode || null,
-          notes: notes || null,
-          inactive: isInactive,
+          companyName: companyName.trim(),
+          location: location?.trim() || null,
+          address: address?.trim() || null,
+          city: city?.trim() || null,
+          province: provinceState?.trim() || null,
+          postalCode: postalCode?.trim() || null,
+          contactName: contactName?.trim() || null,
+          email: email?.trim() || null,
+          phone: phone?.trim() || null,
+          roofLadderCode: roofLadderCode?.trim() || null,
+          notes: notes?.trim() || null,
+          inactive: true,
           selectedMonths,
           nextDue,
         });
@@ -768,6 +758,79 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-2xl" data-testid="dialog-import-format">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5" />
+              CSV Import Format
+            </DialogTitle>
+            <DialogDescription>
+              For accurate import, your CSV file should follow this structure
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-muted p-4 rounded-md">
+              <p className="text-sm font-medium mb-2">Required Format:</p>
+              <code className="text-xs block bg-background p-3 rounded border overflow-x-auto whitespace-pre">
+{`Company Name,Location,Address,City,Province/State,Postal,Contact,Email,Phone,Roof/Ladder,Notes`}
+              </code>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Field Descriptions:</p>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li><strong>Company Name</strong> (required) - Client company name</li>
+                <li><strong>Location</strong> (optional) - Location or branch name</li>
+                <li><strong>Address</strong> (optional) - Street address</li>
+                <li><strong>City</strong> (optional) - City name</li>
+                <li><strong>Province/State</strong> (optional) - Province or state</li>
+                <li><strong>Postal</strong> (optional) - Postal or ZIP code</li>
+                <li><strong>Contact</strong> (optional) - Contact person name</li>
+                <li><strong>Email</strong> (optional) - Contact email</li>
+                <li><strong>Phone</strong> (optional) - Contact phone number</li>
+                <li><strong>Roof/Ladder</strong> (optional) - Roof/ladder access code</li>
+                <li><strong>Notes</strong> (optional) - Additional notes</li>
+              </ul>
+            </div>
+
+            <div className="bg-muted p-4 rounded-md">
+              <p className="text-sm font-medium mb-2">Example:</p>
+              <code className="text-xs block bg-background p-3 rounded border overflow-x-auto whitespace-pre">
+{`Company Name,Location,Address,City,Province/State,Postal,Contact,Email,Phone,Roof/Ladder,Notes
+"ABC Corp",Downtown,"123 Main St",Toronto,ON,M5V 3A8,"John Doe",john@abc.com,416-555-0100,A-12,"VIP client"
+"XYZ Ltd",,,Montreal,QC,H3B 4W8,,,,B-5,`}
+              </code>
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3 rounded-md">
+              <p className="text-sm text-amber-900 dark:text-amber-100">
+                <strong>Note:</strong> Only Company Name is mandatory. All other fields are optional. 
+                After import, you can edit clients to set maintenance schedules and add parts/equipment.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setImportDialogOpen(false)}
+              data-testid="button-cancel-import"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleProceedWithImport}
+              data-testid="button-proceed-import"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Select CSV File
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
