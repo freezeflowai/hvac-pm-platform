@@ -121,7 +121,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-24 p-2 border bg-background transition-colors ${isOver ? 'bg-accent' : ''}`}
+      className={`h-full p-2 border bg-background transition-colors ${isOver ? 'bg-accent' : ''}`}
       data-testid={`calendar-day-${day}`}
     >
       <div className="text-sm text-muted-foreground mb-1">{day}</div>
@@ -431,7 +431,7 @@ export default function Calendar() {
             onClientClick={handleClientClick}
           />
         ) : (
-          <div key={i} className="min-h-24 p-2 border bg-muted/10" />
+          <div key={i} className="h-full p-2 border bg-muted/10" />
         )
       );
     }
@@ -467,7 +467,7 @@ export default function Calendar() {
             onClientClick={handleClientClick}
           />
         ) : (
-          <div key={i} className="min-h-48 p-2 border bg-muted/10">
+          <div key={i} className="h-full p-2 border bg-muted/10">
             <div className="text-xs text-muted-foreground">
               {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </div>
@@ -575,9 +575,9 @@ export default function Calendar() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4" style={{ height: 'calc(100vh - 12rem)' }}>
             <div className="lg:col-span-3 flex flex-col overflow-hidden">
               <Card className="h-full flex flex-col">
-                <CardContent className="flex-1 overflow-auto">
+                <CardContent className="flex-1 overflow-hidden p-0">
                   {view === "monthly" && (
-                    <>
+                    <div className="h-full flex flex-col">
                       <div className="grid grid-cols-7">
                         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
                           <div key={day} className="text-center font-medium text-sm p-2 border bg-muted/5">
@@ -585,12 +585,16 @@ export default function Calendar() {
                           </div>
                         ))}
                       </div>
-                      <div className="grid grid-cols-7">
+                      <div className="grid grid-cols-7 grid-rows-6 flex-1">
                         {renderMonthlyView()}
                       </div>
-                    </>
+                    </div>
                   )}
-                  {view === "weekly" && renderWeeklyView()}
+                  {view === "weekly" && (
+                    <div className="h-full flex flex-col">
+                      {renderWeeklyView()}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
