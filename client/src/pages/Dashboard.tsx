@@ -74,7 +74,7 @@ interface ClientPart {
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<{
@@ -106,17 +106,17 @@ export default function Dashboard() {
   const thisMonthRef = useRef<HTMLDivElement>(null);
   const completedRef = useRef<HTMLDivElement>(null);
 
-  // Read tab from URL query parameter using window.location.search
+  // Read tab from URL query parameter
   const urlParams = new URLSearchParams(window.location.search);
   const tabParam = urlParams.get('tab');
   const [activeTab, setActiveTab] = useState(tabParam === 'clients' ? 'clients' : 'schedule');
 
-  // Update activeTab when URL changes
+  // Update activeTab when URL changes (location includes both path and search params)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
     setActiveTab(tab === 'clients' ? 'clients' : 'schedule');
-  }, [window.location.search]);
+  }, [location]);
 
   const handleTabChange = (value: string) => {
     if (value === 'clients') {
