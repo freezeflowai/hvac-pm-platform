@@ -82,23 +82,23 @@ export default function Dashboard() {
     upcoming: boolean;
     thisMonth: boolean;
     unscheduled: boolean;
+    completed: boolean;
   }>({
     overdue: false,
     upcoming: false,
     thisMonth: false,
     unscheduled: false,
+    completed: false,
   });
   
   const [minimizedSections, setMinimizedSections] = useState<{
-    overdue: boolean;
-    upcoming: boolean;
-    thisMonth: boolean;
-    unscheduled: boolean;
+    scheduled: boolean;
+    thisMonthAll: boolean;
+    completed: boolean;
   }>({
-    overdue: false,
-    upcoming: false,
-    thisMonth: false,
-    unscheduled: false,
+    scheduled: false,
+    thisMonthAll: false,
+    completed: false,
   });
   const [reportDialogClientId, setReportDialogClientId] = useState<string | null>(null);
   
@@ -661,7 +661,7 @@ export default function Dashboard() {
                       <div ref={thisMonthRef}>
                         <div className="flex items-center gap-2 mb-3">
                           <Calendar className="h-4 w-4 text-status-this-month" />
-                          <h3 className="text-sm font-medium">Due This Month</h3>
+                          <h3 className="text-sm font-medium">Due This Month (Scheduled)</h3>
                         </div>
                         {thisMonthItems.length > 0 ? (
                           <>
@@ -703,7 +703,7 @@ export default function Dashboard() {
                       <div>
                         <div className="flex items-center gap-2 mb-3">
                           <CalendarX className="h-4 w-4 text-status-unscheduled" />
-                          <h3 className="text-sm font-medium">Unscheduled</h3>
+                          <h3 className="text-sm font-medium">This Month (Unscheduled)</h3>
                         </div>
                         {unscheduledItems.length > 0 ? (
                           <>
@@ -744,6 +744,59 @@ export default function Dashboard() {
                   </CardContent>
                 )}
               </Card>
+
+              {/* Completed */}
+              {recentlyCompleted.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base font-medium flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-primary" />
+                        Completed
+                      </CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        data-testid="button-minimize-completed"
+                        onClick={() => setMinimizedSections(prev => ({ ...prev, completed: !prev.completed }))}
+                      >
+                        <ChevronDown className={`h-4 w-4 transition-transform ${minimizedSections.completed ? 'rotate-180' : ''}`} />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  {!minimizedSections.completed && (
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {(expandedSections.completed ? recentlyCompleted : recentlyCompleted.slice(0, 6)).map((item) => (
+                          <MaintenanceCard
+                            key={item.id}
+                            item={item}
+                            onMarkComplete={handleMarkComplete}
+                            onEdit={handleEditClient}
+                            onViewReport={setReportDialogClientId}
+                            parts={clientParts[item.id] || []}
+                            isCompleted={true}
+                            isScheduled={true}
+                            isThisMonthPM={true}
+                          />
+                        ))}
+                      </div>
+                      {recentlyCompleted.length > 6 && (
+                        <Button 
+                          variant="ghost" 
+                          className="w-full mt-2" 
+                          size="sm"
+                          data-testid="button-view-all-completed"
+                          onClick={() => setExpandedSections(prev => ({ ...prev, completed: !prev.completed }))}
+                        >
+                          {expandedSections.completed ? 'Show Less' : `View All (${recentlyCompleted.length})`}
+                        </Button>
+                      )}
+                    </CardContent>
+                  )}
+                </Card>
+              )}
             </div>
           </>
         )}
