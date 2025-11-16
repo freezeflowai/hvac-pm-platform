@@ -288,6 +288,17 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                       placeholder="email@example.com"
                     />
                   </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="roofLadderCode" className="text-xs">Roof/Ladder Code</Label>
+                    <Input
+                      id="roofLadderCode"
+                      data-testid="input-roof-ladder-code"
+                      value={formData.roofLadderCode}
+                      onChange={(e) => setFormData({ ...formData, roofLadderCode: e.target.value })}
+                      placeholder="Roof/Ladder Code"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -339,16 +350,28 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="roofLadderCode" className="text-xs">Roof/Ladder Code</Label>
-                    <Input
-                      id="roofLadderCode"
-                      data-testid="input-roof-ladder-code"
-                      value={formData.roofLadderCode}
-                      onChange={(e) => setFormData({ ...formData, roofLadderCode: e.target.value })}
-                      placeholder="Roof/Ladder Code"
-                    />
-                  </div>
+                  {!formData.inactive && (
+                    <div className="space-y-2 pt-2">
+                      <Label className="text-sm font-semibold">
+                        Maintenance Months <span className="text-destructive">*</span>
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {MONTHS.map((month, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`month-${index}`}
+                              checked={formData.selectedMonths.includes(index)}
+                              onCheckedChange={() => toggleMonth(index)}
+                              data-testid={`checkbox-month-${index}`}
+                            />
+                            <Label htmlFor={`month-${index}`} className="cursor-pointer text-xs">
+                              {month}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -372,32 +395,6 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
                   Inactive clients won't appear in scheduled maintenance reports.
                 </p>
               </div>
-
-              {!formData.inactive && (
-                <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold">
-                      Maintenance Months <span className="text-destructive">*</span>
-                    </Label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {MONTHS.map((month, index) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`month-${index}`}
-                            checked={formData.selectedMonths.includes(index)}
-                            onCheckedChange={() => toggleMonth(index)}
-                            data-testid={`checkbox-month-${index}`}
-                          />
-                          <Label htmlFor={`month-${index}`} className="cursor-pointer text-xs">
-                            {month}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
               
               <Separator />
               
