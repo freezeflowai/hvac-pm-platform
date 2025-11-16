@@ -90,9 +90,25 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, onViewRe
     return 'text-muted-foreground';
   };
 
+  const getBorderColor = () => {
+    // Match the status colors from the top stats cards
+    if (isCompleted) return 'border-l-primary';
+    if (isOverdue) return 'border-l-status-overdue';
+    
+    if (isThisMonthPM && !isScheduled) return 'border-l-status-unscheduled';
+    
+    const weekFromNow = new Date();
+    weekFromNow.setDate(weekFromNow.getDate() + 7);
+    if (item.nextDue <= weekFromNow && !isOverdue) return 'border-l-status-upcoming';
+    
+    if (isScheduled) return 'border-l-status-this-month';
+    
+    return 'border-l-border';
+  };
+
   return (
     <Card 
-      className={`bg-card hover-elevate cursor-pointer shadow-sm rounded-xl border ${getStatusStyles()}`}
+      className={`bg-card hover-elevate cursor-pointer shadow-sm rounded-xl border border-l-4 ${getStatusStyles()} ${getBorderColor()}`}
       data-testid={`card-maintenance-${item.id}`}
       onClick={handleCardClick}
     >
