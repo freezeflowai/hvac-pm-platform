@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Printer, Pencil, Package, Wrench } from "lucide-react";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
+import EditClientDialog from "./EditClientDialog";
 
 interface Part {
   id: string;
@@ -81,6 +83,7 @@ const getPartDisplayName = (part: Part): string => {
 
 export default function ClientReportDialog({ clientId, open, onOpenChange }: ClientReportDialogProps) {
   const [, setLocation] = useLocation();
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const { data: reportData, isLoading } = useQuery<ClientReportData>({
     queryKey: ['/api/clients', clientId, 'report'],
@@ -103,10 +106,14 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
   };
 
   const handleEdit = () => {
-    if (clientId) {
-      onOpenChange(false);
-      setLocation(`/edit-client/${clientId}`);
+    if (reportData?.client) {
+      setEditDialogOpen(true);
     }
+  };
+
+  const handleEditSaved = (clientId: string) => {
+    setEditDialogOpen(false);
+    onOpenChange(false);
   };
 
   const handleManageParts = () => {
@@ -349,6 +356,15 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
           </div>
         )}
       </DialogContent>
+
+      {reportData?.client && (
+        <EditClientDialog
+          client={reportData.client}
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          onSaved={handleEditSaved}
+        />
+      )}
     </Dialog>
   );
 }

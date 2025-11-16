@@ -238,7 +238,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
 
   const updateClientMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return await apiRequest(`/api/clients/${client.id}`, 'PATCH', data);
+      return await apiRequest('PATCH', `/api/clients/${client.id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
@@ -248,7 +248,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
 
   const updatePartsMutation = useMutation({
     mutationFn: async (parts: typeof partRows) => {
-      return await apiRequest(`/api/clients/${client.id}/parts`, 'PUT', { parts });
+      return await apiRequest('PUT', `/api/clients/${client.id}/parts`, { parts });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients', client.id, 'parts'] });
@@ -257,7 +257,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
 
   const updateEquipmentMutation = useMutation({
     mutationFn: async (equipment: typeof equipmentRows) => {
-      return await apiRequest(`/api/clients/${client.id}/equipment`, 'PUT', { equipment });
+      return await apiRequest('PUT', `/api/clients/${client.id}/equipment`, { equipment });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients', client.id, 'equipment'] });
@@ -400,6 +400,25 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
                       placeholder="Notes"
                     />
                   </div>
+
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="inactive"
+                        checked={formData.inactive}
+                        onCheckedChange={(checked) => 
+                          setFormData({ ...formData, inactive: checked as boolean })
+                        }
+                        data-testid="checkbox-inactive"
+                      />
+                      <Label htmlFor="inactive" className="cursor-pointer text-xs">
+                        Mark as Inactive (On-Call/As-Needed Only)
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-6">
+                      Inactive clients won't appear in scheduled maintenance reports.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -474,27 +493,6 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
                     </div>
                   )}
                 </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="inactive"
-                    checked={formData.inactive}
-                    onCheckedChange={(checked) => 
-                      setFormData({ ...formData, inactive: checked as boolean })
-                    }
-                    data-testid="checkbox-inactive"
-                  />
-                  <Label htmlFor="inactive" className="cursor-pointer text-sm">
-                    Mark as Inactive (On-Call/As-Needed Only)
-                  </Label>
-                </div>
-                <p className="text-xs text-muted-foreground pl-6">
-                  Inactive clients won't appear in scheduled maintenance reports.
-                </p>
               </div>
             </TabsContent>
 
