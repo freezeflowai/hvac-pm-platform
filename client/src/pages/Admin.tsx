@@ -187,7 +187,7 @@ export default function Admin() {
   return (
     <>
       <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-6 mx-auto">
         <h1 className="text-3xl font-bold mb-6">User Management</h1>
       
       <Card>

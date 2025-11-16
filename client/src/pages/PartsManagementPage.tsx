@@ -14,7 +14,7 @@ export default function PartsManagementPage() {
     <div className="min-h-screen bg-background">
       <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
       
-      <main className="container mx-auto p-6 max-w-5xl">
+      <main className="container mx-auto p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Manage Parts Inventory</h1>
           <p className="text-muted-foreground">Add and manage parts for maintenance schedules.</p>

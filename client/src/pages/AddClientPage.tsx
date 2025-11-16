@@ -198,7 +198,7 @@ export default function AddClientPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
-      <main className="container mx-auto p-6 max-w-5xl">
+      <main className="container mx-auto p-6">
         <div className="mb-6 flex items-center gap-4">
           <Button
             variant="outline"
