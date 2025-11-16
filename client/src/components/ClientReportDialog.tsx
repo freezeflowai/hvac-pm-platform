@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Printer, Pencil } from "lucide-react";
 import { format } from "date-fns";
@@ -119,19 +118,21 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
   const { client, parts = [], equipment = [] } = reportData || {};
   const pmMonths = client?.selectedMonths.map(m => MONTH_NAMES[m]).join(", ") || "";
 
+  const hasContactInfo = client && (client.contactName || client.email || client.phone || client.address || client.city || client.province || client.postalCode || client.roofLadderCode || client.notes);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="pb-2">
+        <DialogHeader className="border-b pb-4">
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-base">Client Report</DialogTitle>
-            <div className="flex gap-1">
-              <Button onClick={handleEdit} size="sm" variant="outline" data-testid="button-edit" className="gap-1 h-7 text-xs">
-                <Pencil className="h-3 w-3" />
+            <DialogTitle className="text-2xl font-bold">Client Report</DialogTitle>
+            <div className="flex gap-2">
+              <Button onClick={handleEdit} size="default" variant="outline" data-testid="button-edit" className="gap-2">
+                <Pencil className="h-4 w-4" />
                 Edit
               </Button>
-              <Button onClick={handlePrint} data-testid="button-print" size="sm" className="gap-1 h-7 text-xs">
-                <Printer className="h-3 w-3" />
+              <Button onClick={handlePrint} data-testid="button-print" size="default" variant="outline" className="gap-2 no-print">
+                <Printer className="h-4 w-4" />
                 Print
               </Button>
             </div>
@@ -139,196 +140,175 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
         </DialogHeader>
 
         {isLoading ? (
-          <div className="p-4">
-            <p className="text-center text-muted-foreground text-sm">Loading report...</p>
+          <div className="p-8">
+            <p className="text-center text-muted-foreground">Loading report...</p>
           </div>
         ) : client ? (
-          <div className="space-y-2">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Client Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 p-3">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1.5">
+          <div className="space-y-6 pt-2">
+            {/* Client Information Section */}
+            <div className="space-y-3">
+              <h2 className="text-xl font-bold">Client Information</h2>
+              <div className="grid grid-cols-3 gap-8">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Company Name</p>
+                  <p className="text-base font-medium" data-testid="text-company-name">
+                    {client.companyName}
+                    {client.location && ` - ${client.location}`}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Status</p>
+                  <p className="text-base font-medium" data-testid="text-status">
+                    {client.inactive ? "Inactive (On-Call)" : "Active"}
+                  </p>
+                </div>
+                {!client.inactive && (
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground">Company Name</p>
-                    <p className="text-xs font-semibold" data-testid="text-company-name">{client.companyName}</p>
-                  </div>
-                  {client.location && (
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Location Name</p>
-                      <p className="text-xs" data-testid="text-location">{client.location}</p>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Status</p>
-                    <p className="text-xs" data-testid="text-status">
-                      {client.inactive ? "Inactive (On-Call)" : "Active"}
+                    <p className="text-sm text-muted-foreground mb-1">Next Maintenance Due</p>
+                    <p className="text-base font-medium" data-testid="text-next-due">
+                      {format(new Date(client.nextDue), "MMMM d, yyyy")}
                     </p>
                   </div>
-                  {!client.inactive && (
+                )}
+              </div>
+            </div>
+
+            {/* Contact Information Section */}
+            <div className="space-y-3 border-t pt-6">
+              <h2 className="text-xl font-bold">Contact Information</h2>
+              {hasContactInfo ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {client.contactName && (
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground">Next Maintenance Due</p>
-                      <p className="text-xs" data-testid="text-next-due">
-                        {format(new Date(client.nextDue), "MMMM d, yyyy")}
-                      </p>
+                      <p className="text-sm text-muted-foreground mb-1">Contact Name</p>
+                      <p className="text-base" data-testid="text-contact-name">{client.contactName}</p>
+                    </div>
+                  )}
+                  {client.email && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Email</p>
+                      <p className="text-base" data-testid="text-email">{client.email}</p>
+                    </div>
+                  )}
+                  {client.phone && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Phone</p>
+                      <p className="text-base" data-testid="text-phone">{client.phone}</p>
+                    </div>
+                  )}
+                  {client.address && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Address</p>
+                      <p className="text-base" data-testid="text-address">{client.address}</p>
+                    </div>
+                  )}
+                  {client.city && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">City</p>
+                      <p className="text-base" data-testid="text-city">{client.city}</p>
+                    </div>
+                  )}
+                  {client.province && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Province/State</p>
+                      <p className="text-base" data-testid="text-province">{client.province}</p>
+                    </div>
+                  )}
+                  {client.postalCode && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Postal/Zip Code</p>
+                      <p className="text-base" data-testid="text-postal-code">{client.postalCode}</p>
+                    </div>
+                  )}
+                  {client.roofLadderCode && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Roof/Ladder Code</p>
+                      <p className="text-base" data-testid="text-roof-ladder-code">{client.roofLadderCode}</p>
+                    </div>
+                  )}
+                  {client.notes && (
+                    <div className="md:col-span-4">
+                      <p className="text-sm text-muted-foreground mb-1">Notes</p>
+                      <p className="text-base" data-testid="text-notes">{client.notes}</p>
                     </div>
                   )}
                 </div>
-                
-                <div className="pt-1.5 border-t">
-                  <p className="text-xs font-semibold mb-1.5">Contact Information</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1.5">
-                    {client.address && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Address</p>
-                        <p className="text-xs" data-testid="text-address">{client.address}</p>
-                      </div>
-                    )}
-                    {client.city && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">City</p>
-                        <p className="text-xs" data-testid="text-city">{client.city}</p>
-                      </div>
-                    )}
-                    {client.province && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Province/State</p>
-                        <p className="text-xs" data-testid="text-province">{client.province}</p>
-                      </div>
-                    )}
-                    {client.postalCode && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Postal/Zip Code</p>
-                        <p className="text-xs" data-testid="text-postal-code">{client.postalCode}</p>
-                      </div>
-                    )}
-                    {client.contactName && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Contact Name</p>
-                        <p className="text-xs" data-testid="text-contact-name">{client.contactName}</p>
-                      </div>
-                    )}
-                    {client.email && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Email</p>
-                        <p className="text-xs" data-testid="text-email">{client.email}</p>
-                      </div>
-                    )}
-                    {client.phone && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Phone</p>
-                        <p className="text-xs" data-testid="text-phone">{client.phone}</p>
-                      </div>
-                    )}
-                    {client.roofLadderCode && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Roof/Ladder Code</p>
-                        <p className="text-xs" data-testid="text-roof-ladder-code">{client.roofLadderCode}</p>
-                      </div>
-                    )}
-                    {client.notes && (
-                      <div className="md:col-span-4">
-                        <p className="text-xs font-medium text-muted-foreground">Notes</p>
-                        <p className="text-xs" data-testid="text-notes">{client.notes}</p>
-                      </div>
-                    )}
-                    {!client.address && !client.city && !client.province && !client.postalCode && 
-                     !client.contactName && !client.email && !client.phone && !client.roofLadderCode && !client.notes && (
-                      <p className="text-xs text-muted-foreground md:col-span-4">No contact information available</p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <Card>
-                <CardHeader className="pb-1.5">
-                  <CardTitle className="text-sm font-semibold">PM Schedule</CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 pt-0">
-                  <p className="text-xs font-medium text-muted-foreground mb-0.5">Scheduled Months</p>
-                  <p className="text-xs" data-testid="text-pm-months">
-                    {client.inactive ? "On-Call / As-Needed" : pmMonths}
-                  </p>
-                </CardContent>
-              </Card>
-
-              {parts.length > 0 && (
-                <Card className="md:col-span-2">
-                  <CardHeader className="pb-1.5">
-                    <CardTitle className="text-sm font-semibold">Parts Inventory</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-3 pt-0">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left py-1 px-2 text-xs font-medium text-muted-foreground">Part Name</th>
-                            <th className="text-left py-1 px-2 text-xs font-medium text-muted-foreground">Type</th>
-                            <th className="text-right py-1 px-2 text-xs font-medium text-muted-foreground">Qty</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {parts.map((clientPart, index) => (
-                            <tr key={clientPart.id} className="border-b" data-testid={`row-part-${index}`}>
-                              <td className="py-1 px-2 text-xs">{getPartDisplayName(clientPart.part)}</td>
-                              <td className="py-1 px-2 text-xs capitalize">{clientPart.part.type}</td>
-                              <td className="py-1 px-2 text-xs text-right">{clientPart.quantity}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
+              ) : (
+                <p className="text-base text-muted-foreground">No contact information available</p>
               )}
             </div>
 
-            {equipment.length > 0 && (
-              <Card>
-                <CardHeader className="pb-1.5">
-                  <CardTitle className="text-sm font-semibold">Equipment</CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 pt-0">
+            {/* PM Schedule and Parts Inventory Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t pt-6">
+              <div className="space-y-3">
+                <h2 className="text-xl font-bold">PM Schedule</h2>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Scheduled Months</p>
+                  <p className="text-base" data-testid="text-pm-months">
+                    {client.inactive ? "On-Call / As-Needed" : pmMonths}
+                  </p>
+                </div>
+              </div>
+
+              {parts.length > 0 && (
+                <div className="space-y-3">
+                  <h2 className="text-xl font-bold">Parts Inventory</h2>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left py-1 px-2 text-xs font-medium text-muted-foreground">Equipment Name</th>
-                          <th className="text-left py-1 px-2 text-xs font-medium text-muted-foreground">Model Number</th>
-                          <th className="text-left py-1 px-2 text-xs font-medium text-muted-foreground">Serial Number</th>
-                          <th className="text-left py-1 px-2 text-xs font-medium text-muted-foreground">Notes</th>
+                          <th className="text-left py-2 text-sm font-medium text-muted-foreground">Part Name</th>
+                          <th className="text-left py-2 text-sm font-medium text-muted-foreground">Type</th>
+                          <th className="text-right py-2 text-sm font-medium text-muted-foreground">Qty</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {equipment.map((eq, index) => (
-                          <tr key={eq.id} className="border-b" data-testid={`row-equipment-${index}`}>
-                            <td className="py-1 px-2 text-xs font-medium">{eq.name}</td>
-                            <td className="py-1 px-2 text-xs">{eq.modelNumber || '—'}</td>
-                            <td className="py-1 px-2 text-xs">{eq.serialNumber || '—'}</td>
-                            <td className="py-1 px-2 text-xs">{eq.notes || '—'}</td>
+                        {parts.map((clientPart, index) => (
+                          <tr key={clientPart.id} className="border-b" data-testid={`row-part-${index}`}>
+                            <td className="py-2 text-base">{getPartDisplayName(clientPart.part)}</td>
+                            <td className="py-2 text-base capitalize">{clientPart.part.type}</td>
+                            <td className="py-2 text-base text-right">{clientPart.quantity}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              )}
+            </div>
 
-            {parts.length === 0 && equipment.length === 0 && (
-              <Card>
-                <CardContent className="p-3 text-center text-xs text-muted-foreground">
-                  No parts or equipment assigned to this client yet.
-                </CardContent>
-              </Card>
+            {/* Equipment Section */}
+            {equipment.length > 0 && (
+              <div className="space-y-3 border-t pt-6">
+                <h2 className="text-xl font-bold">Equipment</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 text-sm font-medium text-muted-foreground">Equipment Name</th>
+                        <th className="text-left py-2 text-sm font-medium text-muted-foreground">Model Number</th>
+                        <th className="text-left py-2 text-sm font-medium text-muted-foreground">Serial Number</th>
+                        <th className="text-left py-2 text-sm font-medium text-muted-foreground">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {equipment.map((eq, index) => (
+                        <tr key={eq.id} className="border-b" data-testid={`row-equipment-${index}`}>
+                          <td className="py-2 text-base font-medium">{eq.name}</td>
+                          <td className="py-2 text-base">{eq.modelNumber || '—'}</td>
+                          <td className="py-2 text-base">{eq.serialNumber || '—'}</td>
+                          <td className="py-2 text-base">{eq.notes || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
           </div>
         ) : (
-          <div className="p-4">
-            <p className="text-center text-muted-foreground text-sm">Client not found</p>
+          <div className="p-8">
+            <p className="text-center text-muted-foreground">Client not found</p>
           </div>
         )}
       </DialogContent>
