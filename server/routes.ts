@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, type Client } from "@shared/schema";
 import { passport, isAdmin } from "./auth";
 import { z } from "zod";
 

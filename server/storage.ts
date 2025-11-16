@@ -22,6 +22,37 @@ import {
 import { randomUUID } from "crypto";
 import { STANDARD_BELTS, STANDARD_FILTERS } from "./seed-data";
 
+// Helper function to calculate the next maintenance due date
+function calculateNextDueDate(selectedMonths: number[], inactive: boolean): string {
+  if (inactive || selectedMonths.length === 0) {
+    return '9999-12-31'; // Far future date for inactive clients
+  }
+  
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  const currentDay = today.getDate();
+  
+  // Sort months to ensure consistent behavior
+  const sortedMonths = [...selectedMonths].sort((a, b) => a - b);
+  
+  // If current month is selected and we haven't passed the 15th, use current month
+  if (sortedMonths.includes(currentMonth) && currentDay < 15) {
+    return new Date(currentYear, currentMonth, 15).toISOString();
+  }
+  
+  // Otherwise find the next scheduled month
+  let nextMonth = sortedMonths.find(m => m > currentMonth);
+  
+  if (nextMonth === undefined) {
+    // Wrap to next year
+    nextMonth = sortedMonths[0];
+    return new Date(currentYear + 1, nextMonth, 15).toISOString();
+  }
+  
+  return new Date(currentYear, nextMonth, 15).toISOString();
+}
+
 export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
@@ -273,6 +304,14 @@ export class MemStorage implements IStorage {
     if (!existing || existing.userId !== userId) return undefined;
     
     const updated: Client = { ...existing, ...clientUpdate };
+    
+    // Recalculate nextDue if selectedMonths or inactive status changed
+    if (clientUpdate.selectedMonths !== undefined || clientUpdate.inactive !== undefined) {
+      const selectedMonths = clientUpdate.selectedMonths ?? existing.selectedMonths;
+      const inactive = clientUpdate.inactive ?? existing.inactive;
+      updated.nextDue = calculateNextDueDate(selectedMonths, inactive);
+    }
+    
     this.clients.set(id, updated);
     return updated;
   }
