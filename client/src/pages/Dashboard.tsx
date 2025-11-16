@@ -343,9 +343,9 @@ export default function Dashboard() {
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
-  // Unscheduled: have PM this month but not on calendar
+  // Unscheduled: have PM this month but not on calendar - exclude completed items
   const unscheduledItems: MaintenanceItem[] = clientsWithCurrentMonthPM
-    .filter(c => !scheduledClientIds.has(c.id))
+    .filter(c => !scheduledClientIds.has(c.id) && !completionStatuses[c.id]?.completed)
     .map(c => ({
       id: c.id,
       companyName: c.companyName,
@@ -356,13 +356,16 @@ export default function Dashboard() {
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
-  // Overdue/upcoming only from SCHEDULED clients
-  const overdueItems = scheduledMaintenanceItems.filter(item => item.status === "overdue");
-  const thisMonthItems = scheduledMaintenanceItems.filter(item => {
-    const monthFromNow = new Date();
-    monthFromNow.setMonth(monthFromNow.getMonth() + 1);
-    return item.nextDue <= monthFromNow && item.status !== "overdue";
-  });
+  // Overdue/upcoming only from SCHEDULED clients - exclude completed items
+  const overdueItems = scheduledMaintenanceItems
+    .filter(item => item.status === "overdue" && !completionStatuses[item.id]?.completed);
+  
+  const thisMonthItems = scheduledMaintenanceItems
+    .filter(item => {
+      const monthFromNow = new Date();
+      monthFromNow.setMonth(monthFromNow.getMonth() + 1);
+      return item.nextDue <= monthFromNow && item.status !== "overdue" && !completionStatuses[item.id]?.completed;
+    });
   
 
   const completedCount = recentlyCompleted.length;
@@ -372,6 +375,7 @@ export default function Dashboard() {
   
   const topOverdueClients = overdueItems
     .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime());
+  
   const upcomingNextWeek = scheduledMaintenanceItems
     .filter(item => {
       const today = new Date();
@@ -379,7 +383,7 @@ export default function Dashboard() {
       const weekFromNow = new Date();
       weekFromNow.setDate(weekFromNow.getDate() + 7);
       weekFromNow.setHours(23, 59, 59, 999);
-      return item.nextDue >= today && item.nextDue <= weekFromNow && item.status !== "overdue";
+      return item.nextDue >= today && item.nextDue <= weekFromNow && item.status !== "overdue" && !completionStatuses[item.id]?.completed;
     })
     .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime());
   
