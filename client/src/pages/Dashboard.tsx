@@ -807,19 +807,6 @@ export default function Dashboard() {
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsContent value="schedule" className="space-y-6">
-            {recentlyCompleted.length > 0 && (
-              <div ref={completedRef}>
-                <MaintenanceSection
-                  title="Recently Completed (This Month)"
-                  items={recentlyCompleted}
-                  onMarkComplete={handleMarkComplete}
-                  onEdit={handleEditClient}
-                  emptyMessage="No recently completed maintenance"
-                  clientParts={clientParts}
-                  completionStatuses={completionStatuses}
-                />
-              </div>
-            )}
           </TabsContent>
 
           <TabsContent value="clients">
