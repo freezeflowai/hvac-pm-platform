@@ -140,10 +140,10 @@ export default function Dashboard() {
 
   const handleTabChange = (value: string) => {
     if (value === 'clients') {
-      setLocation('/?tab=clients');
+      window.history.pushState({}, '', '/?tab=clients');
       setActiveTab('clients');
     } else {
-      setLocation('/');
+      window.history.pushState({}, '', '/');
       setActiveTab('schedule');
     }
   };
