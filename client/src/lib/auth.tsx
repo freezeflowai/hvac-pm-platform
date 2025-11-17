@@ -62,11 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onMutate: () => {
       setUser(null);
-      queryClient.cancelQueries({ queryKey: ["/api/company-settings"] });
+      queryClient.cancelQueries();
     },
     onSuccess: () => {
-      queryClient.removeQueries({ queryKey: ["/api/company-settings"] });
-      queryClient.removeQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.clear();
     },
   });
 
