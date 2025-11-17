@@ -758,7 +758,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         client.selectedMonths.includes(month) && !client.inactive
       );
       
-      res.json(scheduledClients);
+      // Get parts for each client
+      const clientsWithParts = await Promise.all(
+        scheduledClients.map(async (client) => {
+          const clientParts = await storage.getClientParts(req.user!.id, client.id);
+          return {
+            ...client,
+            parts: clientParts
+          };
+        })
+      );
+      
+      res.json(clientsWithParts);
     } catch (error) {
       res.status(500).json({ error: "Failed to generate schedule report" });
     }

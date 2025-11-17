@@ -49,11 +49,27 @@ function getPartDisplay(part: ReportItem['part']) {
   }
 }
 
+interface ClientPart {
+  id: string;
+  partId: string;
+  quantity: number;
+  part: {
+    id: string;
+    type: string;
+    filterType?: string | null;
+    beltType?: string | null;
+    size?: string | null;
+    name?: string | null;
+    description?: string | null;
+  };
+}
+
 interface ClientScheduleItem {
   id: string;
   companyName: string;
   location: string;
   selectedMonths: number[];
+  parts: ClientPart[];
 }
 
 export default function Reports() {
@@ -356,32 +372,87 @@ export default function Reports() {
                         <TableHead>Company Name</TableHead>
                         <TableHead>Location</TableHead>
                         <TableHead>PM Schedule</TableHead>
+                        <TableHead>Parts</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {scheduleData.map((client, index) => (
-                        <TableRow key={client.id} data-testid={`schedule-row-${index}`}>
-                          <TableCell className="font-medium" data-testid={`client-name-${index}`}>
-                            {client.companyName}
-                          </TableCell>
-                          <TableCell data-testid={`client-location-${index}`}>
-                            {client.location}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {client.selectedMonths.map(monthIndex => (
-                                <Badge
-                                  key={monthIndex}
-                                  variant={monthIndex === scheduleMonth ? "default" : "outline"}
-                                  data-testid={`month-badge-${index}-${monthIndex}`}
-                                >
-                                  {MONTHS[monthIndex]}
-                                </Badge>
-                              ))}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {scheduleData.map((client, index) => {
+                        const filters = client.parts.filter(cp => cp.part.type === "filter");
+                        const belts = client.parts.filter(cp => cp.part.type === "belt");
+                        const sortedFilters = filters.sort((a, b) => {
+                          const aDisplay = getPartDisplay(a.part);
+                          const bDisplay = getPartDisplay(b.part);
+                          return aDisplay.name.localeCompare(bDisplay.name);
+                        });
+                        const sortedBelts = belts.sort((a, b) => {
+                          const aDisplay = getPartDisplay(a.part);
+                          const bDisplay = getPartDisplay(b.part);
+                          return aDisplay.name.localeCompare(bDisplay.name);
+                        });
+                        
+                        return (
+                          <TableRow key={client.id} data-testid={`schedule-row-${index}`}>
+                            <TableCell className="font-medium py-1.5" data-testid={`client-name-${index}`}>
+                              {client.companyName}
+                            </TableCell>
+                            <TableCell className="py-1.5" data-testid={`client-location-${index}`}>
+                              {client.location}
+                            </TableCell>
+                            <TableCell className="py-1.5">
+                              <div className="flex flex-wrap gap-1">
+                                {client.selectedMonths.map(monthIndex => (
+                                  <Badge
+                                    key={monthIndex}
+                                    variant={monthIndex === scheduleMonth ? "default" : "outline"}
+                                    data-testid={`month-badge-${index}-${monthIndex}`}
+                                  >
+                                    {MONTHS[monthIndex]}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-1.5">
+                              <div className="space-y-1">
+                                {sortedFilters.length > 0 && (
+                                  <div className="text-xs">
+                                    <span className="font-medium">Filters: </span>
+                                    <span className="text-muted-foreground">
+                                      {sortedFilters.map((cp, i) => {
+                                        const display = getPartDisplay(cp.part);
+                                        return (
+                                          <span key={cp.id}>
+                                            {i > 0 && ", "}
+                                            {display.details} ({cp.quantity})
+                                          </span>
+                                        );
+                                      })}
+                                    </span>
+                                  </div>
+                                )}
+                                {sortedBelts.length > 0 && (
+                                  <div className="text-xs">
+                                    <span className="font-medium">Belts: </span>
+                                    <span className="text-muted-foreground">
+                                      {sortedBelts.map((cp, i) => {
+                                        const display = getPartDisplay(cp.part);
+                                        return (
+                                          <span key={cp.id}>
+                                            {i > 0 && ", "}
+                                            {display.details} ({cp.quantity})
+                                          </span>
+                                        );
+                                      })}
+                                    </span>
+                                  </div>
+                                )}
+                                {sortedFilters.length === 0 && sortedBelts.length === 0 && (
+                                  <span className="text-xs text-muted-foreground">No parts</span>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </CardContent>
