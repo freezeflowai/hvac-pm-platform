@@ -84,7 +84,7 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
 
   if (isMinimized) {
     return (
-      <div className="fixed right-0 top-0 h-screen flex items-center z-40">
+      <div className="fixed right-0 top-0 h-screen flex items-center z-50">
         <Card className="h-full w-12 shadow-lg rounded-l-xl rounded-r-none flex flex-col items-center justify-center border-r-0">
           <Button
             variant="ghost"
@@ -104,8 +104,8 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
   }
 
   return (
-    <div className="h-full">
-      <Card className="h-full shadow-md rounded-xl flex flex-col">
+    <div className="h-full flex flex-col">
+      <Card className="h-full shadow-md rounded-xl flex flex-col overflow-hidden">
         <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0 flex-shrink-0">
           <CardTitle className="text-base font-semibold">Unscheduled ({clients.length})</CardTitle>
           <Button
@@ -118,10 +118,10 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
             <ChevronsRight className="h-4 w-4" />
           </Button>
         </CardHeader>
-        <CardContent className="flex-1 overflow-hidden">
+        <CardContent className="flex-1 min-h-0 p-4">
           <div 
             ref={setNodeRef}
-            className="space-y-2 h-full overflow-y-auto"
+            className="space-y-2 h-full overflow-y-auto pr-2"
             data-testid="unscheduled-panel"
           >
             {clients.map((client: any) => (
@@ -729,7 +729,7 @@ export default function Calendar() {
       <div className="min-h-screen bg-background">
         <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
         
-        <main className="mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+        <main className={`mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Button
