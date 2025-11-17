@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Link } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -21,6 +21,10 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Search, Plus, Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 function Router() {
   return (
@@ -72,7 +76,8 @@ function Router() {
 function AppContent() {
   const [location] = useLocation();
   const { user } = useAuth();
-  const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   
   const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
@@ -89,6 +94,15 @@ function AppContent() {
     window.location.href = '/';
   };
 
+  const handleAddClient = () => {
+    window.dispatchEvent(new CustomEvent('openAddClientDialog'));
+  };
+
+  const filteredClients = allClients.filter(client =>
+    client.companyName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    client.location?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
@@ -101,17 +115,62 @@ function AppContent() {
   return (
     <SidebarProvider style={style as React.CSSProperties}>
       <div className="flex h-screen w-full">
-        <AppSidebar 
-          clients={allClients}
-          onAddClient={() => {
-            window.dispatchEvent(new CustomEvent('openAddClientDialog'));
-          }}
-          onDashboardClick={handleDashboardClick}
-          onClientSelect={handleClientSelect}
-        />
+        <AppSidebar onDashboardClick={handleDashboardClick} />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center gap-2 border-b px-4 py-2">
+          <header className="flex items-center justify-between gap-2 border-b px-4 py-2">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-2">
+              <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" data-testid="button-search">
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0" align="end">
+                  <Command>
+                    <CommandInput
+                      placeholder="Search clients..."
+                      value={searchQuery}
+                      onValueChange={setSearchQuery}
+                      data-testid="input-client-search"
+                    />
+                    <CommandList>
+                      <CommandEmpty>No clients found.</CommandEmpty>
+                      <CommandGroup>
+                        {filteredClients.map((client) => (
+                          <CommandItem
+                            key={client.id}
+                            value={client.id}
+                            keywords={[client.companyName, client.location || '']}
+                            onSelect={() => {
+                              handleClientSelect(client.id);
+                              setSearchOpen(false);
+                              setSearchQuery("");
+                            }}
+                            data-testid={`client-search-item-${client.id}`}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{client.companyName}</span>
+                              {client.location && (
+                                <span className="text-xs text-muted-foreground">{client.location}</span>
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <Button variant="ghost" size="icon" onClick={handleAddClient} data-testid="button-add-client">
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" asChild data-testid="button-settings">
+                <Link href="/company-settings">
+                  <Settings className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           </header>
           <main className="flex-1 overflow-auto">
             <Router />

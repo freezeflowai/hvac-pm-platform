@@ -5,10 +5,7 @@ import {
   Package, 
   FileText, 
   Shield, 
-  Settings, 
-  LogOut,
-  Plus,
-  Search
+  LogOut
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -27,24 +24,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useState } from "react";
-
 interface AppSidebarProps {
-  onAddClient?: () => void;
   onDashboardClick?: () => void;
-  onClientSelect?: (clientId: string) => void;
-  clients?: any[];
 }
 
-export function AppSidebar({ onAddClient, onDashboardClick, onClientSelect, clients = [] }: AppSidebarProps) {
+export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const { toast } = useToast();
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: companySettings } = useQuery<CompanySettings | null>({
     queryKey: ["/api/company-settings"],
@@ -72,11 +59,6 @@ export function AppSidebar({ onAddClient, onDashboardClick, onClientSelect, clie
     }
   };
 
-  const filteredClients = clients.filter(client =>
-    client.companyName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.location?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   const isClientsTab = location === "/" && window.location.search.includes("tab=clients");
 
   const menuItems = [
@@ -101,14 +83,14 @@ export function AppSidebar({ onAddClient, onDashboardClick, onClientSelect, clie
       testId: "nav-calendar"
     },
     {
-      title: "All Clients",
+      title: "Clients",
       icon: Users,
       isActive: isClientsTab,
       onClick: () => {
         window.history.pushState({}, '', '/?tab=clients');
         window.dispatchEvent(new PopStateEvent('popstate'));
       },
-      testId: "nav-all-clients"
+      testId: "nav-clients"
     },
     {
       title: "Parts",
@@ -145,92 +127,25 @@ export function AppSidebar({ onAddClient, onDashboardClick, onClientSelect, clie
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild={!item.onClick}
-                    isActive={item.isActive}
-                    onClick={item.onClick}
-                    data-testid={item.testId}
-                  >
-                    {item.href ? (
+                  {item.href ? (
+                    <SidebarMenuButton asChild isActive={item.isActive} data-testid={item.testId}>
                       <Link href={item.href}>
-                        <item.icon />
+                        <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </Link>
-                    ) : (
-                      <button>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </button>
-                    )}
-                  </SidebarMenuButton>
+                    </SidebarMenuButton>
+                  ) : (
+                    <SidebarMenuButton isActive={item.isActive} onClick={item.onClick} data-testid={item.testId}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  )}
                 </SidebarMenuItem>
               ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Actions</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-                  <PopoverTrigger asChild>
-                    <SidebarMenuButton data-testid="button-search">
-                      <Search />
-                      <span>Search Clients</span>
-                    </SidebarMenuButton>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80 p-0" align="start" side="right">
-                    <Command>
-                      <CommandInput
-                        placeholder="Search clients..."
-                        value={searchQuery}
-                        onValueChange={setSearchQuery}
-                        data-testid="input-client-search"
-                      />
-                      <CommandList>
-                        <CommandEmpty>No clients found.</CommandEmpty>
-                        <CommandGroup>
-                          {filteredClients.map((client) => (
-                            <CommandItem
-                              key={client.id}
-                              value={client.id}
-                              keywords={[client.companyName, client.location || '']}
-                              onSelect={() => {
-                                if (onClientSelect) {
-                                  onClientSelect(client.id);
-                                }
-                                setSearchOpen(false);
-                                setSearchQuery("");
-                              }}
-                              data-testid={`client-search-item-${client.id}`}
-                            >
-                              <div className="flex flex-col">
-                                <span className="font-medium">{client.companyName}</span>
-                                {client.location && (
-                                  <span className="text-xs text-muted-foreground">{client.location}</span>
-                                )}
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton onClick={onAddClient} data-testid="button-add-client">
-                  <Plus />
-                  <span>Add Client</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -238,16 +153,8 @@ export function AppSidebar({ onAddClient, onDashboardClick, onClientSelect, clie
       <SidebarFooter className="border-t">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/company-settings">
-                <Settings />
-                <span>Settings</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
             <SidebarMenuButton onClick={handleLogout} data-testid="button-logout">
-              <LogOut />
+              <LogOut className="h-4 w-4" />
               <span>Logout</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
