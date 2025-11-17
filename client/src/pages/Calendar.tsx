@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable } from "@dnd-kit/core";
+import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable, pointerWithin, CollisionDetection } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useCallback } from "react";
 import Header from "@/components/Header";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import ClientReportDialog from "@/components/ClientReportDialog";
@@ -597,6 +598,33 @@ export default function Calendar() {
     return days;
   };
 
+  // Custom collision detection that only checks drop zones (days), not individual items
+  const customCollisionDetection: CollisionDetection = useCallback((args) => {
+    // Filter to only check day drop zones and the unscheduled panel
+    const dropZoneContainers = args.droppableContainers.filter(
+      (container) => {
+        const id = container.id as string;
+        return id.startsWith('day-') || id === 'unscheduled-panel';
+      }
+    );
+
+    // Use pointer-first approach for precision
+    const pointerCollisions = pointerWithin({
+      ...args,
+      droppableContainers: dropZoneContainers,
+    });
+    
+    if (pointerCollisions.length > 0) {
+      return pointerCollisions;
+    }
+
+    // Fallback to closestCenter
+    return closestCenter({
+      ...args,
+      droppableContainers: dropZoneContainers,
+    });
+  }, []);
+
   const renderWeeklyView = () => {
     // Get current week dates
     const today = new Date();
@@ -680,7 +708,7 @@ export default function Calendar() {
 
   return (
     <DndContext
-      collisionDetection={closestCenter}
+      collisionDetection={customCollisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
