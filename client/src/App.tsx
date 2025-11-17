@@ -113,7 +113,7 @@ function AppContent() {
   }
 
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
+    <SidebarProvider defaultOpen={true} style={style as React.CSSProperties}>
       <div className="flex h-screen w-full">
         <AppSidebar onDashboardClick={handleDashboardClick} />
         <div className="flex flex-col flex-1 overflow-hidden">

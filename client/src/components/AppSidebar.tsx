@@ -119,7 +119,7 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
   }
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader className="border-b px-3 py-3">
         <div className="font-semibold text-sm truncate">
           {companySettings?.companyName || "HVAC/R Scheduler"}
