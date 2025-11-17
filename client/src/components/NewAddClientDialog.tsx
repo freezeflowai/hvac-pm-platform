@@ -292,7 +292,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
           </TabsList>
 
           <ScrollArea className="flex-1 pr-4">
-            <TabsContent value="info" className="space-y-4 mt-4">
+            <TabsContent value="info" className="space-y-4 mt-4 pb-6">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="companyName">Company Name <span className="text-destructive">*</span></Label>
@@ -476,7 +476,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
               </div>
             </TabsContent>
 
-            <TabsContent value="filters" className="space-y-3 mt-4">
+            <TabsContent value="filters" className="space-y-3 mt-4 pb-6">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Filters</Label>
                 {partRows.filter(row => row.type === 'filter').map((row, idx) => {
@@ -578,7 +578,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
               </div>
             </TabsContent>
 
-            <TabsContent value="belts" className="space-y-3 mt-4">
+            <TabsContent value="belts" className="space-y-3 mt-4 pb-6">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Belts</Label>
                 {partRows.filter(row => row.type === 'belt').map((row, idx) => {
