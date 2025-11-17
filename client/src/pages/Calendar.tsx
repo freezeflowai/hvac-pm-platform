@@ -561,6 +561,8 @@ export default function Calendar() {
 
   const { data: maintenanceStatuses = {} } = useQuery<Record<string, { completed: boolean; completedDueDate?: string }>>({
     queryKey: ["/api/maintenance/statuses"],
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   if (isLoading) {
