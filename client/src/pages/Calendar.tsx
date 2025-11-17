@@ -156,33 +156,32 @@ function DayPartsCell({ assignments, clients, dayName, date }: { assignments: an
   };
 
   return (
-    <div className="p-3 border bg-card">
-      <div className="flex items-center justify-between mb-2">
-        <div className="font-medium text-sm">{dayName}</div>
+    <div className="p-2 border bg-card">
+      <div className="flex items-center justify-end mb-2">
         <Button
           size="sm"
           variant="outline"
           onClick={handleEmailParts}
           disabled={sortedParts.length === 0}
-          className="h-7 px-2"
+          className="h-6 px-2 text-xs"
           data-testid={`button-email-${dayName.toLowerCase()}`}
         >
           <Mail className="h-3 w-3 mr-1" />
-          Email
+          Send
         </Button>
       </div>
       
       {sortedParts.length > 0 ? (
-        <div className="space-y-1 max-h-48 overflow-y-auto">
+        <div className="space-y-0.5 max-h-48 overflow-y-auto">
           {sortedParts.map(([partName, quantity]) => (
-            <div key={partName} className="flex items-center justify-between gap-2 text-sm">
+            <div key={partName} className="flex items-center justify-between gap-1 text-xs">
               <span className="truncate">{partName}</span>
               <span className="font-semibold text-primary shrink-0">×{quantity}</span>
             </div>
           ))}
         </div>
       ) : (
-        <div className="text-xs text-muted-foreground text-center py-4">
+        <div className="text-xs text-muted-foreground text-center py-3">
           No parts required
         </div>
       )}
