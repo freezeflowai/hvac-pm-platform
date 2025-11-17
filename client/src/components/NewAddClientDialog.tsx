@@ -291,7 +291,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
             <TabsTrigger value="belts" data-testid="tab-belts">Belts</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 pr-4">
+          <div className="flex-1 overflow-y-auto pr-4">
             <TabsContent value="info" className="space-y-4 mt-4 pb-6">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -679,7 +679,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
                 </Button>
               </div>
             </TabsContent>
-          </ScrollArea>
+          </div>
         </Tabs>
 
         <Separator />
