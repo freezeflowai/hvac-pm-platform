@@ -254,10 +254,25 @@ export class MemStorage implements IStorage {
 
   async createClient(userId: string, insertClient: InsertClient): Promise<Client> {
     const id = randomUUID();
+    const inactive = insertClient.inactive ?? false;
+    const selectedMonths = insertClient.selectedMonths ?? [];
+    
     const client: Client = { 
       ...insertClient,
+      location: insertClient.location ?? null,
+      address: insertClient.address ?? null,
+      city: insertClient.city ?? null,
+      province: insertClient.province ?? null,
+      postalCode: insertClient.postalCode ?? null,
+      contactName: insertClient.contactName ?? null,
+      email: insertClient.email ?? null,
+      phone: insertClient.phone ?? null,
+      roofLadderCode: insertClient.roofLadderCode ?? null,
+      notes: insertClient.notes ?? null,
       userId,
-      inactive: insertClient.inactive ?? false,
+      inactive,
+      selectedMonths,
+      nextDue: calculateNextDueDate(selectedMonths, inactive),
       id,
       createdAt: new Date().toISOString()
     };
@@ -721,6 +736,13 @@ export class MemStorage implements IStorage {
       const updated: CompanySettings = {
         ...existing,
         ...settings,
+        address: settings.address ?? null,
+        email: settings.email ?? null,
+        companyName: settings.companyName ?? null,
+        city: settings.city ?? null,
+        provinceState: settings.provinceState ?? null,
+        postalCode: settings.postalCode ?? null,
+        phone: settings.phone ?? null,
         updatedAt: new Date().toISOString()
       };
       this.companySettings.set(existing.id, updated);
@@ -730,6 +752,13 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const newSettings: CompanySettings = {
       ...settings,
+      address: settings.address ?? null,
+      email: settings.email ?? null,
+      companyName: settings.companyName ?? null,
+      city: settings.city ?? null,
+      provinceState: settings.provinceState ?? null,
+      postalCode: settings.postalCode ?? null,
+      phone: settings.phone ?? null,
       id,
       userId,
       updatedAt: new Date().toISOString()
@@ -759,7 +788,9 @@ export class MemStorage implements IStorage {
       ...insertAssignment,
       id,
       userId,
-      day: insertAssignment.day ?? null
+      day: insertAssignment.day ?? null,
+      autoDueDate: insertAssignment.autoDueDate ?? false,
+      completed: insertAssignment.completed ?? false
     };
     this.calendarAssignments.set(id, assignment);
     return assignment;
