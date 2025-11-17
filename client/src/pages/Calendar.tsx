@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Mail } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -97,7 +97,8 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
   );
 }
 
-function DayPartsSummary({ assignments, clients }: { assignments: any[]; clients: any[] }) {
+function DayPartsCell({ assignments, clients, dayName, date }: { assignments: any[]; clients: any[]; dayName: string; date: Date }) {
+  const { toast } = useToast();
   const clientIds = assignments.map((a: any) => a.clientId);
   
   const { data: allParts = [] } = useQuery({
@@ -116,8 +117,6 @@ function DayPartsSummary({ assignments, clients }: { assignments: any[]; clients
     },
     enabled: clientIds.length > 0
   });
-
-  if (!allParts || allParts.length === 0) return null;
 
   // Aggregate parts by type
   const partCounts: Record<string, number> = allParts.reduce((acc: Record<string, number>, clientPart: any) => {
@@ -139,21 +138,54 @@ function DayPartsSummary({ assignments, clients }: { assignments: any[]; clients
 
   const sortedParts = Object.entries(partCounts).sort(([a], [b]) => a.localeCompare(b));
 
-  if (sortedParts.length === 0) return null;
+  const handleEmailParts = () => {
+    if (sortedParts.length === 0) {
+      toast({
+        title: "No parts",
+        description: "There are no parts scheduled for this day.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const partsList = sortedParts.map(([partName, quantity]) => `${partName} ×${quantity}`).join('\n');
+    const subject = `Parts List for ${dayName} ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    const body = `Required Parts:\n\n${partsList}`;
+    
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
 
   return (
-    <div className="mt-2">
-      <div className="bg-card border rounded-md p-2">
-        <div className="text-xs font-semibold text-muted-foreground mb-2">Required Parts</div>
-        <div className="space-y-1">
+    <div className="p-3 border bg-card">
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-medium text-sm">{dayName}</div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleEmailParts}
+          disabled={sortedParts.length === 0}
+          className="h-7 px-2"
+          data-testid={`button-email-${dayName.toLowerCase()}`}
+        >
+          <Mail className="h-3 w-3 mr-1" />
+          Email
+        </Button>
+      </div>
+      
+      {sortedParts.length > 0 ? (
+        <div className="space-y-1 max-h-48 overflow-y-auto">
           {sortedParts.map(([partName, quantity]) => (
-            <div key={partName} className="flex items-center justify-between gap-2">
-              <span className="text-xs truncate">{partName}</span>
-              <span className="text-xs font-bold text-primary shrink-0">×{quantity}</span>
+            <div key={partName} className="flex items-center justify-between gap-2 text-sm">
+              <span className="truncate">{partName}</span>
+              <span className="font-semibold text-primary shrink-0">×{quantity}</span>
             </div>
           ))}
         </div>
-      </div>
+      ) : (
+        <div className="text-xs text-muted-foreground text-center py-4">
+          No parts required
+        </div>
+      )}
     </div>
   );
 }
@@ -213,8 +245,6 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
           ) : null;
         })}
       </div>
-      
-      {showParts && <DayPartsSummary assignments={assignments} clients={clients} />}
     </div>
   );
 }
@@ -511,6 +541,8 @@ export default function Calendar() {
     currentWeekStart.setDate(today.getDate() - today.getDay()); // Start on Sunday
 
     const weekDays = [];
+    const weekDaysData = [];
+    
     for (let i = 0; i < 7; i++) {
       const date = new Date(currentWeekStart);
       date.setDate(currentWeekStart.getDate() + i);
@@ -518,6 +550,14 @@ export default function Calendar() {
       const dayNumber = date.getDate();
       const isCurrentMonth = date.getMonth() === month - 1 && date.getFullYear() === year;
       const dayAssignments = isCurrentMonth ? (assignmentsByDay[dayNumber] || []) : [];
+
+      weekDaysData.push({
+        date,
+        dayNumber,
+        isCurrentMonth,
+        dayAssignments,
+        dayName: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i]
+      });
 
       weekDays.push(
         isCurrentMonth ? (
@@ -530,7 +570,7 @@ export default function Calendar() {
             clients={clients}
             onRemove={handleRemove}
             onClientClick={handleClientClick}
-            showParts={true}
+            showParts={false}
           />
         ) : (
           <div key={i} className="h-full p-2 border bg-muted/10">
@@ -545,21 +585,32 @@ export default function Calendar() {
     return (
       <>
         <div className="grid grid-cols-7">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, i) => {
-            const date = new Date(currentWeekStart);
-            date.setDate(currentWeekStart.getDate() + i);
-            return (
-              <div key={day} className="text-center p-2 border bg-muted/5">
-                <div className="font-medium text-sm">{day}</div>
-                <div className="text-xs text-muted-foreground">
-                  {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </div>
+          {weekDaysData.map((dayData, i) => (
+            <div key={dayData.dayName} className="text-center p-2 border bg-muted/5">
+              <div className="font-medium text-sm">{dayData.dayName}</div>
+              <div className="text-xs text-muted-foreground">
+                {dayData.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
         <div className="grid grid-cols-7">
           {weekDays}
+        </div>
+        
+        <div className="mt-4">
+          <h3 className="text-lg font-semibold mb-3">Required Parts Summary</h3>
+          <div className="grid grid-cols-7 gap-2">
+            {weekDaysData.map((dayData) => (
+              <DayPartsCell
+                key={dayData.dayName}
+                assignments={dayData.isCurrentMonth ? dayData.dayAssignments : []}
+                clients={clients}
+                dayName={dayData.dayName}
+                date={dayData.date}
+              />
+            ))}
+          </div>
         </div>
       </>
     );
