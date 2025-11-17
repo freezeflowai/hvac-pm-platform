@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Mail, ChevronsRight, ChevronsLeft } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -304,6 +305,7 @@ export default function Calendar() {
   const [reportDialogClientId, setReportDialogClientId] = useState<string | null>(null);
   const [isUnscheduledMinimized, setIsUnscheduledMinimized] = useState(false);
   const [showOnlyOutstanding, setShowOnlyOutstanding] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
@@ -768,7 +770,7 @@ export default function Calendar() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => clearSchedule.mutate()}
+                onClick={() => setShowClearConfirm(true)}
                 disabled={clearSchedule.isPending || assignments.length === 0}
                 data-testid="button-clear-schedule"
               >
@@ -922,6 +924,31 @@ export default function Calendar() {
         open={!!reportDialogClientId}
         onOpenChange={(open) => !open && setReportDialogClientId(null)}
       />
+
+      <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Schedule for {monthNames[month - 1]} {year}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all scheduled assignments for {monthNames[month - 1]} and move them back to unscheduled. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-clear">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                clearSchedule.mutate();
+                setShowClearConfirm(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-clear"
+            >
+              Clear Schedule
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DndContext>
   );
 }
