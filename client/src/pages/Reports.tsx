@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { queryClient } from "@/lib/queryClient";
 import Header from "@/components/Header";
+import NewAddClientDialog from "@/components/NewAddClientDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -59,6 +61,7 @@ export default function Reports() {
   const [scheduleMonth, setScheduleMonth] = useState<number>(new Date().getMonth());
   const [activeTab, setActiveTab] = useState<string>("parts");
   const [, setLocation] = useLocation();
+  const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
 
   const { data: reportData = [], isLoading } = useQuery<ReportItem[]>({
     queryKey: ["/api/reports/parts", selectedMonth],
@@ -87,7 +90,7 @@ export default function Reports() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
+      <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
       <main className="container mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -369,6 +372,14 @@ export default function Reports() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <NewAddClientDialog 
+        open={addClientDialogOpen}
+        onOpenChange={setAddClientDialogOpen}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+        }}
+      />
 
       <style>{`
         @media print {

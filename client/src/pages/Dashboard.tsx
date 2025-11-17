@@ -5,6 +5,7 @@ import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
 import ClientReportDialog from "@/components/ClientReportDialog";
+import NewAddClientDialog from "@/components/NewAddClientDialog";
 import { AlertCircle, Calendar, CalendarX, CheckCircle, Clock, Package, Settings, Search, Building2, FileText, Download, Users, ChevronDown } from "lucide-react";
 import MaintenanceCard, { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
@@ -77,6 +78,7 @@ export default function Dashboard() {
   const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<{
     overdue: boolean;
     upcoming: boolean;
@@ -508,7 +510,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <Header 
-        onAddClient={() => setLocation("/add-client")}
+        onAddClient={() => setAddClientDialogOpen(true)}
         onDashboardClick={() => {
           setActiveTab('schedule');
           setLocation('/');
@@ -839,6 +841,14 @@ export default function Dashboard() {
         clientId={reportDialogClientId}
         open={!!reportDialogClientId}
         onOpenChange={(open) => !open && setReportDialogClientId(null)}
+      />
+
+      <NewAddClientDialog 
+        open={addClientDialogOpen}
+        onOpenChange={setAddClientDialogOpen}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+        }}
       />
     </div>
   );

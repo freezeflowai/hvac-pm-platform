@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertCompanySettingsSchema, type CompanySettings } from "@shared/schema";
 import type { z } from "zod";
 import Header from "@/components/Header";
+import NewAddClientDialog from "@/components/NewAddClientDialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 type CompanySettingsFormData = z.infer<typeof insertCompanySettingsSchema>;
@@ -22,6 +23,7 @@ export default function CompanySettingsPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
 
   const { data: settings, isLoading } = useQuery<CompanySettings | null>({
     queryKey: ["/api/company-settings"],
@@ -94,7 +96,7 @@ export default function CompanySettingsPage() {
   if (isLoading) {
     return (
       <>
-        <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
+        <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
         <div className="flex items-center justify-center h-screen">
           <p className="text-muted-foreground">Loading...</p>
         </div>
@@ -104,7 +106,7 @@ export default function CompanySettingsPage() {
 
   return (
     <>
-      <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
+      <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
       <div className="p-6 mx-auto">
         <Button 
           variant="ghost" 
@@ -288,6 +290,14 @@ export default function CompanySettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <NewAddClientDialog 
+        open={addClientDialogOpen}
+        onOpenChange={setAddClientDialogOpen}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+        }}
+      />
     </>
   );
 }

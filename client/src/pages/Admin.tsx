@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Trash2, ShieldCheck, ShieldOff, Package, KeyRound } from "lucide-react";
 import Header from "@/components/Header";
+import NewAddClientDialog from "@/components/NewAddClientDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +45,7 @@ export default function Admin() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [, setLocation] = useLocation();
+  const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
 
   const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
@@ -167,7 +169,7 @@ export default function Admin() {
   if (!currentUser?.isAdmin) {
     return (
       <>
-        <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
+        <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
         <div className="flex items-center justify-center h-screen">
           <Card className="w-full max-w-md">
             <CardHeader>
@@ -386,6 +388,14 @@ export default function Admin() {
         </CardContent>
       </Card>
       </div>
+
+      <NewAddClientDialog 
+        open={addClientDialogOpen}
+        onOpenChange={setAddClientDialogOpen}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+        }}
+      />
     </>
   );
 }

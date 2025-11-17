@@ -4,6 +4,7 @@ import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, u
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Header from "@/components/Header";
+import NewAddClientDialog from "@/components/NewAddClientDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -162,6 +163,7 @@ export default function Calendar() {
   const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
   
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
@@ -371,7 +373,7 @@ export default function Calendar() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
+        <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
         <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
           <div className="text-center py-8">Loading calendar...</div>
         </main>
@@ -504,7 +506,7 @@ export default function Calendar() {
       onDragEnd={handleDragEnd}
     >
       <div className="min-h-screen bg-background">
-        <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
+        <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
         
         <main className="mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
           <div className="flex items-center justify-between">
@@ -663,6 +665,15 @@ export default function Calendar() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <NewAddClientDialog 
+        open={addClientDialogOpen}
+        onOpenChange={setAddClientDialogOpen}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+        }}
+      />
     </DndContext>
   );
 }
