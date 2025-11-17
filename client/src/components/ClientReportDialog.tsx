@@ -28,6 +28,8 @@ interface Equipment {
   id: string;
   clientId: string;
   name: string;
+  type?: string | null;
+  location?: string | null;
   modelNumber?: string | null;
   serialNumber?: string | null;
   notes?: string | null;
@@ -286,6 +288,8 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-2 text-sm font-medium text-muted-foreground">Equipment Name</th>
+                        <th className="text-left py-2 text-sm font-medium text-muted-foreground">Type</th>
+                        <th className="text-left py-2 text-sm font-medium text-muted-foreground">Location</th>
                         <th className="text-left py-2 text-sm font-medium text-muted-foreground">Model Number</th>
                         <th className="text-left py-2 text-sm font-medium text-muted-foreground">Serial Number</th>
                         <th className="text-left py-2 text-sm font-medium text-muted-foreground">Notes</th>
@@ -295,6 +299,8 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
                       {equipment.map((eq, index) => (
                         <tr key={eq.id} className="border-b" data-testid={`row-equipment-${index}`}>
                           <td className="py-2 text-base font-medium">{eq.name}</td>
+                          <td className="py-2 text-base">{eq.type || '—'}</td>
+                          <td className="py-2 text-base">{eq.location || '—'}</td>
                           <td className="py-2 text-base">{eq.modelNumber || '—'}</td>
                           <td className="py-2 text-base">{eq.serialNumber || '—'}</td>
                           <td className="py-2 text-base">{eq.notes || '—'}</td>
