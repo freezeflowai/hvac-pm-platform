@@ -945,9 +945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         equipment.map(e => storage.createEquipment(req.user!.id, {
           clientId: req.params.clientId,
           name: e.name,
-          type: e.type,
           serialNumber: e.serialNumber || null,
-          location: e.location || null,
           modelNumber: null,
           notes: null
         }))

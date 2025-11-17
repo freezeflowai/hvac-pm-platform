@@ -142,20 +142,23 @@ function DayPartsSummary({ assignments, clients }: { assignments: any[]; clients
   if (sortedParts.length === 0) return null;
 
   return (
-    <div className="mt-2 space-y-1">
-      {sortedParts.map(([partName, quantity]) => (
-        <div key={partName} className="bg-card border rounded-md p-2">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-medium truncate">{partName}</span>
-            <span className="text-xs font-bold text-primary shrink-0">×{quantity}</span>
-          </div>
+    <div className="mt-2">
+      <div className="bg-card border rounded-md p-2">
+        <div className="text-xs font-semibold text-muted-foreground mb-2">Required Parts</div>
+        <div className="space-y-1">
+          {sortedParts.map(([partName, quantity]) => (
+            <div key={partName} className="flex items-center justify-between gap-2">
+              <span className="text-xs truncate">{partName}</span>
+              <span className="text-xs font-bold text-primary shrink-0">×{quantity}</span>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
     </div>
   );
 }
 
-function DroppableDay({ day, year, month, assignments, clients, onRemove, onClientClick }: { 
+function DroppableDay({ day, year, month, assignments, clients, onRemove, onClientClick, showParts = false }: { 
   day: number; 
   year: number; 
   month: number; 
@@ -163,6 +166,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   clients: any[];
   onRemove: (assignmentId: string) => void;
   onClientClick: (client: any, assignment: any) => void;
+  showParts?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day-${day}` });
   
@@ -210,7 +214,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
         })}
       </div>
       
-      <DayPartsSummary assignments={assignments} clients={clients} />
+      {showParts && <DayPartsSummary assignments={assignments} clients={clients} />}
     </div>
   );
 }
@@ -489,6 +493,7 @@ export default function Calendar() {
             clients={clients}
             onRemove={handleRemove}
             onClientClick={handleClientClick}
+            showParts={false}
           />
         ) : (
           <div key={i} className="min-h-24 p-2 border bg-muted/10" />
@@ -525,6 +530,7 @@ export default function Calendar() {
             clients={clients}
             onRemove={handleRemove}
             onClientClick={handleClientClick}
+            showParts={true}
           />
         ) : (
           <div key={i} className="h-full p-2 border bg-muted/10">
