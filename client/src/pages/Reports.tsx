@@ -62,9 +62,15 @@ export default function Reports() {
   const [activeTab, setActiveTab] = useState<string>("parts");
   const [, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
+  const [showOnlyOutstanding, setShowOnlyOutstanding] = useState(false);
 
   const { data: reportData = [], isLoading } = useQuery<ReportItem[]>({
-    queryKey: ["/api/reports/parts", selectedMonth],
+    queryKey: ["/api/reports/parts", selectedMonth, showOnlyOutstanding ? "outstanding" : "all"],
+    queryFn: async () => {
+      const response = await fetch(`/api/reports/parts/${selectedMonth}?outstanding=${showOnlyOutstanding}`);
+      if (!response.ok) throw new Error('Failed to fetch report');
+      return response.json();
+    },
     enabled: selectedMonth !== undefined,
   });
 
@@ -101,15 +107,27 @@ export default function Reports() {
             </div>
           </div>
           <div className="flex items-center gap-3 no-print">
-            {activeTab === "parts" && reportData.length > 0 && (
-              <Button
-                variant="outline"
-                onClick={handlePrint}
-                data-testid="button-print-report"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Print
-              </Button>
+            {activeTab === "parts" && (
+              <>
+                <Button
+                  variant={showOnlyOutstanding ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowOnlyOutstanding(!showOnlyOutstanding)}
+                  data-testid="button-toggle-outstanding-reports"
+                >
+                  {showOnlyOutstanding ? "Outstanding Only" : "All Parts"}
+                </Button>
+                {reportData.length > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={handlePrint}
+                    data-testid="button-print-report"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print
+                  </Button>
+                )}
+              </>
             )}
             <Select
               value={currentMonth.toString()}
@@ -188,11 +206,11 @@ export default function Reports() {
                             const display = getPartDisplay(item.part);
                             return (
                               <TableRow key={index} data-testid={`filter-row-${index}`} className="border-b">
-                                <TableCell className="font-medium py-3">{display.name}</TableCell>
-                                <TableCell className="py-3">
+                                <TableCell className="font-medium py-1.5">{display.name}</TableCell>
+                                <TableCell className="py-1.5">
                                   <span className="text-sm text-muted-foreground">{display.details}</span>
                                 </TableCell>
-                                <TableCell className="text-right py-3">
+                                <TableCell className="text-right py-1.5">
                                   <Badge 
                                     data-testid={`filter-quantity-${index}`}
                                     variant="secondary"
@@ -235,11 +253,11 @@ export default function Reports() {
                             const display = getPartDisplay(item.part);
                             return (
                               <TableRow key={index} data-testid={`belt-row-${index}`} className="border-b">
-                                <TableCell className="font-medium py-3">{display.name}</TableCell>
-                                <TableCell className="py-3">
+                                <TableCell className="font-medium py-1.5">{display.name}</TableCell>
+                                <TableCell className="py-1.5">
                                   <span className="text-sm text-muted-foreground">{display.details}</span>
                                 </TableCell>
-                                <TableCell className="text-right py-3">
+                                <TableCell className="text-right py-1.5">
                                   <Badge 
                                     data-testid={`belt-quantity-${index}`}
                                     variant="secondary"
@@ -284,11 +302,11 @@ export default function Reports() {
                         const display = getPartDisplay(item.part);
                         return (
                           <TableRow key={index} data-testid={`other-row-${index}`}>
-                            <TableCell className="font-medium">{display.name}</TableCell>
-                            <TableCell>
+                            <TableCell className="font-medium py-1.5">{display.name}</TableCell>
+                            <TableCell className="py-1.5">
                               {display.details && <Badge variant="outline">{display.details}</Badge>}
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="text-right py-1.5">
                               <Badge data-testid={`other-quantity-${index}`}>{item.totalQuantity}</Badge>
                             </TableCell>
                           </TableRow>
