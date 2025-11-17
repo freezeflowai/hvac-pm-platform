@@ -313,8 +313,8 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
             <TabsTrigger value="equipment" data-testid="tab-equipment">Equipment</TabsTrigger>
           </TabsList>
 
-          <div className="flex-1 overflow-y-auto mt-4">
-            <TabsContent value="info" className="space-y-4 mt-0">
+          <div className="flex-1 overflow-y-auto mt-4 pb-4">
+            <TabsContent value="info" className="space-y-4 mt-0 pb-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="companyName">Company Name</Label>
@@ -496,7 +496,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
               </div>
             </TabsContent>
 
-            <TabsContent value="parts" className="space-y-4 mt-0">
+            <TabsContent value="parts" className="space-y-4 mt-0 pb-4">
               <Tabs value={activePartsType} onValueChange={setActivePartsType} className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="filter" data-testid="tab-filter">Filters</TabsTrigger>
@@ -612,7 +612,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
               </Tabs>
             </TabsContent>
 
-            <TabsContent value="equipment" className="space-y-4 mt-0">
+            <TabsContent value="equipment" className="space-y-4 mt-0 pb-4">
               {equipmentRows.map((row, index) => (
                 <div key={index} className="grid grid-cols-4 gap-2 items-end" data-testid={`row-equipment-${index}`}>
                   <div className="space-y-1.5">
