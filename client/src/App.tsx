@@ -179,7 +179,9 @@ function AppContent() {
             </div>
           </header>
           <main className="flex-1 overflow-auto">
-            <Router />
+            <div className="max-w-[1550px] mx-auto">
+              <Router />
+            </div>
           </main>
         </div>
       </div>
