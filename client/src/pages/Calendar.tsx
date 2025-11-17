@@ -97,6 +97,65 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
   );
 }
 
+function DayPartsSummary({ assignments, clients }: { assignments: any[]; clients: any[] }) {
+  const clientIds = assignments.map((a: any) => a.clientId);
+  
+  const { data: allParts = [] } = useQuery({
+    queryKey: ['/api/parts/day-summary', ...clientIds.sort()],
+    queryFn: async () => {
+      if (clientIds.length === 0) return [];
+      
+      const partsPromises = clientIds.map(async (clientId: string) => {
+        const res = await fetch(`/api/clients/${clientId}/parts`);
+        if (!res.ok) return [];
+        return res.json();
+      });
+      
+      const allClientParts = await Promise.all(partsPromises);
+      return allClientParts.flat();
+    },
+    enabled: clientIds.length > 0
+  });
+
+  if (!allParts || allParts.length === 0) return null;
+
+  // Aggregate parts by type
+  const partCounts: Record<string, number> = allParts.reduce((acc: Record<string, number>, clientPart: any) => {
+    const part = clientPart.part;
+    if (!part) return acc;
+    
+    let key: string;
+    if (part.type === 'filter') {
+      key = `${part.filterType || 'Filter'} ${part.size || ''}`.trim();
+    } else if (part.type === 'belt') {
+      key = `Belt ${part.beltType || ''} ${part.size || ''}`.trim();
+    } else {
+      return acc; // Skip non-filter/belt parts
+    }
+    
+    acc[key] = (acc[key] || 0) + clientPart.quantity;
+    return acc;
+  }, {});
+
+  const sortedParts = Object.entries(partCounts).sort(([a], [b]) => a.localeCompare(b));
+
+  if (sortedParts.length === 0) return null;
+
+  return (
+    <div className="mt-2 pt-2 border-t border-border/50">
+      <div className="text-[10px] font-medium text-muted-foreground mb-1">Required Parts:</div>
+      <div className="space-y-0.5">
+        {sortedParts.map(([partName, quantity]) => (
+          <div key={partName} className="text-[10px] text-muted-foreground flex justify-between gap-1">
+            <span className="truncate">{partName}</span>
+            <span className="font-medium">×{quantity}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DroppableDay({ day, year, month, assignments, clients, onRemove, onClientClick }: { 
   day: number; 
   year: number; 
@@ -151,6 +210,8 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
           ) : null;
         })}
       </div>
+      
+      <DayPartsSummary assignments={assignments} clients={clients} />
     </div>
   );
 }
