@@ -336,6 +336,7 @@ export default function Calendar() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Client scheduled",
@@ -360,6 +361,7 @@ export default function Calendar() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Updated",
@@ -381,6 +383,7 @@ export default function Calendar() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Removed",
@@ -406,6 +409,7 @@ export default function Calendar() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Schedule cleared",
@@ -493,9 +497,9 @@ export default function Calendar() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance/recently-completed"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/maintenance/statuses"] });
       setSelectedClient(null);
       setSelectedAssignment(null);
       toast({
@@ -516,8 +520,8 @@ export default function Calendar() {
     queryKey: ["/api/clients"],
   });
 
-  const { data: maintenanceStatuses = {} } = useQuery<Record<string, { completed: boolean; completedDueDate?: string }>>({
-    queryKey: ["/api/maintenance/statuses"],
+  const { data: unscheduledClients = [] } = useQuery<any[]>({
+    queryKey: ["/api/calendar/unscheduled", year, month],
     staleTime: 0,
     refetchOnMount: 'always',
   });
@@ -534,21 +538,6 @@ export default function Calendar() {
   }
 
   const { assignments = [], clients = [] } = data || {};
-  
-  // Get unscheduled clients (active clients with PM this month, not yet scheduled or completed)
-  const scheduledClientIds = new Set(assignments.map((a: any) => a.clientId));
-  const currentMonthIndex = currentDate.getMonth(); // 0-indexed for selectedMonths
-  const unscheduledClients = clients.filter((c: any) => {
-    if (c.inactive) return false;
-    if (scheduledClientIds.has(c.id)) return false;
-    if (!c.selectedMonths?.includes(currentMonthIndex)) return false;
-    
-    // Check if this client has a completed PM (based on maintenance status)
-    const status = maintenanceStatuses[c.id];
-    if (status && status.completed) return false;
-    
-    return true;
-  });
 
   // Create a map of assignments by day
   const assignmentsByDay: Record<number, any[]> = {};
@@ -895,6 +884,7 @@ export default function Calendar() {
         onSaved={() => {
           queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
           queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/calendar/unscheduled'] });
         }}
       />
 
