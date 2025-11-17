@@ -100,7 +100,7 @@ export interface IStorage {
   deleteAllClientParts(userId: string, clientId: string): Promise<void>;
   
   // Reports
-  getPartsReportByMonth(userId: string, month: number): Promise<Array<{ part: Part; totalQuantity: number }>>;
+  getPartsReportByMonth(userId: string, month: number, outstandingOnly?: boolean): Promise<Array<{ part: Part; totalQuantity: number }>>;
   
   // Maintenance record methods
   getMaintenanceRecord(userId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined>;
@@ -566,11 +566,29 @@ export class MemStorage implements IStorage {
     toDelete.forEach(id => this.clientParts.delete(id));
   }
 
-  async getPartsReportByMonth(userId: string, month: number): Promise<Array<{ part: Part; totalQuantity: number }>> {
+  async getPartsReportByMonth(userId: string, month: number, outstandingOnly = false): Promise<Array<{ part: Part; totalQuantity: number }>> {
     const clientsWithMaintenance = Array.from(this.clients.values())
       .filter(client => client.userId === userId && client.selectedMonths.includes(month) && !client.inactive);
     
-    const clientIds = clientsWithMaintenance.map(c => c.id);
+    let clientIds = clientsWithMaintenance.map(c => c.id);
+    
+    // Filter out clients with completed maintenance if outstandingOnly is true
+    if (outstandingOnly) {
+      const completedClientIds = new Set<string>();
+      const currentYear = new Date().getFullYear();
+      
+      // Get all maintenance records for this month
+      for (const record of this.maintenanceRecords.values()) {
+        if (record.userId === userId && record.completedAt) {
+          const dueDate = new Date(record.dueDate);
+          if (dueDate.getMonth() === month && dueDate.getFullYear() === currentYear) {
+            completedClientIds.add(record.clientId);
+          }
+        }
+      }
+      
+      clientIds = clientIds.filter(id => !completedClientIds.has(id));
+    }
     
     const partsMap = new Map<string, { part: Part; totalQuantity: number }>();
     
@@ -1235,7 +1253,7 @@ export class DbStorage implements IStorage {
     await db.delete(clientParts).where(and(eq(clientParts.clientId, clientId), eq(clientParts.userId, userId)));
   }
 
-  async getPartsReportByMonth(userId: string, month: number): Promise<Array<{ part: Part; totalQuantity: number }>> {
+  async getPartsReportByMonth(userId: string, month: number, outstandingOnly = false): Promise<Array<{ part: Part; totalQuantity: number }>> {
     const clientsWithMaintenance = await db.select()
       .from(clients)
       .where(and(
@@ -1248,7 +1266,31 @@ export class DbStorage implements IStorage {
       return [];
     }
     
-    const clientIds = clientsWithMaintenance.map(c => c.id);
+    let clientIds = clientsWithMaintenance.map(c => c.id);
+    
+    // Filter out clients with completed maintenance if outstandingOnly is true
+    if (outstandingOnly) {
+      const currentYear = new Date().getFullYear();
+      const startDate = new Date(currentYear, month, 1).toISOString();
+      const endDate = new Date(currentYear, month + 1, 0, 23, 59, 59).toISOString();
+      
+      const completedRecords = await db.select()
+        .from(maintenanceRecords)
+        .where(and(
+          eq(maintenanceRecords.userId, userId),
+          inArray(maintenanceRecords.clientId, clientIds),
+          sql`${maintenanceRecords.completedAt} IS NOT NULL`,
+          sql`${maintenanceRecords.dueDate} >= ${startDate}`,
+          sql`${maintenanceRecords.dueDate} <= ${endDate}`
+        ));
+      
+      const completedClientIds = new Set(completedRecords.map(r => r.clientId));
+      clientIds = clientIds.filter(id => !completedClientIds.has(id));
+    }
+    
+    if (clientIds.length === 0) {
+      return [];
+    }
     
     const partsData = await db.select()
       .from(clientParts)

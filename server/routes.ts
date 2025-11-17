@@ -735,7 +735,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(month) || month < 0 || month > 11) {
         return res.status(400).json({ error: "Invalid month. Must be 0-11." });
       }
-      const report = await storage.getPartsReportByMonth(req.user!.id, month);
+      const outstandingOnly = req.query.outstanding === 'true';
+      const report = await storage.getPartsReportByMonth(req.user!.id, month, outstandingOnly);
       res.json(report);
     } catch (error) {
       res.status(500).json({ error: "Failed to generate report" });
