@@ -5,6 +5,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Header from "@/components/Header";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
+import ClientReportDialog from "@/components/ClientReportDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -73,7 +74,7 @@ function CompletedUnscheduledSection() {
   );
 }
 
-function UnscheduledPanel({ clients }: { clients: any[] }) {
+function UnscheduledPanel({ clients, onClientClick }: { clients: any[]; onClientClick?: (clientId: string) => void }) {
   const { setNodeRef } = useDroppable({ id: 'unscheduled-panel' });
 
   return (
@@ -93,6 +94,7 @@ function UnscheduledPanel({ clients }: { clients: any[] }) {
                 key={client.id}
                 id={client.id}
                 client={client}
+                onClick={() => onClientClick?.(client.id)}
               />
             ))}
             {clients.length === 0 && (
@@ -132,7 +134,7 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
   };
 
   const handleClick = (e: React.MouseEvent) => {
-    if (onClick && inCalendar && !isDragging) {
+    if (onClick && !isDragging) {
       e.stopPropagation();
       onClick();
     }
@@ -145,7 +147,7 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
       {...attributes}
       {...listeners}
       onClick={handleClick}
-      className={`text-xs p-2 rounded-lg hover:shadow-md transition-all relative cursor-move select-none ${getBackgroundColor()}`}
+      className={`text-xs p-2 rounded-lg hover:shadow-md transition-all relative cursor-pointer select-none ${getBackgroundColor()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
       <div className={`font-semibold ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
@@ -311,6 +313,7 @@ export default function Calendar() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
+  const [reportDialogClientId, setReportDialogClientId] = useState<string | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
@@ -520,6 +523,10 @@ export default function Calendar() {
     queryKey: ["/api/clients"],
   });
 
+  const { data: maintenanceStatuses = {} } = useQuery<Record<string, { completed: boolean; completedDueDate?: string }>>({
+    queryKey: ["/api/maintenance/statuses"],
+  });
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -535,14 +542,18 @@ export default function Calendar() {
   
   // Get unscheduled clients (active clients with PM this month, not yet scheduled or completed)
   const scheduledClientIds = new Set(assignments.map((a: any) => a.clientId));
-  const completedClientIds = new Set(assignments.filter((a: any) => a.completed).map((a: any) => a.clientId));
   const currentMonthIndex = currentDate.getMonth(); // 0-indexed for selectedMonths
-  const unscheduledClients = clients.filter((c: any) => 
-    !c.inactive && 
-    !scheduledClientIds.has(c.id) &&
-    !completedClientIds.has(c.id) &&
-    c.selectedMonths?.includes(currentMonthIndex)
-  );
+  const unscheduledClients = clients.filter((c: any) => {
+    if (c.inactive) return false;
+    if (scheduledClientIds.has(c.id)) return false;
+    if (!c.selectedMonths?.includes(currentMonthIndex)) return false;
+    
+    // Check if this client has a completed PM (based on maintenance status)
+    const status = maintenanceStatuses[c.id];
+    if (status && status.completed) return false;
+    
+    return true;
+  });
 
   // Create a map of assignments by day
   const assignmentsByDay: Record<number, any[]> = {};
@@ -774,7 +785,10 @@ export default function Calendar() {
             </div>
 
             <div className="h-full">
-              <UnscheduledPanel clients={unscheduledClients} />
+              <UnscheduledPanel 
+                clients={unscheduledClients} 
+                onClientClick={setReportDialogClientId}
+              />
             </div>
           </div>
 
@@ -853,6 +867,12 @@ export default function Calendar() {
           queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
           queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
         }}
+      />
+
+      <ClientReportDialog 
+        clientId={reportDialogClientId}
+        open={!!reportDialogClientId}
+        onOpenChange={(open) => !open && setReportDialogClientId(null)}
       />
     </DndContext>
   );
