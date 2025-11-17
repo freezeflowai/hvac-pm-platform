@@ -139,12 +139,12 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
       {...listeners}
       onMouseDown={handleMouseDown}
       onClick={handleClick}
-      className={`text-xs p-2 rounded-lg hover:shadow-md transition-all relative cursor-grab active:cursor-grabbing select-none ${getBackgroundColor()}`}
+      className={`text-xs px-1.5 py-1 rounded hover:shadow-md transition-all relative cursor-grab active:cursor-grabbing select-none ${getBackgroundColor()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
-      <div className={`font-semibold ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
+      <div className={`font-semibold leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
       {client.location && (
-        <div className={`text-muted-foreground text-[10px] ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
+        <div className={`text-muted-foreground text-[10px] leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
       )}
     </div>
   );
@@ -260,14 +260,14 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-24 p-2 border transition-all ${
+      className={`min-h-24 px-1 py-2 border transition-all ${
         isOver 
           ? 'bg-primary/10 border-primary border-2 ring-2 ring-primary/30 shadow-md' 
           : 'bg-background'
       }`}
       data-testid={`calendar-day-${day}`}
     >
-      <div className="text-sm text-muted-foreground mb-1">{day}</div>
+      <div className="text-sm text-muted-foreground mb-1 px-0.5">{day}</div>
       <div className="space-y-1">
         {assignments.map((assignment: any) => {
           const client = clients.find((c: any) => c.id === assignment.clientId);
