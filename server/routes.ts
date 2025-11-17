@@ -1187,6 +1187,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/calendar/unscheduled", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { year, month } = req.query;
+      
+      if (!year || !month) {
+        return res.status(400).json({ error: "Year and month are required" });
+      }
+      
+      const yearNum = parseInt(year as string);
+      const monthNum = parseInt(month as string);
+      
+      if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+        return res.status(400).json({ error: "Invalid year or month" });
+      }
+      
+      const unscheduledClients = await storage.getUnscheduledClients(userId, yearNum, monthNum);
+      res.json(unscheduledClients);
+    } catch (error) {
+      console.error('Get unscheduled clients error:', error);
+      res.status(500).json({ error: "Failed to fetch unscheduled clients" });
+    }
+  });
+
   app.post("/api/calendar/assign", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;

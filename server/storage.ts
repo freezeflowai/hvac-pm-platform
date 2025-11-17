@@ -134,6 +134,7 @@ export interface IStorage {
   updateCalendarAssignment(userId: string, id: string, assignment: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined>;
   deleteCalendarAssignment(userId: string, id: string): Promise<boolean>;
   getClientCalendarAssignment(userId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined>;
+  getUnscheduledClients(userId: string, year: number, month: number): Promise<Client[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -872,6 +873,46 @@ export class MemStorage implements IStorage {
                       assignment.month === month
     );
   }
+
+  async getUnscheduledClients(userId: string, year: number, month: number): Promise<Client[]> {
+    const allClients = await this.getAllClients(userId);
+    const assignments = await this.getCalendarAssignments(userId, year, month);
+    const scheduledClientIds = new Set(assignments.map(a => a.clientId));
+    
+    const monthIndex = month - 1; // Convert to 0-indexed
+    
+    return allClients.filter(client => {
+      // Exclude inactive clients
+      if (client.inactive) return false;
+      
+      // Exclude clients not scheduled for this month
+      if (!client.selectedMonths?.includes(monthIndex)) return false;
+      
+      // Exclude clients already scheduled
+      if (scheduledClientIds.has(client.id)) return false;
+      
+      // Check if maintenance is completed
+      const latestRecord = Array.from(this.maintenanceRecords.values())
+        .filter(r => r.userId === userId && r.clientId === client.id && r.completedAt)
+        .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())[0];
+      
+      if (latestRecord) {
+        const completedDate = new Date(latestRecord.completedAt!);
+        const completedDueDate = latestRecord.dueDate ? new Date(latestRecord.dueDate) : null;
+        
+        // Check if completed for this month's schedule
+        if (completedDueDate) {
+          const dueMonth = completedDueDate.getMonth();
+          const dueYear = completedDueDate.getFullYear();
+          if (dueMonth === monthIndex && dueYear === year) {
+            return false; // Already completed for this month
+          }
+        }
+      }
+      
+      return true;
+    });
+  }
 }
 
 import { db } from './db';
@@ -1500,6 +1541,69 @@ export class DbStorage implements IStorage {
       ))
       .limit(1);
     return result[0];
+  }
+
+  async getUnscheduledClients(userId: string, year: number, month: number): Promise<Client[]> {
+    const monthIndex = month - 1; // Convert to 0-indexed
+    
+    // Get all assignments for this month
+    const assignments = await db.select()
+      .from(calendarAssignments)
+      .where(and(
+        eq(calendarAssignments.userId, userId),
+        eq(calendarAssignments.year, year),
+        eq(calendarAssignments.month, month)
+      ));
+    
+    const scheduledClientIds = new Set(assignments.map(a => a.clientId));
+    
+    // Get all clients for this user
+    const allClients = await db.select()
+      .from(clients)
+      .where(eq(clients.userId, userId));
+    
+    // Filter clients
+    const unscheduled: Client[] = [];
+    
+    for (const client of allClients) {
+      // Exclude inactive clients
+      if (client.inactive) continue;
+      
+      // Exclude clients not scheduled for this month
+      if (!client.selectedMonths?.includes(monthIndex)) continue;
+      
+      // Exclude clients already scheduled
+      if (scheduledClientIds.has(client.id)) continue;
+      
+      // Check if maintenance is completed for this month
+      const latestRecord = await db.select()
+        .from(maintenanceRecords)
+        .where(and(
+          eq(maintenanceRecords.userId, userId),
+          eq(maintenanceRecords.clientId, client.id),
+          sql`${maintenanceRecords.completedAt} IS NOT NULL`
+        ))
+        .orderBy(desc(maintenanceRecords.completedAt))
+        .limit(1);
+      
+      if (latestRecord.length > 0) {
+        const record = latestRecord[0];
+        const completedDueDate = record.dueDate ? new Date(record.dueDate) : null;
+        
+        // Check if completed for this month's schedule
+        if (completedDueDate) {
+          const dueMonth = completedDueDate.getMonth();
+          const dueYear = completedDueDate.getFullYear();
+          if (dueMonth === monthIndex && dueYear === year) {
+            continue; // Already completed for this month
+          }
+        }
+      }
+      
+      unscheduled.push(client);
+    }
+    
+    return unscheduled;
   }
 }
 
