@@ -117,6 +117,7 @@ export interface IStorage {
   createEquipment(userId: string, equipment: InsertEquipment): Promise<Equipment>;
   updateEquipment(userId: string, id: string, equipment: Partial<InsertEquipment>): Promise<Equipment | undefined>;
   deleteEquipment(userId: string, id: string): Promise<boolean>;
+  deleteAllClientEquipment(userId: string, clientId: string): Promise<void>;
   
   // Client report
   getClientReport(userId: string, clientId: string): Promise<{ client: Client; parts: (ClientPart & { part: Part })[]; equipment: Equipment[] } | null>;
@@ -684,6 +685,10 @@ export class MemStorage implements IStorage {
 
   async deleteEquipment(userId: string, id: string): Promise<boolean> {
     return false;
+  }
+
+  async deleteAllClientEquipment(userId: string, clientId: string): Promise<void> {
+    return;
   }
 
   async getClientReport(userId: string, clientId: string): Promise<{ client: Client; parts: (ClientPart & { part: Part })[]; equipment: Equipment[] } | null> {
@@ -1284,6 +1289,10 @@ export class DbStorage implements IStorage {
   async deleteEquipment(userId: string, id: string): Promise<boolean> {
     const result = await db.delete(equipment).where(and(eq(equipment.id, id), eq(equipment.userId, userId))).returning();
     return result.length > 0;
+  }
+
+  async deleteAllClientEquipment(userId: string, clientId: string): Promise<void> {
+    await db.delete(equipment).where(and(eq(equipment.userId, userId), eq(equipment.clientId, clientId)));
   }
 
   async getClientReport(userId: string, clientId: string): Promise<{ client: Client; parts: (ClientPart & { part: Part })[]; equipment: Equipment[] } | null> {

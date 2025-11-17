@@ -694,6 +694,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/clients/:id/parts", isAuthenticated, async (req, res) => {
+    try {
+      const parts = req.body.parts as Array<{ partId: string; quantity: number }>;
+      
+      // Delete existing parts for this client
+      await storage.deleteAllClientParts(req.user!.id, req.params.id);
+      
+      // Add new parts
+      const createdParts = await Promise.all(
+        parts.map(p => storage.addClientPart(req.user!.id, {
+          clientId: req.params.id,
+          partId: p.partId,
+          quantity: p.quantity
+        }))
+      );
+      
+      res.json(createdParts);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid parts data" });
+    }
+  });
+
   app.delete("/api/client-parts/:id", isAuthenticated, async (req, res) => {
     try {
       const deleted = await storage.deleteClientPart(req.user!.id, req.params.id);
@@ -906,6 +928,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId: req.params.clientId
       });
       res.json(equipment);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid equipment data" });
+    }
+  });
+
+  app.put("/api/clients/:clientId/equipment", isAuthenticated, async (req, res) => {
+    try {
+      const equipment = req.body.equipment as Array<{ name: string; type: string; serialNumber?: string; location?: string }>;
+      
+      // Delete existing equipment for this client
+      await storage.deleteAllClientEquipment(req.user!.id, req.params.clientId);
+      
+      // Add new equipment
+      const createdEquipment = await Promise.all(
+        equipment.map(e => storage.createEquipment(req.user!.id, {
+          clientId: req.params.clientId,
+          name: e.name,
+          type: e.type,
+          serialNumber: e.serialNumber || null,
+          location: e.location || null,
+          modelNumber: null,
+          notes: null
+        }))
+      );
+      
+      res.json(createdEquipment);
     } catch (error) {
       res.status(400).json({ error: "Invalid equipment data" });
     }
