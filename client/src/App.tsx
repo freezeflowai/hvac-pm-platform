@@ -74,7 +74,7 @@ function Router() {
 }
 
 function AppContent() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -91,7 +91,7 @@ function AppContent() {
   };
 
   const handleDashboardClick = () => {
-    window.location.href = '/';
+    setLocation('/');
   };
 
   const handleAddClient = () => {
