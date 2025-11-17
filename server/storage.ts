@@ -578,7 +578,8 @@ export class MemStorage implements IStorage {
       const currentYear = new Date().getFullYear();
       
       // Get all maintenance records for this month
-      for (const record of this.maintenanceRecords.values()) {
+      const allRecords = Array.from(this.maintenanceRecords.values());
+      for (const record of allRecords) {
         if (record.userId === userId && record.completedAt) {
           const dueDate = new Date(record.dueDate);
           if (dueDate.getMonth() === month && dueDate.getFullYear() === currentYear) {
