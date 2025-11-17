@@ -716,9 +716,9 @@ export class MemStorage implements IStorage {
   }
 
   async getClientEquipment(userId: string, clientId: string): Promise<Equipment[]> {
-    return Array.from(this.maintenanceRecords.values()).filter(
+    return Array.from(this.equipment.values()).filter(
       (eq) => eq.userId === userId && eq.clientId === clientId
-    ) as unknown as Equipment[];
+    );
   }
 
   async getEquipment(userId: string, id: string): Promise<Equipment | undefined> {
