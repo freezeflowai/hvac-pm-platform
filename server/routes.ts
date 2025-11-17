@@ -893,6 +893,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateCalendarAssignment(req.user!.id, calendarAssignment.id, { completed: true });
         }
 
+        // Automatically create calendar assignment for the next due date
+        const nextYear = nextDue.getFullYear();
+        const nextMonthNum = nextDue.getMonth() + 1; // Calendar API uses 1-indexed months
+        const nextDay = nextDue.getDate();
+        
+        // Check if assignment already exists for the next due date
+        const existingNextAssignment = await storage.getClientCalendarAssignment(
+          req.user!.id, 
+          clientId, 
+          nextYear, 
+          nextMonthNum
+        );
+        
+        if (!existingNextAssignment) {
+          // Create new calendar assignment for next due date
+          await storage.createCalendarAssignment(req.user!.id, {
+            clientId,
+            year: nextYear,
+            month: nextMonthNum,
+            day: nextDay,
+            scheduledDate: nextDue.toISOString().split('T')[0],
+            autoDueDate: true,
+            completed: false
+          });
+        }
+
         res.json({ completed: true, nextDue: nextDue.toISOString() });
       }
     } catch (error) {
