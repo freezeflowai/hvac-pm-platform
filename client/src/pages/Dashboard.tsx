@@ -273,7 +273,7 @@ export default function Dashboard() {
   const handleSelectClient = (clientId: string) => {
     setSearchQuery("");
     setSearchOpen(false);
-    setLocation(`/client-report/${clientId}`);
+    setReportDialogClientId(clientId);
   };
 
   // Helper to check if client has PM scheduled for current month
