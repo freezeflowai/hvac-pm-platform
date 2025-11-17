@@ -5,7 +5,6 @@ import { ArrowLeft } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import Header from "@/components/Header";
 import AddClientDialog, { ClientFormData } from "@/components/AddClientDialog";
 import type { Client } from "@shared/schema";
 
@@ -169,7 +168,6 @@ export default function AddClientPage() {
   if (isEditing && isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
         <main className="container mx-auto p-6">
           <div className="animate-pulse">
             <div className="h-8 bg-muted rounded w-1/4 mb-6"></div>
@@ -187,7 +185,6 @@ export default function AddClientPage() {
   if (isEditing && !client) {
     return (
       <div className="min-h-screen bg-background">
-        <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
         <main className="container mx-auto p-6">
           <p className="text-muted-foreground">Client not found</p>
         </main>
@@ -197,7 +194,6 @@ export default function AddClientPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
       <main className="container mx-auto p-6">
         <div className="mb-6 flex items-center gap-4">
           <Button

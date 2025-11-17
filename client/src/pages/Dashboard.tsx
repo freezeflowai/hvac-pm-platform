@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import Header from "@/components/Header";
 import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
@@ -212,6 +211,23 @@ export default function Dashboard() {
     }
   }, [dbClients]);
 
+  // Listen for sidebar events
+  useEffect(() => {
+    const handleAddClient = () => setAddClientDialogOpen(true);
+    const handleOpenClient = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      handleSelectClient(customEvent.detail.clientId);
+    };
+
+    window.addEventListener('openAddClientDialog', handleAddClient);
+    window.addEventListener('openClientDialog', handleOpenClient);
+
+    return () => {
+      window.removeEventListener('openAddClientDialog', handleAddClient);
+      window.removeEventListener('openClientDialog', handleOpenClient);
+    };
+  }, []);
+
   const deleteClientMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiRequest("DELETE", `/api/clients/${id}`);
@@ -312,7 +328,6 @@ export default function Dashboard() {
   if (isLoading || isCalendarLoading || !calendarData) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
         <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
           <div className="text-center py-8">Loading dashboard...</div>
         </main>
@@ -509,16 +524,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header 
-        onAddClient={() => setAddClientDialogOpen(true)}
-        onDashboardClick={() => {
-          setActiveTab('schedule');
-          setLocation('/');
-        }}
-        clients={clients}
-        onClientSelect={handleSelectClient}
-      />
-      
       <main className="mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsContent value="schedule" className="space-y-6">

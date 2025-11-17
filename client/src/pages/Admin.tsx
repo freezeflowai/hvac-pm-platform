@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Trash2, ShieldCheck, ShieldOff, Package, KeyRound } from "lucide-react";
-import Header from "@/components/Header";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import {
   AlertDialog,
@@ -169,7 +168,6 @@ export default function Admin() {
   if (!currentUser?.isAdmin) {
     return (
       <>
-        <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
         <div className="flex items-center justify-center h-screen">
           <Card className="w-full max-w-md">
             <CardHeader>
@@ -188,7 +186,6 @@ export default function Admin() {
 
   return (
     <>
-      <Header clients={allClients} onAddClient={() => setLocation("/add-client")} />
       <div className="p-6 mx-auto">
         <h1 className="text-3xl font-bold mb-6">User Management</h1>
       

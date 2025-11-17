@@ -3,8 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable, pointerWithin, CollisionDetection } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useCallback } from "react";
-import Header from "@/components/Header";
+import { useCallback, useEffect } from "react";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import ClientReportDialog from "@/components/ClientReportDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -539,10 +538,26 @@ export default function Calendar() {
     refetchOnMount: 'always',
   });
 
+  // Listen for sidebar events
+  useEffect(() => {
+    const handleAddClient = () => setAddClientDialogOpen(true);
+    const handleOpenClient = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      setReportDialogClientId(customEvent.detail.clientId);
+    };
+
+    window.addEventListener('openAddClientDialog', handleAddClient);
+    window.addEventListener('openClientDialog', handleOpenClient);
+
+    return () => {
+      window.removeEventListener('openAddClientDialog', handleAddClient);
+      window.removeEventListener('openClientDialog', handleOpenClient);
+    };
+  }, []);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
         <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
           <div className="text-center py-8">Loading calendar...</div>
         </main>
@@ -728,8 +743,6 @@ export default function Calendar() {
       onDragEnd={handleDragEnd}
     >
       <div className="min-h-screen bg-background">
-        <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
-        
         <main className={`mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

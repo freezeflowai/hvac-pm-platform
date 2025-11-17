@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import Header from "@/components/Header";
 import PartsManagementDialog from "@/components/PartsManagementDialog";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 
@@ -16,7 +15,6 @@ export default function PartsManagementPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
       
       <main className="container mx-auto p-6">
         <div className="mb-6">

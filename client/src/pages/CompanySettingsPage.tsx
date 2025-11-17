@@ -13,7 +13,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertCompanySettingsSchema, type CompanySettings } from "@shared/schema";
 import type { z } from "zod";
-import Header from "@/components/Header";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
@@ -96,7 +95,6 @@ export default function CompanySettingsPage() {
   if (isLoading) {
     return (
       <>
-        <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
         <div className="flex items-center justify-center h-screen">
           <p className="text-muted-foreground">Loading...</p>
         </div>
@@ -106,7 +104,6 @@ export default function CompanySettingsPage() {
 
   return (
     <>
-      <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
       <div className="p-6 mx-auto">
         <Button 
           variant="ghost" 
