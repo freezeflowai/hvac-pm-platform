@@ -171,7 +171,8 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
                       {filteredClients.map((client) => (
                         <CommandItem
                           key={client.id}
-                          value={client.companyName}
+                          value={client.id}
+                          keywords={[client.companyName, client.location || '']}
                           onSelect={() => {
                             if (onClientSelect) {
                               onClientSelect(client.id);
