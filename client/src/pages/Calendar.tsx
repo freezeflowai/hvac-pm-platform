@@ -121,7 +121,8 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
         <CardContent className="flex-1 min-h-0 p-4">
           <div 
             ref={setNodeRef}
-            className="space-y-2 h-full overflow-y-auto pr-2"
+            className="space-y-2 h-full overflow-y-scroll pr-2"
+            style={{ scrollbarWidth: 'thin' }}
             data-testid="unscheduled-panel"
           >
             {clients.map((client: any) => (
@@ -266,13 +267,13 @@ function DayPartsCell({ assignments, clients, dayName, date }: { assignments: an
   };
 
   return (
-    <div className="p-2 border bg-card group relative transition-all hover:z-50">
+    <div className="p-2 border bg-card">
       {sortedParts.length > 0 ? (
         <>
-          <div className="space-y-0.5 max-h-48 overflow-y-auto mb-2 group-hover:max-h-96 group-hover:absolute group-hover:left-0 group-hover:right-0 group-hover:bg-card group-hover:border group-hover:shadow-lg group-hover:p-3 group-hover:rounded-md transition-all">
+          <div className="space-y-0.5 mb-2">
             {sortedParts.map(([partName, quantity]) => (
-              <div key={partName} className="flex items-center justify-between gap-1 text-xs group-hover:text-sm">
-                <span className="truncate group-hover:whitespace-normal">{partName}</span>
+              <div key={partName} className="flex items-center justify-between gap-1 text-xs">
+                <span className="flex-1">{partName}</span>
                 <span className="font-semibold text-primary shrink-0">×{quantity}</span>
               </div>
             ))}
