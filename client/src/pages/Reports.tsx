@@ -70,6 +70,7 @@ interface ClientScheduleItem {
   location: string;
   selectedMonths: number[];
   parts: ClientPart[];
+  isCompleted: boolean;
 }
 
 export default function Reports() {
@@ -355,108 +356,128 @@ export default function Reports() {
                 </CardContent>
               </Card>
             ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Clients Scheduled for {MONTHS[scheduleMonth]}
-                  </CardTitle>
-                  <CardDescription>
-                    {scheduleData.length} {scheduleData.length === 1 ? 'client' : 'clients'} scheduled for preventive maintenance
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Company Name</TableHead>
-                        <TableHead>Location</TableHead>
-                        <TableHead>PM Schedule</TableHead>
-                        <TableHead>Parts</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {scheduleData.map((client, index) => {
-                        const filters = client.parts.filter(cp => cp.part.type === "filter");
-                        const belts = client.parts.filter(cp => cp.part.type === "belt");
-                        const sortedFilters = filters.sort((a, b) => {
-                          const aDisplay = getPartDisplay(a.part);
-                          const bDisplay = getPartDisplay(b.part);
-                          return aDisplay.name.localeCompare(bDisplay.name);
-                        });
-                        const sortedBelts = belts.sort((a, b) => {
-                          const aDisplay = getPartDisplay(a.part);
-                          const bDisplay = getPartDisplay(b.part);
-                          return aDisplay.name.localeCompare(bDisplay.name);
-                        });
-                        
-                        return (
-                          <TableRow key={client.id} data-testid={`schedule-row-${index}`}>
-                            <TableCell className="font-medium py-1.5" data-testid={`client-name-${index}`}>
-                              {client.companyName}
-                            </TableCell>
-                            <TableCell className="py-1.5" data-testid={`client-location-${index}`}>
-                              {client.location}
-                            </TableCell>
-                            <TableCell className="py-1.5">
-                              <div className="flex flex-wrap gap-1">
-                                {client.selectedMonths.map(monthIndex => (
-                                  <Badge
-                                    key={monthIndex}
-                                    variant={monthIndex === scheduleMonth ? "default" : "outline"}
-                                    data-testid={`month-badge-${index}-${monthIndex}`}
-                                  >
-                                    {MONTHS[monthIndex]}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-1.5">
-                              <div className="space-y-1">
-                                {sortedFilters.length > 0 && (
-                                  <div className="text-xs">
-                                    <span className="font-medium">Filters: </span>
-                                    <span className="text-muted-foreground">
-                                      {sortedFilters.map((cp, i) => {
-                                        const display = getPartDisplay(cp.part);
-                                        return (
-                                          <span key={cp.id}>
-                                            {i > 0 && ", "}
-                                            {display.details} ({cp.quantity})
-                                          </span>
-                                        );
-                                      })}
-                                    </span>
-                                  </div>
-                                )}
-                                {sortedBelts.length > 0 && (
-                                  <div className="text-xs">
-                                    <span className="font-medium">Belts: </span>
-                                    <span className="text-muted-foreground">
-                                      {sortedBelts.map((cp, i) => {
-                                        const display = getPartDisplay(cp.part);
-                                        return (
-                                          <span key={cp.id}>
-                                            {i > 0 && ", "}
-                                            {display.details} ({cp.quantity})
-                                          </span>
-                                        );
-                                      })}
-                                    </span>
-                                  </div>
-                                )}
-                                {sortedFilters.length === 0 && sortedBelts.length === 0 && (
-                                  <span className="text-xs text-muted-foreground">No parts</span>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+              <>
+                {(() => {
+                  const uncompletedClients = scheduleData.filter(c => !c.isCompleted);
+                  const completedClients = scheduleData.filter(c => c.isCompleted);
+                  
+                  const renderClientTable = (clients: ClientScheduleItem[], testIdPrefix: string) => (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Company Name</TableHead>
+                          <TableHead>Location</TableHead>
+                          <TableHead>Parts</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {clients.map((client, index) => {
+                          const filters = client.parts.filter(cp => cp.part.type === "filter");
+                          const belts = client.parts.filter(cp => cp.part.type === "belt");
+                          const sortedFilters = filters.sort((a, b) => {
+                            const aDisplay = getPartDisplay(a.part);
+                            const bDisplay = getPartDisplay(b.part);
+                            return aDisplay.name.localeCompare(bDisplay.name);
+                          });
+                          const sortedBelts = belts.sort((a, b) => {
+                            const aDisplay = getPartDisplay(a.part);
+                            const bDisplay = getPartDisplay(b.part);
+                            return aDisplay.name.localeCompare(bDisplay.name);
+                          });
+                          
+                          return (
+                            <TableRow key={client.id} data-testid={`${testIdPrefix}-row-${index}`}>
+                              <TableCell className="font-medium py-1.5" data-testid={`${testIdPrefix}-name-${index}`}>
+                                {client.companyName}
+                              </TableCell>
+                              <TableCell className="py-1.5" data-testid={`${testIdPrefix}-location-${index}`}>
+                                {client.location}
+                              </TableCell>
+                              <TableCell className="py-1.5">
+                                <div className="space-y-1">
+                                  {sortedFilters.length > 0 && (
+                                    <div className="text-xs">
+                                      <span className="font-medium">Filters: </span>
+                                      <span className="text-muted-foreground">
+                                        {sortedFilters.map((cp, i) => {
+                                          const display = getPartDisplay(cp.part);
+                                          return (
+                                            <span key={cp.id}>
+                                              {i > 0 && ", "}
+                                              {display.details} ({cp.quantity})
+                                            </span>
+                                          );
+                                        })}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {sortedBelts.length > 0 && (
+                                    <div className="text-xs">
+                                      <span className="font-medium">Belts: </span>
+                                      <span className="text-muted-foreground">
+                                        {sortedBelts.map((cp, i) => {
+                                          const display = getPartDisplay(cp.part);
+                                          return (
+                                            <span key={cp.id}>
+                                              {i > 0 && ", "}
+                                              {display.details} ({cp.quantity})
+                                            </span>
+                                          );
+                                        })}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {sortedFilters.length === 0 && sortedBelts.length === 0 && (
+                                    <span className="text-xs text-muted-foreground">No parts</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  );
+                  
+                  return (
+                    <>
+                      {uncompletedClients.length > 0 && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <Calendar className="h-5 w-5" />
+                              Uncompleted PM - {MONTHS[scheduleMonth]}
+                            </CardTitle>
+                            <CardDescription>
+                              {uncompletedClients.length} {uncompletedClients.length === 1 ? 'client' : 'clients'} pending maintenance
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            {renderClientTable(uncompletedClients, 'uncompleted')}
+                          </CardContent>
+                        </Card>
+                      )}
+                      
+                      {completedClients.length > 0 && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <Calendar className="h-5 w-5" />
+                              Completed PM - {MONTHS[scheduleMonth]}
+                            </CardTitle>
+                            <CardDescription>
+                              {completedClients.length} {completedClients.length === 1 ? 'client' : 'clients'} with completed maintenance
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            {renderClientTable(completedClients, 'completed')}
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  );
+                })()}
+              </>
             )}
           </TabsContent>
         </Tabs>

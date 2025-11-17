@@ -758,13 +758,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         client.selectedMonths.includes(month) && !client.inactive
       );
       
-      // Get parts for each client
+      // Get parts and completion status for each client
+      const currentYear = new Date().getFullYear();
+      const completedRecords = await storage.getRecentlyCompletedMaintenance(req.user!.id, month, currentYear);
+      
       const clientsWithParts = await Promise.all(
         scheduledClients.map(async (client) => {
           const clientParts = await storage.getClientParts(req.user!.id, client.id);
+          
+          // Check if there's a completed maintenance record for this month
+          const isCompleted = completedRecords.some(record => record.clientId === client.id);
+          
           return {
             ...client,
-            parts: clientParts
+            parts: clientParts,
+            isCompleted
           };
         })
       );
