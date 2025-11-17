@@ -142,16 +142,15 @@ function DayPartsSummary({ assignments, clients }: { assignments: any[]; clients
   if (sortedParts.length === 0) return null;
 
   return (
-    <div className="mt-2 pt-2 border-t border-border/50">
-      <div className="text-[10px] font-medium text-muted-foreground mb-1">Required Parts:</div>
-      <div className="space-y-0.5">
-        {sortedParts.map(([partName, quantity]) => (
-          <div key={partName} className="text-[10px] text-muted-foreground flex justify-between gap-1">
-            <span className="truncate">{partName}</span>
-            <span className="font-medium">×{quantity}</span>
+    <div className="mt-2 space-y-1">
+      {sortedParts.map(([partName, quantity]) => (
+        <div key={partName} className="bg-card border rounded-md p-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium truncate">{partName}</span>
+            <span className="text-xs font-bold text-primary shrink-0">×{quantity}</span>
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -218,7 +217,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
 
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<"monthly" | "weekly">("monthly");
+  const [view, setView] = useState<"monthly" | "weekly">("weekly");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
