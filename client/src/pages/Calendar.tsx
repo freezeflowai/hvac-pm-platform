@@ -154,6 +154,8 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     isDragging,
   } = useSortable({ id });
 
+  const [clickStartPos, setClickStartPos] = useState<{ x: number; y: number } | null>(null);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -168,11 +170,22 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     return 'bg-status-this-month/10 border-status-this-month/30';
   };
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setClickStartPos({ x: e.clientX, y: e.clientY });
+  };
+
   const handleClick = (e: React.MouseEvent) => {
-    if (onClick && !isDragging) {
-      e.stopPropagation();
-      onClick();
+    // Only trigger onClick if the mouse didn't move significantly (not a drag)
+    if (onClick && clickStartPos) {
+      const deltaX = Math.abs(e.clientX - clickStartPos.x);
+      const deltaY = Math.abs(e.clientY - clickStartPos.y);
+      
+      // If movement is less than 5 pixels, consider it a click
+      if (deltaX < 5 && deltaY < 5) {
+        onClick();
+      }
     }
+    setClickStartPos(null);
   };
 
   return (
@@ -181,8 +194,9 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
       style={style}
       {...attributes}
       {...listeners}
+      onMouseDown={handleMouseDown}
       onClick={handleClick}
-      className={`text-xs p-2 rounded-lg hover:shadow-md transition-all relative cursor-pointer select-none ${getBackgroundColor()}`}
+      className={`text-xs p-2 rounded-lg hover:shadow-md transition-all relative cursor-grab active:cursor-grabbing select-none ${getBackgroundColor()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
       <div className={`font-semibold ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
