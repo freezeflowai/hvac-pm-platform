@@ -104,9 +104,9 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
   }
 
   return (
-    <div>
-      <Card className="h-full shadow-md rounded-xl">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+    <div className="h-full">
+      <Card className="h-full shadow-md rounded-xl flex flex-col">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0 flex-shrink-0">
           <CardTitle className="text-base font-semibold">Unscheduled ({clients.length})</CardTitle>
           <Button
             variant="ghost"
@@ -118,7 +118,7 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
             <ChevronsRight className="h-4 w-4" />
           </Button>
         </CardHeader>
-        <CardContent className="h-[calc(100%-4rem)]">
+        <CardContent className="flex-1 overflow-hidden">
           <div 
             ref={setNodeRef}
             className="space-y-2 h-full overflow-y-auto"
