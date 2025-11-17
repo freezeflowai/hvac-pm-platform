@@ -5,7 +5,8 @@ import {
   Package, 
   FileText, 
   Shield, 
-  LogOut
+  LogOut,
+  Smartphone
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -105,6 +106,13 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       href: "/reports",
       isActive: location === "/reports",
       testId: "nav-reports"
+    },
+    {
+      title: "Technician",
+      icon: Smartphone,
+      href: "/technician",
+      isActive: location === "/technician",
+      testId: "nav-technician"
     },
   ];
 

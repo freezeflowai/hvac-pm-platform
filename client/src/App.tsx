@@ -12,6 +12,7 @@ import Admin from "@/pages/Admin";
 import AddClientPage from "@/pages/AddClientPage";
 import PartsManagementPage from "@/pages/PartsManagementPage";
 import CompanySettingsPage from "@/pages/CompanySettingsPage";
+import TechnicianDashboard from "@/pages/TechnicianDashboard";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import RequestReset from "@/pages/RequestReset";
@@ -66,6 +67,11 @@ function Router() {
       <Route path="/company-settings">
         <ProtectedRoute>
           <CompanySettingsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/technician">
+        <ProtectedRoute>
+          <TechnicianDashboard />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />

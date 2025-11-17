@@ -40,6 +40,14 @@ The application uses a Material Design-inspired typography hierarchy with the In
 - **Parts System Redesign**: A complete overhaul of the parts inventory system, introducing type-specific fields for filters, belts, and other parts, a tabbed management interface, and updated duplicate prevention logic.
 - **CSV Import**: Clients can be imported via CSV file with an import button in the client list. The import includes basic parsing, validation, automatic nextDue calculation, and detailed import statistics. Note: Best for simple client lists; avoid complex text with line breaks for reliability.
 - **Authentication**: Fixed login bug where users had to enter credentials twice. Login now properly waits for user state to be set before redirecting using useEffect, ensuring smooth single-attempt authentication.
+- **Mobile Technician Dashboard**: A dedicated mobile-optimized view for field technicians to access their schedules and view client information. Features include:
+  - Today's schedule prominently displayed with client details
+  - 7-day upcoming schedule view with assignments grouped by date
+  - Touch-friendly card interface with large tap targets
+  - Client detail modal showing parts inventory and equipment information
+  - Fully accessible with keyboard navigation and screen reader support
+  - Responsive design optimized for mobile devices with proper breakpoints
+  - Quick access to client contact information (phone, email, address) with tap-to-call/email functionality
 
 ## External Dependencies
 
