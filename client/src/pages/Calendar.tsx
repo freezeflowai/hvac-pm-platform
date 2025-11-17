@@ -522,6 +522,11 @@ export default function Calendar() {
 
   const { data: unscheduledClients = [] } = useQuery<any[]>({
     queryKey: ["/api/calendar/unscheduled", year, month],
+    queryFn: async () => {
+      const res = await fetch(`/api/calendar/unscheduled?year=${year}&month=${month}`);
+      if (!res.ok) throw new Error("Failed to fetch unscheduled clients");
+      return res.json();
+    },
     staleTime: 0,
     refetchOnMount: 'always',
   });
