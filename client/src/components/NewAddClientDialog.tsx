@@ -204,6 +204,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/client-parts/bulk'] });
     }
   });
 

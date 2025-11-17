@@ -159,22 +159,12 @@ function DayPartsCell({ assignments, clients, dayName, date, showOnlyOutstanding
   
   const clientIds = relevantAssignments.map((a: any) => a.clientId);
   
-  const { data: allParts = [] } = useQuery({
-    queryKey: ['/api/parts/day-summary', showOnlyOutstanding, ...clientIds.sort()],
-    queryFn: async () => {
-      if (clientIds.length === 0) return [];
-      
-      const partsPromises = clientIds.map(async (clientId: string) => {
-        const res = await fetch(`/api/clients/${clientId}/parts`);
-        if (!res.ok) return [];
-        return res.json();
-      });
-      
-      const allClientParts = await Promise.all(partsPromises);
-      return allClientParts.flat();
-    },
-    enabled: clientIds.length > 0
+  const { data: bulkParts = {} } = useQuery<Record<string, any[]>>({
+    queryKey: ['/api/client-parts/bulk'],
+    staleTime: 60 * 1000,
   });
+
+  const allParts = clientIds.flatMap((clientId: string) => bulkParts[clientId] || []);
 
   // Aggregate parts by type
   const partCounts: Record<string, number> = allParts.reduce((acc: Record<string, number>, clientPart: any) => {

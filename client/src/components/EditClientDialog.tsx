@@ -252,6 +252,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients', client.id, 'parts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/client-parts/bulk'] });
     }
   });
 
