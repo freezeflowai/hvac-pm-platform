@@ -150,12 +150,18 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
   );
 }
 
-function DayPartsCell({ assignments, clients, dayName, date }: { assignments: any[]; clients: any[]; dayName: string; date: Date }) {
+function DayPartsCell({ assignments, clients, dayName, date, showOnlyOutstanding }: { assignments: any[]; clients: any[]; dayName: string; date: Date; showOnlyOutstanding: boolean }) {
   const { toast } = useToast();
-  const clientIds = assignments.map((a: any) => a.clientId);
+  
+  // Filter assignments based on mode
+  const relevantAssignments = showOnlyOutstanding 
+    ? assignments.filter((a: any) => !a.completed)
+    : assignments;
+  
+  const clientIds = relevantAssignments.map((a: any) => a.clientId);
   
   const { data: allParts = [] } = useQuery({
-    queryKey: ['/api/parts/day-summary', ...clientIds.sort()],
+    queryKey: ['/api/parts/day-summary', showOnlyOutstanding, ...clientIds.sort()],
     queryFn: async () => {
       if (clientIds.length === 0) return [];
       
@@ -202,21 +208,22 @@ function DayPartsCell({ assignments, clients, dayName, date }: { assignments: an
     }
 
     const partsList = sortedParts.map(([partName, quantity]) => `${partName} ×${quantity}`).join('\n');
-    const subject = `Parts List for ${dayName} ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-    const body = `Required Parts:\n\n${partsList}`;
+    const reportType = showOnlyOutstanding ? 'Outstanding Parts' : 'All Parts';
+    const subject = `${reportType} for ${dayName} ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    const body = `Required Parts${showOnlyOutstanding ? ' (Outstanding Only)' : ''}:\n\n${partsList}`;
     
     window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   return (
-    <div className="p-2 border bg-card">
+    <div className="px-1.5 py-1 border bg-card">
       {sortedParts.length > 0 ? (
         <>
-          <div className="space-y-0.5 mb-2">
+          <div className="space-y-0 mb-1">
             {sortedParts.map(([partName, quantity]) => (
-              <div key={partName} className="flex items-center justify-between gap-1 text-xs">
-                <span className="flex-1">{partName}</span>
-                <span className="font-semibold text-primary shrink-0">×{quantity}</span>
+              <div key={partName} className="flex items-center justify-between gap-0.5 text-[10px] leading-tight py-0.5">
+                <span className="flex-1 truncate" title={partName}>{partName}</span>
+                <span className="font-semibold text-primary shrink-0 text-[11px]">×{quantity}</span>
               </div>
             ))}
           </div>
@@ -224,16 +231,16 @@ function DayPartsCell({ assignments, clients, dayName, date }: { assignments: an
             size="sm"
             variant="outline"
             onClick={handleEmailParts}
-            className="h-6 px-2 text-xs w-full"
+            className="h-5 px-1.5 text-[10px] w-full"
             data-testid={`button-email-${dayName.toLowerCase()}`}
           >
-            <Mail className="h-3 w-3 mr-1" />
-            Send
+            <Mail className="h-2.5 w-2.5 mr-0.5" />
+            Email
           </Button>
         </>
       ) : (
-        <div className="text-xs text-muted-foreground text-center py-3">
-          No parts required
+        <div className="text-[10px] text-muted-foreground text-center py-2">
+          No parts
         </div>
       )}
     </div>
@@ -307,6 +314,7 @@ export default function Calendar() {
   const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
   const [reportDialogClientId, setReportDialogClientId] = useState<string | null>(null);
   const [isUnscheduledMinimized, setIsUnscheduledMinimized] = useState(false);
+  const [showOnlyOutstanding, setShowOnlyOutstanding] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
@@ -684,6 +692,18 @@ export default function Calendar() {
         </div>
         
         <div className="mt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold">Parts Order</h3>
+            <Button
+              variant={showOnlyOutstanding ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowOnlyOutstanding(!showOnlyOutstanding)}
+              className="h-7 px-2 text-xs"
+              data-testid="button-toggle-outstanding"
+            >
+              {showOnlyOutstanding ? "Outstanding Only" : "All Parts"}
+            </Button>
+          </div>
           <div className="grid grid-cols-7 gap-2">
             {weekDaysData.map((dayData) => (
               <DayPartsCell
@@ -692,6 +712,7 @@ export default function Calendar() {
                 clients={clients}
                 dayName={dayData.dayName}
                 date={dayData.date}
+                showOnlyOutstanding={showOnlyOutstanding}
               />
             ))}
           </div>
