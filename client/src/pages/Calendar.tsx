@@ -15,65 +15,6 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
-function CompletedUnscheduledSection() {
-  const [showAll, setShowAll] = useState(false);
-  const { data: completedUnscheduled = [], isLoading } = useQuery({
-    queryKey: ['/api/maintenance/completed-unscheduled'],
-    queryFn: async () => {
-      const res = await fetch('/api/maintenance/completed-unscheduled');
-      if (!res.ok) return [];
-      return res.json();
-    }
-  });
-
-  if (isLoading || completedUnscheduled.length === 0) return null;
-
-  const displayedItems = showAll ? completedUnscheduled : completedUnscheduled.slice(0, 3);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base font-semibold">Completed (Never Scheduled)</CardTitle>
-      </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {displayedItems.map((item: any) => (
-              <div key={item.id} className="p-3 border rounded-lg bg-card" data-testid={`completed-unscheduled-${item.id}`}>
-                <div className="font-semibold text-sm">{item.companyName}</div>
-                {item.location && <div className="text-xs text-muted-foreground">{item.location}</div>}
-                <div className="text-xs text-muted-foreground mt-1">
-                  Completed: {new Date(item.completedAt).toLocaleDateString()}
-                </div>
-              </div>
-            ))}
-          </div>
-          {completedUnscheduled.length > 3 && !showAll && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAll(true)}
-              className="mt-3 w-full"
-              data-testid="button-view-all-completed"
-            >
-              View All ({completedUnscheduled.length})
-            </Button>
-          )}
-          {showAll && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAll(false)}
-              className="mt-3 w-full"
-              data-testid="button-show-less-completed"
-            >
-              Show Less
-            </Button>
-          )}
-        </CardContent>
-    </Card>
-  );
-}
-
 function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimize }: { 
   clients: any[]; 
   onClientClick?: (clientId: string) => void;
@@ -857,12 +798,6 @@ export default function Calendar() {
               onToggleMinimize={() => setIsUnscheduledMinimized(!isUnscheduledMinimized)}
             />
           )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mt-4">
-            <div className="lg:col-span-3">
-              <CompletedUnscheduledSection />
-            </div>
-          </div>
         </main>
 
         <DragOverlay>
