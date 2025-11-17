@@ -174,42 +174,15 @@ export default function Dashboard() {
   });
 
 
-  const [clientParts, setClientParts] = useState<Record<string, ClientPart[]>>({});
-  const [completionStatuses, setCompletionStatuses] = useState<Record<string, { completed: boolean; completedDueDate?: string }>>({});
+  const { data: clientParts = {} } = useQuery<Record<string, ClientPart[]>>({
+    queryKey: ["/api/client-parts/bulk"],
+    staleTime: 60 * 1000, // Cache for 60 seconds
+  });
 
-  useEffect(() => {
-    const fetchAllClientParts = async () => {
-      const partsData: Record<string, ClientPart[]> = {};
-      for (const client of dbClients) {
-        try {
-          const res = await fetch(`/api/clients/${client.id}/parts`);
-          if (res.ok) {
-            partsData[client.id] = await res.json();
-          }
-        } catch (error) {
-          console.error(`Failed to fetch parts for client ${client.id}`, error);
-        }
-      }
-      setClientParts(partsData);
-    };
-
-    const fetchCompletionStatuses = async () => {
-      try {
-        const res = await fetch(`/api/maintenance/statuses`);
-        if (res.ok) {
-          const statuses = await res.json();
-          setCompletionStatuses(statuses);
-        }
-      } catch (error) {
-        console.error('Failed to fetch completion statuses', error);
-      }
-    };
-
-    if (dbClients.length > 0) {
-      fetchAllClientParts();
-      fetchCompletionStatuses();
-    }
-  }, [dbClients]);
+  const { data: completionStatuses = {} } = useQuery<Record<string, { completed: boolean; completedDueDate?: string }>>({
+    queryKey: ["/api/maintenance/statuses"],
+    staleTime: 60 * 1000, // Cache for 60 seconds
+  });
 
   // Listen for sidebar events
   useEffect(() => {

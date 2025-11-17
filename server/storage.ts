@@ -94,6 +94,7 @@ export interface IStorage {
   
   // Client-Part relationship methods
   getClientParts(userId: string, clientId: string): Promise<(ClientPart & { part: Part })[]>;
+  getAllClientPartsBulk(userId: string): Promise<Record<string, (ClientPart & { part: Part })[]>>;
   addClientPart(userId: string, clientPart: InsertClientPart): Promise<ClientPart>;
   updateClientPart(userId: string, id: string, quantity: number): Promise<ClientPart | undefined>;
   deleteClientPart(userId: string, id: string): Promise<boolean>;
@@ -524,6 +525,26 @@ export class MemStorage implements IStorage {
       .filter((cp): cp is (ClientPart & { part: Part }) => cp !== null);
   }
 
+  async getAllClientPartsBulk(userId: string): Promise<Record<string, (ClientPart & { part: Part })[]>> {
+    const bulkMap: Record<string, (ClientPart & { part: Part })[]> = {};
+    
+    const allClientParts = Array.from(this.clientParts.values())
+      .filter(cp => cp.userId === userId);
+    
+    for (const cp of allClientParts) {
+      const part = this.parts.get(cp.partId);
+      if (!part) continue;
+      
+      if (!bulkMap[cp.clientId]) {
+        bulkMap[cp.clientId] = [];
+      }
+      
+      bulkMap[cp.clientId].push({ ...cp, part });
+    }
+    
+    return bulkMap;
+  }
+
   async addClientPart(userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
     // Verify that the client belongs to the userId
     const client = this.clients.get(insertClientPart.clientId);
@@ -751,6 +772,8 @@ export class MemStorage implements IStorage {
       userId,
       id,
       createdAt: new Date().toISOString(),
+      type: equipment.type ?? null,
+      location: equipment.location ?? null,
       modelNumber: equipment.modelNumber ?? null,
       serialNumber: equipment.serialNumber ?? null,
       notes: equipment.notes ?? null
@@ -1221,6 +1244,31 @@ export class DbStorage implements IStorage {
         ...row.client_parts,
         part: row.parts!
       }));
+  }
+
+  async getAllClientPartsBulk(userId: string): Promise<Record<string, (ClientPart & { part: Part })[]>> {
+    const result = await db.select()
+      .from(clientParts)
+      .leftJoin(parts, eq(clientParts.partId, parts.id))
+      .where(eq(clientParts.userId, userId));
+    
+    const bulkMap: Record<string, (ClientPart & { part: Part })[]> = {};
+    
+    for (const row of result) {
+      if (row.parts === null) continue;
+      
+      const clientId = row.client_parts.clientId;
+      if (!bulkMap[clientId]) {
+        bulkMap[clientId] = [];
+      }
+      
+      bulkMap[clientId].push({
+        ...row.client_parts,
+        part: row.parts
+      });
+    }
+    
+    return bulkMap;
   }
 
   async addClientPart(userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {

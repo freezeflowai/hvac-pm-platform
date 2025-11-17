@@ -663,6 +663,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Client-Part routes
+  app.get("/api/client-parts/bulk", isAuthenticated, async (req, res) => {
+    try {
+      const bulkParts = await storage.getAllClientPartsBulk(req.user!.id);
+      res.json(bulkParts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch bulk client parts" });
+    }
+  });
+
   app.get("/api/clients/:id/parts", isAuthenticated, async (req, res) => {
     try {
       const clientParts = await storage.getClientParts(req.user!.id, req.params.id);
