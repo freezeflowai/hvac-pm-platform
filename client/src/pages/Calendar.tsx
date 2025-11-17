@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Mail } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Mail, ChevronsRight, ChevronsLeft } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -74,14 +74,49 @@ function CompletedUnscheduledSection() {
   );
 }
 
-function UnscheduledPanel({ clients, onClientClick }: { clients: any[]; onClientClick?: (clientId: string) => void }) {
+function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimize }: { 
+  clients: any[]; 
+  onClientClick?: (clientId: string) => void;
+  isMinimized: boolean;
+  onToggleMinimize: () => void;
+}) {
   const { setNodeRef } = useDroppable({ id: 'unscheduled-panel' });
+
+  if (isMinimized) {
+    return (
+      <div className="fixed right-0 top-0 h-screen flex items-center z-40">
+        <Card className="h-full w-12 shadow-lg rounded-l-xl rounded-r-none flex flex-col items-center justify-center border-r-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleMinimize}
+            className="mb-4"
+            data-testid="button-expand-unscheduled"
+          >
+            <ChevronsLeft className="h-5 w-5" />
+          </Button>
+          <div className="writing-mode-vertical text-sm font-semibold text-muted-foreground whitespace-nowrap" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+            Unscheduled ({clients.length})
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>
       <Card className="h-full shadow-md rounded-xl">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base font-semibold">Unscheduled ({clients.length})</CardTitle>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleMinimize}
+            className="h-8 w-8"
+            data-testid="button-minimize-unscheduled"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </Button>
         </CardHeader>
         <CardContent className="h-[calc(100%-4rem)]">
           <div 
@@ -314,6 +349,7 @@ export default function Calendar() {
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
   const [reportDialogClientId, setReportDialogClientId] = useState<string | null>(null);
+  const [isUnscheduledMinimized, setIsUnscheduledMinimized] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
@@ -757,8 +793,8 @@ export default function Calendar() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4" style={{ height: 'calc(100vh - 12rem)' }}>
-            <div className="lg:col-span-3 flex flex-col h-full">
+          <div className={`grid gap-4 ${isUnscheduledMinimized ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-4'}`} style={{ height: 'calc(100vh - 12rem)' }}>
+            <div className={`${isUnscheduledMinimized ? 'col-span-1' : 'lg:col-span-3'} flex flex-col h-full`}>
               <Card className="h-full flex flex-col">
                 <CardContent className="flex-1 overflow-auto p-0">
                   {view === "monthly" && (
@@ -784,13 +820,26 @@ export default function Calendar() {
               </Card>
             </div>
 
-            <div className="h-full">
-              <UnscheduledPanel 
-                clients={unscheduledClients} 
-                onClientClick={setReportDialogClientId}
-              />
-            </div>
+            {!isUnscheduledMinimized && (
+              <div className="h-full">
+                <UnscheduledPanel 
+                  clients={unscheduledClients} 
+                  onClientClick={setReportDialogClientId}
+                  isMinimized={isUnscheduledMinimized}
+                  onToggleMinimize={() => setIsUnscheduledMinimized(!isUnscheduledMinimized)}
+                />
+              </div>
+            )}
           </div>
+
+          {isUnscheduledMinimized && (
+            <UnscheduledPanel 
+              clients={unscheduledClients} 
+              onClientClick={setReportDialogClientId}
+              isMinimized={isUnscheduledMinimized}
+              onToggleMinimize={() => setIsUnscheduledMinimized(!isUnscheduledMinimized)}
+            />
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mt-4">
             <div className="lg:col-span-3">
