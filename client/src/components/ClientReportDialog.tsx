@@ -278,9 +278,9 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
             </div>
 
             {/* Equipment Section */}
-            {equipment.length > 0 && (
-              <div className="space-y-3 border-t pt-6">
-                <h2 className="text-xl font-bold">Equipment</h2>
+            <div className="space-y-3 border-t pt-6">
+              <h2 className="text-xl font-bold">Equipment</h2>
+              {equipment.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -303,8 +303,10 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
                     </tbody>
                   </table>
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-muted-foreground">No equipment tracked for this client.</p>
+              )}
+            </div>
           </div>
         ) : (
           <div className="p-8">

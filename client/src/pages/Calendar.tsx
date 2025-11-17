@@ -156,13 +156,13 @@ function DayPartsCell({ assignments, clients, dayName, date }: { assignments: an
   };
 
   return (
-    <div className="p-2 border bg-card">
+    <div className="p-2 border bg-card group relative transition-all hover:z-50">
       {sortedParts.length > 0 ? (
         <>
-          <div className="space-y-0.5 max-h-48 overflow-y-auto mb-2">
+          <div className="space-y-0.5 max-h-48 overflow-y-auto mb-2 group-hover:max-h-96 group-hover:absolute group-hover:left-0 group-hover:right-0 group-hover:bg-card group-hover:border group-hover:shadow-lg group-hover:p-3 group-hover:rounded-md transition-all">
             {sortedParts.map(([partName, quantity]) => (
-              <div key={partName} className="flex items-center justify-between gap-1 text-xs">
-                <span className="truncate">{partName}</span>
+              <div key={partName} className="flex items-center justify-between gap-1 text-xs group-hover:text-sm">
+                <span className="truncate group-hover:whitespace-normal">{partName}</span>
                 <span className="font-semibold text-primary shrink-0">×{quantity}</span>
               </div>
             ))}
