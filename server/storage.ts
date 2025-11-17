@@ -319,13 +319,32 @@ export class MemStorage implements IStorage {
     const existing = this.clients.get(id);
     if (!existing || existing.userId !== userId) return undefined;
     
-    const updated: Client = { ...existing, ...clientUpdate };
+    const updated: Client = { 
+      ...existing, 
+      ...clientUpdate,
+      location: clientUpdate.location !== undefined ? (clientUpdate.location ?? null) : existing.location,
+      address: clientUpdate.address !== undefined ? (clientUpdate.address ?? null) : existing.address,
+      city: clientUpdate.city !== undefined ? (clientUpdate.city ?? null) : existing.city,
+      province: clientUpdate.province !== undefined ? (clientUpdate.province ?? null) : existing.province,
+      postalCode: clientUpdate.postalCode !== undefined ? (clientUpdate.postalCode ?? null) : existing.postalCode,
+      contactName: clientUpdate.contactName !== undefined ? (clientUpdate.contactName ?? null) : existing.contactName,
+      email: clientUpdate.email !== undefined ? (clientUpdate.email ?? null) : existing.email,
+      phone: clientUpdate.phone !== undefined ? (clientUpdate.phone ?? null) : existing.phone,
+      roofLadderCode: clientUpdate.roofLadderCode !== undefined ? (clientUpdate.roofLadderCode ?? null) : existing.roofLadderCode,
+      notes: clientUpdate.notes !== undefined ? (clientUpdate.notes ?? null) : existing.notes,
+    };
     
     // Recalculate nextDue if selectedMonths or inactive status changed
     if (clientUpdate.selectedMonths !== undefined || clientUpdate.inactive !== undefined) {
       const selectedMonths = clientUpdate.selectedMonths ?? existing.selectedMonths;
       const inactive = clientUpdate.inactive ?? existing.inactive;
+      console.log(`[Update Client] Recalculating nextDue for ${existing.companyName}:`, {
+        selectedMonths,
+        inactive,
+        oldNextDue: existing.nextDue
+      });
       updated.nextDue = calculateNextDueDate(selectedMonths, inactive);
+      console.log(`[Update Client] New nextDue: ${updated.nextDue}`);
     }
     
     this.clients.set(id, updated);
