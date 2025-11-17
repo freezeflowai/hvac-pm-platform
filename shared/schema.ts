@@ -157,8 +157,10 @@ export const equipment = pgTable("equipment", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
+  type: text("type"),
   modelNumber: text("model_number"),
   serialNumber: text("serial_number"),
+  location: text("location"),
   notes: text("notes"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
