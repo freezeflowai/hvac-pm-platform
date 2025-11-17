@@ -30,11 +30,10 @@ function CompletedUnscheduledSection() {
   const displayedItems = showAll ? completedUnscheduled : completedUnscheduled.slice(0, 3);
 
   return (
-    <div className="mt-4 lg:col-span-3">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">Completed (Never Scheduled)</CardTitle>
-        </CardHeader>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-semibold">Completed (Never Scheduled)</CardTitle>
+      </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {displayedItems.map((item: any) => (
@@ -70,8 +69,7 @@ function CompletedUnscheduledSection() {
             </Button>
           )}
         </CardContent>
-      </Card>
-    </div>
+    </Card>
   );
 }
 
@@ -535,12 +533,14 @@ export default function Calendar() {
 
   const { assignments = [], clients = [] } = data || {};
   
-  // Get unscheduled clients (active clients with PM this month, not yet scheduled)
+  // Get unscheduled clients (active clients with PM this month, not yet scheduled or completed)
   const scheduledClientIds = new Set(assignments.map((a: any) => a.clientId));
+  const completedClientIds = new Set(assignments.filter((a: any) => a.completed).map((a: any) => a.clientId));
   const currentMonthIndex = currentDate.getMonth(); // 0-indexed for selectedMonths
   const unscheduledClients = clients.filter((c: any) => 
     !c.inactive && 
     !scheduledClientIds.has(c.id) &&
+    !completedClientIds.has(c.id) &&
     c.selectedMonths?.includes(currentMonthIndex)
   );
 
@@ -778,7 +778,11 @@ export default function Calendar() {
             </div>
           </div>
 
-          <CompletedUnscheduledSection />
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mt-4">
+            <div className="lg:col-span-3">
+              <CompletedUnscheduledSection />
+            </div>
+          </div>
         </main>
 
         <DragOverlay>
