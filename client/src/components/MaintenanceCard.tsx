@@ -124,26 +124,36 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, onViewRe
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
             <p className="text-xs text-muted-foreground whitespace-nowrap">
               {monthsDisplay}
             </p>
             <Button
-              size="icon"
-              variant={isCompleted ? "default" : "ghost"}
+              size="sm"
+              variant={isCompleted ? "default" : "outline"}
               onClick={(e) => {
                 e.stopPropagation();
                 onMarkComplete(item.id);
               }}
               data-testid={`button-complete-${item.id}`}
-              title={isCompleted ? "Reopen" : "Complete"}
               aria-label={isCompleted ? "Reopen maintenance" : "Mark maintenance complete"}
-              className={`h-7 w-7 rounded-full ${getIconColor()}`}
+              className={`h-7 text-xs whitespace-nowrap gap-1 ${isCompleted ? '' : isOverdue ? 'border-status-overdue text-status-overdue hover:bg-status-overdue/10' : ''}`}
             >
-              {isOverdue ? (
-                <AlertTriangle className="h-3.5 w-3.5" />
+              {isCompleted ? (
+                <>
+                  <CheckCircle className="h-3 w-3" />
+                  Completed
+                </>
+              ) : isOverdue ? (
+                <>
+                  <AlertTriangle className="h-3 w-3" />
+                  Complete
+                </>
               ) : (
-                <CheckCircle className="h-3.5 w-3.5" />
+                <>
+                  <CheckCircle className="h-3 w-3" />
+                  Complete
+                </>
               )}
             </Button>
           </div>
