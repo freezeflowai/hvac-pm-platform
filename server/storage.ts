@@ -106,6 +106,7 @@ export interface IStorage {
   getMaintenanceRecord(userId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined>;
   getLatestCompletedMaintenanceRecord(userId: string, clientId: string): Promise<MaintenanceRecord | undefined>;
   getRecentlyCompletedMaintenance(userId: string, month: number, year: number): Promise<MaintenanceRecord[]>;
+  getCompletedUnscheduledMaintenance(userId: string): Promise<MaintenanceRecord[]>;
   createMaintenanceRecord(userId: string, record: InsertMaintenanceRecord): Promise<MaintenanceRecord>;
   updateMaintenanceRecord(userId: string, id: string, record: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined>;
   deleteMaintenanceRecord(userId: string, id: string): Promise<boolean>;
@@ -649,6 +650,30 @@ export class MemStorage implements IStorage {
         const dateB = new Date(b.completedAt!).getTime();
         return dateB - dateA; // Most recent first
       });
+  }
+
+  async getCompletedUnscheduledMaintenance(userId: string): Promise<MaintenanceRecord[]> {
+    const completedRecords = Array.from(this.maintenanceRecords.values())
+      .filter(record => record.userId === userId && record.completedAt);
+    
+    const result = [];
+    for (const record of completedRecords) {
+      const dueDate = new Date(record.dueDate);
+      const year = dueDate.getFullYear();
+      const month = dueDate.getMonth() + 1;
+      
+      // Check if there was a calendar assignment for this client in this month
+      const assignment = await this.getClientCalendarAssignment(userId, record.clientId, year, month);
+      if (!assignment) {
+        result.push(record);
+      }
+    }
+    
+    return result.sort((a, b) => {
+      const dateA = new Date(a.completedAt!).getTime();
+      const dateB = new Date(b.completedAt!).getTime();
+      return dateB - dateA;
+    });
   }
 
   async createMaintenanceRecord(userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
@@ -1271,6 +1296,31 @@ export class DbStorage implements IStorage {
         sql`${maintenanceRecords.completedAt} <= ${endDate}`
       ))
       .orderBy(desc(maintenanceRecords.completedAt));
+  }
+
+  async getCompletedUnscheduledMaintenance(userId: string): Promise<MaintenanceRecord[]> {
+    const completedRecords = await db.select()
+      .from(maintenanceRecords)
+      .where(and(
+        eq(maintenanceRecords.userId, userId),
+        sql`${maintenanceRecords.completedAt} IS NOT NULL`
+      ))
+      .orderBy(desc(maintenanceRecords.completedAt));
+    
+    const result = [];
+    for (const record of completedRecords) {
+      const dueDate = new Date(record.dueDate);
+      const year = dueDate.getFullYear();
+      const month = dueDate.getMonth() + 1;
+      
+      // Check if there was a calendar assignment for this client in this month
+      const assignment = await this.getClientCalendarAssignment(userId, record.clientId, year, month);
+      if (!assignment) {
+        result.push(record);
+      }
+    }
+    
+    return result;
   }
 
   async createMaintenanceRecord(userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {

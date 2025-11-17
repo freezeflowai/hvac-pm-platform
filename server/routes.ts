@@ -821,6 +821,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get completed but unscheduled maintenance
+  app.get("/api/maintenance/completed-unscheduled", isAuthenticated, async (req, res) => {
+    try {
+      const records = await storage.getCompletedUnscheduledMaintenance(req.user!.id);
+      
+      // Fetch client details for each record and format for frontend
+      const completedItems = [];
+      for (const record of records) {
+        const client = await storage.getClient(req.user!.id, record.clientId);
+        if (client) {
+          completedItems.push({
+            id: record.id,
+            clientId: client.id,
+            companyName: client.companyName,
+            location: client.location,
+            dueDate: record.dueDate,
+            completedAt: record.completedAt
+          });
+        }
+      }
+      
+      res.json(completedItems);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch completed unscheduled maintenance" });
+    }
+  });
+
   // Maintenance completion routes
   app.post("/api/maintenance/:clientId/toggle", isAuthenticated, async (req, res) => {
     try {

@@ -14,6 +14,67 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
+function CompletedUnscheduledSection() {
+  const [showAll, setShowAll] = useState(false);
+  const { data: completedUnscheduled = [], isLoading } = useQuery({
+    queryKey: ['/api/maintenance/completed-unscheduled'],
+    queryFn: async () => {
+      const res = await fetch('/api/maintenance/completed-unscheduled');
+      if (!res.ok) return [];
+      return res.json();
+    }
+  });
+
+  if (isLoading || completedUnscheduled.length === 0) return null;
+
+  const displayedItems = showAll ? completedUnscheduled : completedUnscheduled.slice(0, 3);
+
+  return (
+    <div className="mt-4 lg:col-span-3">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Completed (Never Scheduled)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {displayedItems.map((item: any) => (
+              <div key={item.id} className="p-3 border rounded-lg bg-card" data-testid={`completed-unscheduled-${item.id}`}>
+                <div className="font-semibold text-sm">{item.companyName}</div>
+                {item.location && <div className="text-xs text-muted-foreground">{item.location}</div>}
+                <div className="text-xs text-muted-foreground mt-1">
+                  Completed: {new Date(item.completedAt).toLocaleDateString()}
+                </div>
+              </div>
+            ))}
+          </div>
+          {completedUnscheduled.length > 3 && !showAll && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAll(true)}
+              className="mt-3 w-full"
+              data-testid="button-view-all-completed"
+            >
+              View All ({completedUnscheduled.length})
+            </Button>
+          )}
+          {showAll && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAll(false)}
+              className="mt-3 w-full"
+              data-testid="button-show-less-completed"
+            >
+              Show Less
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function UnscheduledPanel({ clients }: { clients: any[] }) {
   const { setNodeRef } = useDroppable({ id: 'unscheduled-panel' });
 
@@ -686,7 +747,7 @@ export default function Calendar() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4" style={{ height: 'calc(100vh - 12rem)' }}>
-            <div className="lg:col-span-3 flex flex-col">
+            <div className="lg:col-span-3 flex flex-col h-full">
               <Card className="h-full flex flex-col">
                 <CardContent className="flex-1 overflow-auto p-0">
                   {view === "monthly" && (
@@ -716,6 +777,8 @@ export default function Calendar() {
               <UnscheduledPanel clients={unscheduledClients} />
             </div>
           </div>
+
+          <CompletedUnscheduledSection />
         </main>
 
         <DragOverlay>
