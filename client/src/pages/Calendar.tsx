@@ -726,10 +726,11 @@ export default function Calendar() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="min-h-screen bg-background">
+      <div className="h-screen bg-background flex flex-col overflow-hidden">
         <Header clients={allClients} onAddClient={() => setAddClientDialogOpen(true)} />
         
-        <main className={`mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
+        <main className={`flex-1 mx-auto px-4 sm:px-6 lg:px-8 py-4 overflow-y-auto transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
+          <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Button
@@ -845,6 +846,7 @@ export default function Calendar() {
             <div className="lg:col-span-3">
               <CompletedUnscheduledSection />
             </div>
+          </div>
           </div>
         </main>
 
