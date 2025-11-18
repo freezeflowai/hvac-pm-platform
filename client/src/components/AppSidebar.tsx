@@ -12,6 +12,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import type { CompanySettings } from "@shared/schema";
 import {
   Sidebar,
@@ -33,6 +34,7 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const { toast } = useToast();
+  const [urlParams, setUrlParams] = useState(() => new URLSearchParams(window.location.search));
 
   const { data: companySettings } = useQuery<CompanySettings | null>({
     queryKey: ["/api/company-settings"],
@@ -42,6 +44,16 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
     refetchOnMount: false,
     refetchOnWindowFocus: false,
   });
+
+  // Listen for URL changes to update active menu item
+  useEffect(() => {
+    const handlePopState = () => {
+      setUrlParams(new URLSearchParams(window.location.search));
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -60,7 +72,7 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
     }
   };
 
-  const isClientsTab = location === "/" && window.location.search.includes("tab=clients");
+  const isClientsTab = location === "/" && urlParams.has("tab") && urlParams.get("tab") === "clients";
 
   const menuItems = [
     {
