@@ -6,6 +6,15 @@ import { storage } from "./storage";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, type Client } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
+import Stripe from "stripe";
+
+// Initialize Stripe (optional - will be undefined if keys not set)
+let stripe: Stripe | undefined;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2025-10-29.clover",
+  });
+}
 
 function isAuthenticated(req: Request, res: Response, next: NextFunction) {
   if (req.isAuthenticated()) {
@@ -1423,6 +1432,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid settings data", details: error.errors });
       }
       res.status(500).json({ error: "Failed to update company settings" });
+    }
+  });
+
+  // Stripe subscription routes
+  app.post("/api/subscription/create-checkout", isAuthenticated, async (req, res) => {
+    try {
+      if (!stripe) {
+        return res.status(503).json({ error: "Stripe is not configured. Please contact support." });
+      }
+
+      if (!process.env.STRIPE_PRICE_ID) {
+        return res.status(503).json({ error: "Stripe price ID is not configured. Please contact support." });
+      }
+
+      let user = req.user!;
+      let customerId = user.stripeCustomerId;
+
+      // Create Stripe customer if doesn't exist
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          metadata: { userId: user.id },
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeCustomer(user.id, customerId);
+        
+        // Refresh session with updated user
+        const updatedUser = await storage.getUser(user.id);
+        if (updatedUser) {
+          req.login(updatedUser, (err) => {
+            if (err) console.error("Failed to refresh session:", err);
+          });
+          user = updatedUser;
+        }
+      }
+
+      // Create checkout session
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: "subscription",
+        line_items: [
+          {
+            price: process.env.STRIPE_PRICE_ID,
+            quantity: 1,
+          },
+        ],
+        success_url: `${process.env.REPLIT_DEV_DOMAIN || "http://localhost:5000"}/?success=true`,
+        cancel_url: `${process.env.REPLIT_DEV_DOMAIN || "http://localhost:5000"}/?canceled=true`,
+      });
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Stripe checkout error:", error);
+      res.status(500).json({ error: "Failed to create checkout session: " + error.message });
+    }
+  });
+
+  app.get("/api/subscription/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      
+      res.json({
+        subscriptionStatus: user.subscriptionStatus,
+        trialEndsAt: user.trialEndsAt,
+        currentPeriodEnd: user.currentPeriodEnd,
+        subscriptionPlan: user.subscriptionPlan,
+        cancelAtPeriodEnd: user.cancelAtPeriodEnd,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch subscription status" });
     }
   });
 

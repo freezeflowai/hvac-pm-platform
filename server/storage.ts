@@ -65,6 +65,7 @@ export interface IStorage {
   deleteUser(id: string): Promise<boolean>;
   updateUserAdminStatus(id: string, isAdmin: boolean): Promise<void>;
   updateUserTrialDate(id: string, trialEndsAt: Date): Promise<void>;
+  updateUserStripeCustomer(id: string, stripeCustomerId: string): Promise<void>;
   
   // Password reset token methods
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -219,6 +220,13 @@ export class MemStorage implements IStorage {
     const user = this.users.get(id);
     if (user) {
       this.users.set(id, { ...user, trialEndsAt });
+    }
+  }
+
+  async updateUserStripeCustomer(id: string, stripeCustomerId: string): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      this.users.set(id, { ...user, stripeCustomerId });
     }
   }
 
@@ -1020,6 +1028,10 @@ export class DbStorage implements IStorage {
 
   async updateUserTrialDate(id: string, trialEndsAt: Date): Promise<void> {
     await db.update(users).set({ trialEndsAt }).where(eq(users.id, id));
+  }
+
+  async updateUserStripeCustomer(id: string, stripeCustomerId: string): Promise<void> {
+    await db.update(users).set({ stripeCustomerId }).where(eq(users.id, id));
   }
 
   // Password reset token methods

@@ -74,6 +74,15 @@ declare global {
       email: string;
       password: string;
       isAdmin: boolean;
+      // Subscription fields
+      trialEndsAt: Date | null;
+      subscriptionStatus: string;
+      subscriptionPlan: string | null;
+      billingInterval: string | null;
+      currentPeriodEnd: Date | null;
+      cancelAtPeriodEnd: boolean;
+      stripeCustomerId: string | null;
+      stripeSubscriptionId: string | null;
     }
   }
 }
