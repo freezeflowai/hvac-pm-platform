@@ -8,6 +8,17 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   isAdmin: boolean("is_admin").notNull().default(false),
+  // Subscription and trial fields
+  trialEndsAt: timestamp("trial_ends_at"),
+  subscriptionStatus: text("subscription_status").notNull().default("trial"), 
+  // Possible values: "trial", "trialing", "active", "past_due", "unpaid", "canceled", "incomplete", "incomplete_expired"
+  subscriptionPlan: text("subscription_plan"), // e.g., "basic", "pro"
+  billingInterval: text("billing_interval"), // "month" or "year"
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  // Stripe integration
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({

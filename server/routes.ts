@@ -34,6 +34,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = await storage.createUser({ email, password: hashedPassword });
       
+      // Set trial period (configurable via TRIAL_DAYS env var, defaults to 30 days)
+      const trialDays = parseInt(process.env.TRIAL_DAYS || "30", 10);
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
+      await storage.updateUserTrialDate(user.id, trialEndsAt);
+      user.trialEndsAt = trialEndsAt;
+      
       // SECURITY: Only the first user is automatically made an admin
       // Additional admins must be promoted by existing admins
       if (isFirstUser) {
@@ -285,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/clients", requireAdmin, async (req, res) => {
+  app.post("/api/clients", isAuthenticated, async (req, res) => {
     try {
       const { parts, ...clientData } = req.body;
       const validated = insertClientSchema.parse(clientData);
@@ -315,7 +322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/clients/import-simple", requireAdmin, async (req, res) => {
+  app.post("/api/clients/import-simple", isAuthenticated, async (req, res) => {
     try {
       const { clients } = req.body;
       
@@ -347,7 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/clients/import", requireAdmin, async (req, res) => {
+  app.post("/api/clients/import", isAuthenticated, async (req, res) => {
     try {
       const { clients } = req.body;
       
@@ -456,7 +463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/clients/:id", requireAdmin, async (req, res) => {
+  app.put("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertClientSchema.partial().parse(req.body);
       const client = await storage.updateClient(req.user!.id, req.params.id, validated);
@@ -469,7 +476,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/clients/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
       await storage.deleteAllClientParts(req.user!.id, req.params.id);
       const deleted = await storage.deleteClient(req.user!.id, req.params.id);
@@ -482,7 +489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/clients/bulk-delete", requireAdmin, async (req, res) => {
+  app.post("/api/clients/bulk-delete", isAuthenticated, async (req, res) => {
     try {
       const schema = z.object({
         ids: z.array(z.string().uuid()).min(1).max(200)
@@ -515,7 +522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/parts", requireAdmin, async (req, res) => {
+  app.post("/api/parts", isAuthenticated, async (req, res) => {
     try {
       const validated = insertPartSchema.parse(req.body);
       
@@ -542,7 +549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/parts/bulk", requireAdmin, async (req, res) => {
+  app.post("/api/parts/bulk", isAuthenticated, async (req, res) => {
     try {
       const parts = Array.isArray(req.body) ? req.body : [req.body];
       const validated = parts.map(p => insertPartSchema.parse(p));
@@ -581,7 +588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/parts/:id", requireAdmin, async (req, res) => {
+  app.put("/api/parts/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertPartSchema.partial().parse(req.body);
       const part = await storage.updatePart(req.user!.id, req.params.id, validated);
@@ -594,7 +601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/parts/seed", requireAdmin, async (req, res) => {
+  app.post("/api/parts/seed", isAuthenticated, async (req, res) => {
     try {
       await storage.seedUserParts(req.user!.id);
       res.json({ 
@@ -606,7 +613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/parts/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/parts/:id", isAuthenticated, async (req, res) => {
     try {
       const deleted = await storage.deletePart(req.user!.id, req.params.id);
       if (!deleted) {
@@ -618,7 +625,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/parts/bulk-delete", requireAdmin, async (req, res) => {
+  app.post("/api/parts/bulk-delete", isAuthenticated, async (req, res) => {
     try {
       const schema = z.object({
         ids: z.array(z.string().uuid()).min(1).max(200)
@@ -660,7 +667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/clients/:id/parts", requireAdmin, async (req, res) => {
+  app.post("/api/clients/:id/parts", isAuthenticated, async (req, res) => {
     try {
       const parts = req.body.parts as Array<{ partId: string; quantity: number }>;
       
@@ -682,7 +689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/clients/:id/parts", requireAdmin, async (req, res) => {
+  app.put("/api/clients/:id/parts", isAuthenticated, async (req, res) => {
     try {
       const parts = req.body.parts as Array<{ partId: string; quantity: number }>;
       
@@ -704,7 +711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/client-parts/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/client-parts/:id", isAuthenticated, async (req, res) => {
     try {
       const deleted = await storage.deleteClientPart(req.user!.id, req.params.id);
       if (!deleted) {
@@ -857,7 +864,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Maintenance completion routes
-  app.post("/api/maintenance/:clientId/toggle", requireAdmin, async (req, res) => {
+  app.post("/api/maintenance/:clientId/toggle", isAuthenticated, async (req, res) => {
     try {
       const { clientId } = req.params;
       const { dueDate } = req.body;  // Frontend sends the dueDate it's displaying
@@ -981,7 +988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/clients/:clientId/equipment", requireAdmin, async (req, res) => {
+  app.post("/api/clients/:clientId/equipment", isAuthenticated, async (req, res) => {
     try {
       const validated = insertEquipmentSchema.parse(req.body);
       const equipment = await storage.createEquipment(req.user!.id, {
@@ -994,7 +1001,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/clients/:clientId/equipment", requireAdmin, async (req, res) => {
+  app.put("/api/clients/:clientId/equipment", isAuthenticated, async (req, res) => {
     try {
       const equipment = req.body.equipment as Array<{ name: string; type: string; serialNumber?: string; location?: string }>;
       
@@ -1020,7 +1027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/equipment/:id", requireAdmin, async (req, res) => {
+  app.put("/api/equipment/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertEquipmentSchema.partial().parse(req.body);
       const equipment = await storage.updateEquipment(req.user!.id, req.params.id, validated);
@@ -1033,7 +1040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/equipment/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/equipment/:id", isAuthenticated, async (req, res) => {
     try {
       const deleted = await storage.deleteEquipment(req.user!.id, req.params.id);
       if (!deleted) {
@@ -1221,7 +1228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/calendar/assign", requireAdmin, async (req, res) => {
+  app.post("/api/calendar/assign", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
       const assignmentData = insertCalendarAssignmentSchema.parse(req.body);
@@ -1258,7 +1265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/calendar/assign/:id", requireAdmin, async (req, res) => {
+  app.patch("/api/calendar/assign/:id", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
       const { id } = req.params;
@@ -1341,7 +1348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/calendar/assign/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/calendar/assign/:id", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
       const { id } = req.params;
@@ -1403,7 +1410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/company-settings", requireAdmin, async (req, res) => {
+  app.post("/api/company-settings", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
       const settingsData = insertCompanySettingsSchema.parse(req.body);

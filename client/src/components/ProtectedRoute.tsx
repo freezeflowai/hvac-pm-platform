@@ -14,17 +14,8 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
   useEffect(() => {
     if (!isLoading && !user) {
       setLocation("/login");
-      return;
     }
-
-    if (!isLoading && user) {
-      if (requireAdmin && !user.isAdmin) {
-        setLocation("/technician");
-      } else if (!requireAdmin && !user.isAdmin && location !== "/technician") {
-        setLocation("/technician");
-      }
-    }
-  }, [user, isLoading, setLocation, requireAdmin, location]);
+  }, [user, isLoading, setLocation]);
 
   if (isLoading) {
     return (
@@ -35,10 +26,6 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
   }
 
   if (!user) {
-    return null;
-  }
-
-  if (requireAdmin && !user.isAdmin) {
     return null;
   }
 

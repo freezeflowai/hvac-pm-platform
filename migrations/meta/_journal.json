@@ -8,6 +8,20 @@
       "when": 1763408825111,
       "tag": "0000_massive_mac_gargan",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1763424889886,
+      "tag": "0001_sharp_owl",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1763424958566,
+      "tag": "0002_wide_fenris",
+      "breakpoints": true
     }
   ]
 }

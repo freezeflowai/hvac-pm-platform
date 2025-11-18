@@ -64,6 +64,7 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   deleteUser(id: string): Promise<boolean>;
   updateUserAdminStatus(id: string, isAdmin: boolean): Promise<void>;
+  updateUserTrialDate(id: string, trialEndsAt: Date): Promise<void>;
   
   // Password reset token methods
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -174,7 +175,19 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id, isAdmin: false };
+    const user: User = { 
+      ...insertUser, 
+      id, 
+      isAdmin: false,
+      trialEndsAt: null,
+      subscriptionStatus: "trial",
+      subscriptionPlan: null,
+      billingInterval: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+    };
     this.users.set(id, user);
     return user;
   }
@@ -199,6 +212,13 @@ export class MemStorage implements IStorage {
     const user = this.users.get(id);
     if (user) {
       this.users.set(id, { ...user, isAdmin });
+    }
+  }
+
+  async updateUserTrialDate(id: string, trialEndsAt: Date): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      this.users.set(id, { ...user, trialEndsAt });
     }
   }
 
@@ -996,6 +1016,10 @@ export class DbStorage implements IStorage {
 
   async updateUserAdminStatus(id: string, isAdmin: boolean): Promise<void> {
     await db.update(users).set({ isAdmin }).where(eq(users.id, id));
+  }
+
+  async updateUserTrialDate(id: string, trialEndsAt: Date): Promise<void> {
+    await db.update(users).set({ trialEndsAt }).where(eq(users.id, id));
   }
 
   // Password reset token methods
