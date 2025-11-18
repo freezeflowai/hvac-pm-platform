@@ -790,12 +790,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all completed maintenance statuses
   app.get("/api/maintenance/statuses", isAuthenticated, async (req, res) => {
     try {
+      // Optimized: Fetch all latest completed records in a single query instead of looping
+      const latestCompletedRecords = await storage.getAllLatestCompletedMaintenanceRecords(req.user!.id);
+      
       const clients = await storage.getAllClients(req.user!.id);
       const statuses: Record<string, { completed: boolean; completedDueDate?: string }> = {};
       
       for (const client of clients) {
-        // Check for the most recent completed maintenance
-        const latestCompleted = await storage.getLatestCompletedMaintenanceRecord(req.user!.id, client.id);
+        const latestCompleted = latestCompletedRecords[client.id];
         
         if (latestCompleted && latestCompleted.completedAt) {
           statuses[client.id] = {

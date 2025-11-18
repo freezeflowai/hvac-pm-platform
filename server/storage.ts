@@ -108,6 +108,7 @@ export interface IStorage {
   // Maintenance record methods
   getMaintenanceRecord(userId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined>;
   getLatestCompletedMaintenanceRecord(userId: string, clientId: string): Promise<MaintenanceRecord | undefined>;
+  getAllLatestCompletedMaintenanceRecords(userId: string): Promise<Record<string, MaintenanceRecord>>;
   getRecentlyCompletedMaintenance(userId: string, month: number, year: number): Promise<MaintenanceRecord[]>;
   getCompletedUnscheduledMaintenance(userId: string): Promise<MaintenanceRecord[]>;
   createMaintenanceRecord(userId: string, record: InsertMaintenanceRecord): Promise<MaintenanceRecord>;
@@ -704,6 +705,22 @@ export class MemStorage implements IStorage {
       const dateB = new Date(b.completedAt!).getTime();
       return dateB - dateA;
     })[0];
+  }
+
+  async getAllLatestCompletedMaintenanceRecords(userId: string): Promise<Record<string, MaintenanceRecord>> {
+    const allRecords = Array.from(this.maintenanceRecords.values())
+      .filter(record => record.userId === userId && record.completedAt);
+    
+    const latestByClient: Record<string, MaintenanceRecord> = {};
+    
+    for (const record of allRecords) {
+      const existing = latestByClient[record.clientId];
+      if (!existing || new Date(record.completedAt!) > new Date(existing.completedAt!)) {
+        latestByClient[record.clientId] = record;
+      }
+    }
+    
+    return latestByClient;
   }
 
   async getRecentlyCompletedMaintenance(userId: string, month: number, year: number): Promise<MaintenanceRecord[]> {
@@ -1449,6 +1466,35 @@ export class DbStorage implements IStorage {
       .orderBy(desc(maintenanceRecords.completedAt))
       .limit(1);
     return result[0];
+  }
+
+  async getAllLatestCompletedMaintenanceRecords(userId: string): Promise<Record<string, MaintenanceRecord>> {
+    // Use a window function to get the latest completed record for each client
+    const records = await db.execute<MaintenanceRecord>(sql`
+      WITH ranked_records AS (
+        SELECT *,
+          ROW_NUMBER() OVER (PARTITION BY client_id ORDER BY completed_at DESC) as rn
+        FROM maintenance_records
+        WHERE user_id = ${userId}
+          AND completed_at IS NOT NULL
+      )
+      SELECT id, user_id, client_id, due_date, completed_at
+      FROM ranked_records
+      WHERE rn = 1
+    `);
+    
+    const result: Record<string, MaintenanceRecord> = {};
+    for (const record of records.rows as any[]) {
+      result[record.client_id] = {
+        id: record.id,
+        userId: record.user_id,
+        clientId: record.client_id,
+        dueDate: record.due_date,
+        completedAt: record.completed_at,
+      };
+    }
+    
+    return result;
   }
 
   async getRecentlyCompletedMaintenance(userId: string, month: number, year: number): Promise<MaintenanceRecord[]> {
