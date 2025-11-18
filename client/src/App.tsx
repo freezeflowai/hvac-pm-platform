@@ -97,7 +97,9 @@ function AppContent() {
   };
 
   const handleDashboardClick = () => {
-    setLocation('/');
+    // Clear query params and dispatch popstate to ensure Dashboard re-renders
+    window.history.pushState({}, '', '/');
+    window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
   const handleAddClient = () => {
