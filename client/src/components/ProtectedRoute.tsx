@@ -4,17 +4,27 @@ import { useAuth } from "@/lib/auth";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requireAdmin?: boolean;
 }
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   useEffect(() => {
     if (!isLoading && !user) {
       setLocation("/login");
+      return;
     }
-  }, [user, isLoading, setLocation]);
+
+    if (!isLoading && user) {
+      if (requireAdmin && !user.isAdmin) {
+        setLocation("/technician");
+      } else if (!requireAdmin && !user.isAdmin && location !== "/technician") {
+        setLocation("/technician");
+      }
+    }
+  }, [user, isLoading, setLocation, requireAdmin, location]);
 
   if (isLoading) {
     return (
@@ -25,6 +35,10 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
+    return null;
+  }
+
+  if (requireAdmin && !user.isAdmin) {
     return null;
   }
 

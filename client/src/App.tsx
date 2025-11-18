@@ -35,37 +35,37 @@ function Router() {
       <Route path="/request-reset" component={RequestReset} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/">
-        <ProtectedRoute>
+        <ProtectedRoute requireAdmin>
           <Dashboard />
         </ProtectedRoute>
       </Route>
       <Route path="/calendar">
-        <ProtectedRoute>
+        <ProtectedRoute requireAdmin>
           <Calendar />
         </ProtectedRoute>
       </Route>
       <Route path="/reports">
-        <ProtectedRoute>
+        <ProtectedRoute requireAdmin>
           <Reports />
         </ProtectedRoute>
       </Route>
       <Route path="/admin">
-        <ProtectedRoute>
+        <ProtectedRoute requireAdmin>
           <Admin />
         </ProtectedRoute>
       </Route>
       <Route path="/add-client">
-        <ProtectedRoute>
+        <ProtectedRoute requireAdmin>
           <AddClientPage />
         </ProtectedRoute>
       </Route>
       <Route path="/manage-parts">
-        <ProtectedRoute>
+        <ProtectedRoute requireAdmin>
           <PartsManagementPage />
         </ProtectedRoute>
       </Route>
       <Route path="/company-settings">
-        <ProtectedRoute>
+        <ProtectedRoute requireAdmin>
           <CompanySettingsPage />
         </ProtectedRoute>
       </Route>

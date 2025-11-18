@@ -40,7 +40,11 @@ export default function Signup() {
     setIsLoading(true);
     try {
       await signup(data.email, data.password);
-      setLocation("/");
+      toast({
+        title: "Account created",
+        description: "You've been signed up as a technician. An administrator can promote your account if needed.",
+      });
+      setLocation("/technician");
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -116,6 +120,9 @@ export default function Signup() {
                   </FormItem>
                 )}
               />
+              <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+                New accounts are created as technician accounts with read-only access. Contact an administrator to upgrade to full access.
+              </div>
               <Button
                 data-testid="button-signup"
                 type="submit"

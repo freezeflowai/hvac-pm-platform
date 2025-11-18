@@ -64,3 +64,16 @@ export function isAdmin(req: any, res: any, next: any) {
   
   next();
 }
+
+// Middleware to require admin for mutating operations
+export function requireAdmin(req: any, res: any, next: any) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  
+  if (!req.user?.isAdmin) {
+    return res.status(403).json({ error: "Technicians have read-only access" });
+  }
+  
+  next();
+}

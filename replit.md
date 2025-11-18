@@ -48,6 +48,13 @@ The application uses a Material Design-inspired typography hierarchy with the In
   - Fully accessible with keyboard navigation and screen reader support
   - Responsive design optimized for mobile devices with proper breakpoints
   - Quick access to client contact information (phone, email, address) with tap-to-call/email functionality
+- **Role-Based Access Control**: Secure implementation of admin and technician roles with complete separation of privileges:
+  - Backend: All mutating operations (POST/PUT/DELETE/PATCH) protected by requireAdmin middleware returning 403 for technicians
+  - Frontend: ProtectedRoute component automatically redirects technicians to /technician dashboard and prevents access to admin pages
+  - Signup: New accounts created as technicians by default; first user becomes admin automatically
+  - User Management: Admins can promote technicians to admin via the Admin page user management interface
+  - Security: No privilege escalation vulnerabilities; technicians have strict read-only access to schedules and client data
+  - Technician Experience: Full read-only access to schedules, client information, parts inventory, and equipment details via mobile-optimized dashboard
 
 ## External Dependencies
 
