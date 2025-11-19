@@ -6,7 +6,8 @@ import {
   FileText, 
   Shield, 
   LogOut,
-  Smartphone
+  Smartphone,
+  MessageCircle
 } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -26,6 +27,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import FeedbackDialog from "./FeedbackDialog";
 interface AppSidebarProps {
   onDashboardClick?: () => void;
 }
@@ -34,6 +36,7 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const { toast } = useToast();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const { data: companySettings } = useQuery<CompanySettings | null>({
     queryKey: ["/api/company-settings"],
@@ -175,6 +178,12 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       <SidebarFooter className="border-t">
         <SidebarMenu>
           <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => setFeedbackOpen(true)} data-testid="button-feedback" className="h-10 hover:bg-[#F8F9FB]">
+              <MessageCircle className="h-4 w-4" />
+              <span>Feedback</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <SidebarMenuButton onClick={handleLogout} data-testid="button-logout" className="h-10 hover:bg-[#F8F9FB]">
               <LogOut className="h-4 w-4" />
               <span>Logout</span>
@@ -182,6 +191,7 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </Sidebar>
   );
 }
