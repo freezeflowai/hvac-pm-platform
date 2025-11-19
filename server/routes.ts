@@ -1495,6 +1495,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/feedback/:id", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const deleted = await storage.deleteFeedback(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Feedback not found" });
+      }
+      
+      res.json({ message: "Feedback deleted successfully" });
+    } catch (error) {
+      console.error('Delete feedback error:', error);
+      res.status(500).json({ error: "Failed to delete feedback" });
+    }
+  });
+
   // Stripe subscription routes
   app.post("/api/subscription/create-checkout", isAuthenticated, async (req, res) => {
     try {
