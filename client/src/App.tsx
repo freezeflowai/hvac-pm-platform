@@ -140,7 +140,7 @@ function AppContent() {
                   onFocus={() => searchQuery.length > 0 && setSearchOpen(true)}
                   onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
                   data-testid="input-client-search"
-                  className="h-9 w-64 rounded-md border border-input bg-background pl-8 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="h-9 w-64 rounded-md border border-input bg-white dark:bg-gray-900 pl-8 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 />
                 {searchOpen && searchQuery && (
                   <div className="absolute top-full left-0 right-0 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md outline-none z-50">

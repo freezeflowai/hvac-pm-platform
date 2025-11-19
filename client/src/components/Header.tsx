@@ -163,7 +163,7 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
                     }}
                     onFocus={() => setSearchOpen(true)}
                     data-testid="input-client-search"
-                    className="h-8 w-64 rounded-md border border-input bg-background pl-8 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="h-8 w-64 rounded-md border border-input bg-white dark:bg-gray-900 pl-8 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   />
                 </div>
               </PopoverTrigger>
