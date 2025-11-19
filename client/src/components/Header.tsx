@@ -100,8 +100,7 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
                 className={`rounded-full ${isClientsTab ? "" : "hover:bg-background/60"}`}
                 data-testid="nav-all-clients"
                 onClick={() => {
-                  window.history.pushState({}, '', '/?tab=clients');
-                  window.dispatchEvent(new PopStateEvent('popstate'));
+                  setLocation('/?tab=clients');
                 }}
               >
                 <Users className="h-3.5 w-3.5 mr-1.5" />

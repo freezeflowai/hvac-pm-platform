@@ -12,6 +12,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import type { CompanySettings } from "@shared/schema";
 import {
   Sidebar,
@@ -43,6 +44,10 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
     refetchOnWindowFocus: false,
   });
 
+  // Derive isClientsTab directly from current URL - always in sync
+  const isClientsTab = location === "/" && 
+    (typeof window !== 'undefined' && window.location.search.includes("tab=clients"));
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -59,8 +64,6 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       });
     }
   };
-
-  const isClientsTab = location === "/" && window.location.search.includes("tab=clients");
 
   const menuItems = [
     {
@@ -88,8 +91,7 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       icon: Users,
       isActive: isClientsTab,
       onClick: () => {
-        window.history.pushState({}, '', '/?tab=clients');
-        window.dispatchEvent(new PopStateEvent('popstate'));
+        setLocation('/?tab=clients');
       },
       testId: "nav-clients"
     },
