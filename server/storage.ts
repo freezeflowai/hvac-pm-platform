@@ -147,6 +147,7 @@ export interface IStorage {
   getAllFeedback(): Promise<Feedback[]>;
   getUserFeedback(userId: string): Promise<Feedback[]>;
   updateFeedbackStatus(id: string, status: string): Promise<Feedback | undefined>;
+  deleteFeedback(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -1045,6 +1046,10 @@ export class MemStorage implements IStorage {
     this.feedback.set(id, updated);
     return updated;
   }
+
+  async deleteFeedback(id: string): Promise<boolean> {
+    return this.feedback.delete(id);
+  }
 }
 
 import { db } from './db';
@@ -1853,6 +1858,13 @@ export class DbStorage implements IStorage {
       .where(eq(feedback.id, id))
       .returning();
     return result[0];
+  }
+
+  async deleteFeedback(id: string): Promise<boolean> {
+    const result = await db.delete(feedback)
+      .where(eq(feedback.id, id))
+      .returning();
+    return result.length > 0;
   }
 }
 
