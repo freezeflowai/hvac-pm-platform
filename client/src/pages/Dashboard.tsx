@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useLocation, useSearch } from "wouter";
 import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
@@ -107,35 +107,12 @@ export default function Dashboard() {
   const thisMonthRef = useRef<HTMLDivElement>(null);
   const completedRef = useRef<HTMLDivElement>(null);
 
-  // Read tab from URL query parameter and sync with URL changes
-  const [activeTab, setActiveTab] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
+  // Derive activeTab directly from URL search params - no separate state
+  const searchString = useSearch();
+  const activeTab = useMemo(() => {
+    const params = new URLSearchParams(searchString);
     return params.get('tab') === 'clients' ? 'clients' : 'schedule';
-  });
-
-  // Sync activeTab with URL on every render
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlTab = params.get('tab') === 'clients' ? 'clients' : 'schedule';
-    if (urlTab !== activeTab) {
-      setActiveTab(urlTab);
-    }
-  });
-
-  // Listen for popstate (back/forward navigation)
-  useEffect(() => {
-    const handlePopState = () => {
-      const params = new URLSearchParams(window.location.search);
-      const tab = params.get('tab');
-      setActiveTab(tab === 'clients' ? 'clients' : 'schedule');
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
+  }, [searchString]);
 
   const handleTabChange = (value: string) => {
     if (value === 'clients') {
@@ -395,7 +372,6 @@ export default function Dashboard() {
   
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
     if (activeTab !== 'schedule') {
-      setActiveTab('schedule');
       setLocation('/');
       setTimeout(() => {
         ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
