@@ -113,20 +113,29 @@ export default function Dashboard() {
     return params.get('tab') === 'clients' ? 'clients' : 'schedule';
   });
 
-  // Update activeTab when location changes (including query params)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tab = params.get('tab');
-    const newTab = tab === 'clients' ? 'clients' : 'schedule';
-    setActiveTab(newTab);
-  }, [location]);
+  // Track the current URL search params to detect changes
+  const [currentSearch, setCurrentSearch] = useState(window.location.search);
 
-  // Listen for popstate (back/forward navigation)
+  // Update activeTab when URL changes
   useEffect(() => {
+    const checkUrlChange = () => {
+      if (window.location.search !== currentSearch) {
+        setCurrentSearch(window.location.search);
+        const params = new URLSearchParams(window.location.search);
+        const tab = params.get('tab');
+        setActiveTab(tab === 'clients' ? 'clients' : 'schedule');
+      }
+    };
+
+    // Check on every render (wouter navigations)
+    checkUrlChange();
+
+    // Also listen for popstate (back/forward navigation)
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab');
       setActiveTab(tab === 'clients' ? 'clients' : 'schedule');
+      setCurrentSearch(window.location.search);
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -134,7 +143,7 @@ export default function Dashboard() {
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, []);
+  }, [location, currentSearch]);
 
   const handleTabChange = (value: string) => {
     if (value === 'clients') {
