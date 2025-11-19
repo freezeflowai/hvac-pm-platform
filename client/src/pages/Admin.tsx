@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, ShieldCheck, ShieldOff, Package, KeyRound, MessageCircle } from "lucide-react";
+import { Trash2, ShieldCheck, ShieldOff, Package, KeyRound, MessageCircle, Archive, ArchiveRestore } from "lucide-react";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -159,6 +159,26 @@ export default function Admin() {
       toast({
         title: "Error",
         description: error.message || "Failed to update feedback status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const archiveFeedbackMutation = useMutation({
+    mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {
+      await apiRequest("PATCH", `/api/feedback/${id}/archive`, { archived });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
+      toast({
+        title: "Feedback archived",
+        description: "Feedback archive status has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to archive feedback",
         variant: "destructive",
       });
     },
@@ -456,103 +476,213 @@ export default function Admin() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {feedback.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    No feedback submissions yet
-                  </p>
-                ) : (
-                  feedback.map((item) => (
-                    <div
-                      key={item.id}
-                      className="p-4 border rounded-lg space-y-2"
-                      data-testid={`feedback-item-${item.id}`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant={
-                              item.category === "bug" ? "destructive" :
-                              item.category === "feature" ? "default" :
-                              "secondary"
-                            }>
-                              {item.category}
-                            </Badge>
-                            <Badge variant={
-                              item.status === "new" ? "destructive" :
-                              item.status === "in-progress" ? "default" :
-                              "secondary"
-                            }>
-                              {item.status}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(item.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            From: {item.userEmail}
-                          </p>
-                          <p className="text-sm whitespace-pre-wrap">{item.message}</p>
-                        </div>
-                        <div className="flex gap-1 ml-4">
-                          {item.status === "new" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateFeedbackStatusMutation.mutate({ id: item.id, status: "in-progress" })}
-                              disabled={updateFeedbackStatusMutation.isPending}
-                              data-testid={`button-feedback-in-progress-${item.id}`}
-                            >
-                              In Progress
-                            </Button>
-                          )}
-                          {item.status !== "resolved" && (
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() => updateFeedbackStatusMutation.mutate({ id: item.id, status: "resolved" })}
-                              disabled={updateFeedbackStatusMutation.isPending}
-                              data-testid={`button-feedback-resolve-${item.id}`}
-                            >
-                              Resolve
-                            </Button>
-                          )}
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
+              <Tabs defaultValue="active" className="w-full">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="active" data-testid="tab-active-feedback">
+                    Active ({feedback.filter(f => !f.archived).length})
+                  </TabsTrigger>
+                  <TabsTrigger value="archived" data-testid="tab-archived-feedback">
+                    Archived ({feedback.filter(f => f.archived).length})
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="active">
+                  <div className="space-y-4">
+                    {feedback.filter(f => !f.archived).length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">
+                        No active feedback
+                      </p>
+                    ) : (
+                      feedback.filter(f => !f.archived).map((item) => (
+                        <div
+                          key={item.id}
+                          className="p-4 border rounded-lg space-y-2"
+                          data-testid={`feedback-item-${item.id}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant={
+                                  item.category === "bug" ? "destructive" :
+                                  item.category === "feature" ? "default" :
+                                  "secondary"
+                                }>
+                                  {item.category}
+                                </Badge>
+                                <Badge variant={
+                                  item.status === "new" ? "destructive" :
+                                  item.status === "in-progress" ? "default" :
+                                  "secondary"
+                                }>
+                                  {item.status}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(item.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-2">
+                                From: {item.userEmail}
+                              </p>
+                              <p className="text-sm whitespace-pre-wrap">{item.message}</p>
+                            </div>
+                            <div className="flex gap-1 ml-4">
+                              {item.status === "new" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateFeedbackStatusMutation.mutate({ id: item.id, status: "in-progress" })}
+                                  disabled={updateFeedbackStatusMutation.isPending}
+                                  data-testid={`button-feedback-in-progress-${item.id}`}
+                                >
+                                  In Progress
+                                </Button>
+                              )}
+                              {item.status !== "resolved" && (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => updateFeedbackStatusMutation.mutate({ id: item.id, status: "resolved" })}
+                                  disabled={updateFeedbackStatusMutation.isPending}
+                                  data-testid={`button-feedback-resolve-${item.id}`}
+                                >
+                                  Resolve
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
-                                variant="destructive"
-                                disabled={deleteFeedbackMutation.isPending}
-                                data-testid={`button-feedback-delete-${item.id}`}
+                                variant="outline"
+                                onClick={() => archiveFeedbackMutation.mutate({ id: item.id, archived: true })}
+                                disabled={archiveFeedbackMutation.isPending}
+                                data-testid={`button-feedback-archive-${item.id}`}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Archive className="h-4 w-4" />
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Feedback</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this feedback? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel data-testid={`button-cancel-delete-feedback-${item.id}`}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteFeedbackMutation.mutate(item.id)}
-                                  className="bg-destructive text-destructive-foreground"
-                                  data-testid={`button-confirm-delete-feedback-${item.id}`}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={deleteFeedbackMutation.isPending}
+                                    data-testid={`button-feedback-delete-${item.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Feedback</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete this feedback? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel data-testid={`button-cancel-delete-feedback-${item.id}`}>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteFeedbackMutation.mutate(item.id)}
+                                      className="bg-destructive text-destructive-foreground"
+                                      data-testid={`button-confirm-delete-feedback-${item.id}`}
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                      ))
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="archived">
+                  <div className="space-y-4">
+                    {feedback.filter(f => f.archived).length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">
+                        No archived feedback
+                      </p>
+                    ) : (
+                      feedback.filter(f => f.archived).map((item) => (
+                        <div
+                          key={item.id}
+                          className="p-4 border rounded-lg space-y-2 bg-muted/30"
+                          data-testid={`feedback-item-archived-${item.id}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant={
+                                  item.category === "bug" ? "destructive" :
+                                  item.category === "feature" ? "default" :
+                                  "secondary"
+                                }>
+                                  {item.category}
+                                </Badge>
+                                <Badge variant={
+                                  item.status === "new" ? "destructive" :
+                                  item.status === "in-progress" ? "default" :
+                                  "secondary"
+                                }>
+                                  {item.status}
+                                </Badge>
+                                <Badge variant="outline">Archived</Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(item.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-2">
+                                From: {item.userEmail}
+                              </p>
+                              <p className="text-sm whitespace-pre-wrap">{item.message}</p>
+                            </div>
+                            <div className="flex gap-1 ml-4">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => archiveFeedbackMutation.mutate({ id: item.id, archived: false })}
+                                disabled={archiveFeedbackMutation.isPending}
+                                data-testid={`button-feedback-unarchive-${item.id}`}
+                              >
+                                <ArchiveRestore className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={deleteFeedbackMutation.isPending}
+                                    data-testid={`button-feedback-delete-archived-${item.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Feedback</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete this archived feedback? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel data-testid={`button-cancel-delete-archived-feedback-${item.id}`}>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteFeedbackMutation.mutate(item.id)}
+                                      className="bg-destructive text-destructive-foreground"
+                                      data-testid={`button-confirm-delete-archived-feedback-${item.id}`}
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </TabsContent>
