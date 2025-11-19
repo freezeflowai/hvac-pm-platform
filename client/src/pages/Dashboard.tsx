@@ -314,8 +314,9 @@ export default function Dashboard() {
     })
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
-  // ALL maintenance items for this month (for "Due This Month" count)
+  // ALL maintenance items for this month (excluding completed)
   const allMaintenanceItems: MaintenanceItem[] = clientsWithCurrentMonthPM
+    .filter(c => !completionStatuses[c.id]?.completed)
     .map(c => ({
       id: c.id,
       companyName: c.companyName,
@@ -466,7 +467,7 @@ export default function Dashboard() {
       <main className="mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsContent value="schedule" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <StatsCard 
                 title="Overdue" 
                 value={overdueItems.length} 
@@ -482,22 +483,6 @@ export default function Dashboard() {
                 variant="warning"
                 subtitle="next 7 days"
                 onClick={() => scrollToSection(thisMonthRef)}
-              />
-              <StatsCard 
-                title="Due This Month" 
-                value={totalActiveScheduled} 
-                icon={Calendar} 
-                variant="default"
-                subtitle="total PMs"
-                onClick={() => scrollToSection(thisMonthRef)}
-              />
-              <StatsCard 
-                title="Unscheduled" 
-                value={unscheduledItems.length} 
-                icon={CalendarX} 
-                variant="neutral"
-                subtitle="not on calendar"
-                onClick={() => setLocation('/calendar')}
               />
             </div>
 
@@ -627,90 +612,41 @@ export default function Dashboard() {
                 </CardHeader>
                 {!minimizedSections.thisMonthAll && (
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Due This Month */}
-                      <div ref={thisMonthRef}>
-                        <div className="flex items-center gap-2 mb-3">
-                          <Calendar className="h-4 w-4 text-status-this-month" />
-                          <h3 className="text-sm font-medium">Due This Month (Scheduled)</h3>
-                        </div>
-                        {thisMonthItems.length > 0 ? (
-                          <>
-                            <div className="space-y-2">
-                              {(expandedSections.thisMonth ? thisMonthItems : thisMonthItems.slice(0, 3)).map((item) => (
-                                <MaintenanceCard
-                                  key={item.id}
-                                  item={item}
-                                  onMarkComplete={handleMarkComplete}
-                                  onEdit={handleEditClient}
-                                  onViewReport={setReportDialogClientId}
-                                  parts={clientParts[item.id] || []}
-                                  isCompleted={completionStatuses[item.id]?.completed || false}
-                                  isScheduled={true}
-                                  isThisMonthPM={true}
-                                />
-                              ))}
-                            </div>
-                            {thisMonthItems.length > 3 && (
-                              <Button 
-                                variant="ghost" 
-                                className="w-full mt-2" 
-                                size="sm"
-                                data-testid="button-view-all-thismonth"
-                                onClick={() => setExpandedSections(prev => ({ ...prev, thisMonth: !prev.thisMonth }))}
-                              >
-                                {expandedSections.thisMonth ? 'Show Less' : `View All (${thisMonthItems.length})`}
-                              </Button>
-                            )}
-                          </>
-                        ) : (
-                          <div className="text-center py-8 text-muted-foreground text-sm">
-                            No maintenance due this month
+                    <div ref={thisMonthRef}>
+                      {allMaintenanceItems.length > 0 ? (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {(expandedSections.thisMonth ? allMaintenanceItems : allMaintenanceItems.slice(0, 6)).map((item) => (
+                              <MaintenanceCard
+                                key={item.id}
+                                item={item}
+                                onMarkComplete={handleMarkComplete}
+                                onEdit={handleEditClient}
+                                onViewReport={setReportDialogClientId}
+                                parts={clientParts[item.id] || []}
+                                isCompleted={completionStatuses[item.id]?.completed || false}
+                                isScheduled={scheduledClientIds.has(item.id)}
+                                isThisMonthPM={true}
+                              />
+                            ))}
                           </div>
-                        )}
-                      </div>
-
-                      {/* Unscheduled */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <CalendarX className="h-4 w-4 text-status-unscheduled" />
-                          <h3 className="text-sm font-medium">This Month (Unscheduled)</h3>
+                          {allMaintenanceItems.length > 6 && (
+                            <Button 
+                              variant="ghost" 
+                              className="w-full mt-3" 
+                              size="sm"
+                              data-testid="button-view-all-thismonth"
+                              onClick={() => setExpandedSections(prev => ({ ...prev, thisMonth: !prev.thisMonth }))}
+                            >
+                              {expandedSections.thisMonth ? 'Show Less' : `View All (${allMaintenanceItems.length})`}
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          No maintenance due this month
                         </div>
-                        {unscheduledItems.length > 0 ? (
-                          <>
-                            <div className="space-y-2">
-                              {(expandedSections.unscheduled ? unscheduledItems : unscheduledItems.slice(0, 3)).map((item) => (
-                                <MaintenanceCard
-                                  key={item.id}
-                                  item={item}
-                                  onMarkComplete={handleMarkComplete}
-                                  onEdit={handleEditClient}
-                                  onViewReport={setReportDialogClientId}
-                                  parts={clientParts[item.id] || []}
-                                  isCompleted={completionStatuses[item.id]?.completed || false}
-                                  isScheduled={false}
-                                  isThisMonthPM={true}
-                                />
-                              ))}
-                            </div>
-                            {unscheduledItems.length > 3 && (
-                              <Button 
-                                variant="ghost" 
-                                className="w-full mt-2" 
-                                size="sm"
-                                data-testid="button-view-all-unscheduled"
-                                onClick={() => setExpandedSections(prev => ({ ...prev, unscheduled: !prev.unscheduled }))}
-                              >
-                                {expandedSections.unscheduled ? 'Show Less' : `View All (${unscheduledItems.length})`}
-                              </Button>
-                            )}
-                          </>
-                        ) : (
-                          <div className="text-center py-8 text-muted-foreground text-sm">
-                            No unscheduled maintenance
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </CardContent>
                 )}

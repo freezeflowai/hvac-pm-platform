@@ -114,15 +114,13 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, onViewRe
     >
       <CardContent className="p-3">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex-1 min-w-0 space-y-0.5">
+          <div className="flex-1 min-w-0">
             <h3 className="font-bold text-sm leading-tight" data-testid={`text-company-${item.id}`}>
               {item.companyName}
+              {item.location && (
+                <span className="text-xs text-muted-foreground font-normal" data-testid={`text-location-${item.id}`}> ({item.location})</span>
+              )}
             </h3>
-            {item.location && (
-              <p className="text-xs text-muted-foreground" data-testid={`text-location-${item.id}`}>
-                {item.location}
-              </p>
-            )}
           </div>
           <div className="flex flex-col items-end gap-1 flex-shrink-0">
             <p className="text-xs text-muted-foreground whitespace-nowrap">
