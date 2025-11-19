@@ -87,9 +87,9 @@ export default function Dashboard() {
   }>({
     overdue: false,
     upcoming: false,
-    thisMonth: false,
+    thisMonth: true,
     unscheduled: false,
-    completed: false,
+    completed: true,
   });
   
   const [minimizedSections, setMinimizedSections] = useState<{
