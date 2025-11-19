@@ -150,24 +150,24 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
           <div className="flex items-center gap-2">
             <Popover open={searchOpen} onOpenChange={setSearchOpen}>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-testid="button-search"
-                  className="h-8 gap-2"
-                >
-                  <Search className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Search</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 p-0" align="end">
-                <Command>
-                  <CommandInput
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
                     placeholder="Search clients..."
                     value={searchQuery}
-                    onValueChange={setSearchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setSearchOpen(true);
+                    }}
+                    onFocus={() => setSearchOpen(true)}
                     data-testid="input-client-search"
+                    className="h-8 w-64 rounded-md border border-input bg-background pl-8 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   />
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-0" align="start">
+                <Command>
                   <CommandList>
                     <CommandEmpty>No clients found.</CommandEmpty>
                     <CommandGroup>
@@ -206,7 +206,7 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
               className="h-8 gap-1.5"
             >
               <Plus className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Add Client</span>
+              <span>Add Client</span>
             </Button>
             <Link href="/company-settings">
               <Button 
