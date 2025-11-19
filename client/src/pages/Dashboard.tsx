@@ -355,7 +355,14 @@ export default function Dashboard() {
   const completedCount = recentlyCompleted.length;
   
   const activeClientsCount = clients.filter(c => !c.inactive).length;
-  const totalActiveScheduled = allMaintenanceItems.length; // Count ALL with PM this month
+  
+  // Count completed PMs for this month
+  const completedThisMonth = clientsWithCurrentMonthPM.filter(c => completionStatuses[c.id]?.completed).length;
+  
+  // Total PMs this month (completed + not completed)
+  const totalPMsThisMonth = clientsWithCurrentMonthPM.length;
+  
+  const totalActiveScheduled = allMaintenanceItems.length; // Count ALL with PM this month (excluding completed)
   
   const topOverdueClients = overdueItems
     .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime());
@@ -486,10 +493,11 @@ export default function Dashboard() {
               />
               <StatsCard 
                 title="Due This Month" 
-                value={totalActiveScheduled} 
+                value={totalPMsThisMonth} 
+                completedValue={completedThisMonth}
                 icon={Calendar} 
                 variant="default"
-                subtitle="total PMs"
+                subtitle="completed"
                 onClick={() => scrollToSection(thisMonthRef)}
               />
               <StatsCard 

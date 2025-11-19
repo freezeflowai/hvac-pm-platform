@@ -8,6 +8,7 @@ interface StatsCardProps {
   variant?: "default" | "warning" | "danger" | "success" | "neutral";
   subtitle?: string;
   onClick?: () => void;
+  completedValue?: number;
 }
 
 export default function StatsCard({ 
@@ -16,7 +17,8 @@ export default function StatsCard({
   icon: Icon, 
   variant = "default",
   subtitle,
-  onClick
+  onClick,
+  completedValue
 }: StatsCardProps) {
   const borderColorClass = {
     danger: 'border-t-status-overdue',
@@ -35,9 +37,21 @@ export default function StatsCard({
       <CardContent className="p-3">
         <p className="text-sm font-bold text-foreground mb-1">{title}</p>
         <div className="flex items-baseline gap-2">
-          <p className="text-2xl font-bold tabular-nums" data-testid={`text-stats-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-            {value}
-          </p>
+          {completedValue !== undefined ? (
+            <div className="flex items-baseline gap-1">
+              <p className="text-2xl font-bold tabular-nums text-primary" data-testid={`text-stats-completed-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+                {completedValue}
+              </p>
+              <p className="text-lg font-bold text-muted-foreground">/</p>
+              <p className="text-2xl font-bold tabular-nums" data-testid={`text-stats-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+                {value}
+              </p>
+            </div>
+          ) : (
+            <p className="text-2xl font-bold tabular-nums" data-testid={`text-stats-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+              {value}
+            </p>
+          )}
           {subtitle && (
             <p className="text-xs text-muted-foreground">{subtitle}</p>
           )}
