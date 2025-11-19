@@ -594,6 +594,33 @@ export default function Calendar() {
 
   const { assignments = [], clients = [] } = data || {};
 
+  // Custom collision detection that only checks drop zones (days), not individual items
+  const customCollisionDetection: CollisionDetection = useCallback((args) => {
+    // Filter to only check day drop zones and the unscheduled panel
+    const dropZoneContainers = args.droppableContainers.filter(
+      (container) => {
+        const id = container.id as string;
+        return id.startsWith('day-') || id === 'unscheduled-panel';
+      }
+    );
+
+    // Use pointer-first approach for precision
+    const pointerCollisions = pointerWithin({
+      ...args,
+      droppableContainers: dropZoneContainers,
+    });
+    
+    if (pointerCollisions.length > 0) {
+      return pointerCollisions;
+    }
+
+    // Fallback to closestCenter
+    return closestCenter({
+      ...args,
+      droppableContainers: dropZoneContainers,
+    });
+  }, []);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -652,33 +679,6 @@ export default function Calendar() {
 
     return days;
   };
-
-  // Custom collision detection that only checks drop zones (days), not individual items
-  const customCollisionDetection: CollisionDetection = useCallback((args) => {
-    // Filter to only check day drop zones and the unscheduled panel
-    const dropZoneContainers = args.droppableContainers.filter(
-      (container) => {
-        const id = container.id as string;
-        return id.startsWith('day-') || id === 'unscheduled-panel';
-      }
-    );
-
-    // Use pointer-first approach for precision
-    const pointerCollisions = pointerWithin({
-      ...args,
-      droppableContainers: dropZoneContainers,
-    });
-    
-    if (pointerCollisions.length > 0) {
-      return pointerCollisions;
-    }
-
-    // Fallback to closestCenter
-    return closestCenter({
-      ...args,
-      droppableContainers: dropZoneContainers,
-    });
-  }, []);
 
   const renderWeeklyView = () => {
     // Get current week dates
