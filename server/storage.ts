@@ -17,7 +17,9 @@ import {
   type InsertCompanySettings,
   type CalendarAssignment,
   type InsertCalendarAssignment,
-  type UpdateCalendarAssignment
+  type UpdateCalendarAssignment,
+  type Feedback,
+  type InsertFeedback
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { STANDARD_BELTS, STANDARD_FILTERS } from "./seed-data";
@@ -139,6 +141,12 @@ export interface IStorage {
   deleteCalendarAssignment(userId: string, id: string): Promise<boolean>;
   getClientCalendarAssignment(userId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined>;
   getUnscheduledClients(userId: string, year: number, month: number): Promise<Client[]>;
+  
+  // Feedback methods
+  createFeedback(userId: string, userEmail: string, feedback: InsertFeedback): Promise<Feedback>;
+  getAllFeedback(): Promise<Feedback[]>;
+  getUserFeedback(userId: string): Promise<Feedback[]>;
+  updateFeedbackStatus(id: string, status: string): Promise<Feedback | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -151,9 +159,11 @@ export class MemStorage implements IStorage {
   private companySettings: Map<string, CompanySettings>;
   private equipment: Map<string, Equipment>;
   private calendarAssignments: Map<string, CalendarAssignment>;
+  private feedback: Map<string, Feedback>;
 
   constructor() {
     this.users = new Map();
+    this.feedback = new Map();
     this.clients = new Map();
     this.parts = new Map();
     this.clientParts = new Map();
@@ -1000,10 +1010,45 @@ export class MemStorage implements IStorage {
       return true;
     });
   }
+
+  async createFeedback(userId: string, userEmail: string, feedback: InsertFeedback): Promise<Feedback> {
+    const newFeedback: Feedback = {
+      id: randomUUID(),
+      userId,
+      userEmail,
+      category: feedback.category,
+      message: feedback.message,
+      createdAt: new Date(),
+      status: "new"
+    };
+    this.feedback.set(newFeedback.id, newFeedback);
+    return newFeedback;
+  }
+
+  async getAllFeedback(): Promise<Feedback[]> {
+    return Array.from(this.feedback.values()).sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  async getUserFeedback(userId: string): Promise<Feedback[]> {
+    return Array.from(this.feedback.values())
+      .filter(f => f.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async updateFeedbackStatus(id: string, status: string): Promise<Feedback | undefined> {
+    const feedbackItem = this.feedback.get(id);
+    if (!feedbackItem) return undefined;
+    
+    const updated = { ...feedbackItem, status };
+    this.feedback.set(id, updated);
+    return updated;
+  }
 }
 
 import { db } from './db';
-import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments } from '@shared/schema';
+import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback } from '@shared/schema';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
@@ -1777,6 +1822,37 @@ export class DbStorage implements IStorage {
     }
     
     return unscheduled;
+  }
+
+  async createFeedback(userId: string, userEmail: string, feedbackData: InsertFeedback): Promise<Feedback> {
+    const result = await db.insert(feedback).values({
+      userId,
+      userEmail,
+      category: feedbackData.category,
+      message: feedbackData.message
+    }).returning();
+    return result[0];
+  }
+
+  async getAllFeedback(): Promise<Feedback[]> {
+    return db.select()
+      .from(feedback)
+      .orderBy(desc(feedback.createdAt));
+  }
+
+  async getUserFeedback(userId: string): Promise<Feedback[]> {
+    return db.select()
+      .from(feedback)
+      .where(eq(feedback.userId, userId))
+      .orderBy(desc(feedback.createdAt));
+  }
+
+  async updateFeedbackStatus(id: string, status: string): Promise<Feedback | undefined> {
+    const result = await db.update(feedback)
+      .set({ status })
+      .where(eq(feedback.id, id))
+      .returning();
+    return result[0];
   }
 }
 
