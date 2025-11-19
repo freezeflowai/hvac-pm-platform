@@ -48,22 +48,22 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
   return (
     <div className="h-full flex flex-col">
       <Card className="h-full shadow-md rounded-xl flex flex-col overflow-hidden">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0 flex-shrink-0">
-          <CardTitle className="text-base font-semibold">Unscheduled ({clients.length})</CardTitle>
+        <CardHeader className="pb-2 pt-3 px-4 flex flex-row items-center justify-between space-y-0 flex-shrink-0">
+          <CardTitle className="text-sm font-semibold">Unscheduled ({clients.length})</CardTitle>
           <Button
             variant="ghost"
             size="icon"
             onClick={onToggleMinimize}
-            className="h-8 w-8"
+            className="h-7 w-7"
             data-testid="button-minimize-unscheduled"
           >
-            <ChevronsRight className="h-4 w-4" />
+            <ChevronsRight className="h-3.5 w-3.5" />
           </Button>
         </CardHeader>
-        <CardContent className="flex-1 min-h-0 p-4">
+        <CardContent className="flex-1 min-h-0 p-4 pt-2">
           <div 
             ref={setNodeRef}
-            className="space-y-2 h-full overflow-y-scroll pr-2"
+            className="space-y-2 h-full overflow-y-auto pr-2"
             style={{ scrollbarWidth: 'thin' }}
             data-testid="unscheduled-panel"
           >
