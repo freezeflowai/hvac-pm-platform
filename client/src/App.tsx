@@ -127,54 +127,53 @@ function AppContent() {
           <header className="flex items-center justify-between gap-2 border-b px-4 py-2">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-2">
-              <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-                <PopoverTrigger asChild>
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                    <input
-                      type="text"
-                      placeholder="Search clients..."
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        setSearchOpen(true);
-                      }}
-                      onFocus={() => setSearchOpen(true)}
-                      data-testid="input-client-search"
-                      className="h-9 w-64 rounded-md border border-input bg-background pl-8 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    />
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search clients..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setSearchOpen(e.target.value.length > 0);
+                  }}
+                  onFocus={() => searchQuery.length > 0 && setSearchOpen(true)}
+                  onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
+                  data-testid="input-client-search"
+                  className="h-9 w-64 rounded-md border border-input bg-background pl-8 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                />
+                {searchOpen && searchQuery && (
+                  <div className="absolute top-full left-0 right-0 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md outline-none z-50">
+                    <Command>
+                      <CommandList>
+                        <CommandEmpty className="py-6 text-center text-sm">No clients found.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredClients.map((client) => (
+                            <CommandItem
+                              key={client.id}
+                              value={client.id}
+                              keywords={[client.companyName, client.location || '']}
+                              onSelect={() => {
+                                handleClientSelect(client.id);
+                                setSearchOpen(false);
+                                setSearchQuery("");
+                              }}
+                              data-testid={`client-search-item-${client.id}`}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium">{client.companyName}</span>
+                                {client.location && (
+                                  <span className="text-xs text-muted-foreground">{client.location}</span>
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
                   </div>
-                </PopoverTrigger>
-                <PopoverContent className="w-64 p-0" align="start">
-                  <Command>
-                    <CommandList>
-                      <CommandEmpty>No clients found.</CommandEmpty>
-                      <CommandGroup>
-                        {filteredClients.map((client) => (
-                          <CommandItem
-                            key={client.id}
-                            value={client.id}
-                            keywords={[client.companyName, client.location || '']}
-                            onSelect={() => {
-                              handleClientSelect(client.id);
-                              setSearchOpen(false);
-                              setSearchQuery("");
-                            }}
-                            data-testid={`client-search-item-${client.id}`}
-                          >
-                            <div className="flex flex-col">
-                              <span className="font-medium">{client.companyName}</span>
-                              {client.location && (
-                                <span className="text-xs text-muted-foreground">{client.location}</span>
-                              )}
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                )}
+              </div>
               <Button variant="default" size="default" onClick={handleAddClient} data-testid="button-add-client" className="gap-1.5">
                 <Plus className="h-4 w-4" />
                 <span>Add Client</span>
