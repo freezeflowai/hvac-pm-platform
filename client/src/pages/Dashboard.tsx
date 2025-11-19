@@ -108,21 +108,18 @@ export default function Dashboard() {
   const completedRef = useRef<HTMLDivElement>(null);
 
   // Read tab from URL query parameter
-  const urlParams = new URLSearchParams(window.location.search);
-  const tabParam = urlParams.get('tab');
-  const [activeTab, setActiveTab] = useState(tabParam === 'clients' ? 'clients' : 'schedule');
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tab') === 'clients' ? 'clients' : 'schedule';
+  });
 
-  // Update activeTab when URL changes - check on every render and listen to popstate
+  // Update activeTab when location changes (including query params)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
     const newTab = tab === 'clients' ? 'clients' : 'schedule';
-    
-    // Only update if different to avoid infinite loops
-    if (newTab !== activeTab) {
-      setActiveTab(newTab);
-    }
-  });
+    setActiveTab(newTab);
+  }, [location]);
 
   // Listen for popstate (back/forward navigation)
   useEffect(() => {
