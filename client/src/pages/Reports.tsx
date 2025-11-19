@@ -459,10 +459,13 @@ export default function Reports() {
                                       <div key={eq.id} className="text-xs" data-testid={`${testIdPrefix}-equipment-item-${index}-${i}`}>
                                         <span className="font-medium" data-testid={`${testIdPrefix}-equipment-name-${index}-${i}`}>{eq.name}</span>
                                         {eq.type && (
-                                          <span className="text-muted-foreground" data-testid={`${testIdPrefix}-equipment-type-${index}-${i}`}> - {eq.type}</span>
+                                          <span className="text-muted-foreground" data-testid={`${testIdPrefix}-equipment-type-${index}-${i}`}> - Model #: {eq.type}</span>
                                         )}
                                         {eq.serialNumber && (
                                           <span className="text-muted-foreground" data-testid={`${testIdPrefix}-equipment-serial-${index}-${i}`}> (S/N: {eq.serialNumber})</span>
+                                        )}
+                                        {eq.location && (
+                                          <span className="text-muted-foreground" data-testid={`${testIdPrefix}-equipment-location-${index}-${i}`}> - Notes: {eq.location}</span>
                                         )}
                                       </div>
                                     ))
