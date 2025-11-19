@@ -328,7 +328,7 @@ export default function Calendar() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading: isLoadingCalendar } = useQuery({
     queryKey: ["/api/calendar", year, month],
     queryFn: async () => {
       const res = await fetch(`/api/calendar?year=${year}&month=${month}`);
@@ -560,11 +560,11 @@ export default function Calendar() {
     },
   });
 
-  const { data: allClients = [] } = useQuery<any[]>({
+  const { data: allClients = [], isLoading: isLoadingClients } = useQuery<any[]>({
     queryKey: ["/api/clients"],
   });
 
-  const { data: unscheduledClients = [] } = useQuery<any[]>({
+  const { data: unscheduledClients = [], isLoading: isLoadingUnscheduled } = useQuery<any[]>({
     queryKey: ["/api/calendar/unscheduled", year, month],
     queryFn: async () => {
       const res = await fetch(`/api/calendar/unscheduled?year=${year}&month=${month}`);
@@ -621,7 +621,7 @@ export default function Calendar() {
     });
   }, []);
 
-  if (isLoading) {
+  if (isLoadingCalendar || isLoadingClients || isLoadingUnscheduled) {
     return (
       <div className="min-h-screen bg-background">
         <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
