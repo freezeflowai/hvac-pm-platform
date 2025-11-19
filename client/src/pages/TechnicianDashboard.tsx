@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfToday, addDays, parseISO, isSameDay } from "date-fns";
-import { Calendar as CalendarIcon, MapPin, Phone, Mail, Package, Wrench, ChevronRight } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Phone, Mail, Package, Wrench, ChevronRight, MessageCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import FeedbackDialog from "@/components/FeedbackDialog";
 
 interface Client {
   id: string;
@@ -83,6 +84,7 @@ const getPartDisplayName = (part: Part): string => {
 
 export default function TechnicianDashboard() {
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const today = startOfToday();
   
   const currentDate = new Date();
@@ -169,8 +171,22 @@ export default function TechnicianDashboard() {
     <div className="min-h-screen bg-background pb-6">
       {/* Header */}
       <div className="bg-primary text-primary-foreground p-4 md:p-6 sticky top-0 z-10 shadow-md">
-        <h1 className="text-xl md:text-2xl font-bold">Technician Schedule</h1>
-        <p className="text-sm opacity-90">{format(today, "EEEE, MMMM d, yyyy")}</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold">Technician Schedule</h1>
+            <p className="text-sm opacity-90">{format(today, "EEEE, MMMM d, yyyy")}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setFeedbackOpen(true)}
+            data-testid="button-feedback"
+            aria-label="Open feedback form"
+            className="text-primary-foreground"
+          >
+            <MessageCircle className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       <div className="p-4 md:p-6 space-y-6 md:space-y-8">
@@ -449,6 +465,7 @@ export default function TechnicianDashboard() {
           ) : null}
         </DialogContent>
       </Dialog>
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </div>
   );
 }
