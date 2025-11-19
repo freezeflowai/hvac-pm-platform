@@ -215,6 +215,7 @@ export const feedback = pgTable("feedback", {
   message: text("message").notNull(),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   status: text("status").notNull().default("new"),
+  archived: boolean("archived").notNull().default(false),
 });
 
 export const insertFeedbackSchema = createInsertSchema(feedback).omit({
