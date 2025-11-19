@@ -254,7 +254,7 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
   return (
     <div className="space-y-6" data-testid="form-parts-management">
         <Tabs defaultValue="filters" className="w-full">
-          <TabsList className="grid w-full grid-cols-3" data-testid="tabs-parts-types">
+          <TabsList className="grid grid-cols-3 w-fit" data-testid="tabs-parts-types">
             <TabsTrigger value="filters" data-testid="tab-filters">Filters</TabsTrigger>
             <TabsTrigger value="belts" data-testid="tab-belts">Belts</TabsTrigger>
             <TabsTrigger value="other" data-testid="tab-other">Other</TabsTrigger>
@@ -327,15 +327,18 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
                 ))}
               </div>
 
-              <Button
-                onClick={handleSaveFilters}
-                disabled={bulkCreateMutation.isPending || !filterRows.some(r => r.size.trim())}
-                data-testid="button-save-filters"
-                className="w-full gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Save All Filters
-              </Button>
+              <div className="flex justify-center">
+                <Button
+                  onClick={handleSaveFilters}
+                  disabled={bulkCreateMutation.isPending || !filterRows.some(r => r.size.trim())}
+                  data-testid="button-save-filters"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Save All Filters
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-3 pt-4 border-t">
@@ -484,15 +487,18 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
                 ))}
               </div>
 
-              <Button
-                onClick={handleSaveBelts}
-                disabled={bulkCreateMutation.isPending || !beltRows.some(r => r.size.trim())}
-                data-testid="button-save-belts"
-                className="w-full gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Save All Belts
-              </Button>
+              <div className="flex justify-center">
+                <Button
+                  onClick={handleSaveBelts}
+                  disabled={bulkCreateMutation.isPending || !beltRows.some(r => r.size.trim())}
+                  data-testid="button-save-belts"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Save All Belts
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-3 pt-4 border-t">
@@ -634,15 +640,18 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
                 ))}
               </div>
 
-              <Button
-                onClick={handleSaveOther}
-                disabled={bulkCreateMutation.isPending || !otherRows.some(r => r.name.trim())}
-                data-testid="button-save-other"
-                className="w-full gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Save All Other Parts
-              </Button>
+              <div className="flex justify-center">
+                <Button
+                  onClick={handleSaveOther}
+                  disabled={bulkCreateMutation.isPending || !otherRows.some(r => r.name.trim())}
+                  data-testid="button-save-other"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Save All Other Parts
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-3 pt-4 border-t">
