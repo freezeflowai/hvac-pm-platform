@@ -147,6 +147,7 @@ export interface IStorage {
   getAllFeedback(): Promise<Feedback[]>;
   getUserFeedback(userId: string): Promise<Feedback[]>;
   updateFeedbackStatus(id: string, status: string): Promise<Feedback | undefined>;
+  archiveFeedback(id: string, archived: boolean): Promise<Feedback | undefined>;
   deleteFeedback(id: string): Promise<boolean>;
 }
 
@@ -1020,7 +1021,8 @@ export class MemStorage implements IStorage {
       category: feedback.category,
       message: feedback.message,
       createdAt: new Date(),
-      status: "new"
+      status: "new",
+      archived: false
     };
     this.feedback.set(newFeedback.id, newFeedback);
     return newFeedback;
@@ -1043,6 +1045,15 @@ export class MemStorage implements IStorage {
     if (!feedbackItem) return undefined;
     
     const updated = { ...feedbackItem, status };
+    this.feedback.set(id, updated);
+    return updated;
+  }
+
+  async archiveFeedback(id: string, archived: boolean): Promise<Feedback | undefined> {
+    const feedbackItem = this.feedback.get(id);
+    if (!feedbackItem) return undefined;
+    
+    const updated = { ...feedbackItem, archived };
     this.feedback.set(id, updated);
     return updated;
   }
@@ -1855,6 +1866,14 @@ export class DbStorage implements IStorage {
   async updateFeedbackStatus(id: string, status: string): Promise<Feedback | undefined> {
     const result = await db.update(feedback)
       .set({ status })
+      .where(eq(feedback.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async archiveFeedback(id: string, archived: boolean): Promise<Feedback | undefined> {
+    const result = await db.update(feedback)
+      .set({ archived })
       .where(eq(feedback.id, id))
       .returning();
     return result[0];
