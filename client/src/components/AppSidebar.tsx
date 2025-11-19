@@ -8,11 +8,11 @@ import {
   LogOut,
   Smartphone
 } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { CompanySettings } from "@shared/schema";
 import {
   Sidebar,
@@ -44,12 +44,11 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
     refetchOnWindowFocus: false,
   });
 
-  // Check if we're on the clients tab - reactive to location changes
-  const [isClientsTab, setIsClientsTab] = useState(false);
-  
-  useEffect(() => {
-    setIsClientsTab(location === "/" && window.location.search.includes("tab=clients"));
-  }, [location]);
+  // Derive isClientsTab from URL search params
+  const searchString = useSearch();
+  const isClientsTab = useMemo(() => {
+    return location === "/" && searchString.includes("tab=clients");
+  }, [location, searchString]);
 
   const handleLogout = async () => {
     try {

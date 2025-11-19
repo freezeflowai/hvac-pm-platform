@@ -1,13 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, LogOut, User, Shield, Settings, Calendar as CalendarIcon, Plus, Users, Package, FileText, Search } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import type { CompanySettings } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 interface HeaderProps {
   onAddClient?: () => void;
@@ -55,12 +55,11 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
     client.location?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Check if we're on the clients tab - reactive to location changes
-  const [isClientsTab, setIsClientsTab] = useState(false);
-  
-  useEffect(() => {
-    setIsClientsTab(location === "/" && window.location.search.includes("tab=clients"));
-  }, [location]);
+  // Derive isClientsTab from URL search params
+  const searchString = useSearch();
+  const isClientsTab = useMemo(() => {
+    return location === "/" && searchString.includes("tab=clients");
+  }, [location, searchString]);
 
   return (
     <header className="border-b bg-background sticky top-0 z-50 shadow-sm">
