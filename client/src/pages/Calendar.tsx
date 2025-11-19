@@ -592,6 +592,8 @@ export default function Calendar() {
     };
   }, []);
 
+  const { assignments = [], clients = [] } = data || {};
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -601,8 +603,6 @@ export default function Calendar() {
       </div>
     );
   }
-
-  const { assignments = [], clients = [] } = data || {};
 
   // Create a map of assignments by day
   const assignmentsByDay: Record<number, any[]> = {};
