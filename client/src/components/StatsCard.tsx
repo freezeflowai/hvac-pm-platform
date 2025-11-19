@@ -36,24 +36,29 @@ export default function StatsCard({
     >
       <CardContent className="p-3">
         <p className="text-sm font-bold text-foreground mb-1">{title}</p>
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-baseline gap-1">
           {completedValue !== undefined ? (
-            <div className="flex items-baseline gap-1">
+            <>
               <p className="text-2xl font-bold tabular-nums text-primary" data-testid={`text-stats-completed-${title.toLowerCase().replace(/\s+/g, '-')}`}>
                 {completedValue}
               </p>
-              <p className="text-lg font-bold text-muted-foreground">/</p>
+              <p className="text-xs text-muted-foreground">of</p>
               <p className="text-2xl font-bold tabular-nums" data-testid={`text-stats-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
                 {value}
               </p>
-            </div>
+              {subtitle && (
+                <p className="text-xs text-muted-foreground">{subtitle}</p>
+              )}
+            </>
           ) : (
-            <p className="text-2xl font-bold tabular-nums" data-testid={`text-stats-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-              {value}
-            </p>
-          )}
-          {subtitle && (
-            <p className="text-xs text-muted-foreground">{subtitle}</p>
+            <>
+              <p className="text-2xl font-bold tabular-nums" data-testid={`text-stats-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+                {value}
+              </p>
+              {subtitle && (
+                <p className="text-xs text-muted-foreground">{subtitle}</p>
+              )}
+            </>
           )}
         </div>
       </CardContent>
