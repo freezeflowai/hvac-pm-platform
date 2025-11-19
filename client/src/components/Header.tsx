@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { CompanySettings } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface HeaderProps {
   onAddClient?: () => void;
@@ -55,8 +55,12 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
     client.location?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Check if we're on the clients tab
-  const isClientsTab = location === "/" && window.location.search.includes("tab=clients");
+  // Check if we're on the clients tab - reactive to location changes
+  const [isClientsTab, setIsClientsTab] = useState(false);
+  
+  useEffect(() => {
+    setIsClientsTab(location === "/" && window.location.search.includes("tab=clients"));
+  }, [location]);
 
   return (
     <header className="border-b bg-background sticky top-0 z-50 shadow-sm">

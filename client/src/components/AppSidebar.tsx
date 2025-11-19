@@ -44,9 +44,12 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
     refetchOnWindowFocus: false,
   });
 
-  // Derive isClientsTab directly from current URL - always in sync
-  const isClientsTab = location === "/" && 
-    (typeof window !== 'undefined' && window.location.search.includes("tab=clients"));
+  // Check if we're on the clients tab - reactive to location changes
+  const [isClientsTab, setIsClientsTab] = useState(false);
+  
+  useEffect(() => {
+    setIsClientsTab(location === "/" && window.location.search.includes("tab=clients"));
+  }, [location]);
 
   const handleLogout = async () => {
     try {
