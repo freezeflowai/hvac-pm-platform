@@ -47,7 +47,9 @@ export default function PartsManagementPage() {
             <p className="text-muted-foreground">Add and manage parts for maintenance schedules.</p>
           </div>
           <div className="flex flex-col items-end gap-1">
-            <p className="text-xs text-muted-foreground">Need standard parts?</p>
+            <p className="text-xs text-muted-foreground text-right">
+              Seed 244 standard filters and belts (sizes 18-70) - duplicates are skipped.
+            </p>
             <Button
               onClick={() => seedPartsMutation.mutate()}
               disabled={seedPartsMutation.isPending}
