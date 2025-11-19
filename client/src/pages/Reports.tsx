@@ -63,12 +63,22 @@ interface ClientPart {
   };
 }
 
+interface Equipment {
+  id: string;
+  name: string;
+  type?: string;
+  modelNumber?: string;
+  serialNumber?: string;
+  location?: string;
+}
+
 interface ClientScheduleItem {
   id: string;
   companyName: string;
   location: string;
   selectedMonths: number[];
   parts: ClientPart[];
+  equipment: Equipment[];
   isCompleted: boolean;
 }
 
@@ -373,6 +383,7 @@ export default function Reports() {
                           <TableHead>Company Name</TableHead>
                           <TableHead>Location</TableHead>
                           <TableHead>Parts</TableHead>
+                          <TableHead>Equipment</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -389,6 +400,10 @@ export default function Reports() {
                             const bDisplay = getPartDisplay(b.part);
                             return aDisplay.name.localeCompare(bDisplay.name);
                           });
+                          
+                          const sortedEquipment = (client.equipment || []).sort((a, b) => 
+                            a.name.localeCompare(b.name)
+                          );
                           
                           return (
                             <TableRow key={client.id} data-testid={`${testIdPrefix}-row-${index}`}>
@@ -434,6 +449,25 @@ export default function Reports() {
                                   )}
                                   {sortedFilters.length === 0 && sortedBelts.length === 0 && (
                                     <span className="text-xs text-muted-foreground">No parts</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-1.5" data-testid={`${testIdPrefix}-equipment-cell-${index}`}>
+                                <div className="space-y-1">
+                                  {sortedEquipment.length > 0 ? (
+                                    sortedEquipment.map((eq, i) => (
+                                      <div key={eq.id} className="text-xs" data-testid={`${testIdPrefix}-equipment-item-${index}-${i}`}>
+                                        <span className="font-medium" data-testid={`${testIdPrefix}-equipment-name-${index}-${i}`}>{eq.name}</span>
+                                        {eq.type && (
+                                          <span className="text-muted-foreground" data-testid={`${testIdPrefix}-equipment-type-${index}-${i}`}> - {eq.type}</span>
+                                        )}
+                                        {eq.serialNumber && (
+                                          <span className="text-muted-foreground" data-testid={`${testIdPrefix}-equipment-serial-${index}-${i}`}> (S/N: {eq.serialNumber})</span>
+                                        )}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground" data-testid={`${testIdPrefix}-equipment-none-${index}-0`}>No equipment</span>
                                   )}
                                 </div>
                               </TableCell>

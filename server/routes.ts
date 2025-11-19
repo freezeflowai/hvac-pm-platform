@@ -762,13 +762,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         client.selectedMonths.includes(month) && !client.inactive
       );
       
-      // Get parts and completion status for each client
+      // Get parts, equipment and completion status for each client
       const currentYear = new Date().getFullYear();
       const completedRecords = await storage.getRecentlyCompletedMaintenance(req.user!.id, month, currentYear);
       
       const clientsWithParts = await Promise.all(
         scheduledClients.map(async (client) => {
-          const clientParts = await storage.getClientParts(req.user!.id, client.id);
+          const [clientParts, clientEquipment] = await Promise.all([
+            storage.getClientParts(req.user!.id, client.id),
+            storage.getClientEquipment(req.user!.id, client.id)
+          ]);
           
           // Check if there's a completed maintenance record for this month
           const isCompleted = completedRecords.some(record => record.clientId === client.id);
@@ -776,6 +779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return {
             ...client,
             parts: clientParts,
+            equipment: clientEquipment ?? [],
             isCompleted
           };
         })
