@@ -414,9 +414,9 @@ export default function Calendar() {
   });
 
   const clearSchedule = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (assignmentsToDelete: any[]) => {
       // Delete all assignments for this month
-      const deletePromises = assignments.map((assignment: any) => 
+      const deletePromises = assignmentsToDelete.map((assignment: any) => 
         apiRequest("DELETE", `/api/calendar/assign/${assignment.id}`)
       );
       return Promise.all(deletePromises);
@@ -985,7 +985,7 @@ export default function Calendar() {
             <AlertDialogCancel data-testid="button-cancel-clear">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={() => {
-                clearSchedule.mutate();
+                clearSchedule.mutate(assignments);
                 setShowClearConfirm(false);
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
