@@ -622,7 +622,9 @@ export default function Dashboard() {
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-base font-medium">This Month's Maintenance</CardTitle>
+                    <CardTitle className="text-base font-medium">
+                      This Month's Maintenance <span className="text-sm text-muted-foreground">(Pending)</span>
+                    </CardTitle>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -681,9 +683,8 @@ export default function Dashboard() {
                 <Card>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-base font-medium flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-primary" />
-                        Completed
+                      <CardTitle className="text-base font-medium">
+                        This Month's Maintenance <span className="text-sm text-muted-foreground">(Completed)</span>
                       </CardTitle>
                       <Button
                         variant="ghost"
