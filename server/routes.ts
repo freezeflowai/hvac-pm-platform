@@ -1458,7 +1458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/feedback", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
-      const isAdminUser = await isAdmin(req);
+      const isAdminUser = req.user!.isAdmin;
       
       let feedbackList;
       if (isAdminUser) {
