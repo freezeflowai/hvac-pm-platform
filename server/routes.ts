@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, type Client } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
 import Stripe from "stripe";
@@ -1434,6 +1434,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid settings data", details: error.errors });
       }
       res.status(500).json({ error: "Failed to update company settings" });
+    }
+  });
+
+  // Feedback routes
+  app.post("/api/feedback", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const userEmail = req.user!.email;
+      const feedbackData = insertFeedbackSchema.parse(req.body);
+      
+      const feedback = await storage.createFeedback(userId, userEmail, feedbackData);
+      res.json(feedback);
+    } catch (error) {
+      console.error('Create feedback error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid feedback data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to submit feedback" });
+    }
+  });
+
+  app.get("/api/feedback", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const isAdminUser = await isAdmin(req);
+      
+      let feedbackList;
+      if (isAdminUser) {
+        feedbackList = await storage.getAllFeedback();
+      } else {
+        feedbackList = await storage.getUserFeedback(userId);
+      }
+      
+      res.json(feedbackList);
+    } catch (error) {
+      console.error('Get feedback error:', error);
+      res.status(500).json({ error: "Failed to fetch feedback" });
+    }
+  });
+
+  app.patch("/api/feedback/:id/status", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      if (!status || typeof status !== 'string') {
+        return res.status(400).json({ error: "Status is required" });
+      }
+      
+      const feedback = await storage.updateFeedbackStatus(id, status);
+      if (!feedback) {
+        return res.status(404).json({ error: "Feedback not found" });
+      }
+      
+      res.json(feedback);
+    } catch (error) {
+      console.error('Update feedback status error:', error);
+      res.status(500).json({ error: "Failed to update feedback status" });
     }
   });
 
