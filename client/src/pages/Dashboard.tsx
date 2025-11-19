@@ -467,7 +467,7 @@ export default function Dashboard() {
       <main className="mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsContent value="schedule" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <StatsCard 
                 title="Overdue" 
                 value={overdueItems.length} 
@@ -483,6 +483,22 @@ export default function Dashboard() {
                 variant="warning"
                 subtitle="next 7 days"
                 onClick={() => scrollToSection(thisMonthRef)}
+              />
+              <StatsCard 
+                title="Due This Month" 
+                value={totalActiveScheduled} 
+                icon={Calendar} 
+                variant="default"
+                subtitle="total PMs"
+                onClick={() => scrollToSection(thisMonthRef)}
+              />
+              <StatsCard 
+                title="Unscheduled" 
+                value={unscheduledItems.length} 
+                icon={CalendarX} 
+                variant="neutral"
+                subtitle="not on calendar"
+                onClick={() => setLocation('/calendar')}
               />
             </div>
 

@@ -237,7 +237,7 @@ function DayPartsCell({ assignments, clients, dayName, date, showOnlyOutstanding
   );
 }
 
-function DroppableDay({ day, year, month, assignments, clients, onRemove, onClientClick, showParts = false }: { 
+function DroppableDay({ day, year, month, assignments, clients, onRemove, onClientClick, onClearDay, showParts = false }: { 
   day: number; 
   year: number; 
   month: number; 
@@ -245,6 +245,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   clients: any[];
   onRemove: (assignmentId: string) => void;
   onClientClick: (client: any, assignment: any) => void;
+  onClearDay: (day: number, dayAssignments: any[]) => void;
   showParts?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day-${day}` });
@@ -257,7 +258,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-24 px-1 py-2 border transition-all ${
+      className={`min-h-24 px-1 py-2 border transition-all flex flex-col ${
         isOver 
           ? 'bg-primary/10 border-primary border-2 ring-2 ring-primary/30 shadow-md' 
           : 'bg-background'
@@ -265,7 +266,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
       data-testid={`calendar-day-${day}`}
     >
       <div className="text-sm text-muted-foreground mb-1 px-0.5">{day}</div>
-      <div className="space-y-1">
+      <div className="space-y-1 flex-1">
         {assignments.map((assignment: any) => {
           const client = clients.find((c: any) => c.id === assignment.clientId);
           return client ? (
@@ -292,6 +293,20 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
           ) : null;
         })}
       </div>
+      {assignments.length > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClearDay(day, assignments);
+          }}
+          className="mt-1 h-6 text-xs w-full"
+          data-testid={`button-clear-day-${day}`}
+        >
+          Clear Day
+        </Button>
+      )}
     </div>
   );
 }
@@ -424,6 +439,32 @@ export default function Calendar() {
     },
   });
 
+  const clearDay = useMutation({
+    mutationFn: async ({ day, dayAssignments }: { day: number; dayAssignments: any[] }) => {
+      // Delete all assignments for this specific day
+      const deletePromises = dayAssignments.map((assignment: any) => 
+        apiRequest("DELETE", `/api/calendar/assign/${assignment.id}`)
+      );
+      return Promise.all(deletePromises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      toast({
+        title: "Day cleared",
+        description: "All clients for this day have been unscheduled",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to clear day",
+        variant: "destructive",
+      });
+    },
+  });
+
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstDayOfMonth = new Date(year, month - 1, 1).getDay();
   
@@ -480,6 +521,10 @@ export default function Calendar() {
 
   const handleRemove = (assignmentId: string) => {
     deleteAssignment.mutate(assignmentId);
+  };
+
+  const handleClearDay = (day: number, dayAssignments: any[]) => {
+    clearDay.mutate({ day, dayAssignments });
   };
 
   const handleClientClick = (client: any, assignment: any) => {
@@ -596,6 +641,7 @@ export default function Calendar() {
             clients={clients}
             onRemove={handleRemove}
             onClientClick={handleClientClick}
+            onClearDay={handleClearDay}
             showParts={false}
           />
         ) : (
@@ -670,6 +716,7 @@ export default function Calendar() {
             clients={clients}
             onRemove={handleRemove}
             onClientClick={handleClientClick}
+            onClearDay={handleClearDay}
             showParts={false}
           />
         ) : (

@@ -112,49 +112,47 @@ export default function MaintenanceCard({ item, onMarkComplete, onEdit, onViewRe
       data-testid={`card-maintenance-${item.id}`}
       onClick={handleCardClick}
     >
-      <CardContent className="p-3">
-        <div className="flex items-center justify-between gap-3">
+      <CardContent className="p-2">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-sm leading-tight" data-testid={`text-company-${item.id}`}>
-              {item.companyName}
-              {item.location && (
-                <span className="text-xs text-muted-foreground font-normal" data-testid={`text-location-${item.id}`}> ({item.location})</span>
-              )}
-            </h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-bold text-sm leading-tight" data-testid={`text-company-${item.id}`}>
+                {item.companyName}
+                {item.location && (
+                  <span className="text-xs text-muted-foreground font-normal" data-testid={`text-location-${item.id}`}> ({item.location})</span>
+                )}
+              </h3>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">• {monthsDisplay}</span>
+            </div>
           </div>
-          <div className="flex flex-col items-end gap-1 flex-shrink-0">
-            <p className="text-xs text-muted-foreground whitespace-nowrap">
-              {monthsDisplay}
-            </p>
-            <Button
-              size="sm"
-              variant={isCompleted ? "default" : "outline"}
-              onClick={(e) => {
-                e.stopPropagation();
-                onMarkComplete(item.id);
-              }}
-              data-testid={`button-complete-${item.id}`}
-              aria-label={isCompleted ? "Reopen maintenance" : "Mark maintenance complete"}
-              className={`h-7 text-xs whitespace-nowrap gap-1 ${isCompleted ? '' : isOverdue ? 'border-status-overdue text-status-overdue hover:bg-status-overdue/10' : ''}`}
-            >
-              {isCompleted ? (
-                <>
-                  <CheckCircle className="h-3 w-3" />
-                  Completed
-                </>
-              ) : isOverdue ? (
-                <>
-                  <AlertTriangle className="h-3 w-3" />
-                  Complete
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-3 w-3" />
-                  Complete
-                </>
-              )}
-            </Button>
-          </div>
+          <Button
+            size="sm"
+            variant={isCompleted ? "default" : "outline"}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMarkComplete(item.id);
+            }}
+            data-testid={`button-complete-${item.id}`}
+            aria-label={isCompleted ? "Reopen maintenance" : "Mark maintenance complete"}
+            className={`h-7 text-xs whitespace-nowrap gap-1 flex-shrink-0 ${isCompleted ? '' : isOverdue ? 'border-status-overdue text-status-overdue hover:bg-status-overdue/10' : ''}`}
+          >
+            {isCompleted ? (
+              <>
+                <CheckCircle className="h-3 w-3" />
+                Completed
+              </>
+            ) : isOverdue ? (
+              <>
+                <AlertTriangle className="h-3 w-3" />
+                Complete
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-3 w-3" />
+                Complete
+              </>
+            )}
+          </Button>
         </div>
       </CardContent>
     </Card>
