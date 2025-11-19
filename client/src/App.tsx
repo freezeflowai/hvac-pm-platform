@@ -129,18 +129,24 @@ function AppContent() {
             <div className="flex items-center gap-2">
               <Popover open={searchOpen} onOpenChange={setSearchOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" data-testid="button-search">
-                    <Search className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-0" align="end">
-                  <Command>
-                    <CommandInput
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <input
+                      type="text"
                       placeholder="Search clients..."
                       value={searchQuery}
-                      onValueChange={setSearchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setSearchOpen(true);
+                      }}
+                      onFocus={() => setSearchOpen(true)}
                       data-testid="input-client-search"
+                      className="h-9 w-64 rounded-md border border-input bg-background pl-8 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     />
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="start">
+                  <Command>
                     <CommandList>
                       <CommandEmpty>No clients found.</CommandEmpty>
                       <CommandGroup>
@@ -169,8 +175,9 @@ function AppContent() {
                   </Command>
                 </PopoverContent>
               </Popover>
-              <Button variant="ghost" size="icon" onClick={handleAddClient} data-testid="button-add-client">
+              <Button variant="default" size="default" onClick={handleAddClient} data-testid="button-add-client" className="gap-1.5">
                 <Plus className="h-4 w-4" />
+                <span>Add Client</span>
               </Button>
               <Button variant="ghost" size="icon" asChild data-testid="button-settings">
                 <Link href="/company-settings">
