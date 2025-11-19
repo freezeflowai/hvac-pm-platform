@@ -79,7 +79,7 @@ export default function FeedbackDialog({ open, onOpenChange }: FeedbackDialogPro
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger data-testid="select-feedback-category">
                         <SelectValue placeholder="Select a category" />

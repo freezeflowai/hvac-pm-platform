@@ -3,13 +3,16 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, ShieldCheck, ShieldOff, Package, KeyRound } from "lucide-react";
+import { Trash2, ShieldCheck, ShieldOff, Package, KeyRound, MessageCircle } from "lucide-react";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import type { Feedback } from "@shared/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,6 +55,10 @@ export default function Admin() {
 
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
+  });
+
+  const { data: feedback = [] } = useQuery<Feedback[]>({
+    queryKey: ["/api/feedback"],
   });
 
   const deleteUserMutation = useMutation({
@@ -137,6 +144,26 @@ export default function Admin() {
     },
   });
 
+  const updateFeedbackStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      await apiRequest("PATCH", `/api/feedback/${id}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
+      toast({
+        title: "Status updated",
+        description: "Feedback status has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update feedback status",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleResetPassword = () => {
     if (!resetPasswordUserId) return;
     
@@ -187,13 +214,27 @@ export default function Admin() {
   return (
     <>
       <div className="p-6 mx-auto">
-        <h1 className="text-3xl font-bold mb-6">User Management</h1>
+        <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>All Users</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="users" data-testid="tab-users">User Management</TabsTrigger>
+          <TabsTrigger value="feedback" data-testid="tab-feedback">
+            Feedback
+            {feedback.filter(f => f.status === "new").length > 0 && (
+              <Badge variant="destructive" className="ml-2 h-5 min-w-5 px-1.5">
+                {feedback.filter(f => f.status === "new").length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="users">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Users</CardTitle>
+            </CardHeader>
+            <CardContent>
           <div className="space-y-4">
             {users.map((user) => (
               <div
@@ -384,6 +425,88 @@ export default function Admin() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="feedback">
+          <Card>
+            <CardHeader>
+              <CardTitle>User Feedback</CardTitle>
+              <CardDescription>
+                Recommendations, questions, and issues reported by users
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {feedback.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No feedback submissions yet
+                  </p>
+                ) : (
+                  feedback.map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-4 border rounded-lg space-y-2"
+                      data-testid={`feedback-item-${item.id}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant={
+                              item.category === "bug" ? "destructive" :
+                              item.category === "feature" ? "default" :
+                              "secondary"
+                            }>
+                              {item.category}
+                            </Badge>
+                            <Badge variant={
+                              item.status === "new" ? "destructive" :
+                              item.status === "in-progress" ? "default" :
+                              "secondary"
+                            }>
+                              {item.status}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(item.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            From: {item.userEmail}
+                          </p>
+                          <p className="text-sm whitespace-pre-wrap">{item.message}</p>
+                        </div>
+                        <div className="flex gap-1 ml-4">
+                          {item.status === "new" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateFeedbackStatusMutation.mutate({ id: item.id, status: "in-progress" })}
+                              disabled={updateFeedbackStatusMutation.isPending}
+                              data-testid={`button-feedback-in-progress-${item.id}`}
+                            >
+                              In Progress
+                            </Button>
+                          )}
+                          {item.status !== "resolved" && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => updateFeedbackStatusMutation.mutate({ id: item.id, status: "resolved" })}
+                              disabled={updateFeedbackStatusMutation.isPending}
+                              data-testid={`button-feedback-resolve-${item.id}`}
+                            >
+                              Resolve
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
       </div>
 
       <NewAddClientDialog 
