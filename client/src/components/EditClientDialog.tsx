@@ -626,11 +626,11 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Type</Label>
+                    <Label className="text-xs">Model Number</Label>
                     <Input
                       value={row.type}
                       onChange={(e) => handleUpdateEquipment(index, 'type', e.target.value)}
-                      placeholder="Type"
+                      placeholder="Model Number"
                       data-testid={`input-equipment-type-${index}`}
                     />
                   </div>
@@ -644,12 +644,12 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Location</Label>
+                    <Label className="text-xs">Notes</Label>
                     <div className="flex gap-2">
                       <Input
                         value={row.location}
                         onChange={(e) => handleUpdateEquipment(index, 'location', e.target.value)}
-                        placeholder="Location"
+                        placeholder="Notes"
                         data-testid={`input-equipment-location-${index}`}
                       />
                       <Button
