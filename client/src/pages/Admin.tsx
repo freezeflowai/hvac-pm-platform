@@ -164,6 +164,26 @@ export default function Admin() {
     },
   });
 
+  const deleteFeedbackMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/feedback/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
+      toast({
+        title: "Feedback deleted",
+        description: "Feedback has been deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete feedback",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleResetPassword = () => {
     if (!resetPasswordUserId) return;
     
@@ -497,6 +517,36 @@ export default function Admin() {
                               Resolve
                             </Button>
                           )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={deleteFeedbackMutation.isPending}
+                                data-testid={`button-feedback-delete-${item.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Feedback</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this feedback? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel data-testid={`button-cancel-delete-feedback-${item.id}`}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteFeedbackMutation.mutate(item.id)}
+                                  className="bg-destructive text-destructive-foreground"
+                                  data-testid={`button-confirm-delete-feedback-${item.id}`}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
                     </div>
