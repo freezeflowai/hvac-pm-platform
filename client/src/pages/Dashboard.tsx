@@ -98,8 +98,8 @@ export default function Dashboard() {
     completed: boolean;
   }>({
     scheduled: false,
-    thisMonthAll: false,
-    completed: false,
+    thisMonthAll: true,
+    completed: true,
   });
   const [reportDialogClientId, setReportDialogClientId] = useState<string | null>(null);
   
@@ -531,7 +531,7 @@ export default function Dashboard() {
                         {overdueItems.length > 0 ? (
                           <>
                             <div className="space-y-2">
-                              {(expandedSections.overdue ? overdueItems : overdueItems.slice(0, 3)).map((item) => (
+                              {(expandedSections.overdue ? overdueItems : overdueItems.slice(0, 7)).map((item) => (
                                 <MaintenanceCard
                                   key={item.id}
                                   item={item}
@@ -545,7 +545,7 @@ export default function Dashboard() {
                                 />
                               ))}
                             </div>
-                            {overdueItems.length > 3 && (
+                            {overdueItems.length > 7 && (
                               <Button 
                                 variant="ghost" 
                                 className="w-full mt-2" 
@@ -573,7 +573,7 @@ export default function Dashboard() {
                         {upcomingNextWeek.length > 0 ? (
                           <>
                             <div className="space-y-2">
-                              {(expandedSections.upcoming ? upcomingNextWeek : upcomingNextWeek.slice(0, 3)).map((item) => (
+                              {(expandedSections.upcoming ? upcomingNextWeek : upcomingNextWeek.slice(0, 7)).map((item) => (
                                 <MaintenanceCard
                                   key={item.id}
                                   item={item}
@@ -587,7 +587,7 @@ export default function Dashboard() {
                                 />
                               ))}
                             </div>
-                            {upcomingNextWeek.length > 3 && (
+                            {upcomingNextWeek.length > 7 && (
                               <Button 
                                 variant="ghost" 
                                 className="w-full mt-2" 
