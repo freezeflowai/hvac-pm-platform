@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, LogOut, User, Shield, Settings, Calendar as CalendarIcon, Plus, Users, Package, FileText, Search } from "lucide-react";
+import { LayoutDashboard, LogOut, User, Shield, Settings, Calendar as CalendarIcon, Plus, Users, Package, FileText, Search, MessageCircle } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -8,6 +8,7 @@ import type { CompanySettings } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useState, useEffect, useMemo } from "react";
+import FeedbackDialog from "./FeedbackDialog";
 
 interface HeaderProps {
   onAddClient?: () => void;
@@ -23,6 +24,7 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
   const { toast } = useToast();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const { data: companySettings } = useQuery<CompanySettings | null>({
     queryKey: ["/api/company-settings"],
@@ -207,6 +209,15 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
               <Plus className="h-3.5 w-3.5" />
               <span>Add Client</span>
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setFeedbackOpen(true)}
+              data-testid="button-feedback"
+              className="h-8 w-8"
+            >
+              <MessageCircle className="h-4 w-4" />
+            </Button>
             <Link href="/company-settings">
               <Button 
                 variant="ghost"
@@ -229,6 +240,7 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
           </div>
         </div>
       </div>
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </header>
   );
 }
