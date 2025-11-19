@@ -827,7 +827,7 @@ export default function Calendar() {
             </div>
 
             {!isUnscheduledMinimized && (
-              <div className="h-full">
+              <div className="h-full overflow-hidden">
                 <UnscheduledPanel 
                   clients={unscheduledClients} 
                   onClientClick={setReportDialogClientId}
