@@ -107,35 +107,27 @@ export default function Dashboard() {
   const thisMonthRef = useRef<HTMLDivElement>(null);
   const completedRef = useRef<HTMLDivElement>(null);
 
-  // Read tab from URL query parameter
+  // Read tab from URL query parameter and sync with URL changes
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('tab') === 'clients' ? 'clients' : 'schedule';
   });
 
-  // Track the current URL search params to detect changes
-  const [currentSearch, setCurrentSearch] = useState(window.location.search);
-
-  // Update activeTab when URL changes
+  // Sync activeTab with URL on every render
   useEffect(() => {
-    const checkUrlChange = () => {
-      if (window.location.search !== currentSearch) {
-        setCurrentSearch(window.location.search);
-        const params = new URLSearchParams(window.location.search);
-        const tab = params.get('tab');
-        setActiveTab(tab === 'clients' ? 'clients' : 'schedule');
-      }
-    };
+    const params = new URLSearchParams(window.location.search);
+    const urlTab = params.get('tab') === 'clients' ? 'clients' : 'schedule';
+    if (urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  });
 
-    // Check on every render (wouter navigations)
-    checkUrlChange();
-
-    // Also listen for popstate (back/forward navigation)
+  // Listen for popstate (back/forward navigation)
+  useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab');
       setActiveTab(tab === 'clients' ? 'clients' : 'schedule');
-      setCurrentSearch(window.location.search);
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -143,7 +135,7 @@ export default function Dashboard() {
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [location, currentSearch]);
+  }, []);
 
   const handleTabChange = (value: string) => {
     if (value === 'clients') {
