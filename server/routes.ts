@@ -1495,6 +1495,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/feedback/:id/archive", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { archived } = req.body;
+      
+      if (typeof archived !== 'boolean') {
+        return res.status(400).json({ error: "Archived must be a boolean" });
+      }
+      
+      const feedback = await storage.archiveFeedback(id, archived);
+      if (!feedback) {
+        return res.status(404).json({ error: "Feedback not found" });
+      }
+      
+      res.json(feedback);
+    } catch (error) {
+      console.error('Archive feedback error:', error);
+      res.status(500).json({ error: "Failed to archive feedback" });
+    }
+  });
+
   app.delete("/api/feedback/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
