@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Trash2, ShieldCheck, ShieldOff, Package, KeyRound, MessageCircle, Archive, ArchiveRestore } from "lucide-react";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
+import { UserSubscriptionDialog } from "@/components/UserSubscriptionDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import type { Feedback } from "@shared/schema";
@@ -304,6 +305,8 @@ export default function Admin() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <UserSubscriptionDialog userId={user.id} userEmail={user.email} />
+
                   <Button
                     variant="outline"
                     size="icon"

@@ -301,7 +301,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/subscriptions/plans", isAuthenticated, async (req, res) => {
     try {
       const plans = await subscriptionService.getActivePlans();
-      res.json(plans);
+      // Transform monthlyPriceCents to price (in dollars)
+      const transformedPlans = plans.map(plan => ({
+        id: plan.id,
+        name: plan.name,
+        displayName: plan.displayName,
+        price: plan.monthlyPriceCents / 100,
+        locationLimit: plan.locationLimit,
+        active: plan.active,
+      }));
+      res.json(transformedPlans);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch subscription plans" });
     }

@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash2, Check, ChevronsUpDown } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Plus, Trash2, Check, ChevronsUpDown, AlertCircle } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -73,6 +74,15 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
 
   const { data: availableParts = [] } = useQuery<Part[]>({
     queryKey: ['/api/parts'],
+  });
+
+  const { data: canAddLocation } = useQuery<{
+    allowed: boolean;
+    reason?: string;
+    current?: number;
+    limit?: number;
+  }>({
+    queryKey: ['/api/subscriptions/can-add-location'],
   });
 
   const partsByType = useMemo(() => {
@@ -284,6 +294,21 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
         <DialogHeader>
           <DialogTitle>Add New Client</DialogTitle>
         </DialogHeader>
+
+        {canAddLocation && !canAddLocation.allowed && (
+          <Alert variant="destructive" data-testid="alert-subscription-limit">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Location Limit Reached</AlertTitle>
+            <AlertDescription>
+              {canAddLocation.reason}
+              {canAddLocation.current !== undefined && canAddLocation.limit !== undefined && (
+                <span className="block mt-1">
+                  You're using {canAddLocation.current} of {canAddLocation.limit} locations.
+                </span>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
           <TabsList className="grid w-full grid-cols-3">
@@ -696,7 +721,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
           </Button>
           <Button
             onClick={handleSave}
-            disabled={isSaving || !formData.companyName.trim()}
+            disabled={isSaving || !formData.companyName.trim() || (canAddLocation && !canAddLocation.allowed)}
             data-testid="button-save-add"
           >
             {isSaving ? "Saving..." : "Save Client"}

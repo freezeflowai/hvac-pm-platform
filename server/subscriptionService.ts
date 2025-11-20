@@ -148,24 +148,23 @@ export class SubscriptionService {
     const locationCount = await this.getUserLocationCount(userId);
     const [user] = await db.select().from(users).where(eq(users.id, userId));
 
+    const percentUsed = plan && plan.locationLimit > 0 
+      ? Math.round((locationCount / plan.locationLimit) * 100) 
+      : 0;
+
     return {
       plan: plan ? {
         name: plan.name,
         displayName: plan.displayName,
         locationLimit: plan.locationLimit,
-        monthlyPriceCents: plan.monthlyPriceCents,
+        price: plan.monthlyPriceCents / 100, // Convert cents to dollars
       } : null,
       usage: {
         locations: locationCount,
-        limit: plan?.locationLimit || 0,
-        percentage: plan ? Math.round((locationCount / plan.locationLimit) * 100) : 0,
       },
-      subscription: {
-        status: user?.subscriptionStatus || 'trial',
-        trialEndsAt: user?.trialEndsAt,
-        isTrialExpired: user ? this.isTrialExpired(user) : false,
-        isActive: user ? this.isSubscriptionActive(user) : false,
-      }
+      percentUsed,
+      trialEndsAt: user?.trialEndsAt?.toISOString() || null,
+      subscriptionStatus: user?.subscriptionStatus || null,
     };
   }
 }

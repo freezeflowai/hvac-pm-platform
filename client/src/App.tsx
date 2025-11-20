@@ -20,6 +20,7 @@ import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/not-found";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Search, Plus, Settings } from "lucide-react";
@@ -185,6 +186,7 @@ function AppContent() {
               </Button>
             </div>
           </header>
+          <SubscriptionBanner />
           <main className="flex-1 overflow-auto">
             <div className="max-w-[1550px] mx-auto">
               <Router />
