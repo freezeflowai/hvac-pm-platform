@@ -76,6 +76,13 @@ The application uses a Material Design-inspired typography hierarchy with the In
   - **Environment Variable**: Requires `OPENROUTESERVICE_API_KEY` environment variable for production use
   - **API Endpoints**: `/api/routes/optimize` (calculate optimal route), `/api/routes/geocode` (single address geocoding)
   - **Error Handling**: Gracefully handles missing addresses, geocoding failures, and API errors with user-friendly messages
+- **Automatic Calendar Cleanup on PM Month Changes**: Intelligent management of calendar assignments when client PM months are updated:
+  - **Smart Cleanup**: When a client's PM months are changed, the system automatically removes calendar assignments that are no longer valid
+  - **Preserves Completed Jobs**: All completed maintenance records remain in the calendar for historical tracking, regardless of PM month changes
+  - **Removes Only Invalid Assignments**: Only removes assignments that are both (a) not completed AND (b) in months no longer selected for PM
+  - **User Notification**: Shows a toast message indicating how many assignments were removed when cleanup occurs
+  - **Cache Invalidation**: Automatically refreshes calendar queries to reflect the cleaned-up schedule
+  - **Backend Method**: `cleanupInvalidCalendarAssignments()` in storage layer handles the cleanup logic with completed record cross-referencing
 
 ## External Dependencies
 
