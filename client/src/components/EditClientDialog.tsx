@@ -243,6 +243,8 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
     onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/clients', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/maintenance/recently-completed'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/maintenance/statuses'] });
       
       // If calendar assignments were cleaned up, invalidate calendar queries and show notification
       if (response._cleanupInfo && response._cleanupInfo.removedCount > 0) {

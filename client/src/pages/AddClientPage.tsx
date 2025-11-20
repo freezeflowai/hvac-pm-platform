@@ -125,6 +125,8 @@ export default function AddClientPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/reports/parts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/schedule"] });
       queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance/recently-completed"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance/statuses"] });
       toast({
         title: "Client updated",
         description: "The client has been updated successfully.",
