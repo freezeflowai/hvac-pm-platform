@@ -29,6 +29,8 @@ export class RouteOptimizationService {
       throw new Error("OpenRouteService API key not configured");
     }
 
+    console.log(`[Geocoding] Starting location input: "${fullAddress}"`);
+
     try {
       const response = await fetch(
         `${this.baseUrl}/geocode/search?api_key=${this.apiKey}&text=${encodeURIComponent(fullAddress)}&size=1`,
@@ -48,9 +50,13 @@ export class RouteOptimizationService {
       
       if (data.features && data.features.length > 0) {
         const coords = data.features[0].geometry.coordinates;
+        const matchedAddress = data.features[0].properties?.label || 'unknown';
+        console.log(`[Geocoding] Matched address: "${matchedAddress}"`);
+        console.log(`[Geocoding] Coordinates: [${coords[0]}, ${coords[1]}]`);
         return [coords[0], coords[1]]; // [longitude, latitude]
       }
 
+      console.log(`[Geocoding] No results found for "${fullAddress}"`);
       return null;
     } catch (error) {
       console.error(`Error geocoding "${fullAddress}":`, error);
