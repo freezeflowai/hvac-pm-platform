@@ -3,22 +3,44 @@ import { pgTable, text, varchar, integer, boolean, timestamp } from "drizzle-orm
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
+// Companies table - each HVAC business is a company
+export const companies = pgTable("companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: text("email").notNull().unique(),
-  password: text("password").notNull(),
-  isAdmin: boolean("is_admin").notNull().default(false),
-  // Subscription and trial fields
+  name: text("name").notNull(),
+  address: text("address"),
+  city: text("city"),
+  provinceState: text("province_state"),
+  postalCode: text("postal_code"),
+  email: text("email"),
+  phone: text("phone"),
+  // Subscription and trial fields (moved from users to companies)
   trialEndsAt: timestamp("trial_ends_at"),
-  subscriptionStatus: text("subscription_status").notNull().default("trial"), 
-  // Possible values: "trial", "trialing", "active", "past_due", "unpaid", "canceled", "incomplete", "incomplete_expired"
-  subscriptionPlan: text("subscription_plan"), // e.g., "basic", "pro"
-  billingInterval: text("billing_interval"), // "month" or "year"
+  subscriptionStatus: text("subscription_status").notNull().default("trial"),
+  subscriptionPlan: text("subscription_plan"),
+  billingInterval: text("billing_interval"),
   currentPeriodEnd: timestamp("current_period_end"),
   cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
-  // Stripe integration
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertCompanySchema = createInsertSchema(companies).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCompany = z.infer<typeof insertCompanySchema>;
+export type Company = typeof companies.$inferSelect;
+
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  role: text("role").notNull().default("technician"), // "owner", "admin", "technician"
+  fullName: text("full_name"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -51,6 +73,7 @@ export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   companyName: text("company_name").notNull(),
   location: text("location"),
@@ -71,6 +94,7 @@ export const clients = pgTable("clients", {
 
 export const insertClientSchema = createInsertSchema(clients).omit({
   id: true,
+  companyId: true,
   userId: true,
   createdAt: true,
 });
@@ -80,6 +104,7 @@ export type Client = typeof clients.$inferSelect;
 
 export const parts = pgTable("parts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(), // "filter", "belt", or "other"
   // Filter-specific fields
@@ -96,6 +121,7 @@ export const parts = pgTable("parts", {
 
 export const insertPartSchema = createInsertSchema(parts).omit({
   id: true,
+  companyId: true,
   userId: true,
   createdAt: true,
 });
@@ -105,6 +131,7 @@ export type Part = typeof parts.$inferSelect;
 
 export const clientParts = pgTable("client_parts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   partId: varchar("part_id").notNull().references(() => parts.id, { onDelete: "cascade" }),
@@ -113,6 +140,7 @@ export const clientParts = pgTable("client_parts", {
 
 export const insertClientPartSchema = createInsertSchema(clientParts).omit({
   id: true,
+  companyId: true,
   userId: true,
 });
 
@@ -121,6 +149,7 @@ export type ClientPart = typeof clientParts.$inferSelect;
 
 export const maintenanceRecords = pgTable("maintenance_records", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   dueDate: text("due_date").notNull(),
@@ -129,6 +158,7 @@ export const maintenanceRecords = pgTable("maintenance_records", {
 
 export const insertMaintenanceRecordSchema = createInsertSchema(maintenanceRecords).omit({
   id: true,
+  companyId: true,
   userId: true,
 });
 
@@ -137,8 +167,10 @@ export type MaintenanceRecord = typeof maintenanceRecords.$inferSelect;
 
 export const calendarAssignments = pgTable("calendar_assignments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  assignedTechnicianId: varchar("assigned_technician_id").references(() => users.id, { onDelete: "set null" }),
   year: integer("year").notNull(),
   month: integer("month").notNull(),
   day: integer("day"),
@@ -149,6 +181,7 @@ export const calendarAssignments = pgTable("calendar_assignments", {
 
 export const insertCalendarAssignmentSchema = createInsertSchema(calendarAssignments).omit({
   id: true,
+  companyId: true,
   userId: true,
 });
 
@@ -157,6 +190,7 @@ export const updateCalendarAssignmentSchema = z.object({
   scheduledDate: z.string().optional(),
   autoDueDate: z.boolean().optional(),
   completed: z.boolean().optional(),
+  assignedTechnicianId: z.string().nullable().optional(),
 });
 
 export type InsertCalendarAssignment = z.infer<typeof insertCalendarAssignmentSchema>;
@@ -165,6 +199,7 @@ export type CalendarAssignment = typeof calendarAssignments.$inferSelect;
 
 export const equipment = pgTable("equipment", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
@@ -178,6 +213,7 @@ export const equipment = pgTable("equipment", {
 
 export const insertEquipmentSchema = createInsertSchema(equipment).omit({
   id: true,
+  companyId: true,
   userId: true,
   createdAt: true,
 });
@@ -187,6 +223,7 @@ export type Equipment = typeof equipment.$inferSelect;
 
 export const companySettings = pgTable("company_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().unique().references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
   companyName: text("company_name"),
   address: text("address"),
@@ -200,6 +237,7 @@ export const companySettings = pgTable("company_settings", {
 
 export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({
   id: true,
+  companyId: true,
   userId: true,
   updatedAt: true,
 });
@@ -207,8 +245,31 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).o
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
 export type CompanySettings = typeof companySettings.$inferSelect;
 
+// Invitation tokens for technician onboarding
+export const invitationTokens = pgTable("invitation_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  createdByUserId: varchar("created_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  email: text("email"),
+  role: text("role").notNull().default("technician"),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  usedByUserId: varchar("used_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertInvitationTokenSchema = createInsertSchema(invitationTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertInvitationToken = z.infer<typeof insertInvitationTokenSchema>;
+export type InvitationToken = typeof invitationTokens.$inferSelect;
+
 export const feedback = pgTable("feedback", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   userEmail: text("user_email").notNull(),
   category: text("category").notNull(),
@@ -220,6 +281,7 @@ export const feedback = pgTable("feedback", {
 
 export const insertFeedbackSchema = createInsertSchema(feedback).omit({
   id: true,
+  companyId: true,
   userId: true,
   userEmail: true,
   createdAt: true,
