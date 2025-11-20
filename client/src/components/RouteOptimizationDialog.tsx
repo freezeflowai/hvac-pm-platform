@@ -1,12 +1,15 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Route, MapPin, Clock, Navigation, Loader2 } from "lucide-react";
+import { Route, MapPin, Clock, Navigation, Loader2, Home } from "lucide-react";
+import { RouteMap } from "./RouteMap";
 
 interface Client {
   id: string;
@@ -29,6 +32,14 @@ interface OptimizedRouteResult {
   totalDistance: number;
   totalDuration: number;
   geocodedClients: GeocodedClient[];
+  startingCoordinates?: [number, number];
+}
+
+interface CompanySettings {
+  address?: string | null;
+  city?: string | null;
+  provinceState?: string | null;
+  postalCode?: string | null;
 }
 
 interface RouteOptimizationDialogProps {
@@ -46,6 +57,28 @@ export function RouteOptimizationDialog({
 }: RouteOptimizationDialogProps) {
   const { toast } = useToast();
   const [optimizedRoute, setOptimizedRoute] = useState<OptimizedRouteResult | null>(null);
+  const [startingLocation, setStartingLocation] = useState("");
+
+  // Fetch company settings to populate default starting location
+  const { data: companySettings } = useQuery<CompanySettings>({
+    queryKey: ['/api/company-settings'],
+    enabled: open
+  });
+
+  // Auto-fill starting location from company settings when dialog opens
+  useEffect(() => {
+    if (open && companySettings && !startingLocation) {
+      const parts = [
+        companySettings.address,
+        companySettings.city,
+        companySettings.provinceState,
+        companySettings.postalCode
+      ].filter(Boolean);
+      if (parts.length > 0) {
+        setStartingLocation(parts.join(", "));
+      }
+    }
+  }, [open, companySettings]);
 
   const optimizeMutation = useMutation({
     mutationFn: async () => {
@@ -53,7 +86,8 @@ export function RouteOptimizationDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clientIds: clients.map(c => c.id)
+          clientIds: clients.map(c => c.id),
+          startingLocation: startingLocation || undefined
         })
       });
       if (!response.ok) {
@@ -130,38 +164,62 @@ export function RouteOptimizationDialog({
 
         <div className="space-y-4">
           {!optimizedRoute && !optimizeMutation.isPending && (
-            <Card className="p-4">
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div className="flex-1">
-                    <h4 className="font-medium mb-1">Locations to Visit</h4>
-                    <div className="space-y-1">
-                      {clients.map((client, index) => (
-                        <div key={client.id} className="flex items-center gap-2 text-sm">
-                          <Badge variant="outline" className="w-8 justify-center">
-                            {index + 1}
-                          </Badge>
-                          <span className="font-medium">{client.companyName}</span>
-                          {(client.city || client.address) && (
-                            <span className="text-muted-foreground">
-                              - {[client.address, client.city].filter(Boolean).join(", ")}
-                            </span>
-                          )}
-                        </div>
-                      ))}
+            <>
+              <Card className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Home className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div className="flex-1">
+                      <Label htmlFor="starting-location" className="font-medium">Starting Location</Label>
+                      <Input
+                        id="starting-location"
+                        value={startingLocation}
+                        onChange={(e) => setStartingLocation(e.target.value)}
+                        placeholder="Enter your starting address..."
+                        className="mt-2"
+                        data-testid="input-starting-location"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Where will you start your route? (e.g., your office or warehouse)
+                      </p>
                     </div>
                   </div>
                 </div>
+              </Card>
 
-                <div className="pt-3 border-t">
-                  <p className="text-sm text-muted-foreground">
-                    This will use OpenRouteService to calculate the shortest route visiting all locations.
-                    Make sure all clients have valid addresses.
-                  </p>
+              <Card className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-medium mb-1">Locations to Visit</h4>
+                      <div className="space-y-1">
+                        {clients.map((client, index) => (
+                          <div key={client.id} className="flex items-center gap-2 text-sm">
+                            <Badge variant="outline" className="w-8 justify-center">
+                              {index + 1}
+                            </Badge>
+                            <span className="font-medium">{client.companyName}</span>
+                            {(client.city || client.address) && (
+                              <span className="text-muted-foreground">
+                                - {[client.address, client.city].filter(Boolean).join(", ")}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t">
+                    <p className="text-sm text-muted-foreground">
+                      This will use OpenRouteService to calculate the shortest route visiting all locations.
+                      Make sure all clients have valid addresses.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            </>
           )}
 
           {optimizeMutation.isPending && (
@@ -205,6 +263,16 @@ export function RouteOptimizationDialog({
                     </div>
                   </div>
                 </div>
+              </Card>
+
+              {/* Map Visualization */}
+              <Card className="p-4">
+                <h4 className="font-medium mb-3">Route Map</h4>
+                <RouteMap
+                  clients={optimizedRoute.clients}
+                  geocodedClients={optimizedRoute.geocodedClients}
+                  startingCoordinates={optimizedRoute.startingCoordinates}
+                />
               </Card>
 
               <Card className="p-4">

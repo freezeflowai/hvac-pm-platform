@@ -69,12 +69,15 @@ The application uses a Material Design-inspired typography hierarchy with the In
 - **Route Optimization**: Intelligent route planning for technician visits using OpenRouteService API:
   - **Geocoding**: Automatically converts client addresses (address, city, province, postal code) to GPS coordinates
   - **Route Calculation**: Uses OpenRouteService optimization API to calculate the most efficient visiting order for scheduled clients
+  - **Starting Location Input**: Dialog includes input field for starting location (office/warehouse), auto-populated from company settings
+  - **Map Visualization**: Interactive Leaflet map displays the optimized route with numbered markers, starting location icon, and route polyline
   - **Calendar Integration**: "Optimize Route" button on Calendar page allows admins to optimize the current month's schedule
-  - **Visual Feedback**: Shows total distance, travel time, and optimized client order before applying changes
+  - **Visual Feedback**: Shows total distance, travel time, optimized client order list, and map visualization before applying changes
   - **Smart Reordering**: Preserves existing day assignments while reordering clients to follow the optimal route
+  - **Correct Route Display**: Backend reorders geocoded clients to match optimization API results, ensuring map markers and polyline follow optimized sequence
   - **Rate Limiting**: Built-in 1.5s delay between geocoding requests to respect OpenRouteService free tier limits (40 req/min)
   - **Environment Variable**: Requires `OPENROUTESERVICE_API_KEY` environment variable for production use
-  - **API Endpoints**: `/api/routes/optimize` (calculate optimal route), `/api/routes/geocode` (single address geocoding)
+  - **API Endpoints**: `/api/routes/optimize` (calculate optimal route with optional starting location), `/api/routes/geocode` (single address geocoding)
   - **Error Handling**: Gracefully handles missing addresses, geocoding failures, and API errors with user-friendly messages
 - **Automatic Calendar Cleanup on PM Month Changes**: Intelligent management of calendar assignments when client PM months are updated:
   - **Smart Cleanup**: When a client's PM months are changed, the system automatically removes calendar assignments that are no longer valid
@@ -96,6 +99,7 @@ The application uses a Material Design-inspired typography hierarchy with the In
 - **shadcn/ui**: Pre-built component library configuration.
 - **Lucide React**: Icon library.
 - **date-fns**: Date manipulation and formatting utility.
+- **Leaflet / react-leaflet**: Interactive map visualization for route optimization.
 
 ### Form & Validation
 - **React Hook Form**: Performant form state management.

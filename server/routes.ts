@@ -1551,7 +1551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Route optimization routes
   app.post("/api/routes/optimize", isAuthenticated, async (req, res) => {
     try {
-      const { clientIds, startLocation } = req.body;
+      const { clientIds, startingLocation } = req.body;
       
       if (!clientIds || !Array.isArray(clientIds) || clientIds.length === 0) {
         return res.status(400).json({ error: "clientIds array is required" });
@@ -1570,6 +1570,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No valid clients found" });
       }
 
+      // Geocode starting location if provided
+      let startCoords: [number, number] | undefined = undefined;
+      if (startingLocation && typeof startingLocation === 'string' && startingLocation.trim()) {
+        const coords = await routeOptimizationService.geocodeAddress(startingLocation.trim(), "", "", "");
+        if (!coords) {
+          return res.status(400).json({ error: "Could not geocode starting location" });
+        }
+        startCoords = coords;
+      }
+
       // Geocode clients
       const geocoded = await routeOptimizationService.geocodeClients(validClients);
       
@@ -1580,22 +1590,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Optimize route
       const optimizedRoute = await routeOptimizationService.optimizeRoute(
         geocoded,
-        startLocation ? [startLocation.lng, startLocation.lat] : undefined
+        startCoords
       );
 
       if (!optimizedRoute) {
         return res.status(500).json({ error: "Failed to optimize route" });
       }
 
+      // Reorder geocodedClients to match the optimized order
+      const reorderedGeocoded = optimizedRoute.order.map(index => geocoded[index]);
+
       res.json({
         clients: optimizedRoute.clients,
         totalDistance: optimizedRoute.totalDistance,
         totalDuration: optimizedRoute.totalDuration,
-        geocodedClients: geocoded.map(gc => ({
+        geocodedClients: reorderedGeocoded.map(gc => ({
           clientId: gc.client.id,
           coordinates: gc.coordinates,
           address: gc.address
-        }))
+        })),
+        startingCoordinates: startCoords
       });
     } catch (error) {
       console.error('Route optimization error:', error);
