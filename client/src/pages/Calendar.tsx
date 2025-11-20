@@ -6,12 +6,13 @@ import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect } from "react";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import ClientReportDialog from "@/components/ClientReportDialog";
+import { RouteOptimizationDialog } from "@/components/RouteOptimizationDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Mail, ChevronsRight, ChevronsLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Mail, ChevronsRight, ChevronsLeft, Route } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -321,6 +322,7 @@ export default function Calendar() {
   const [isUnscheduledMinimized, setIsUnscheduledMinimized] = useState(false);
   const [showOnlyOutstanding, setShowOnlyOutstanding] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [routeOptimizationOpen, setRouteOptimizationOpen] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
@@ -817,6 +819,16 @@ export default function Calendar() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setRouteOptimizationOpen(true)}
+                disabled={assignments.length === 0}
+                data-testid="button-optimize-route"
+              >
+                <Route className="h-4 w-4 mr-2" />
+                Optimize Route
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setShowClearConfirm(true)}
                 disabled={clearSchedule.isPending || assignments.length === 0}
                 data-testid="button-clear-schedule"
@@ -970,6 +982,88 @@ export default function Calendar() {
         clientId={reportDialogClientId}
         open={!!reportDialogClientId}
         onOpenChange={(open) => !open && setReportDialogClientId(null)}
+      />
+
+      <RouteOptimizationDialog
+        open={routeOptimizationOpen}
+        onOpenChange={setRouteOptimizationOpen}
+        clients={assignments.map((a: any) => clients.find((c: any) => c.id === a.clientId)).filter((c: any): c is NonNullable<typeof c> => c !== null)}
+        onApplyRoute={(optimizedClients) => {
+          // Get all current assignments sorted by day
+          const sortedAssignments = [...assignments].sort((a: any, b: any) => a.day - b.day);
+          
+          // Verify counts match
+          if (optimizedClients.length !== sortedAssignments.length) {
+            toast({
+              title: "Route optimization error",
+              description: `Client count mismatch: ${optimizedClients.length} optimized vs ${sortedAssignments.length} scheduled`,
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          // Create a mapping of clientId to original assignment for quick lookup
+          // Note: The backend prevents duplicate client assignments per month,
+          // so this Map is safe (each clientId appears exactly once)
+          const assignmentByClient = new Map(
+            sortedAssignments.map((a: any) => [a.clientId, a])
+          );
+          
+          // Verify no duplicate clients (defensive check)
+          if (assignmentByClient.size !== sortedAssignments.length) {
+            toast({
+              title: "Route optimization error",
+              description: "Found duplicate client assignments. Please contact support.",
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          // Build update mutations: for each position in sorted order,
+          // swap the assignment at that position to point to the optimized client
+          const updatePromises = sortedAssignments.map((originalAssignment: any, index) => {
+            const optimizedClient = optimizedClients[index];
+            const assignmentForOptimizedClient = assignmentByClient.get(optimizedClient.id);
+            
+            if (!assignmentForOptimizedClient) {
+              console.error(`No assignment found for optimized client ${optimizedClient.id}`);
+              return Promise.resolve();
+            }
+            
+            // If this assignment is already in the correct position, skip
+            if (assignmentForOptimizedClient.day === originalAssignment.day) {
+              return Promise.resolve();
+            }
+            
+            // Update the assignment to the target day/date
+            const newDay = originalAssignment.day;
+            const newScheduledDate = new Date(year, month - 1, newDay).toISOString().split('T')[0];
+            
+            return apiRequest(`/api/calendar/assign/${assignmentForOptimizedClient.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ 
+                day: newDay,
+                scheduledDate: newScheduledDate
+              })
+            });
+          });
+
+          Promise.all(updatePromises)
+            .then(() => {
+              queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+              toast({
+                title: "Route optimized",
+                description: "Calendar has been reordered to follow the optimal route"
+              });
+            })
+            .catch((error) => {
+              toast({
+                title: "Failed to apply route",
+                description: error.message || "Could not update calendar assignments",
+                variant: "destructive"
+              });
+            });
+        }}
       />
 
       <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>

@@ -66,6 +66,16 @@ The application uses a Material Design-inspired typography hierarchy with the In
   - **Trial Management**: New users automatically assigned 30-day trial; trial expiration tracked and enforced on client operations
   - **Stripe Integration Ready**: Infrastructure prepared for Stripe payment integration (client, webhook handlers, service layer) but payments not yet implemented
   - **Usage Tracking**: Real-time location count based on active (non-inactive) clients; percentage calculation against plan limits
+- **Route Optimization**: Intelligent route planning for technician visits using OpenRouteService API:
+  - **Geocoding**: Automatically converts client addresses (address, city, province, postal code) to GPS coordinates
+  - **Route Calculation**: Uses OpenRouteService optimization API to calculate the most efficient visiting order for scheduled clients
+  - **Calendar Integration**: "Optimize Route" button on Calendar page allows admins to optimize the current month's schedule
+  - **Visual Feedback**: Shows total distance, travel time, and optimized client order before applying changes
+  - **Smart Reordering**: Preserves existing day assignments while reordering clients to follow the optimal route
+  - **Rate Limiting**: Built-in 1.5s delay between geocoding requests to respect OpenRouteService free tier limits (40 req/min)
+  - **Environment Variable**: Requires `OPENROUTESERVICE_API_KEY` environment variable for production use
+  - **API Endpoints**: `/api/routes/optimize` (calculate optimal route), `/api/routes/geocode` (single address geocoding)
+  - **Error Handling**: Gracefully handles missing addresses, geocoding failures, and API errors with user-friendly messages
 
 ## External Dependencies
 

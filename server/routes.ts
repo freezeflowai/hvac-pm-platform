@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import { subscriptionService } from "./subscriptionService";
+import { routeOptimizationService } from "./routeOptimizationService";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
@@ -306,7 +307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: plan.id,
         name: plan.name,
         displayName: plan.displayName,
-        price: plan.monthlyPriceCents / 100,
+        price: (plan.monthlyPriceCents ?? 0) / 100,
         locationLimit: plan.locationLimit,
         active: plan.active,
       }));
@@ -1523,6 +1524,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid settings data", details: error.errors });
       }
       res.status(500).json({ error: "Failed to update company settings" });
+    }
+  });
+
+  // Route optimization routes
+  app.post("/api/routes/optimize", isAuthenticated, async (req, res) => {
+    try {
+      const { clientIds, startLocation } = req.body;
+      
+      if (!clientIds || !Array.isArray(clientIds) || clientIds.length === 0) {
+        return res.status(400).json({ error: "clientIds array is required" });
+      }
+
+      const userId = req.user!.id;
+      
+      // Fetch clients
+      const clients = await Promise.all(
+        clientIds.map(id => storage.getClient(userId, id))
+      );
+      
+      const validClients = clients.filter((c): c is NonNullable<typeof c> => c !== null);
+      
+      if (validClients.length === 0) {
+        return res.status(400).json({ error: "No valid clients found" });
+      }
+
+      // Geocode clients
+      const geocoded = await routeOptimizationService.geocodeClients(validClients);
+      
+      if (geocoded.length === 0) {
+        return res.status(400).json({ error: "Could not geocode any client addresses" });
+      }
+
+      // Optimize route
+      const optimizedRoute = await routeOptimizationService.optimizeRoute(
+        geocoded,
+        startLocation ? [startLocation.lng, startLocation.lat] : undefined
+      );
+
+      if (!optimizedRoute) {
+        return res.status(500).json({ error: "Failed to optimize route" });
+      }
+
+      res.json({
+        clients: optimizedRoute.clients,
+        totalDistance: optimizedRoute.totalDistance,
+        totalDuration: optimizedRoute.totalDuration,
+        geocodedClients: geocoded.map(gc => ({
+          clientId: gc.client.id,
+          coordinates: gc.coordinates,
+          address: gc.address
+        }))
+      });
+    } catch (error) {
+      console.error('Route optimization error:', error);
+      res.status(500).json({ error: "Failed to optimize route" });
+    }
+  });
+
+  app.post("/api/routes/geocode", isAuthenticated, async (req, res) => {
+    try {
+      const { address, city, province, postalCode } = req.body;
+      
+      if (!address && !city) {
+        return res.status(400).json({ error: "At least address or city is required" });
+      }
+
+      const coords = await routeOptimizationService.geocodeAddress(
+        address || "",
+        city || "",
+        province || "",
+        postalCode || ""
+      );
+
+      if (!coords) {
+        return res.status(404).json({ error: "Could not geocode address" });
+      }
+
+      res.json({ coordinates: coords });
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      res.status(500).json({ error: "Failed to geocode address" });
     }
   });
 
