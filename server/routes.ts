@@ -1808,6 +1808,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Technician management endpoints
+  app.get("/api/technicians", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const technicians = await storage.getTechniciansByCompanyId(user.companyId);
+      res.json(technicians);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch technicians" });
+    }
+  });
+
+  app.post("/api/technicians/invite", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { email, role = "technician" } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      // Generate secure random token
+      const token = randomBytes(32).toString("hex");
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7); // Expires in 7 days
+
+      // Store invitation token in database
+      await storage.createInvitationToken({
+        companyId: user.companyId,
+        createdByUserId: user.id,
+        token,
+        email,
+        role,
+        expiresAt,
+      });
+
+      const inviteLink = `${process.env.REPLIT_DEV_DOMAIN || "http://localhost:5000"}/signup?token=${token}`;
+      
+      res.json({
+        inviteLink,
+        email,
+        expiresAt,
+        message: "Invitation link generated. Share this with the technician."
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to generate invitation: " + error.message });
+    }
+  });
+
+  app.delete("/api/technicians/:id", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { id } = req.params;
+
+      // Verify technician belongs to same company
+      const technician = await storage.getUser(id);
+      if (!technician || technician.companyId !== user.companyId) {
+        return res.status(403).json({ error: "Cannot delete technician from another company" });
+      }
+
+      const success = await storage.deleteUser(id);
+      if (success) {
+        res.json({ message: "Technician deleted successfully" });
+      } else {
+        res.status(404).json({ error: "Technician not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete technician" });
+    }
+  });
+
+  app.post("/api/technicians/:id/reset-password", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { id } = req.params;
+
+      // Verify technician belongs to same company
+      const technician = await storage.getUser(id);
+      if (!technician || technician.companyId !== user.companyId) {
+        return res.status(403).json({ error: "Cannot reset password for technician from another company" });
+      }
+
+      // Generate password reset token
+      const resetToken = randomBytes(32).toString("hex");
+      const tokenHash = (await import("crypto")).createHash("sha256").update(resetToken).digest("hex");
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 1);
+
+      await storage.createPasswordResetToken({
+        userId: id,
+        tokenHash,
+        expiresAt,
+        requestedIp: req.ip,
+      });
+
+      const resetLink = `${process.env.REPLIT_DEV_DOMAIN || "http://localhost:5000"}/reset-password?token=${resetToken}`;
+      
+      res.json({
+        resetLink,
+        email: technician.email,
+        message: "Password reset link generated. Share this with the technician."
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to generate password reset link" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

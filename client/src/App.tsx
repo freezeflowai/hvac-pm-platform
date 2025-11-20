@@ -13,6 +13,7 @@ import AddClientPage from "@/pages/AddClientPage";
 import PartsManagementPage from "@/pages/PartsManagementPage";
 import CompanySettingsPage from "@/pages/CompanySettingsPage";
 import TechnicianDashboard from "@/pages/TechnicianDashboard";
+import TechnicianManagementPage from "@/pages/TechnicianManagementPage";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import RequestReset from "@/pages/RequestReset";
@@ -68,6 +69,11 @@ function Router() {
       <Route path="/company-settings">
         <ProtectedRoute requireAdmin>
           <CompanySettingsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/manage-technicians">
+        <ProtectedRoute requireAdmin>
+          <TechnicianManagementPage />
         </ProtectedRoute>
       </Route>
       <Route path="/technician">

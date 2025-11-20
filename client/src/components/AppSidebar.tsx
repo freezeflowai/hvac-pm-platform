@@ -7,7 +7,8 @@ import {
   Shield, 
   LogOut,
   Smartphone,
-  MessageCircle
+  MessageCircle,
+  UserCheck
 } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -123,7 +124,14 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
     },
   ];
 
-  if (user?.isAdmin) {
+  if (user?.role === "owner" || user?.role === "admin") {
+    menuItems.push({
+      title: "Manage Team",
+      icon: UserCheck,
+      href: "/manage-technicians",
+      isActive: location === "/manage-technicians",
+      testId: "nav-manage-technicians"
+    });
     menuItems.push({
       title: "Admin",
       icon: Shield,
