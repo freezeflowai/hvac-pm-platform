@@ -1,5 +1,6 @@
-import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
-import { LatLngExpression } from "leaflet";
+import { useEffect } from "react";
+import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
+import { LatLngExpression, LatLngBounds } from "leaflet";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -20,19 +21,44 @@ interface RouteMapProps {
   startingCoordinates?: [number, number]; // [longitude, latitude]
 }
 
+// Component to fit map bounds to all markers
+function FitBounds({ bounds }: { bounds: LatLngBounds }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [bounds, map]);
+  
+  return null;
+}
+
 export function RouteMap({ clients, geocodedClients, startingCoordinates }: RouteMapProps) {
   // Convert [lng, lat] to [lat, lng] for Leaflet
   const positions: LatLngExpression[] = geocodedClients.map(gc => [gc.coordinates[1], gc.coordinates[0]]);
   
-  // Calculate center of map
-  const center: LatLngExpression = positions.length > 0 
-    ? positions[Math.floor(positions.length / 2)]
-    : [43.6532, -79.3832]; // Default to Toronto
-
-  // Add starting location to the route if provided
-  const routePoints = startingCoordinates 
-    ? [[startingCoordinates[1], startingCoordinates[0]], ...positions] as LatLngExpression[]
+  // Calculate all points including starting location for proper map centering
+  const allPoints: LatLngExpression[] = startingCoordinates 
+    ? [[startingCoordinates[1], startingCoordinates[0]], ...positions]
     : positions;
+  
+  // Calculate center and bounds
+  let center: LatLngExpression = [43.6532, -79.3832]; // Default to Toronto
+  let bounds: LatLngBounds | null = null;
+  
+  if (allPoints.length > 0) {
+    // Calculate geographic center
+    const latSum = allPoints.reduce((sum, point) => sum + (point as number[])[0], 0);
+    const lngSum = allPoints.reduce((sum, point) => sum + (point as number[])[1], 0);
+    center = [latSum / allPoints.length, lngSum / allPoints.length];
+    
+    // Create bounds to fit all points
+    bounds = new L.LatLngBounds(allPoints as [number, number][]);
+  }
+
+  // Route points for polyline
+  const routePoints = allPoints;
 
   return (
     <div className="w-full h-[400px] rounded-md overflow-hidden border" data-testid="map-route">
@@ -42,6 +68,7 @@ export function RouteMap({ clients, geocodedClients, startingCoordinates }: Rout
         style={{ height: "100%", width: "100%" }}
         scrollWheelZoom={false}
       >
+        {bounds && <FitBounds bounds={bounds} />}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
