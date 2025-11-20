@@ -561,11 +561,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertClientSchema.partial().parse(req.body);
-      const client = await storage.updateClient(req.user!.id, req.params.id, validated);
+      const userId = req.user!.id;
+      const clientId = req.params.id;
+      
+      // Check if selectedMonths is being updated
+      const isUpdatingPmMonths = validated.selectedMonths !== undefined;
+      
+      // Update the client
+      const client = await storage.updateClient(userId, clientId, validated);
       if (!client) {
         return res.status(404).json({ error: "Client not found" });
       }
-      res.json(client);
+      
+      // If PM months were updated, cleanup invalid calendar assignments
+      let cleanupResult = { removedCount: 0 };
+      if (isUpdatingPmMonths && client.selectedMonths) {
+        cleanupResult = await storage.cleanupInvalidCalendarAssignments(
+          userId,
+          clientId,
+          client.selectedMonths
+        );
+      }
+      
+      res.json({
+        ...client,
+        _cleanupInfo: cleanupResult
+      });
     } catch (error) {
       res.status(400).json({ error: "Invalid client data" });
     }
