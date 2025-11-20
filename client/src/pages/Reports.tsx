@@ -109,6 +109,9 @@ export default function Reports() {
   const belts = reportData.filter(item => item.part.type === "belt");
   const other = reportData.filter(item => item.part.type === "other");
 
+  const totalFilters = filters.reduce((sum, item) => sum + item.totalQuantity, 0);
+  const totalBelts = belts.reduce((sum, item) => sum + item.totalQuantity, 0);
+
   const currentMonth = activeTab === "parts" ? selectedMonth : scheduleMonth;
   const setCurrentMonth = activeTab === "parts" ? setSelectedMonth : setScheduleMonth;
 
@@ -216,9 +219,12 @@ export default function Reports() {
                 {filters.length > 0 && (
                   <Card className="shadow-md rounded-xl">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                        <Package className="h-5 w-5" />
-                        Filters
+                      <CardTitle className="flex items-center justify-between text-lg font-semibold">
+                        <div className="flex items-center gap-2">
+                          <Package className="h-5 w-5" />
+                          Filters
+                        </div>
+                        <span className="text-muted-foreground" data-testid="total-filters-count">{totalFilters}</span>
                       </CardTitle>
                       <CardDescription className="text-sm">
                         Total needed for {MONTHS[selectedMonth]}
@@ -263,9 +269,12 @@ export default function Reports() {
                 {belts.length > 0 && (
                   <Card className="shadow-md rounded-xl">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                        <Package className="h-5 w-5" />
-                        Belts
+                      <CardTitle className="flex items-center justify-between text-lg font-semibold">
+                        <div className="flex items-center gap-2">
+                          <Package className="h-5 w-5" />
+                          Belts
+                        </div>
+                        <span className="text-muted-foreground" data-testid="total-belts-count">{totalBelts}</span>
                       </CardTitle>
                       <CardDescription className="text-sm">
                         Total needed for {MONTHS[selectedMonth]}
