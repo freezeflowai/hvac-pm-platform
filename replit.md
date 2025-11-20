@@ -55,6 +55,17 @@ The application uses a Material Design-inspired typography hierarchy with the In
   - User Management: Admins can promote technicians to admin via the Admin page user management interface
   - Security: No privilege escalation vulnerabilities; technicians have strict read-only access to schedules and client data
   - Technician Experience: Full read-only access to schedules, client information, parts inventory, and equipment details via mobile-optimized dashboard
+- **Subscription System (Feature Flag Controlled)**: Tiered subscription model with location limits and usage tracking:
+  - **Subscription Tiers**: Free Trial (30 days, 10 locations), Silver ($40/month, 100 locations), Gold ($70/month, 200 locations), Enterprise (quote-based, unlimited locations)
+  - **Database Schema**: `subscription_plans` table stores tier definitions; user subscription info tracked in `users` table fields (subscriptionPlan, subscriptionStatus, trialEndsAt)
+  - **Backend Services**: `subscriptionService.ts` handles plan assignment, limit checking, usage calculation, and trial expiration tracking
+  - **API Endpoints**: `/api/subscriptions/plans` (list plans), `/api/subscriptions/usage` (current usage), `/api/subscriptions/can-add-location` (check limits), `/api/admin/users/:userId/subscription` (admin override)
+  - **Limit Enforcement**: Client creation and import operations check subscription limits; returns 403 with detailed error when limits exceeded
+  - **Feature Flag**: Controlled by `ENABLE_SUBSCRIPTIONS` environment variable; when disabled, no limits enforced (legacy behavior)
+  - **Admin Controls**: Admins can manually assign subscription plans to users via admin endpoints
+  - **Trial Management**: New users automatically assigned 30-day trial; trial expiration tracked and enforced on client operations
+  - **Stripe Integration Ready**: Infrastructure prepared for Stripe payment integration (client, webhook handlers, service layer) but payments not yet implemented
+  - **Usage Tracking**: Real-time location count based on active (non-inactive) clients; percentage calculation against plan limits
 
 ## External Dependencies
 

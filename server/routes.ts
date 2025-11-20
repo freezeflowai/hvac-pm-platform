@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
+import { subscriptionService } from "./subscriptionService";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
@@ -43,12 +44,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = await storage.createUser({ email, password: hashedPassword });
       
-      // Set trial period (configurable via TRIAL_DAYS env var, defaults to 30 days)
-      const trialDays = parseInt(process.env.TRIAL_DAYS || "30", 10);
-      const trialEndsAt = new Date();
-      trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
-      await storage.updateUserTrialDate(user.id, trialEndsAt);
-      user.trialEndsAt = trialEndsAt;
+      // Assign trial plan to new user
+      if (subscriptionService.isEnabled()) {
+        await subscriptionService.assignPlanToUser(user.id, 'trial', true);
+      } else {
+        // Legacy: Set trial period directly
+        const trialDays = parseInt(process.env.TRIAL_DAYS || "30", 10);
+        const trialEndsAt = new Date();
+        trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
+        await storage.updateUserTrialDate(user.id, trialEndsAt);
+        user.trialEndsAt = trialEndsAt;
+      }
       
       // SECURITY: Only the first user is automatically made an admin
       // Additional admins must be promoted by existing admins
@@ -291,6 +297,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Subscription routes
+  app.get("/api/subscriptions/plans", isAuthenticated, async (req, res) => {
+    try {
+      const plans = await subscriptionService.getActivePlans();
+      res.json(plans);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch subscription plans" });
+    }
+  });
+
+  app.get("/api/subscriptions/usage", isAuthenticated, async (req, res) => {
+    try {
+      const usage = await subscriptionService.getUsageInfo(req.user!.id);
+      res.json(usage);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch usage info" });
+    }
+  });
+
+  app.get("/api/subscriptions/can-add-location", isAuthenticated, async (req, res) => {
+    try {
+      const result = await subscriptionService.canAddLocation(req.user!.id);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check location limit" });
+    }
+  });
+
+  // Admin-only: Update user subscription
+  app.patch("/api/admin/users/:userId/subscription", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { planName } = req.body;
+
+      if (!planName) {
+        return res.status(400).json({ error: "Plan name is required" });
+      }
+
+      const plan = await subscriptionService.assignPlanToUser(userId, planName, false);
+      res.json({ success: true, plan });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to update subscription" });
+    }
+  });
+
   // Client routes
   app.get("/api/clients", isAuthenticated, async (req, res) => {
     try {
@@ -303,6 +354,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/clients", isAuthenticated, async (req, res) => {
     try {
+      // Check subscription limits
+      const limitCheck = await subscriptionService.canAddLocation(req.user!.id);
+      if (!limitCheck.allowed) {
+        return res.status(403).json({ 
+          error: limitCheck.reason,
+          current: limitCheck.current,
+          limit: limitCheck.limit,
+          subscriptionLimitReached: true
+        });
+      }
+
       const { parts, ...clientData } = req.body;
       const validated = insertClientSchema.parse(clientData);
       
@@ -337,6 +399,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!Array.isArray(clients) || clients.length === 0) {
         return res.status(400).json({ error: "Invalid import data: clients array is required" });
+      }
+
+      // Check if user can import this many clients
+      const usage = await subscriptionService.getUsageInfo(req.user!.id);
+      const availableSlots = usage.plan ? usage.plan.locationLimit - usage.usage.locations : 999999;
+      
+      if (subscriptionService.isEnabled() && clients.length > availableSlots) {
+        return res.status(403).json({ 
+          error: `Cannot import ${clients.length} clients. You have ${availableSlots} available locations on your ${usage.plan?.displayName} plan.`,
+          subscriptionLimitReached: true,
+          current: usage.usage.locations,
+          limit: usage.plan?.locationLimit || 0,
+          requested: clients.length
+        });
       }
 
       let imported = 0;
