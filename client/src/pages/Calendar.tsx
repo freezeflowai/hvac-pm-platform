@@ -530,8 +530,7 @@ export default function Calendar() {
   };
 
   const handleClientClick = (client: any, assignment: any) => {
-    setSelectedClient(client);
-    setSelectedAssignment(assignment);
+    setReportDialogClientId(client.id);
   };
 
   const toggleComplete = useMutation({
