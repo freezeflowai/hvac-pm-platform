@@ -24,14 +24,10 @@ export class RouteOptimizationService {
     }
   }
 
-  async geocodeAddress(address: string, city?: string, province?: string, postalCode?: string): Promise<[number, number] | null> {
+  async geocodeFullAddress(fullAddress: string): Promise<[number, number] | null> {
     if (!this.apiKey) {
       throw new Error("OpenRouteService API key not configured");
     }
-
-    // Build full address string
-    const parts = [address, city, province, postalCode, "Canada"].filter(Boolean);
-    const fullAddress = parts.join(", ");
 
     try {
       const response = await fetch(
@@ -60,6 +56,18 @@ export class RouteOptimizationService {
       console.error(`Error geocoding "${fullAddress}":`, error);
       return null;
     }
+  }
+
+  async geocodeAddress(address: string, city?: string, province?: string, postalCode?: string): Promise<[number, number] | null> {
+    if (!this.apiKey) {
+      throw new Error("OpenRouteService API key not configured");
+    }
+
+    // Build full address string
+    const parts = [address, city, province, postalCode, "Canada"].filter(Boolean);
+    const fullAddress = parts.join(", ");
+
+    return this.geocodeFullAddress(fullAddress);
   }
 
   async geocodeClients(clients: Client[]): Promise<GeocodedClient[]> {

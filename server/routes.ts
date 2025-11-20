@@ -1573,7 +1573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Geocode starting location if provided
       let startCoords: [number, number] | undefined = undefined;
       if (startingLocation && typeof startingLocation === 'string' && startingLocation.trim()) {
-        const coords = await routeOptimizationService.geocodeAddress(startingLocation.trim(), "", "", "");
+        const coords = await routeOptimizationService.geocodeFullAddress(startingLocation.trim());
         if (!coords) {
           return res.status(400).json({ error: "Could not geocode starting location" });
         }
