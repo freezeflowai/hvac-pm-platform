@@ -1840,6 +1840,63 @@ export class DbStorage implements IStorage {
     return unscheduled;
   }
 
+  async cleanupInvalidCalendarAssignments(userId: string, clientId: string, validMonths: number[]): Promise<{ removedCount: number }> {
+    // Get all calendar assignments for this client
+    const allAssignments = await db.select()
+      .from(calendarAssignments)
+      .where(and(
+        eq(calendarAssignments.userId, userId),
+        eq(calendarAssignments.clientId, clientId)
+      ));
+    
+    if (allAssignments.length === 0) {
+      return { removedCount: 0 };
+    }
+    
+    // Get all completed maintenance records for this client
+    const completedRecords = await db.select()
+      .from(maintenanceRecords)
+      .where(and(
+        eq(maintenanceRecords.userId, userId),
+        eq(maintenanceRecords.clientId, clientId),
+        sql`${maintenanceRecords.completedAt} IS NOT NULL`
+      ));
+    
+    // Create a Set of completed dates for fast lookup (using month-year key)
+    const completedMonthYears = new Set<string>();
+    for (const record of completedRecords) {
+      const dueDate = new Date(record.dueDate);
+      const key = `${dueDate.getFullYear()}-${dueDate.getMonth() + 1}`;
+      completedMonthYears.add(key);
+    }
+    
+    // Find assignments to remove: not completed AND in invalid month
+    const assignmentsToRemove: string[] = [];
+    for (const assignment of allAssignments) {
+      const assignmentKey = `${assignment.year}-${assignment.month}`;
+      const isCompleted = completedMonthYears.has(assignmentKey);
+      const isValidMonth = validMonths.includes(assignment.month - 1); // validMonths is 0-indexed
+      
+      // Remove if NOT completed AND NOT in a valid month
+      if (!isCompleted && !isValidMonth) {
+        assignmentsToRemove.push(assignment.id);
+      }
+    }
+    
+    // Delete the invalid assignments
+    if (assignmentsToRemove.length > 0) {
+      await db.delete(calendarAssignments)
+        .where(
+          and(
+            eq(calendarAssignments.userId, userId),
+            sql`${calendarAssignments.id} IN (${sql.join(assignmentsToRemove.map(id => sql`${id}`), sql`, `)})`
+          )
+        );
+    }
+    
+    return { removedCount: assignmentsToRemove.length };
+  }
+
   async createFeedback(userId: string, userEmail: string, feedbackData: InsertFeedback): Promise<Feedback> {
     const result = await db.insert(feedback).values({
       userId,
