@@ -240,9 +240,18 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
     mutationFn: async (data: typeof formData) => {
       return await apiRequest('PUT', `/api/clients/${client.id}`, data);
     },
-    onSuccess: () => {
+    onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/clients', client.id] });
+      
+      // If calendar assignments were cleaned up, invalidate calendar queries and show notification
+      if (response._cleanupInfo && response._cleanupInfo.removedCount > 0) {
+        queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+        toast({
+          title: "Calendar updated",
+          description: `Removed ${response._cleanupInfo.removedCount} invalid calendar ${response._cleanupInfo.removedCount === 1 ? 'assignment' : 'assignments'} based on new PM months. Completed jobs were preserved.`
+        });
+      }
     }
   });
 
