@@ -820,7 +820,7 @@ export default function Calendar() {
                 variant="outline"
                 size="sm"
                 onClick={() => setRouteOptimizationOpen(true)}
-                disabled={assignments.length === 0}
+                disabled={assignments.filter((a: any) => !a.completed).length === 0}
                 data-testid="button-optimize-route"
               >
                 <Route className="h-4 w-4 mr-2" />
@@ -987,10 +987,15 @@ export default function Calendar() {
       <RouteOptimizationDialog
         open={routeOptimizationOpen}
         onOpenChange={setRouteOptimizationOpen}
-        clients={assignments.map((a: any) => clients.find((c: any) => c.id === a.clientId)).filter((c: any): c is NonNullable<typeof c> => c !== null)}
+        clients={assignments
+          .filter((a: any) => !a.completed)
+          .map((a: any) => clients.find((c: any) => c.id === a.clientId))
+          .filter((c: any): c is NonNullable<typeof c> => c !== null)}
         onApplyRoute={(optimizedClients) => {
-          // Get all current assignments sorted by day
-          const sortedAssignments = [...assignments].sort((a: any, b: any) => a.day - b.day);
+          // Get all current assignments sorted by day (only non-completed)
+          const sortedAssignments = [...assignments]
+            .filter((a: any) => !a.completed)
+            .sort((a: any, b: any) => a.day - b.day);
           
           // Verify counts match
           if (optimizedClients.length !== sortedAssignments.length) {
@@ -1039,12 +1044,9 @@ export default function Calendar() {
             const newDay = originalAssignment.day;
             const newScheduledDate = new Date(year, month - 1, newDay).toISOString().split('T')[0];
             
-            return apiRequest(`/api/calendar/assign/${assignmentForOptimizedClient.id}`, {
-              method: "PATCH",
-              body: JSON.stringify({ 
-                day: newDay,
-                scheduledDate: newScheduledDate
-              })
+            return apiRequest("PATCH", `/api/calendar/assign/${assignmentForOptimizedClient.id}`, { 
+              day: newDay,
+              scheduledDate: newScheduledDate
             });
           });
 
