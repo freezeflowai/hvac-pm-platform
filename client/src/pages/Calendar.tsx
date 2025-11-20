@@ -155,7 +155,7 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
             e.stopPropagation();
             onClick();
           }}
-          className="absolute top-0.5 right-0.5 p-0.5 rounded hover:bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-0.5 left-0.5 p-0.5 rounded hover:bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity z-10"
           title="View details"
           data-testid={`button-view-client-${id}`}
         >
