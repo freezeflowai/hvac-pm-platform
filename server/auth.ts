@@ -52,13 +52,14 @@ export function isAuthenticated(req: any, res: any, next: any) {
   res.status(401).json({ error: "Not authenticated" });
 }
 
-// Middleware to check if user is an admin
+// Middleware to check if user is an admin or owner
 export function isAdmin(req: any, res: any, next: any) {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ error: "Not authenticated" });
   }
   
-  if (!req.user?.isAdmin) {
+  const userRole = req.user?.role;
+  if (userRole !== "owner" && userRole !== "admin") {
     return res.status(403).json({ error: "Access denied. Admin privileges required." });
   }
   
@@ -71,9 +72,25 @@ export function requireAdmin(req: any, res: any, next: any) {
     return res.status(401).json({ error: "Not authenticated" });
   }
   
-  if (!req.user?.isAdmin) {
+  const userRole = req.user?.role;
+  if (userRole !== "owner" && userRole !== "admin") {
     return res.status(403).json({ error: "Technicians have read-only access" });
   }
   
+  next();
+}
+
+// Middleware to ensure user can only access their company's data
+export function requireCompanyAccess(req: any, res: any, next: any) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  
+  if (!req.user?.companyId) {
+    return res.status(403).json({ error: "User not associated with a company" });
+  }
+  
+  // Store companyId in request for use in routes
+  req.companyId = req.user.companyId;
   next();
 }

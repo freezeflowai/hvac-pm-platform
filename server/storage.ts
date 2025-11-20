@@ -59,8 +59,11 @@ export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUsersByCompanyId(companyId: string): Promise<User[]>;
+  getTechniciansByCompanyId(companyId: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPassword(id: string, hashedPassword: string): Promise<void>;
+  updateUserRole(companyId: string, id: string, role: string): Promise<void>;
   
   // Admin user management methods
   getAllUsers(): Promise<User[]>;
@@ -77,75 +80,75 @@ export interface IStorage {
   invalidateUserTokens(userId: string): Promise<void>;
   
   // Client methods
-  getClient(userId: string, id: string): Promise<Client | undefined>;
-  getAllClients(userId: string): Promise<Client[]>;
-  createClient(userId: string, client: InsertClient): Promise<Client>;
-  createClientWithParts(userId: string, client: InsertClient, partsList: Array<{ partId: string; quantity: number }>): Promise<Client>;
-  updateClient(userId: string, id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
-  deleteClient(userId: string, id: string): Promise<boolean>;
-  deleteClients(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }>;
+  getClient(companyId: string, id: string): Promise<Client | undefined>;
+  getAllClients(companyId: string): Promise<Client[]>;
+  createClient(companyId: string, userId: string, client: InsertClient): Promise<Client>;
+  createClientWithParts(companyId: string, userId: string, client: InsertClient, partsList: Array<{ partId: string; quantity: number }>): Promise<Client>;
+  updateClient(companyId: string, id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
+  deleteClient(companyId: string, id: string): Promise<boolean>;
+  deleteClients(companyId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }>;
   
   // Part methods
-  getPart(userId: string, id: string): Promise<Part | undefined>;
-  getAllParts(userId: string): Promise<Part[]>;
-  getPartsByType(userId: string, type: string): Promise<Part[]>;
-  findDuplicatePart(userId: string, part: InsertPart): Promise<Part | undefined>;
-  createPart(userId: string, part: InsertPart): Promise<Part>;
-  updatePart(userId: string, id: string, part: Partial<InsertPart>): Promise<Part | undefined>;
-  deletePart(userId: string, id: string): Promise<boolean>;
-  deleteParts(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }>;
-  seedUserParts(userId: string): Promise<void>;
+  getPart(companyId: string, id: string): Promise<Part | undefined>;
+  getAllParts(companyId: string): Promise<Part[]>;
+  getPartsByType(companyId: string, type: string): Promise<Part[]>;
+  findDuplicatePart(companyId: string, part: InsertPart): Promise<Part | undefined>;
+  createPart(companyId: string, userId: string, part: InsertPart): Promise<Part>;
+  updatePart(companyId: string, id: string, part: Partial<InsertPart>): Promise<Part | undefined>;
+  deletePart(companyId: string, id: string): Promise<boolean>;
+  deleteParts(companyId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }>;
+  seedUserParts(companyId: string, userId: string): Promise<void>;
   
   // Client-Part relationship methods
-  getClientParts(userId: string, clientId: string): Promise<(ClientPart & { part: Part })[]>;
-  getAllClientPartsBulk(userId: string): Promise<Record<string, (ClientPart & { part: Part })[]>>;
-  addClientPart(userId: string, clientPart: InsertClientPart): Promise<ClientPart>;
-  updateClientPart(userId: string, id: string, quantity: number): Promise<ClientPart | undefined>;
-  deleteClientPart(userId: string, id: string): Promise<boolean>;
-  deleteAllClientParts(userId: string, clientId: string): Promise<void>;
+  getClientParts(companyId: string, clientId: string): Promise<(ClientPart & { part: Part })[]>;
+  getAllClientPartsBulk(companyId: string): Promise<Record<string, (ClientPart & { part: Part })[]>>;
+  addClientPart(companyId: string, userId: string, clientPart: InsertClientPart): Promise<ClientPart>;
+  updateClientPart(companyId: string, id: string, quantity: number): Promise<ClientPart | undefined>;
+  deleteClientPart(companyId: string, id: string): Promise<boolean>;
+  deleteAllClientParts(companyId: string, clientId: string): Promise<void>;
   
   // Reports
-  getPartsReportByMonth(userId: string, month: number, outstandingOnly?: boolean): Promise<Array<{ part: Part; totalQuantity: number }>>;
+  getPartsReportByMonth(companyId: string, month: number, outstandingOnly?: boolean): Promise<Array<{ part: Part; totalQuantity: number }>>;
   
   // Maintenance record methods
-  getMaintenanceRecord(userId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined>;
-  getLatestCompletedMaintenanceRecord(userId: string, clientId: string): Promise<MaintenanceRecord | undefined>;
-  getAllLatestCompletedMaintenanceRecords(userId: string): Promise<Record<string, MaintenanceRecord>>;
-  getRecentlyCompletedMaintenance(userId: string, month: number, year: number): Promise<MaintenanceRecord[]>;
-  getCompletedUnscheduledMaintenance(userId: string): Promise<MaintenanceRecord[]>;
-  createMaintenanceRecord(userId: string, record: InsertMaintenanceRecord): Promise<MaintenanceRecord>;
-  updateMaintenanceRecord(userId: string, id: string, record: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined>;
-  deleteMaintenanceRecord(userId: string, id: string): Promise<boolean>;
+  getMaintenanceRecord(companyId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined>;
+  getLatestCompletedMaintenanceRecord(companyId: string, clientId: string): Promise<MaintenanceRecord | undefined>;
+  getAllLatestCompletedMaintenanceRecords(companyId: string): Promise<Record<string, MaintenanceRecord>>;
+  getRecentlyCompletedMaintenance(companyId: string, month: number, year: number): Promise<MaintenanceRecord[]>;
+  getCompletedUnscheduledMaintenance(companyId: string): Promise<MaintenanceRecord[]>;
+  createMaintenanceRecord(companyId: string, userId: string, record: InsertMaintenanceRecord): Promise<MaintenanceRecord>;
+  updateMaintenanceRecord(companyId: string, id: string, record: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined>;
+  deleteMaintenanceRecord(companyId: string, id: string): Promise<boolean>;
   
   // Equipment methods
-  getAllEquipment(userId: string): Promise<Equipment[]>;
-  getClientEquipment(userId: string, clientId: string): Promise<Equipment[]>;
-  getEquipment(userId: string, id: string): Promise<Equipment | undefined>;
-  createEquipment(userId: string, equipment: InsertEquipment): Promise<Equipment>;
-  updateEquipment(userId: string, id: string, equipment: Partial<InsertEquipment>): Promise<Equipment | undefined>;
-  deleteEquipment(userId: string, id: string): Promise<boolean>;
-  deleteAllClientEquipment(userId: string, clientId: string): Promise<void>;
+  getAllEquipment(companyId: string): Promise<Equipment[]>;
+  getClientEquipment(companyId: string, clientId: string): Promise<Equipment[]>;
+  getEquipment(companyId: string, id: string): Promise<Equipment | undefined>;
+  createEquipment(companyId: string, userId: string, equipment: InsertEquipment): Promise<Equipment>;
+  updateEquipment(companyId: string, id: string, equipment: Partial<InsertEquipment>): Promise<Equipment | undefined>;
+  deleteEquipment(companyId: string, id: string): Promise<boolean>;
+  deleteAllClientEquipment(companyId: string, clientId: string): Promise<void>;
   
   // Client report
-  getClientReport(userId: string, clientId: string): Promise<{ client: Client; parts: (ClientPart & { part: Part })[]; equipment: Equipment[] } | null>;
+  getClientReport(companyId: string, clientId: string): Promise<{ client: Client; parts: (ClientPart & { part: Part })[]; equipment: Equipment[] } | null>;
   
   // Company settings methods
-  getCompanySettings(userId: string): Promise<CompanySettings | undefined>;
-  upsertCompanySettings(userId: string, settings: InsertCompanySettings): Promise<CompanySettings>;
+  getCompanySettings(companyId: string): Promise<CompanySettings | undefined>;
+  upsertCompanySettings(companyId: string, userId: string, settings: InsertCompanySettings): Promise<CompanySettings>;
   
   // Calendar assignment methods
-  getCalendarAssignments(userId: string, year: number, month: number): Promise<CalendarAssignment[]>;
-  getCalendarAssignment(userId: string, id: string): Promise<CalendarAssignment | undefined>;
-  createCalendarAssignment(userId: string, assignment: InsertCalendarAssignment): Promise<CalendarAssignment>;
-  updateCalendarAssignment(userId: string, id: string, assignment: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined>;
-  deleteCalendarAssignment(userId: string, id: string): Promise<boolean>;
-  getClientCalendarAssignment(userId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined>;
-  getUnscheduledClients(userId: string, year: number, month: number): Promise<Client[]>;
+  getCalendarAssignments(companyId: string, year: number, month: number, assignedTechnicianId?: string): Promise<CalendarAssignment[]>;
+  getCalendarAssignment(companyId: string, id: string): Promise<CalendarAssignment | undefined>;
+  createCalendarAssignment(companyId: string, userId: string, assignment: InsertCalendarAssignment): Promise<CalendarAssignment>;
+  updateCalendarAssignment(companyId: string, id: string, assignment: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined>;
+  deleteCalendarAssignment(companyId: string, id: string): Promise<boolean>;
+  getClientCalendarAssignment(companyId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined>;
+  getUnscheduledClients(companyId: string, year: number, month: number): Promise<Client[]>;
   
   // Feedback methods
-  createFeedback(userId: string, userEmail: string, feedback: InsertFeedback): Promise<Feedback>;
+  createFeedback(companyId: string, userId: string, userEmail: string, feedback: InsertFeedback): Promise<Feedback>;
   getAllFeedback(): Promise<Feedback[]>;
-  getUserFeedback(userId: string): Promise<Feedback[]>;
+  getCompanyFeedback(companyId: string): Promise<Feedback[]>;
   updateFeedbackStatus(id: string, status: string): Promise<Feedback | undefined>;
   archiveFeedback(id: string, archived: boolean): Promise<Feedback | undefined>;
   deleteFeedback(id: string): Promise<boolean>;
@@ -187,6 +190,18 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getUsersByCompanyId(companyId: string): Promise<User[]> {
+    return Array.from(this.users.values()).filter(
+      (user) => user.companyId === companyId,
+    );
+  }
+
+  async getTechniciansByCompanyId(companyId: string): Promise<User[]> {
+    return Array.from(this.users.values()).filter(
+      (user) => user.companyId === companyId && user.role === "technician",
+    );
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
     const user: User = { 
@@ -210,6 +225,13 @@ export class MemStorage implements IStorage {
     const user = this.users.get(id);
     if (user) {
       this.users.set(id, { ...user, password: hashedPassword });
+    }
+  }
+
+  async updateUserRole(companyId: string, id: string, role: string): Promise<void> {
+    const user = this.users.get(id);
+    if (user && user.companyId === companyId) {
+      this.users.set(id, { ...user, role });
     }
   }
 
@@ -284,19 +306,19 @@ export class MemStorage implements IStorage {
   }
 
   // Client methods
-  async getClient(userId: string, id: string): Promise<Client | undefined> {
+  async getClient(companyId: string, id: string): Promise<Client | undefined> {
     const client = this.clients.get(id);
-    if (!client || client.userId !== userId) return undefined;
+    if (!client || client.companyId !== companyId) return undefined;
     return client;
   }
 
-  async getAllClients(userId: string): Promise<Client[]> {
+  async getAllClients(companyId: string): Promise<Client[]> {
     return Array.from(this.clients.values())
-      .filter(client => client.userId === userId)
+      .filter(client => client.companyId === companyId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  async createClient(userId: string, insertClient: InsertClient): Promise<Client> {
+  async createClient(companyId: string, userId: string, insertClient: InsertClient): Promise<Client> {
     const id = randomUUID();
     const inactive = insertClient.inactive ?? false;
     const selectedMonths = insertClient.selectedMonths ?? [];
@@ -313,6 +335,7 @@ export class MemStorage implements IStorage {
       phone: insertClient.phone ?? null,
       roofLadderCode: insertClient.roofLadderCode ?? null,
       notes: insertClient.notes ?? null,
+      companyId,
       userId,
       inactive,
       selectedMonths,
@@ -324,23 +347,23 @@ export class MemStorage implements IStorage {
     return client;
   }
 
-  async createClientWithParts(userId: string, insertClient: InsertClient, partsList: Array<{ partId: string; quantity: number }>): Promise<Client> {
-    // Validate all parts exist and belong to user before creating client
+  async createClientWithParts(companyId: string, userId: string, insertClient: InsertClient, partsList: Array<{ partId: string; quantity: number }>): Promise<Client> {
+    // Validate all parts exist and belong to company before creating client
     for (const partItem of partsList) {
-      const existingPart = await this.getPart(userId, partItem.partId);
+      const existingPart = await this.getPart(companyId, partItem.partId);
       if (!existingPart) {
-        throw new Error(`Part with ID ${partItem.partId} not found or does not belong to user`);
+        throw new Error(`Part with ID ${partItem.partId} not found or does not belong to company`);
       }
     }
     
     // Create the client
-    const client = await this.createClient(userId, insertClient);
+    const client = await this.createClient(companyId, userId, insertClient);
     const createdClientPartIds: string[] = [];
     
     try {
       // Add all parts to the client
       for (const partItem of partsList) {
-        const clientPart = await this.addClientPart(userId, {
+        const clientPart = await this.addClientPart(companyId, userId, {
           clientId: client.id,
           partId: partItem.partId,
           quantity: partItem.quantity
@@ -359,9 +382,9 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async updateClient(userId: string, id: string, clientUpdate: Partial<InsertClient>): Promise<Client | undefined> {
+  async updateClient(companyId: string, id: string, clientUpdate: Partial<InsertClient>): Promise<Client | undefined> {
     const existing = this.clients.get(id);
-    if (!existing || existing.userId !== userId) return undefined;
+    if (!existing || existing.companyId !== companyId) return undefined;
     
     const updated: Client = { 
       ...existing, 
@@ -395,35 +418,35 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  async deleteClient(userId: string, id: string): Promise<boolean> {
+  async deleteClient(companyId: string, id: string): Promise<boolean> {
     const existing = this.clients.get(id);
-    if (!existing || existing.userId !== userId) return false;
+    if (!existing || existing.companyId !== companyId) return false;
     return this.clients.delete(id);
   }
 
-  async deleteClients(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }> {
+  async deleteClients(companyId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }> {
     const deletedIds: string[] = [];
     const notFoundIds: string[] = [];
 
     for (const id of ids) {
       const existing = this.clients.get(id);
-      if (!existing || existing.userId !== userId) {
+      if (!existing || existing.companyId !== companyId) {
         notFoundIds.push(id);
         continue;
       }
 
       // Delete associated client parts
-      await this.deleteAllClientParts(userId, id);
+      await this.deleteAllClientParts(companyId, id);
       
       // Delete associated maintenance records
       const maintenanceToDelete = Array.from(this.maintenanceRecords.entries())
-        .filter(([_, record]) => record.clientId === id && record.userId === userId)
+        .filter(([_, record]) => record.clientId === id && record.companyId === companyId)
         .map(([recordId]) => recordId);
       maintenanceToDelete.forEach(recordId => this.maintenanceRecords.delete(recordId));
       
       // Delete associated equipment
       const equipmentToDelete = Array.from(this.equipment.entries())
-        .filter(([_, eq]) => eq.clientId === id && eq.userId === userId)
+        .filter(([_, eq]) => eq.clientId === id && eq.companyId === companyId)
         .map(([eqId]) => eqId);
       equipmentToDelete.forEach(eqId => this.equipment.delete(eqId));
 
@@ -437,26 +460,26 @@ export class MemStorage implements IStorage {
   }
 
   // Part methods
-  async getPart(userId: string, id: string): Promise<Part | undefined> {
+  async getPart(companyId: string, id: string): Promise<Part | undefined> {
     const part = this.parts.get(id);
-    if (!part || part.userId !== userId) return undefined;
+    if (!part || part.companyId !== companyId) return undefined;
     return part;
   }
 
-  async getAllParts(userId: string): Promise<Part[]> {
+  async getAllParts(companyId: string): Promise<Part[]> {
     return Array.from(this.parts.values())
-      .filter(part => part.userId === userId)
+      .filter(part => part.companyId === companyId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  async getPartsByType(userId: string, type: string): Promise<Part[]> {
+  async getPartsByType(companyId: string, type: string): Promise<Part[]> {
     return Array.from(this.parts.values())
-      .filter(part => part.userId === userId && part.type === type);
+      .filter(part => part.companyId === companyId && part.type === type);
   }
 
-  async findDuplicatePart(userId: string, insertPart: InsertPart): Promise<Part | undefined> {
+  async findDuplicatePart(companyId: string, insertPart: InsertPart): Promise<Part | undefined> {
     return Array.from(this.parts.values()).find(part => {
-      if (part.userId !== userId) return false;
+      if (part.companyId !== companyId) return false;
       if (part.type !== insertPart.type) return false;
       
       if (insertPart.type === 'filter') {
@@ -471,10 +494,11 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async createPart(userId: string, insertPart: InsertPart): Promise<Part> {
+  async createPart(companyId: string, userId: string, insertPart: InsertPart): Promise<Part> {
     const id = randomUUID();
     const part: Part = { 
       id,
+      companyId,
       userId,
       type: insertPart.type,
       filterType: insertPart.filterType ?? null,
@@ -488,22 +512,22 @@ export class MemStorage implements IStorage {
     return part;
   }
 
-  async updatePart(userId: string, id: string, partUpdate: Partial<InsertPart>): Promise<Part | undefined> {
+  async updatePart(companyId: string, id: string, partUpdate: Partial<InsertPart>): Promise<Part | undefined> {
     const existing = this.parts.get(id);
-    if (!existing || existing.userId !== userId) return undefined;
+    if (!existing || existing.companyId !== companyId) return undefined;
     
     const updated: Part = { ...existing, ...partUpdate };
     this.parts.set(id, updated);
     return updated;
   }
 
-  async deletePart(userId: string, id: string): Promise<boolean> {
+  async deletePart(companyId: string, id: string): Promise<boolean> {
     const existing = this.parts.get(id);
-    if (!existing || existing.userId !== userId) return false;
+    if (!existing || existing.companyId !== companyId) return false;
     
     // Delete all client-part associations for this part
     const toDelete = Array.from(this.clientParts.entries())
-      .filter(([_, cp]) => cp.partId === id && cp.userId === userId)
+      .filter(([_, cp]) => cp.partId === id && cp.companyId === companyId)
       .map(([cpId]) => cpId);
     
     toDelete.forEach(cpId => this.clientParts.delete(cpId));
@@ -512,20 +536,20 @@ export class MemStorage implements IStorage {
     return this.parts.delete(id);
   }
 
-  async deleteParts(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }> {
+  async deleteParts(companyId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }> {
     const deletedIds: string[] = [];
     const notFoundIds: string[] = [];
 
     for (const id of ids) {
       const existing = this.parts.get(id);
-      if (!existing || existing.userId !== userId) {
+      if (!existing || existing.companyId !== companyId) {
         notFoundIds.push(id);
         continue;
       }
 
       // Delete all client-part associations for this part
       const toDelete = Array.from(this.clientParts.entries())
-        .filter(([_, cp]) => cp.partId === id && cp.userId === userId)
+        .filter(([_, cp]) => cp.partId === id && cp.companyId === companyId)
         .map(([cpId]) => cpId);
       
       toDelete.forEach(cpId => this.clientParts.delete(cpId));
@@ -539,14 +563,14 @@ export class MemStorage implements IStorage {
     return { deletedIds, notFoundIds };
   }
 
-  async seedUserParts(userId: string): Promise<void> {
+  async seedUserParts(companyId: string, userId: string): Promise<void> {
     const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
     
     for (const partData of allSeedParts) {
-      const existingPart = await this.findDuplicatePart(userId, partData);
+      const existingPart = await this.findDuplicatePart(companyId, partData);
       
       if (!existingPart) {
-        await this.createPart(userId, partData);
+        await this.createPart(companyId, userId, partData);
       }
     }
   }
@@ -586,43 +610,43 @@ export class MemStorage implements IStorage {
     return bulkMap;
   }
 
-  async addClientPart(userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
-    // Verify that the client belongs to the userId
+  async addClientPart(companyId: string, userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
+    // Verify that the client belongs to the company
     const client = this.clients.get(insertClientPart.clientId);
-    if (!client || client.userId !== userId) {
-      throw new Error("Client not found or does not belong to user");
+    if (!client || client.companyId !== companyId) {
+      throw new Error("Client not found or does not belong to company");
     }
     
-    // Verify that the part belongs to the userId
+    // Verify that the part belongs to the company
     const part = this.parts.get(insertClientPart.partId);
-    if (!part || part.userId !== userId) {
-      throw new Error("Part not found or does not belong to user");
+    if (!part || part.companyId !== companyId) {
+      throw new Error("Part not found or does not belong to company");
     }
     
     const id = randomUUID();
-    const clientPart: ClientPart = { ...insertClientPart, userId, id };
+    const clientPart: ClientPart = { ...insertClientPart, companyId, userId, id };
     this.clientParts.set(id, clientPart);
     return clientPart;
   }
 
-  async updateClientPart(userId: string, id: string, quantity: number): Promise<ClientPart | undefined> {
+  async updateClientPart(companyId: string, id: string, quantity: number): Promise<ClientPart | undefined> {
     const existing = this.clientParts.get(id);
-    if (!existing || existing.userId !== userId) return undefined;
+    if (!existing || existing.companyId !== companyId) return undefined;
     
     const updated: ClientPart = { ...existing, quantity };
     this.clientParts.set(id, updated);
     return updated;
   }
 
-  async deleteClientPart(userId: string, id: string): Promise<boolean> {
+  async deleteClientPart(companyId: string, id: string): Promise<boolean> {
     const existing = this.clientParts.get(id);
-    if (!existing || existing.userId !== userId) return false;
+    if (!existing || existing.companyId !== companyId) return false;
     return this.clientParts.delete(id);
   }
 
-  async deleteAllClientParts(userId: string, clientId: string): Promise<void> {
+  async deleteAllClientParts(companyId: string, clientId: string): Promise<void> {
     const toDelete = Array.from(this.clientParts.entries())
-      .filter(([_, cp]) => cp.userId === userId && cp.clientId === clientId)
+      .filter(([_, cp]) => cp.companyId === companyId && cp.clientId === clientId)
       .map(([id]) => id);
     
     toDelete.forEach(id => this.clientParts.delete(id));
