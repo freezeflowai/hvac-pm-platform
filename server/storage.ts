@@ -152,6 +152,9 @@ export interface IStorage {
   updateFeedbackStatus(id: string, status: string): Promise<Feedback | undefined>;
   archiveFeedback(id: string, archived: boolean): Promise<Feedback | undefined>;
   deleteFeedback(id: string): Promise<boolean>;
+
+  // Invitation token methods
+  createInvitationToken(token: any): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
@@ -165,6 +168,7 @@ export class MemStorage implements IStorage {
   private equipment: Map<string, Equipment>;
   private calendarAssignments: Map<string, CalendarAssignment>;
   private feedback: Map<string, Feedback>;
+  private invitationTokens: Map<string, any>;
 
   constructor() {
     this.users = new Map();
@@ -177,6 +181,7 @@ export class MemStorage implements IStorage {
     this.companySettings = new Map();
     this.equipment = new Map();
     this.calendarAssignments = new Map();
+    this.invitationTokens = new Map();
   }
 
   // User methods
@@ -1965,6 +1970,12 @@ export class DbStorage implements IStorage {
       .where(eq(feedback.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  async createInvitationToken(tokenData: any): Promise<any> {
+    const id = randomUUID();
+    const token = { ...tokenData, id };
+    return db.insert(invitationTokens as any).values(token).returning().then((results: any) => results[0]);
   }
 }
 
