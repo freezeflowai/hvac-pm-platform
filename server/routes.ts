@@ -74,7 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (err) {
             return res.status(500).json({ error: "Failed to login after signup" });
           }
-          res.json({ id: user.id, email: user.email, isAdmin: user.isAdmin });
+          res.json({ id: user.id, email: user.email, role: user.role, companyId: user.companyId });
         });
       });
     } catch (error) {
@@ -98,7 +98,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (err) {
             return res.status(500).json({ error: "Failed to login" });
           }
-          res.json({ id: user.id, email: user.email, isAdmin: user.isAdmin });
+          res.json({ id: user.id, email: user.email, role: user.role, companyId: user.companyId });
         });
       });
     })(req, res, next);
@@ -121,7 +121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/user", (req, res) => {
     if (req.isAuthenticated() && req.user) {
-      res.json({ id: req.user.id, email: req.user.email, isAdmin: req.user.isAdmin });
+      res.json({ id: req.user.id, email: req.user.email, role: req.user.role, companyId: req.user.companyId });
     } else {
       res.status(401).json({ error: "Not authenticated" });
     }
@@ -132,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const allUsers = await storage.getAllUsers();
       const userCount = allUsers.length;
-      const adminUsers = allUsers.filter(u => u.isAdmin);
+      const adminUsers = allUsers.filter(u => u.role === "owner" || u.role === "admin");
       const isProduction = process.env.NODE_ENV === "production" || !!process.env.REPLIT_DEPLOYMENT;
       
       res.json({
