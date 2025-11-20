@@ -12,10 +12,14 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      setLocation("/login");
+    if (!isLoading) {
+      if (!user) {
+        setLocation("/login");
+      } else if (requireAdmin && user.role !== "owner" && user.role !== "admin") {
+        setLocation("/");
+      }
     }
-  }, [user, isLoading, setLocation]);
+  }, [user, isLoading, setLocation, requireAdmin]);
 
   if (isLoading) {
     return (
@@ -27,6 +31,14 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
 
   if (!user) {
     return null;
+  }
+
+  if (requireAdmin && user.role !== "owner" && user.role !== "admin") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg text-destructive">Access denied. Admin privileges required.</div>
+      </div>
+    );
   }
 
   return <>{children}</>;

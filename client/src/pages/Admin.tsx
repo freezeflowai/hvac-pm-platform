@@ -38,7 +38,8 @@ import {
 interface User {
   id: string;
   email: string;
-  isAdmin: boolean;
+  role: string;
+  companyId: string;
 }
 
 export default function Admin() {
