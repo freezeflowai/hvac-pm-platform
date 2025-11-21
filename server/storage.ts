@@ -1826,6 +1826,8 @@ export class DbStorage implements IStorage {
     const month = today.getMonth() + 1;
     const day = today.getDate();
     
+    console.log(`[Technician Today] Looking for assignments for ${technicianId} on ${year}-${month}-${day}`);
+    
     const assignments = await db.select()
       .from(calendarAssignments)
       .where(and(
@@ -1835,17 +1837,25 @@ export class DbStorage implements IStorage {
         eq(calendarAssignments.completed, false)
       ));
 
+    console.log(`[Technician Today] Found ${assignments.length} total assignments for today`);
+
     const result = [];
     for (const assignment of assignments) {
+      console.log(`[Technician Today] Checking assignment ${assignment.id}: techIds=${JSON.stringify(assignment.assignedTechnicianIds)}`);
       // Check if technician is in the assignedTechnicianIds array
       if (assignment.assignedTechnicianIds && assignment.assignedTechnicianIds.includes(technicianId)) {
+        console.log(`[Technician Today] Technician ${technicianId} IS assigned to ${assignment.id}`);
         const client = await this.getClient(assignment.companyId, assignment.clientId);
         if (client) {
           result.push({ id: assignment.id, client, assignment });
+        } else {
+          console.log(`[Technician Today] Failed to get client for assignment ${assignment.id}`);
         }
+      } else {
+        console.log(`[Technician Today] Technician ${technicianId} NOT in array for ${assignment.id}`);
       }
     }
-    console.log(`getTechnicianTodayAssignments for ${technicianId}: found ${result.length} assignments`);
+    console.log(`[Technician Today] Returning ${result.length} assignments for technician ${technicianId}`);
     return result;
   }
 
