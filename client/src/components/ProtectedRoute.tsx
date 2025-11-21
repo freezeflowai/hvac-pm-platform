@@ -9,18 +9,21 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
-  const [currentLocation, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
-    // Only redirect once auth is loaded
     if (isLoading) return;
     
-    if (!user && currentLocation !== "/login") {
+    if (!user) {
       setLocation("/login");
-    } else if (user && requireAdmin && user.role !== "owner" && user.role !== "admin" && currentLocation !== "/technician") {
-      setLocation("/technician");
+      return;
     }
-  }, [user, isLoading, requireAdmin, currentLocation, setLocation]);
+    
+    if (requireAdmin && user.role !== "owner" && user.role !== "admin") {
+      setLocation("/technician");
+      return;
+    }
+  }, [user, isLoading, requireAdmin, setLocation]);
 
   if (isLoading) {
     return (
