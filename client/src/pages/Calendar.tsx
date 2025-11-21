@@ -124,27 +124,25 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     >
       <div 
         {...listeners}
-        className={inCalendar ? "cursor-grab active:cursor-grabbing flex justify-between items-start" : "flex justify-between items-start"}
+        className={inCalendar ? "cursor-grab active:cursor-grabbing" : ""}
       >
-        <div className="flex-1">
-          <div className={`font-semibold leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
-          {client.location && (
-            <div className={`text-muted-foreground text-[10px] leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
-          )}
-        </div>
-        {inCalendar && onClick && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClick();
-            }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-1 h-4 w-4 flex items-center justify-center hover:bg-primary/20 rounded"
-            data-testid={`button-open-client-${id}`}
-          >
-            <Info className="h-3 w-3" />
-          </button>
+        <div className={`font-semibold leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
+        {client.location && (
+          <div className={`text-muted-foreground text-[10px] leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
         )}
       </div>
+      {inCalendar && onClick && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          className="absolute bottom-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity h-4 w-4 flex items-center justify-center hover:bg-primary/20 rounded"
+          data-testid={`button-open-client-${id}`}
+        >
+          <Info className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 }
