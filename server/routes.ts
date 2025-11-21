@@ -2174,6 +2174,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get parts and equipment for a specific assignment (technician-safe)
+  app.get("/api/technician/assignment/:assignmentId/details", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const companyId = req.user!.companyId;
+      const assignmentId = req.params.assignmentId;
+      
+      // Get the assignment and verify technician is assigned to it
+      const [assignment] = await db.select().from(calendarAssignments).where(
+        eq(calendarAssignments.id, assignmentId)
+      );
+      
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      
+      // Verify the technician is assigned to this PM
+      let techIds = assignment.assignedTechnicianIds;
+      if (typeof techIds === 'string') {
+        try {
+          techIds = JSON.parse(techIds);
+        } catch (e) {
+          techIds = [];
+        }
+      }
+      if (!Array.isArray(techIds)) {
+        techIds = techIds ? [techIds] : [];
+      }
+      
+      if (!techIds.includes(userId)) {
+        return res.status(403).json({ error: "Not authorized to view this assignment" });
+      }
+      
+      // Fetch parts and equipment for the client
+      const [parts, equipment] = await Promise.all([
+        storage.getClientParts(companyId, assignment.clientId),
+        storage.getClientEquipment(userId, assignment.clientId)
+      ]);
+      
+      res.json({ parts, equipment });
+    } catch (error) {
+      console.error("Error fetching assignment details:", error);
+      res.status(500).json({ error: "Failed to fetch assignment details" });
+    }
+  });
+
   // Endpoint to mark calendar assignment as complete with notes
   app.patch("/api/calendar/:id", isAuthenticated, async (req, res) => {
     try {

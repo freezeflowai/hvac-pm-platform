@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Phone, Mail, MapPin, Package, CheckCircle2, Circle, AlertCircle } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -13,62 +13,21 @@ export default function Technician() {
   const [selectedPM, setSelectedPM] = useState<any>(null);
   const [completionNotes, setCompletionNotes] = useState("");
   const [isSubmittingNotes, setIsSubmittingNotes] = useState(false);
-  const [allParts, setAllParts] = useState<Record<string, any>>({});
-  const [allEquipment, setAllEquipment] = useState<Record<string, any[]>>({});
 
   // Get today's assigned PMs
-  const { data: todaysPMs = [], isLoading, refetch } = useQuery<any[]>({
+  const { data: todaysPMs = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/technician/today'],
     enabled: !!user?.id,
     staleTime: 0,
     gcTime: 0,
   });
 
-  // Fetch parts and equipment for all PMs on mount/update
-  useEffect(() => {
-    const fetchAllData = async () => {
-      const partsMap: Record<string, any> = {};
-      const equipmentMap: Record<string, any[]> = {};
-
-      for (const pm of todaysPMs) {
-        try {
-          const partsRes = await fetch(`/api/client-parts/${pm.client.id}`);
-          if (partsRes.ok) {
-            const data = await partsRes.json();
-            partsMap[pm.client.id] = data;
-          }
-        } catch (error) {
-          console.error("Error fetching parts:", error);
-        }
-
-        try {
-          const equipRes = await fetch(`/api/equipment/${pm.client.id}`);
-          if (equipRes.ok) {
-            const data = await equipRes.json();
-            equipmentMap[pm.client.id] = Array.isArray(data) ? data : [];
-          } else {
-            equipmentMap[pm.client.id] = [];
-          }
-        } catch (error) {
-          console.error("Error fetching equipment:", error);
-          equipmentMap[pm.client.id] = [];
-        }
-      }
-
-      setAllParts(partsMap);
-      setAllEquipment(equipmentMap);
-    };
-
-    if (todaysPMs.length > 0) {
-      fetchAllData();
-    }
-  }, [todaysPMs]);
-
-  useEffect(() => {
-    if (user?.id) {
-      refetch();
-    }
-  }, [user?.id, refetch]);
+  // Fetch assignment details (parts and equipment) for selected PM
+  const { data: assignmentDetails } = useQuery<{ parts: any; equipment: any[] }>({
+    queryKey: ['/api/technician/assignment', selectedPM?.id, 'details'],
+    enabled: !!selectedPM?.id,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
 
   const handleMarkComplete = async () => {
     if (!selectedPM) return;
@@ -83,7 +42,6 @@ export default function Technician() {
       queryClient.invalidateQueries({ queryKey: ['/api/technician/today'] });
       setSelectedPM(null);
       setCompletionNotes("");
-      await refetch();
     } catch (error) {
       console.error("Failed to mark complete:", error);
       alert("Failed to mark complete. Please try again.");
@@ -102,7 +60,6 @@ export default function Technician() {
       queryClient.invalidateQueries({ queryKey: ['/api/technician/today'] });
       setSelectedPM(null);
       setCompletionNotes("");
-      await refetch();
     } catch (error) {
       console.error("Failed to uncomplete:", error);
       alert("Failed to uncomplete. Please try again.");
@@ -126,7 +83,6 @@ export default function Technician() {
       queryClient.invalidateQueries({ queryKey: ['/api/technician/today'] });
       setSelectedPM(null);
       setCompletionNotes("");
-      await refetch();
     } catch (error) {
       console.error("Failed to save notes:", error);
       alert("Failed to save notes. Please try again.");
@@ -146,7 +102,7 @@ export default function Technician() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <main className="mx-auto max-w-4xl px-4 py-6">
+        <main className="w-full px-3 sm:px-4 py-4 sm:py-6">
           <div className="text-center py-8">Loading your schedule...</div>
         </main>
       </div>
@@ -155,85 +111,64 @@ export default function Technician() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="mx-auto max-w-4xl px-4 py-6">
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-3xl font-bold">Your Schedule</h1>
-            <p className="text-sm text-muted-foreground">{displayName}</p>
+      <main className="w-full px-3 sm:px-4 py-4 sm:py-6">
+        <div className="mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+            <h1 className="text-2xl sm:text-3xl font-bold">Your Schedule</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">{displayName}</p>
           </div>
-          <p className="text-muted-foreground">{dateStr}</p>
+          <p className="text-sm sm:text-base text-muted-foreground">{dateStr}</p>
         </div>
 
         {/* Pending PMs */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Circle className="h-5 w-5" />
+        <div className="mb-6 sm:mb-8">
+          <h2 className="text-base sm:text-lg font-semibold mb-3 flex items-center gap-2">
+            <Circle className="h-4 w-4 sm:h-5 sm:w-5" />
             Today's Jobs ({pendingPMs.length})
           </h2>
           {pendingPMs.length > 0 ? (
-            <div className="space-y-3">
-              {pendingPMs.map((pm: any) => {
-                const parts = allParts[pm.client.id] || {};
-                const equip = allEquipment[pm.client.id] || [];
-                const partCount = Object.keys(parts).length;
-                const equipCount = equip.length;
-
-                return (
-                  <Card 
-                    key={pm.id} 
-                    className="cursor-pointer hover-elevate"
-                    onClick={() => {
-                      setSelectedPM(pm);
-                      setCompletionNotes("");
-                    }}
-                    data-testid={`card-pm-${pm.id}`}
-                  >
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg">{pm.client.companyName}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{pm.client.location}</p>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {pm.client.address && (
-                        <div className="flex items-start gap-2 text-sm">
-                          <MapPin className="h-4 w-4 mt-0.5" />
-                          <span>{pm.client.address}, {pm.client.city} {pm.client.province}</span>
-                        </div>
-                      )}
-                      {pm.client.phone && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Phone className="h-4 w-4" />
-                          <a href={`tel:${pm.client.phone}`} className="hover:underline">{pm.client.phone}</a>
-                        </div>
-                      )}
-                      {pm.client.email && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Mail className="h-4 w-4" />
-                          <a href={`mailto:${pm.client.email}`} className="hover:underline">{pm.client.email}</a>
-                        </div>
-                      )}
-                      <div className="flex gap-4 text-sm text-muted-foreground pt-1">
-                        {partCount > 0 && (
-                          <div className="flex items-center gap-1">
-                            <Package className="h-4 w-4" />
-                            <span>{partCount} parts</span>
-                          </div>
-                        )}
-                        {equipCount > 0 && (
-                          <div className="flex items-center gap-1">
-                            <AlertCircle className="h-4 w-4" />
-                            <span>{equipCount} equipment</span>
-                          </div>
-                        )}
+            <div className="space-y-2 sm:space-y-3">
+              {pendingPMs.map((pm: any) => (
+                <Card 
+                  key={pm.id} 
+                  className="cursor-pointer hover-elevate active-elevate-2"
+                  onClick={() => {
+                    setSelectedPM(pm);
+                    setCompletionNotes("");
+                  }}
+                  data-testid={`card-pm-${pm.id}`}
+                >
+                  <CardHeader className="pb-2 sm:pb-3">
+                    <CardTitle className="text-base sm:text-lg">{pm.client.companyName}</CardTitle>
+                    <p className="text-xs sm:text-sm text-muted-foreground">{pm.client.location}</p>
+                  </CardHeader>
+                  <CardContent className="space-y-1.5 sm:space-y-2">
+                    {pm.client.address && (
+                      <div className="flex items-start gap-2 text-xs sm:text-sm">
+                        <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 mt-0.5 flex-shrink-0" />
+                        <span className="break-words">{pm.client.address}, {pm.client.city} {pm.client.province}</span>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                    )}
+                    {pm.client.phone && (
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <a href={`tel:${pm.client.phone}`} className="hover:underline">{pm.client.phone}</a>
+                      </div>
+                    )}
+                    {pm.client.email && (
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <a href={`mailto:${pm.client.email}`} className="hover:underline truncate">{pm.client.email}</a>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           ) : (
             <Card>
               <CardContent className="py-6 text-center">
-                <p className="text-muted-foreground">No jobs scheduled for today</p>
+                <p className="text-sm text-muted-foreground">No jobs scheduled for today</p>
               </CardContent>
             </Card>
           )}
@@ -241,48 +176,56 @@ export default function Technician() {
 
         {/* Completed PMs */}
         {completedPMs.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
+          <div className="mb-6 sm:mb-8">
+            <h2 className="text-base sm:text-lg font-semibold mb-3 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
               Completed ({completedPMs.length})
             </h2>
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {completedPMs.map((pm: any) => (
                 <Card 
                   key={pm.id} 
                   className="opacity-75"
                   data-testid={`card-completed-${pm.id}`}
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{pm.client.companyName}</CardTitle>
-                        <p className="text-sm text-muted-foreground">{pm.client.location}</p>
+                  <CardHeader className="pb-2 sm:pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base sm:text-lg truncate">{pm.client.companyName}</CardTitle>
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">{pm.client.location}</p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
                         <Button 
                           size="sm" 
                           variant="ghost"
-                          onClick={() => handleEditNotes(pm)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditNotes(pm);
+                          }}
                           data-testid={`button-edit-notes-${pm.id}`}
+                          className="text-xs sm:text-sm"
                         >
                           Notes
                         </Button>
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => handleUncomplete(pm)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUncomplete(pm);
+                          }}
                           data-testid={`button-uncomplete-${pm.id}`}
+                          className="text-xs sm:text-sm"
                         >
-                          Uncomplete
+                          Reopen
                         </Button>
                       </div>
                     </div>
                   </CardHeader>
                   {pm.assignment.completionNotes && (
                     <CardContent className="pt-0">
-                      <div className="text-sm bg-muted/50 p-2 rounded">
-                        <p className="text-muted-foreground">Notes: {pm.assignment.completionNotes}</p>
+                      <div className="text-xs sm:text-sm bg-muted/50 p-2 rounded">
+                        <p className="text-muted-foreground break-words">Notes: {pm.assignment.completionNotes}</p>
                       </div>
                     </CardContent>
                   )}
@@ -294,17 +237,17 @@ export default function Technician() {
 
         {/* Dialog for job details and completion */}
         <Dialog open={!!selectedPM && !selectedPM.assignment.completed} onOpenChange={() => setSelectedPM(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{selectedPM?.client?.companyName}</DialogTitle>
+              <DialogTitle className="text-base sm:text-lg">{selectedPM?.client?.companyName}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
+            <div className="space-y-4 sm:space-y-6">
+              <div className="space-y-2 sm:space-y-3">
+                <h3 className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                  <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   Location Details
                 </h3>
-                <div className="text-sm space-y-1 text-muted-foreground">
+                <div className="text-xs sm:text-sm space-y-1 text-muted-foreground">
                   <p>{selectedPM?.client?.location}</p>
                   <p>{selectedPM?.client?.address}</p>
                   <p>{selectedPM?.client?.city}, {selectedPM?.client?.province} {selectedPM?.client?.postalCode}</p>
@@ -312,19 +255,19 @@ export default function Technician() {
                 </div>
               </div>
 
-              {selectedPM && allParts[selectedPM.client.id] && Object.keys(allParts[selectedPM.client.id]).length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Package className="h-4 w-4" />
+              {assignmentDetails?.parts && Object.keys(assignmentDetails.parts).length > 0 && (
+                <div className="space-y-2 sm:space-y-3">
+                  <h3 className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                    <Package className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     Parts for this location
                   </h3>
-                  <div className="space-y-2">
-                    {Object.entries(allParts[selectedPM.client.id] || {}).map(([partId, data]: [string, any]) => {
+                  <div className="space-y-1.5 sm:space-y-2">
+                    {Object.entries(assignmentDetails.parts).map(([partId, data]: [string, any]) => {
                       if (!data || !data.part) return null;
                       return (
-                        <div key={partId} className="flex justify-between text-sm p-2 bg-muted/50 rounded">
-                          <span>{data.part.name || `${data.part.type} - ${data.part.size}`}</span>
-                          <span className="font-semibold">Qty: {data.quantity}</span>
+                        <div key={partId} className="flex justify-between text-xs sm:text-sm p-2 bg-muted/50 rounded">
+                          <span className="break-words flex-1 mr-2">{data.part.name || `${data.part.type} - ${data.part.size}`}</span>
+                          <span className="font-semibold flex-shrink-0">Qty: {data.quantity}</span>
                         </div>
                       );
                     })}
@@ -332,16 +275,16 @@ export default function Technician() {
                 </div>
               )}
 
-              {selectedPM && allEquipment[selectedPM.client.id] && allEquipment[selectedPM.client.id].length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
+              {assignmentDetails?.equipment && assignmentDetails.equipment.length > 0 && (
+                <div className="space-y-2 sm:space-y-3">
+                  <h3 className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                    <AlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     Equipment
                   </h3>
-                  <div className="space-y-2">
-                    {allEquipment[selectedPM.client.id].map((item: any) => (
-                      <div key={item.id} className="text-sm p-2 bg-muted/50 rounded">
-                        <p className="font-medium">{item.name}</p>
+                  <div className="space-y-1.5 sm:space-y-2">
+                    {assignmentDetails.equipment.map((item: any) => (
+                      <div key={item.id} className="text-xs sm:text-sm p-2 bg-muted/50 rounded">
+                        <p className="font-medium break-words">{item.name}</p>
                         {item.type && <p className="text-muted-foreground">Type: {item.type}</p>}
                         {item.modelNumber && <p className="text-muted-foreground">Model: {item.modelNumber}</p>}
                       </div>
@@ -350,13 +293,13 @@ export default function Technician() {
                 </div>
               )}
 
-              <div className="space-y-3">
-                <label className="font-semibold text-sm">Notes for this job (optional)</label>
+              <div className="space-y-2 sm:space-y-3">
+                <label className="text-xs sm:text-sm font-semibold">Notes for this job (optional)</label>
                 <Textarea
                   placeholder="Add any notes about this PM..."
                   value={completionNotes}
                   onChange={(e) => setCompletionNotes(e.target.value)}
-                  className="resize-none"
+                  className="resize-none text-xs sm:text-sm min-h-[80px]"
                   data-testid="input-completion-notes"
                 />
               </div>
@@ -364,7 +307,7 @@ export default function Technician() {
               <Button 
                 onClick={handleMarkComplete} 
                 disabled={isSubmittingNotes}
-                className="w-full"
+                className="w-full text-sm sm:text-base"
                 data-testid="button-mark-complete"
               >
                 {isSubmittingNotes ? "Saving..." : "Mark Complete"}
@@ -375,27 +318,27 @@ export default function Technician() {
 
         {/* Dialog for editing notes on completed jobs */}
         <Dialog open={!!selectedPM && selectedPM.assignment?.completed} onOpenChange={() => setSelectedPM(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-full sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Edit Notes - {selectedPM?.client?.companyName}</DialogTitle>
+              <DialogTitle className="text-base sm:text-lg">Edit Notes - {selectedPM?.client?.companyName}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="space-y-3">
-                <label className="font-semibold text-sm">Completion Notes</label>
+              <div className="space-y-2 sm:space-y-3">
+                <label className="text-xs sm:text-sm font-semibold">Completion Notes</label>
                 <Textarea
                   placeholder="Edit notes for this completed PM..."
                   value={completionNotes}
                   onChange={(e) => setCompletionNotes(e.target.value)}
-                  className="resize-none"
+                  className="resize-none text-xs sm:text-sm min-h-[80px]"
                   data-testid="input-edit-completion-notes"
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Button 
                   onClick={handleSaveNotes} 
                   disabled={isSubmittingNotes}
-                  className="flex-1"
+                  className="flex-1 text-sm sm:text-base"
                   data-testid="button-save-notes"
                 >
                   {isSubmittingNotes ? "Saving..." : "Save Notes"}
@@ -403,7 +346,7 @@ export default function Technician() {
                 <Button 
                   onClick={() => setSelectedPM(null)} 
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 text-sm sm:text-base"
                   data-testid="button-cancel-notes"
                 >
                   Cancel
