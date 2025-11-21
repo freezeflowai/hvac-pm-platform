@@ -157,40 +157,36 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
           <div className={`text-muted-foreground text-[10px] leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
         )}
       </div>
-      {inCalendar && (
+      {inCalendar && onClick && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          className="absolute top-0.5 left-0.5 p-0.5 rounded hover:bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          title="View details"
+          data-testid={`button-view-client-${id}`}
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+      )}
+      {inCalendar && assignment && onAssignTechnician && (
         <>
-          <div className="absolute top-0.5 left-0.5 right-0.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-            {onClick && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClick();
-                }}
-                className="p-0.5 rounded hover:bg-background/80 flex-1"
-                title="View details"
-                data-testid={`button-view-client-${id}`}
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
-            )}
-            {assignment && onAssignTechnician && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowTechnicianSelect(!showTechnicianSelect);
-                }}
-                className="p-0.5 rounded hover:bg-background/80"
-                title="Assign technician"
-                data-testid={`button-assign-tech-${id}`}
-              >
-                <Users className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-          {inCalendar && assignment && onAssignTechnician && showTechnicianSelect && (
-            <div className="absolute top-6 left-0 z-50 bg-card border rounded p-1 shadow-lg w-40" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowTechnicianSelect(!showTechnicianSelect);
+            }}
+            className="absolute bottom-0.5 left-0.5 p-0.5 rounded hover:bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            title="Assign technician"
+            data-testid={`button-assign-tech-${id}`}
+          >
+            <Users className="w-3 h-3" />
+          </button>
+          {showTechnicianSelect && (
+            <div className="absolute bottom-4 left-0 z-50 bg-card border rounded p-1 shadow-lg w-40" onClick={(e) => e.stopPropagation()}>
               <Select value={assignment.assignedTechnicianId || ''} onValueChange={(value) => {
                 onAssignTechnician(assignment.id, value || null);
                 setShowTechnicianSelect(false);
