@@ -1408,11 +1408,11 @@ export class DbStorage implements IStorage {
   }
 
   // Client-Part relationship methods
-  async getClientParts(userId: string, clientId: string): Promise<(ClientPart & { part: Part })[]> {
+  async getClientParts(companyId: string, clientId: string): Promise<(ClientPart & { part: Part })[]> {
     const result = await db.select()
       .from(clientParts)
       .leftJoin(parts, eq(clientParts.partId, parts.id))
-      .where(and(eq(clientParts.clientId, clientId), eq(clientParts.userId, userId)));
+      .where(and(eq(clientParts.clientId, clientId), eq(clientParts.companyId, companyId)));
     
     return result
       .filter(row => row.parts !== null)
@@ -1422,11 +1422,11 @@ export class DbStorage implements IStorage {
       }));
   }
 
-  async getAllClientPartsBulk(userId: string): Promise<Record<string, (ClientPart & { part: Part })[]>> {
+  async getAllClientPartsBulk(companyId: string): Promise<Record<string, (ClientPart & { part: Part })[]>> {
     const result = await db.select()
       .from(clientParts)
       .leftJoin(parts, eq(clientParts.partId, parts.id))
-      .where(eq(clientParts.userId, userId));
+      .where(eq(clientParts.companyId, companyId));
     
     const bulkMap: Record<string, (ClientPart & { part: Part })[]> = {};
     
@@ -1447,35 +1447,35 @@ export class DbStorage implements IStorage {
     return bulkMap;
   }
 
-  async addClientPart(userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
-    // Verify that the client belongs to the userId
-    const client = await this.getClient(userId, insertClientPart.clientId);
+  async addClientPart(companyId: string, userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
+    // Verify that the client belongs to the companyId
+    const client = await this.getClient(companyId, insertClientPart.clientId);
     if (!client) {
-      throw new Error("Client not found or does not belong to user");
+      throw new Error("Client not found or does not belong to company");
     }
     
-    // Verify that the part belongs to the userId
-    const part = await this.getPart(userId, insertClientPart.partId);
+    // Verify that the part belongs to the companyId
+    const part = await this.getPart(companyId, insertClientPart.partId);
     if (!part) {
-      throw new Error("Part not found or does not belong to user");
+      throw new Error("Part not found or does not belong to company");
     }
     
-    const result = await db.insert(clientParts).values({ ...insertClientPart, userId }).returning();
+    const result = await db.insert(clientParts).values({ ...insertClientPart, companyId, userId }).returning();
     return result[0];
   }
 
-  async updateClientPart(userId: string, id: string, quantity: number): Promise<ClientPart | undefined> {
-    const result = await db.update(clientParts).set({ quantity }).where(and(eq(clientParts.id, id), eq(clientParts.userId, userId))).returning();
+  async updateClientPart(companyId: string, id: string, quantity: number): Promise<ClientPart | undefined> {
+    const result = await db.update(clientParts).set({ quantity }).where(and(eq(clientParts.id, id), eq(clientParts.companyId, companyId))).returning();
     return result[0];
   }
 
-  async deleteClientPart(userId: string, id: string): Promise<boolean> {
-    const result = await db.delete(clientParts).where(and(eq(clientParts.id, id), eq(clientParts.userId, userId))).returning();
+  async deleteClientPart(companyId: string, id: string): Promise<boolean> {
+    const result = await db.delete(clientParts).where(and(eq(clientParts.id, id), eq(clientParts.companyId, companyId))).returning();
     return result.length > 0;
   }
 
-  async deleteAllClientParts(userId: string, clientId: string): Promise<void> {
-    await db.delete(clientParts).where(and(eq(clientParts.clientId, clientId), eq(clientParts.userId, userId)));
+  async deleteAllClientParts(companyId: string, clientId: string): Promise<void> {
+    await db.delete(clientParts).where(and(eq(clientParts.clientId, clientId), eq(clientParts.companyId, companyId)));
   }
 
   async getPartsReportByMonth(userId: string, month: number, outstandingOnly = false): Promise<Array<{ part: Part; totalQuantity: number }>> {
