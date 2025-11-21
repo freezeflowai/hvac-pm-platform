@@ -842,11 +842,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parts = req.body.parts as Array<{ partId: string; quantity: number }>;
       
       // Delete existing parts for this client
-      await storage.deleteAllClientParts(req.user!.id, req.params.id);
+      await storage.deleteAllClientParts(req.user!.companyId, req.params.id);
       
       // Add new parts
       const createdParts = await Promise.all(
-        parts.map(p => storage.addClientPart(req.user!.id, {
+        parts.map(p => storage.addClientPart(req.user!.companyId, req.user!.id, {
           clientId: req.params.id,
           partId: p.partId,
           quantity: p.quantity
@@ -864,11 +864,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parts = req.body.parts as Array<{ partId: string; quantity: number }>;
       
       // Delete existing parts for this client
-      await storage.deleteAllClientParts(req.user!.id, req.params.id);
+      await storage.deleteAllClientParts(req.user!.companyId, req.params.id);
       
       // Add new parts
       const createdParts = await Promise.all(
-        parts.map(p => storage.addClientPart(req.user!.id, {
+        parts.map(p => storage.addClientPart(req.user!.companyId, req.user!.id, {
           clientId: req.params.id,
           partId: p.partId,
           quantity: p.quantity
