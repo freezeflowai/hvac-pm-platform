@@ -877,6 +877,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(createdParts);
     } catch (error) {
+      console.error("[PUT /api/clients/:id/parts] Error:", error);
       res.status(400).json({ error: "Invalid parts data" });
     }
   });
