@@ -8,6 +8,8 @@ import { routeOptimizationService } from "./routeOptimizationService";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
+import { db } from "./db";
+import { companies } from "@shared/schema";
 import Stripe from "stripe";
 
 // Initialize Stripe (optional - will be undefined if keys not set)
@@ -30,7 +32,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { email, password } = req.body;
+      const { email, password, invitationToken } = req.body;
       insertUserSchema.parse({ email, password });
       
       const existingUser = await storage.getUserByEmail(email);
@@ -38,31 +40,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Email already exists" });
       }
       
-      // Check if this will be the first user
-      const allUsers = await storage.getAllUsers();
-      const isFirstUser = allUsers.length === 0;
+      let companyId: string;
+      let userRole: string;
+      let invitation: any = null;
       
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await storage.createUser({ email, password: hashedPassword });
-      
-      // Assign trial plan to new user
-      if (subscriptionService.isEnabled()) {
-        await subscriptionService.assignPlanToUser(user.id, 'trial', true);
+      // Handle invitation-based signup (technician joining existing company)
+      if (invitationToken) {
+        invitation = await storage.getInvitationByToken(invitationToken);
+        
+        if (!invitation) {
+          return res.status(400).json({ error: "Invalid or expired invitation" });
+        }
+        
+        // Optionally verify email matches invitation
+        if (invitation.email && invitation.email !== email) {
+          return res.status(400).json({ error: "Email does not match invitation" });
+        }
+        
+        companyId = invitation.companyId;
+        userRole = invitation.role || "technician";
       } else {
-        // Legacy: Set trial period directly
-        const trialDays = parseInt(process.env.TRIAL_DAYS || "30", 10);
-        const trialEndsAt = new Date();
-        trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
-        await storage.updateUserTrialDate(user.id, trialEndsAt);
-        user.trialEndsAt = trialEndsAt;
+        // Regular signup - create new company and owner
+        const allUsers = await storage.getAllUsers();
+        const isFirstUser = allUsers.length === 0;
+        
+        // Create new company
+        const newCompany = await db.insert(companies).values({
+          name: email.split('@')[0] + "'s Company",
+        }).returning();
+        companyId = newCompany[0].id;
+        userRole = "owner";
       }
       
-      // SECURITY: Only the first user is automatically made an admin
-      // Additional admins must be promoted by existing admins
-      if (isFirstUser) {
-        await storage.updateUserAdminStatus(user.id, true);
-        user.isAdmin = true;
-        // Seed standard parts for the first admin user
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({ 
+        email, 
+        password: hashedPassword,
+        companyId,
+        role: userRole,
+      });
+      
+      // Mark invitation as used if this was an invitation signup
+      if (invitation) {
+        await storage.markInvitationUsed(invitation.id, user.id);
+      }
+      
+      // Only assign trial/seed parts for company owners
+      if (userRole === "owner") {
+        if (subscriptionService.isEnabled()) {
+          await subscriptionService.assignPlanToUser(user.id, 'trial', true);
+        } else {
+          const trialDays = parseInt(process.env.TRIAL_DAYS || "30", 10);
+          const trialEndsAt = new Date();
+          trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
+          await storage.updateUserTrialDate(user.id, trialEndsAt);
+          user.trialEndsAt = trialEndsAt;
+        }
+        
+        // Seed standard parts for new company owners
         await storage.seedUserParts(user.id);
       }
       
@@ -77,8 +112,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           res.json({ id: user.id, email: user.email, role: user.role, companyId: user.companyId });
         });
       });
-    } catch (error) {
-      res.status(400).json({ error: "Invalid signup data" });
+    } catch (error: any) {
+      console.error("Signup error:", error);
+      res.status(400).json({ error: error.message || "Invalid signup data" });
     }
   });
 
@@ -1805,6 +1841,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch subscription status" });
+    }
+  });
+
+  // Invitation validation endpoint (public - no auth required)
+  app.get("/api/invitations/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const invitation = await storage.getInvitationByToken(token);
+      
+      if (!invitation) {
+        return res.status(404).json({ error: "Invalid or expired invitation" });
+      }
+      
+      // Get company details
+      const company = await storage.getCompanyById(invitation.companyId);
+      
+      res.json({
+        valid: true,
+        email: invitation.email,
+        role: invitation.role,
+        companyId: invitation.companyId,
+        companyName: company?.name || "Unknown Company",
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to validate invitation" });
     }
   });
 

@@ -155,6 +155,11 @@ export interface IStorage {
 
   // Invitation token methods
   createInvitationToken(token: any): Promise<any>;
+  getInvitationByToken(token: string): Promise<any | undefined>;
+  markInvitationUsed(id: string, usedByUserId: string): Promise<void>;
+  
+  // Company methods
+  getCompanyById(id: string): Promise<any | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -169,6 +174,7 @@ export class MemStorage implements IStorage {
   private calendarAssignments: Map<string, CalendarAssignment>;
   private feedback: Map<string, Feedback>;
   private invitationTokens: Map<string, any>;
+  private companies: Map<string, any>;
 
   constructor() {
     this.users = new Map();
@@ -182,6 +188,7 @@ export class MemStorage implements IStorage {
     this.equipment = new Map();
     this.calendarAssignments = new Map();
     this.invitationTokens = new Map();
+    this.companies = new Map();
   }
 
   // User methods
@@ -1090,10 +1097,35 @@ export class MemStorage implements IStorage {
   async deleteFeedback(id: string): Promise<boolean> {
     return this.feedback.delete(id);
   }
+
+  async createInvitationToken(tokenData: any): Promise<any> {
+    const id = randomUUID();
+    const token = { ...tokenData, id };
+    this.invitationTokens.set(id, token);
+    return token;
+  }
+
+  async getInvitationByToken(token: string): Promise<any | undefined> {
+    return Array.from(this.invitationTokens.values()).find(
+      (invite) => invite.token === token && !invite.usedAt
+    );
+  }
+
+  async markInvitationUsed(id: string, usedByUserId: string): Promise<void> {
+    const invitation = this.invitationTokens.get(id);
+    if (invitation) {
+      const updated = { ...invitation, usedAt: new Date(), usedByUserId };
+      this.invitationTokens.set(id, updated);
+    }
+  }
+
+  async getCompanyById(id: string): Promise<any | undefined> {
+    return this.companies.get(id);
+  }
 }
 
 import { db } from './db';
-import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback, invitationTokens } from '@shared/schema';
+import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback, invitationTokens, companies } from '@shared/schema';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
@@ -1982,9 +2014,34 @@ export class DbStorage implements IStorage {
   }
 
   async createInvitationToken(tokenData: any): Promise<any> {
-    const id = randomUUID();
-    const token = { ...tokenData, id };
-    return db.insert(invitationTokens as any).values(token).returning().then((results: any) => results[0]);
+    const result = await db.insert(invitationTokens).values(tokenData).returning();
+    return result[0];
+  }
+
+  async getInvitationByToken(token: string): Promise<any | undefined> {
+    const result = await db.select()
+      .from(invitationTokens)
+      .where(and(
+        eq(invitationTokens.token, token),
+        sql`${invitationTokens.usedAt} IS NULL`,
+        sql`${invitationTokens.expiresAt} > NOW()`
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async markInvitationUsed(id: string, usedByUserId: string): Promise<void> {
+    await db.update(invitationTokens)
+      .set({ usedAt: new Date(), usedByUserId })
+      .where(eq(invitationTokens.id, id));
+  }
+
+  async getCompanyById(id: string): Promise<any | undefined> {
+    const result = await db.select()
+      .from(companies)
+      .where(eq(companies.id, id))
+      .limit(1);
+    return result[0];
   }
 }
 

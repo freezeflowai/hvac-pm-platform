@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,6 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Building2 } from "lucide-react";
 
 const signupSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -22,10 +25,21 @@ const signupSchema = z.object({
 type SignupFormData = z.infer<typeof signupSchema>;
 
 export default function Signup() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { signup } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+
+  // Extract invitation token from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const invitationToken = urlParams.get('token');
+
+  // Fetch invitation details if token exists
+  const { data: invitationData, isLoading: isLoadingInvitation, error: invitationError } = useQuery({
+    queryKey: ['/api/invitations', invitationToken],
+    enabled: !!invitationToken,
+    retry: false,
+  });
 
   const form = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
@@ -36,15 +50,48 @@ export default function Signup() {
     },
   });
 
+  // Pre-fill email from invitation
+  useEffect(() => {
+    if (invitationData?.email) {
+      form.setValue('email', invitationData.email);
+    }
+  }, [invitationData, form]);
+
   const onSubmit = async (data: SignupFormData) => {
     setIsLoading(true);
     try {
-      await signup(data.email, data.password);
+      // Include invitation token in signup request
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+          invitationToken: invitationToken || undefined,
+        }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Signup failed');
+      }
+
+      const userData = await response.json();
+
       toast({
         title: "Account created",
-        description: "Welcome! Your free trial has started.",
+        description: invitationToken 
+          ? `Welcome to ${invitationData?.companyName || 'the team'}!`
+          : "Welcome! Your free trial has started.",
       });
-      setLocation("/");
+
+      // Redirect based on role
+      if (userData.role === 'technician') {
+        setLocation("/technician");
+      } else {
+        setLocation("/");
+      }
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -56,14 +103,57 @@ export default function Signup() {
     }
   };
 
+  if (isLoadingInvitation) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading invitation...</div>
+      </div>
+    );
+  }
+
+  if (invitationToken && invitationError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Invalid Invitation</CardTitle>
+            <CardDescription>This invitation link is invalid or has expired.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              data-testid="button-back-to-login"
+              onClick={() => setLocation("/login")}
+              className="w-full"
+            >
+              Go to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Sign Up</CardTitle>
-          <CardDescription>Create a new account to get started</CardDescription>
+          <CardTitle>{invitationToken ? "Join Team" : "Sign Up"}</CardTitle>
+          <CardDescription>
+            {invitationToken 
+              ? `You've been invited to join a team`
+              : "Create a new account to get started"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
+          {invitationToken && invitationData && (
+            <Alert className="mb-4" data-testid="alert-invitation-info">
+              <Building2 className="h-4 w-4" />
+              <AlertDescription>
+                You're joining <strong>{invitationData.companyName}</strong> as a{" "}
+                <strong>{invitationData.role || "technician"}</strong>
+              </AlertDescription>
+            </Alert>
+          )}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
