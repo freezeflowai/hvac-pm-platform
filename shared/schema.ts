@@ -40,6 +40,8 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull().default("technician"), // "owner", "admin", "technician"
   fullName: text("full_name"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
