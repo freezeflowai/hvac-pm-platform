@@ -624,9 +624,12 @@ export default function Calendar() {
     if (view === "weekly" && weeklyScrollContainerRef.current && companySettings?.calendarStartHour !== undefined) {
       const startHour = companySettings.calendarStartHour;
       const scrollPosition = startHour * 64; // Each row is min-h-16 (64px)
+      // Use a longer delay to ensure DOM is fully rendered
       setTimeout(() => {
-        weeklyScrollContainerRef.current?.scrollTo({ top: scrollPosition, behavior: 'smooth' });
-      }, 0);
+        if (weeklyScrollContainerRef.current) {
+          weeklyScrollContainerRef.current.scrollTop = scrollPosition;
+        }
+      }, 100);
     }
   }, [view, companySettings?.calendarStartHour]);
 
@@ -768,7 +771,7 @@ export default function Calendar() {
             </div>
           ))}
         </div>
-        <div ref={weeklyScrollContainerRef} className="overflow-y-auto flex-1" style={{ scrollbarWidth: 'thin' }}>
+        <div ref={weeklyScrollContainerRef} className="overflow-y-auto flex-1" style={{ scrollbarWidth: 'auto', overflowX: 'hidden' }}>
           {hours.map((h) => (
             <div key={h.hour} className="grid grid-cols-8 border-b">
               <div className={`p-2 text-xs font-medium border-r sticky left-0 ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
