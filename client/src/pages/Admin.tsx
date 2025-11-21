@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, ShieldCheck, ShieldOff, Package, KeyRound, MessageCircle, Archive, ArchiveRestore } from "lucide-react";
+import { Trash2, ShieldCheck, ShieldOff, Package, KeyRound, MessageCircle, Archive, ArchiveRestore, Clock } from "lucide-react";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import { UserSubscriptionDialog } from "@/components/UserSubscriptionDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -52,6 +52,7 @@ export default function Admin() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
+  const [calendarStartHour, setCalendarStartHour] = useState<number>(8);
 
   const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
@@ -63,6 +64,15 @@ export default function Admin() {
 
   const { data: feedback = [] } = useQuery<Feedback[]>({
     queryKey: ["/api/feedback"],
+  });
+
+  const { data: companySettings } = useQuery<{ calendarStartHour?: number }>({
+    queryKey: ["/api/company-settings"],
+    onSuccess: (data) => {
+      if (data?.calendarStartHour !== undefined) {
+        setCalendarStartHour(data.calendarStartHour);
+      }
+    },
   });
 
   const deleteUserMutation = useMutation({
@@ -208,6 +218,28 @@ export default function Admin() {
     },
   });
 
+  const updateSettingsMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/company-settings", {
+        calendarStartHour,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/company-settings"] });
+      toast({
+        title: "Settings saved",
+        description: "Calendar start hour has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save settings",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleResetPassword = () => {
     if (!resetPasswordUserId) return;
     
@@ -263,6 +295,7 @@ export default function Admin() {
       <Tabs defaultValue="users" className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="users" data-testid="tab-users">User Management</TabsTrigger>
+          <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
           <TabsTrigger value="feedback" data-testid="tab-feedback">
             Feedback
             {feedback.filter(f => f.status === "new").length > 0 && (
@@ -472,6 +505,55 @@ export default function Admin() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle>Calendar Settings</CardTitle>
+              <CardDescription>
+                Configure calendar behavior and display options
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <Label htmlFor="calendar-start-hour" className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Daily Schedule Start Hour
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Set the hour when the daily schedule begins (0-23, where 0 is midnight and 8 is 8 AM)
+                  </p>
+                  <Input
+                    id="calendar-start-hour"
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={calendarStartHour}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val) && val >= 0 && val <= 23) {
+                        setCalendarStartHour(val);
+                      }
+                    }}
+                    data-testid="input-calendar-start-hour"
+                    className="w-24"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Current setting: {calendarStartHour}:00 ({calendarStartHour < 12 ? calendarStartHour === 0 ? "midnight" : calendarStartHour + " AM" : calendarStartHour === 12 ? "12 PM" : (calendarStartHour - 12) + " PM"})
+                  </p>
+                </div>
+                <Button
+                  onClick={() => updateSettingsMutation.mutate()}
+                  disabled={updateSettingsMutation.isPending}
+                  data-testid="button-save-settings"
+                >
+                  {updateSettingsMutation.isPending ? "Saving..." : "Save Settings"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="feedback">
