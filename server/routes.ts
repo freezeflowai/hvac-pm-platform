@@ -2094,28 +2094,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/technician/today", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
-      const email = req.user!.email;
       const today = new Date();
       const year = today.getFullYear();
       const month = today.getMonth() + 1;
       const day = today.getDate();
-      console.log(`=== TECH LOOKUP === TechID: ${userId}, Email: ${email}, Date: ${year}-${month}-${day}`);
       
-      // Query raw database to see what's stored
+      // Get both pending AND completed assignments for today
       const allAssignmentsForDay = await db.select().from(calendarAssignments).where(and(
         eq(calendarAssignments.year, year),
         eq(calendarAssignments.month, month),
-        eq(calendarAssignments.day, day),
-        eq(calendarAssignments.completed, false)
+        eq(calendarAssignments.day, day)
       ));
-      console.log(`=== RAW DB === Found ${allAssignmentsForDay.length} total assignments for ${year}-${month}-${day}`);
-      for (const a of allAssignmentsForDay) {
-        console.log(`  Assignment ${a.id}: assignedTechnicianIds = ${JSON.stringify(a.assignedTechnicianIds)}, type: ${typeof a.assignedTechnicianIds}`);
+      
+      const result = [];
+      for (const assignment of allAssignmentsForDay) {
+        let techIds = assignment.assignedTechnicianIds;
+        
+        // Handle array that might be a string or actual array
+        if (typeof techIds === 'string') {
+          try {
+            techIds = JSON.parse(techIds);
+          } catch (e) {
+            techIds = [];
+          }
+        }
+        
+        // Ensure it's an array
+        if (!Array.isArray(techIds)) {
+          techIds = techIds ? [techIds] : [];
+        }
+        
+        // Check if technician is in the array
+        if (techIds.includes(userId)) {
+          // Get client by companyId and clientId directly from database
+          const client = await db.select()
+            .from(clients)
+            .where(and(
+              eq(clients.companyId, assignment.companyId),
+              eq(clients.id, assignment.clientId)
+            ))
+            .limit(1);
+          
+          if (client && client.length > 0) {
+            result.push({ id: assignment.id, client: client[0], assignment });
+          }
+        }
       }
       
-      const assignments = await storage.getTechnicianTodayAssignments(userId);
-      console.log(`=== RESULT === Found ${assignments.length} matching assignments`);
-      res.json(assignments);
+      res.json(result);
     } catch (error) {
       console.error("Error fetching technician today assignments:", error);
       res.status(500).json({ error: "Failed to fetch today's assignments" });
