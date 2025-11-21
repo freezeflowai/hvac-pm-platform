@@ -771,24 +771,29 @@ export default function Calendar() {
             </div>
           ))}
         </div>
-        <div ref={weeklyScrollContainerRef} className="overflow-y-auto flex-1" style={{ scrollbarWidth: 'auto', overflowX: 'hidden' }}>
+        <div ref={weeklyScrollContainerRef} className="overflow-y-scroll flex-1" style={{ scrollbarWidth: 'auto', overflowX: 'hidden' }}>
           {hours.map((h) => (
             <div key={h.hour} className="grid grid-cols-8 border-b">
-              <div className={`p-2 text-xs font-medium border-r sticky left-0 ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
+              <div className={`p-2 text-xs font-medium border-r sticky left-0 z-20 ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
                 {h.display}
               </div>
               {weekDaysData.map((dayData) => (
                 <div key={`${dayData.dayName}-${h.hour}`} className="p-1 border-r min-h-16 bg-background">
                   {h.hour === startHour && dayData.dayAssignments.map((assignment: any, idx: number) => {
                     const client = clients.find((c: any) => c.id === assignment.clientId);
+                    const isCompleted = assignment.completed;
                     return client ? (
                       <div 
                         key={assignment.id} 
-                        className="text-xs bg-primary/20 border border-primary/50 rounded p-1 mb-1 cursor-pointer hover:bg-primary/30"
+                        className={`text-xs rounded p-1 mb-1 cursor-pointer transition-all ${
+                          isCompleted 
+                            ? 'bg-primary/20 border border-primary/50 line-through opacity-60 hover:bg-primary/25' 
+                            : 'bg-primary/20 border border-primary/50 hover:bg-primary/30'
+                        }`}
                         onClick={() => handleClientClick(client, assignment)}
                         data-testid={`hourly-assignment-${assignment.id}`}
                       >
-                        <div className="font-semibold line-clamp-2">{client.companyName}</div>
+                        <div className={`font-semibold line-clamp-2 ${isCompleted ? 'line-through' : ''}`}>{client.companyName}</div>
                         {assignment.assignedTechnicianIds?.length > 0 && technicians.length > 0 && (
                           <div className="text-muted-foreground text-[10px]">
                             {technicians
