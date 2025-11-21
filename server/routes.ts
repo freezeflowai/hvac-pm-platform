@@ -101,7 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Seed standard parts for new company owners
-        await storage.seedUserParts(user.id);
+        await storage.seedUserParts(user.companyId, user.id);
       }
       
       req.session.regenerate((err) => {
@@ -409,7 +409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Client routes
   app.get("/api/clients", isAuthenticated, async (req, res) => {
     try {
-      const clients = await storage.getAllClients(req.user!.id);
+      const clients = await storage.getAllClients(req.user!.companyId);
       res.json(clients);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch clients" });
@@ -442,10 +442,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }));
         
         const validatedParts = partsSchema.parse(parts);
-        client = await storage.createClientWithParts(req.user!.id, validated, validatedParts);
+        client = await storage.createClientWithParts(req.user!.companyId, req.user!.id, validated, validatedParts);
       } else {
         // No parts, use regular client creation
-        client = await storage.createClient(req.user!.id, validated);
+        client = await storage.createClient(req.user!.companyId, req.user!.id, validated);
       }
       
       res.json(client);
@@ -485,7 +485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const clientData of clients) {
         try {
           const validated = insertClientSchema.parse(clientData);
-          await storage.createClient(req.user!.id, validated);
+          await storage.createClient(req.user!.companyId, req.user!.id, validated);
           imported++;
         } catch (error) {
           errors.push(`Failed to import ${clientData.companyName || 'unknown client'}`);
@@ -518,7 +518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const { parts, equipment, ...clientInfo } = clientData;
           const validated = insertClientSchema.parse(clientInfo);
-          const client = await storage.createClient(req.user!.id, validated);
+          const client = await storage.createClient(req.user!.companyId, req.user!.id, validated);
           imported++;
           
           // Import parts if present
@@ -526,7 +526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             for (const partData of parts) {
               try {
                 // Create part as "other" type with the name from backup
-                const part = await storage.createPart(req.user!.id, {
+                const part = await storage.createPart(req.user!.companyId, req.user!.id, {
                   type: 'other',
                   name: partData.name,
                   filterType: null,
@@ -536,7 +536,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 });
                 
                 // Link part to client
-                await storage.addClientPart(req.user!.id, {
+                await storage.addClientPart(req.user!.companyId, req.user!.id, {
                   clientId: client.id,
                   partId: part.id,
                   quantity: partData.quantity || 1,
@@ -551,7 +551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (equipment && Array.isArray(equipment) && equipment.length > 0) {
             for (const equipData of equipment) {
               try {
-                await storage.createEquipment(req.user!.id, {
+                await storage.createEquipment(req.user!.companyId, req.user!.id, {
                   clientId: client.id,
                   name: equipData.name,
                   modelNumber: equipData.modelNumber || null,
@@ -582,7 +582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
-      const client = await storage.getClient(req.user!.id, req.params.id);
+      const client = await storage.getClient(req.user!.companyId, req.params.id);
       if (!client) {
         return res.status(404).json({ error: "Client not found" });
       }
@@ -594,13 +594,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/clients/:id/report", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const companyId = req.user!.companyId;
       const clientId = req.params.id;
-      console.log(`[Report] Fetching report for userId: ${userId}, clientId: ${clientId}`);
+      console.log(`[Report] Fetching report for companyId: ${companyId}, clientId: ${clientId}`);
       
-      const report = await storage.getClientReport(userId, clientId);
+      const report = await storage.getClientReport(companyId, clientId);
       if (!report) {
-        console.log(`[Report] Client not found - userId: ${userId}, clientId: ${clientId}`);
+        console.log(`[Report] Client not found - companyId: ${companyId}, clientId: ${clientId}`);
         return res.status(404).json({ error: "Client not found" });
       }
       
@@ -615,14 +615,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertClientSchema.partial().parse(req.body);
-      const userId = req.user!.id;
+      const companyId = req.user!.companyId;
       const clientId = req.params.id;
       
       // Check if selectedMonths is being updated
       const isUpdatingPmMonths = validated.selectedMonths !== undefined;
       
       // Update the client
-      const client = await storage.updateClient(userId, clientId, validated);
+      const client = await storage.updateClient(companyId, clientId, validated);
       if (!client) {
         return res.status(404).json({ error: "Client not found" });
       }
@@ -631,7 +631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let cleanupResult = { removedCount: 0 };
       if (isUpdatingPmMonths && client.selectedMonths) {
         cleanupResult = await storage.cleanupInvalidCalendarAssignments(
-          userId,
+          companyId,
           clientId,
           client.selectedMonths
         );
@@ -649,7 +649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
       await storage.deleteAllClientParts(req.user!.companyId, req.params.id);
-      const deleted = await storage.deleteClient(req.user!.id, req.params.id);
+      const deleted = await storage.deleteClient(req.user!.companyId, req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Client not found" });
       }
@@ -666,7 +666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       const { ids } = schema.parse(req.body);
       
-      const result = await storage.deleteClients(req.user!.id, ids);
+      const result = await storage.deleteClients(req.user!.companyId, ids);
       
       res.json({
         deletedIds: result.deletedIds,
@@ -685,7 +685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Part routes
   app.get("/api/parts", isAuthenticated, async (req, res) => {
     try {
-      const parts = await storage.getAllParts(req.user!.id);
+      const parts = await storage.getAllParts(req.user!.companyId);
       res.json(parts);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch parts" });
@@ -697,7 +697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = insertPartSchema.parse(req.body);
       
       // Check for duplicate part
-      const existingPart = await storage.findDuplicatePart(req.user!.id, validated);
+      const existingPart = await storage.findDuplicatePart(req.user!.companyId, validated);
       
       if (existingPart) {
         let errorMessage = "A part with these details already exists";
@@ -712,7 +712,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ error: errorMessage });
       }
       
-      const part = await storage.createPart(req.user!.id, validated);
+      const part = await storage.createPart(req.user!.companyId, req.user!.id, validated);
       res.json(part);
     } catch (error) {
       res.status(400).json({ error: "Invalid part data" });
@@ -731,7 +731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const partData = validated[i];
         
         // Check for duplicate
-        const existingPart = await storage.findDuplicatePart(req.user!.id, partData);
+        const existingPart = await storage.findDuplicatePart(req.user!.companyId, partData);
         
         if (existingPart) {
           let errorMessage = "Duplicate";
@@ -744,7 +744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           errors.push({ index: i, error: errorMessage });
         } else {
-          const part = await storage.createPart(req.user!.id, partData);
+          const part = await storage.createPart(req.user!.companyId, req.user!.id, partData);
           createdParts.push(part);
         }
       }
@@ -761,7 +761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/parts/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertPartSchema.partial().parse(req.body);
-      const part = await storage.updatePart(req.user!.id, req.params.id, validated);
+      const part = await storage.updatePart(req.user!.companyId, req.params.id, validated);
       if (!part) {
         return res.status(404).json({ error: "Part not found" });
       }
@@ -773,7 +773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/parts/seed", isAuthenticated, async (req, res) => {
     try {
-      await storage.seedUserParts(req.user!.id);
+      await storage.seedUserParts(req.user!.companyId, req.user!.id);
       res.json({ 
         message: "Standard parts seeded successfully"
       });
@@ -785,7 +785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/parts/:id", isAuthenticated, async (req, res) => {
     try {
-      const deleted = await storage.deletePart(req.user!.id, req.params.id);
+      const deleted = await storage.deletePart(req.user!.companyId, req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Part not found" });
       }
@@ -802,7 +802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       const { ids } = schema.parse(req.body);
       
-      const result = await storage.deleteParts(req.user!.id, ids);
+      const result = await storage.deleteParts(req.user!.companyId, ids);
       
       res.json({
         deletedIds: result.deletedIds,
@@ -902,7 +902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid month. Must be 0-11." });
       }
       const outstandingOnly = req.query.outstanding === 'true';
-      const report = await storage.getPartsReportByMonth(req.user!.id, month, outstandingOnly);
+      const report = await storage.getPartsReportByMonth(req.user!.companyId, month, outstandingOnly);
       res.json(report);
     } catch (error) {
       res.status(500).json({ error: "Failed to generate report" });
@@ -917,7 +917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid month. Must be 0-11." });
       }
       
-      const allClients = await storage.getAllClients(req.user!.id);
+      const allClients = await storage.getAllClients(req.user!.companyId);
       
       // Filter clients that have the selected month in their selectedMonths array and are not inactive
       const scheduledClients = allClients.filter(client => 
@@ -926,13 +926,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get parts, equipment and completion status for each client
       const currentYear = new Date().getFullYear();
-      const completedRecords = await storage.getRecentlyCompletedMaintenance(req.user!.id, month, currentYear);
+      const completedRecords = await storage.getRecentlyCompletedMaintenance(req.user!.companyId, month, currentYear);
       
       const clientsWithParts = await Promise.all(
         scheduledClients.map(async (client) => {
           const [clientParts, clientEquipment] = await Promise.all([
             storage.getClientParts(req.user!.companyId, client.id),
-            storage.getClientEquipment(req.user!.id, client.id)
+            storage.getClientEquipment(req.user!.companyId, client.id)
           ]);
           
           // Check if there's a completed maintenance record for this month
@@ -967,7 +967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         eq(calendarAssignments.month, currentMonth)
       ));
       
-      const clients = await storage.getAllClients(req.user!.id);
+      const clients = await storage.getAllClients(req.user!.companyId);
       const statuses: Record<string, { completed: boolean; completedDueDate?: string }> = {};
       
       // For each client, check if there's a completed assignment in the current month
@@ -998,12 +998,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
       
-      const records = await storage.getRecentlyCompletedMaintenance(req.user!.id, currentMonth, currentYear);
+      const records = await storage.getRecentlyCompletedMaintenance(req.user!.companyId, currentMonth, currentYear);
       
       // Fetch client details for each record and format for frontend
       const completedItems = [];
       for (const record of records) {
-        const client = await storage.getClient(req.user!.id, record.clientId);
+        const client = await storage.getClient(req.user!.companyId, record.clientId);
         if (client) {
           // Format to match MaintenanceItem interface expected by frontend
           completedItems.push({
@@ -1026,12 +1026,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get completed but unscheduled maintenance
   app.get("/api/maintenance/completed-unscheduled", isAuthenticated, async (req, res) => {
     try {
-      const records = await storage.getCompletedUnscheduledMaintenance(req.user!.id);
+      const records = await storage.getCompletedUnscheduledMaintenance(req.user!.companyId);
       
       // Fetch client details for each record and format for frontend
       const completedItems = [];
       for (const record of records) {
-        const client = await storage.getClient(req.user!.id, record.clientId);
+        const client = await storage.getClient(req.user!.companyId, record.clientId);
         if (client) {
           completedItems.push({
             id: record.id,
@@ -1060,29 +1060,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "dueDate is required" });
       }
       
-      const client = await storage.getClient(req.user!.id, clientId);
+      const client = await storage.getClient(req.user!.companyId, clientId);
       
       if (!client) {
         return res.status(404).json({ error: "Client not found" });
       }
 
       // Check if there's a record for the requested dueDate
-      const record = await storage.getMaintenanceRecord(req.user!.id, clientId, dueDate);
+      const record = await storage.getMaintenanceRecord(req.user!.companyId, clientId, dueDate);
       
       // Check if there's a calendar assignment for this month
       const dueDateObj = new Date(dueDate);
       const year = dueDateObj.getFullYear();
       const month = dueDateObj.getMonth() + 1; // Calendar API uses 1-indexed months
-      const calendarAssignment = await storage.getClientCalendarAssignment(req.user!.id, clientId, year, month);
+      const calendarAssignment = await storage.getClientCalendarAssignment(req.user!.companyId, clientId, year, month);
 
       if (record && record.completedAt) {
         // This cycle is completed - uncomplete it and restore nextDue
-        await storage.updateClient(req.user!.id, clientId, { nextDue: dueDate });
-        await storage.updateMaintenanceRecord(req.user!.id, record.id, { completedAt: null });
+        await storage.updateClient(req.user!.companyId, clientId, { nextDue: dueDate });
+        await storage.updateMaintenanceRecord(req.user!.companyId, record.id, { completedAt: null });
         
         // Update calendar assignment to mark as incomplete
         if (calendarAssignment) {
-          await storage.updateCalendarAssignment(req.user!.id, calendarAssignment.id, { completed: false });
+          await storage.updateCalendarAssignment(req.user!.companyId, calendarAssignment.id, { completed: false });
         }
         
         res.json({ completed: false, record });
@@ -1095,9 +1095,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Create or update maintenance record for this dueDate
         if (record) {
-          await storage.updateMaintenanceRecord(req.user!.id, record.id, { completedAt });
+          await storage.updateMaintenanceRecord(req.user!.companyId, record.id, { completedAt });
         } else {
-          await storage.createMaintenanceRecord(req.user!.id, {
+          await storage.createMaintenanceRecord(req.user!.companyId, req.user!.id, {
             clientId,
             dueDate,
             completedAt,
@@ -1115,11 +1115,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Update client's nextDue
-        await storage.updateClient(req.user!.id, clientId, { nextDue: nextDue.toISOString() });
+        await storage.updateClient(req.user!.companyId, clientId, { nextDue: nextDue.toISOString() });
         
         // Update calendar assignment to mark as complete
         if (calendarAssignment) {
-          await storage.updateCalendarAssignment(req.user!.id, calendarAssignment.id, { completed: true });
+          await storage.updateCalendarAssignment(req.user!.companyId, calendarAssignment.id, { completed: true });
         }
 
         // Automatically create calendar assignment for the next due date
@@ -1129,7 +1129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Check if assignment already exists for the next due date
         const existingNextAssignment = await storage.getClientCalendarAssignment(
-          req.user!.id, 
+          req.user!.companyId, 
           clientId, 
           nextYear, 
           nextMonthNum
@@ -1137,7 +1137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (!existingNextAssignment) {
           // Create new calendar assignment for next due date
-          await storage.createCalendarAssignment(req.user!.id, {
+          await storage.createCalendarAssignment(req.user!.companyId, req.user!.id, {
             clientId,
             year: nextYear,
             month: nextMonthNum,
@@ -1159,7 +1159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Equipment routes
   app.get("/api/equipment", isAuthenticated, async (req, res) => {
     try {
-      const equipment = await storage.getAllEquipment(req.user!.id);
+      const equipment = await storage.getAllEquipment(req.user!.companyId);
       res.json(equipment);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch equipment" });
@@ -1168,7 +1168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/clients/:clientId/equipment", isAuthenticated, async (req, res) => {
     try {
-      const equipment = await storage.getClientEquipment(req.user!.id, req.params.clientId);
+      const equipment = await storage.getClientEquipment(req.user!.companyId, req.params.clientId);
       res.json(equipment);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch equipment" });
@@ -1178,7 +1178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/clients/:clientId/equipment", isAuthenticated, async (req, res) => {
     try {
       const validated = insertEquipmentSchema.parse(req.body);
-      const equipment = await storage.createEquipment(req.user!.id, {
+      const equipment = await storage.createEquipment(req.user!.companyId, req.user!.id, {
         ...validated,
         clientId: req.params.clientId
       });
@@ -1193,11 +1193,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const equipment = req.body.equipment as Array<{ name: string; type: string; serialNumber?: string; location?: string }>;
       
       // Delete existing equipment for this client
-      await storage.deleteAllClientEquipment(req.user!.id, req.params.clientId);
+      await storage.deleteAllClientEquipment(req.user!.companyId, req.params.clientId);
       
       // Add new equipment
       const createdEquipment = await Promise.all(
-        equipment.map(e => storage.createEquipment(req.user!.id, {
+        equipment.map(e => storage.createEquipment(req.user!.companyId, req.user!.id, {
           clientId: req.params.clientId,
           name: e.name,
           type: e.type || null,
@@ -1217,7 +1217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/equipment/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertEquipmentSchema.partial().parse(req.body);
-      const equipment = await storage.updateEquipment(req.user!.id, req.params.id, validated);
+      const equipment = await storage.updateEquipment(req.user!.companyId, req.params.id, validated);
       if (!equipment) {
         return res.status(404).json({ error: "Equipment not found" });
       }
@@ -1229,7 +1229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/equipment/:id", isAuthenticated, async (req, res) => {
     try {
-      const deleted = await storage.deleteEquipment(req.user!.id, req.params.id);
+      const deleted = await storage.deleteEquipment(req.user!.companyId, req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Equipment not found" });
       }
@@ -1366,8 +1366,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
       
-      await storage.seedUserParts(id);
-      const parts = await storage.getAllParts(id);
+      await storage.seedUserParts(user.companyId, id);
+      const parts = await storage.getAllParts(user.companyId);
       
       res.json({ 
         success: true,
@@ -1428,8 +1428,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid year or month" });
       }
       
-      const assignments = await storage.getCalendarAssignments(userId, yearNum, monthNum);
-      const clients = await storage.getAllClients(userId);
+      const assignments = await storage.getCalendarAssignments(req.user!.companyId, yearNum, monthNum);
+      const clients = await storage.getAllClients(req.user!.companyId);
       
       res.json({ assignments, clients });
     } catch (error) {
@@ -1454,7 +1454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid year or month" });
       }
       
-      const unscheduledClients = await storage.getUnscheduledClients(userId, yearNum, monthNum);
+      const unscheduledClients = await storage.getUnscheduledClients(req.user!.companyId, yearNum, monthNum);
       res.json(unscheduledClients);
     } catch (error) {
       console.error('Get unscheduled clients error:', error);
@@ -1470,7 +1470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if this client already has an assignment for this month
       const existingAssignment = await storage.getClientCalendarAssignment(
-        userId,
+        companyId,
         assignmentData.clientId,
         assignmentData.year,
         assignmentData.month
@@ -1480,12 +1480,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Client already has an assignment for this month" });
       }
       
-      const assignment = await storage.createCalendarAssignment(userId, companyId, assignmentData);
+      const assignment = await storage.createCalendarAssignment(companyId, userId, assignmentData);
       
       // Update client's nextDue date
-      const client = await storage.getClient(userId, assignmentData.clientId);
+      const client = await storage.getClient(companyId, assignmentData.clientId);
       if (client) {
-        await storage.updateClient(userId, assignmentData.clientId, {
+        await storage.updateClient(companyId, assignmentData.clientId, {
           nextDue: assignmentData.scheduledDate
         });
       }
@@ -1516,7 +1516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignmentUpdate = updateCalendarAssignmentSchema.parse(body);
       console.log(`[PATCH /api/calendar/assign] Parsed update:`, JSON.stringify(assignmentUpdate));
       
-      const assignment = await storage.updateCalendarAssignment(userId, id, assignmentUpdate);
+      const assignment = await storage.updateCalendarAssignment(req.user!.companyId, id, assignmentUpdate);
       console.log(`[PATCH /api/calendar/assign] Updated assignment assignedTechnicianIds:`, assignment?.assignedTechnicianIds);
       
       if (!assignment) {
@@ -1525,7 +1525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Update client's nextDue date if scheduledDate changed
       if (assignmentUpdate.scheduledDate) {
-        await storage.updateClient(userId, assignment.clientId, {
+        await storage.updateClient(req.user!.companyId, assignment.clientId, {
           nextDue: assignmentUpdate.scheduledDate
         });
       }
@@ -1536,13 +1536,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (assignmentUpdate.completed === true) {
           // Marking as complete - create/update maintenanceRecord
-          const record = await storage.getMaintenanceRecord(userId, assignment.clientId, dueDate);
+          const record = await storage.getMaintenanceRecord(req.user!.companyId, assignment.clientId, dueDate);
           const completedAt = new Date().toISOString();
           
           if (record) {
-            await storage.updateMaintenanceRecord(userId, record.id, { completedAt });
+            await storage.updateMaintenanceRecord(req.user!.companyId, record.id, { completedAt });
           } else {
-            await storage.createMaintenanceRecord(userId, {
+            await storage.createMaintenanceRecord(req.user!.companyId, userId, {
               clientId: assignment.clientId,
               dueDate,
               completedAt,
@@ -1550,7 +1550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           // Advance nextDue to next occurrence
-          const client = await storage.getClient(userId, assignment.clientId);
+          const client = await storage.getClient(req.user!.companyId, assignment.clientId);
           if (client && client.selectedMonths && client.selectedMonths.length > 0) {
             const currentDate = new Date(assignment.scheduledDate);
             const currentMonth = currentDate.getMonth();
@@ -1566,19 +1566,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             const nextDueDate = new Date(nextYear, nextMonth, 15);
-            await storage.updateClient(userId, assignment.clientId, {
+            await storage.updateClient(req.user!.companyId, assignment.clientId, {
               nextDue: nextDueDate.toISOString().split('T')[0]
             });
           }
         } else {
           // Marking as incomplete - remove completion from maintenanceRecord
-          const record = await storage.getMaintenanceRecord(userId, assignment.clientId, dueDate);
+          const record = await storage.getMaintenanceRecord(req.user!.companyId, assignment.clientId, dueDate);
           if (record) {
-            await storage.updateMaintenanceRecord(userId, record.id, { completedAt: null });
+            await storage.updateMaintenanceRecord(req.user!.companyId, record.id, { completedAt: null });
           }
           
           // Restore client's nextDue to this assignment's date
-          await storage.updateClient(userId, assignment.clientId, {
+          await storage.updateClient(req.user!.companyId, assignment.clientId, {
             nextDue: dueDate
           });
         }
@@ -1599,19 +1599,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user!.id;
       const { id } = req.params;
       
-      const assignment = await storage.getCalendarAssignment(userId, id);
+      const assignment = await storage.getCalendarAssignment(req.user!.companyId, id);
       if (!assignment) {
         return res.status(404).json({ error: "Assignment not found" });
       }
       
-      const deleted = await storage.deleteCalendarAssignment(userId, id);
+      const deleted = await storage.deleteCalendarAssignment(req.user!.companyId, id);
       
       if (!deleted) {
         return res.status(404).json({ error: "Assignment not found" });
       }
       
       // Recalculate client's nextDue based on selectedMonths
-      const client = await storage.getClient(userId, assignment.clientId);
+      const client = await storage.getClient(req.user!.companyId, assignment.clientId);
       if (client && client.selectedMonths && client.selectedMonths.length > 0) {
         const today = new Date();
         const currentMonth = today.getMonth();
@@ -1627,7 +1627,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         const nextDueDate = new Date(nextYear, nextMonth, 15);
-        await storage.updateClient(userId, assignment.clientId, {
+        await storage.updateClient(req.user!.companyId, assignment.clientId, {
           nextDue: nextDueDate.toISOString().split('T')[0]
         });
       }
@@ -1643,7 +1643,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/company-settings", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
-      const settings = await storage.getCompanySettings(userId);
+      const settings = await storage.getCompanySettings(req.user!.companyId);
       
       if (!settings) {
         return res.json({ calendarStartHour: 8 });
@@ -1665,7 +1665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user!.id;
       const settingsData = insertCompanySettingsSchema.parse(req.body);
       
-      const settings = await storage.upsertCompanySettings(userId, settingsData);
+      const settings = await storage.upsertCompanySettings(req.user!.companyId, settingsData);
       res.json(settings);
     } catch (error) {
       console.error('Update company settings error:', error);
@@ -1689,7 +1689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Fetch clients
       const clients = await Promise.all(
-        clientIds.map(id => storage.getClient(userId, id))
+        clientIds.map(id => storage.getClient(req.user!.companyId, id))
       );
       
       const validClients = clients.filter((c): c is NonNullable<typeof c> => c !== null);
@@ -1778,7 +1778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userEmail = req.user!.email;
       const feedbackData = insertFeedbackSchema.parse(req.body);
       
-      const feedback = await storage.createFeedback(userId, userEmail, feedbackData);
+      const feedback = await storage.createFeedback(req.user!.companyId, userId, userEmail, feedbackData);
       res.json(feedback);
     } catch (error) {
       console.error('Create feedback error:', error);
@@ -2155,7 +2155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyId = req.user!.companyId;
       
       // Get all today's assignments for this technician
-      const assignments = await storage.getTechnicianTodayAssignments(userId);
+      const assignments = await storage.getTechnicianTodayAssignments(companyId, userId);
       const clientIds = assignments.map(a => a.client.id);
       
       // Aggregate parts from all assigned clients
@@ -2232,7 +2232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch parts and equipment for the client
       const [parts, equipment] = await Promise.all([
         storage.getClientParts(companyId, assignment.clientId),
-        storage.getClientEquipment(userId, assignment.clientId)
+        storage.getClientEquipment(companyId, assignment.clientId)
       ]);
       
       res.json({ parts, equipment });
@@ -2279,16 +2279,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ error: "Not assigned to this job" });
         }
         
-        // Update using the owner's userId (the creator of the assignment)
-        const updated = await storage.updateCalendarAssignment(assignmentData.userId, assignmentId, updateData);
+        // Update using the company ID from the assignment
+        const updated = await storage.updateCalendarAssignment(assignmentData.companyId, assignmentId, updateData);
         if (!updated) {
           return res.status(500).json({ error: "Failed to update assignment" });
         }
         return res.json(updated);
       }
       
-      // For admins/owners: use their own userId
-      const updated = await storage.updateCalendarAssignment(userId, assignmentId, updateData);
+      // For admins/owners: use their own companyId
+      const updated = await storage.updateCalendarAssignment(req.user!.companyId, assignmentId, updateData);
       if (!updated) {
         return res.status(404).json({ error: "Assignment not found or not authorized" });
       }

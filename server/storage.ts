@@ -203,7 +203,7 @@ export class MemStorage implements IStorage {
 
   async getUsersByCompanyId(companyId: string): Promise<User[]> {
     return Array.from(this.users.values()).filter(
-      (user) => user.companyId === companyId,
+      (user) => user.companyId === companyId
     );
   }
 
@@ -217,16 +217,12 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const user: User = { 
       ...insertUser, 
-      id, 
-      isAdmin: false,
-      trialEndsAt: null,
-      subscriptionStatus: "trial",
-      subscriptionPlan: null,
-      billingInterval: null,
-      currentPeriodEnd: null,
-      cancelAtPeriodEnd: false,
-      stripeCustomerId: null,
-      stripeSubscriptionId: null,
+      id,
+      createdAt: new Date(),
+      fullName: null,
+      firstName: null,
+      lastName: null,
+      role: 'technician'
     };
     this.users.set(id, user);
     return user;
@@ -256,17 +252,11 @@ export class MemStorage implements IStorage {
   }
 
   async updateUserTrialDate(id: string, trialEndsAt: Date): Promise<void> {
-    const user = this.users.get(id);
-    if (user) {
-      this.users.set(id, { ...user, trialEndsAt });
-    }
+    // Trial date is now on Company, not User - this is a no-op for MemStorage
   }
 
   async updateUserStripeCustomer(id: string, stripeCustomerId: string): Promise<void> {
-    const user = this.users.get(id);
-    if (user) {
-      this.users.set(id, { ...user, stripeCustomerId });
-    }
+    // Stripe customer is now on Company, not User - this is a no-op for MemStorage
   }
 
   // Password reset token methods
@@ -580,9 +570,9 @@ export class MemStorage implements IStorage {
   }
 
   // Client-Part relationship methods
-  async getClientParts(userId: string, clientId: string): Promise<(ClientPart & { part: Part })[]> {
+  async getClientParts(companyId: string, clientId: string): Promise<(ClientPart & { part: Part })[]> {
     const clientPartsList = Array.from(this.clientParts.values())
-      .filter(cp => cp.userId === userId && cp.clientId === clientId);
+      .filter(cp => cp.companyId === companyId && cp.clientId === clientId);
     
     // Filter out any client-parts where the part no longer exists
     return clientPartsList
@@ -594,11 +584,11 @@ export class MemStorage implements IStorage {
       .filter((cp): cp is (ClientPart & { part: Part }) => cp !== null);
   }
 
-  async getAllClientPartsBulk(userId: string): Promise<Record<string, (ClientPart & { part: Part })[]>> {
+  async getAllClientPartsBulk(companyId: string): Promise<Record<string, (ClientPart & { part: Part })[]>> {
     const bulkMap: Record<string, (ClientPart & { part: Part })[]> = {};
     
     const allClientParts = Array.from(this.clientParts.values())
-      .filter(cp => cp.userId === userId);
+      .filter(cp => cp.companyId === companyId);
     
     for (const cp of allClientParts) {
       const part = this.parts.get(cp.partId);
@@ -656,9 +646,9 @@ export class MemStorage implements IStorage {
     toDelete.forEach(id => this.clientParts.delete(id));
   }
 
-  async getPartsReportByMonth(userId: string, month: number, outstandingOnly = false): Promise<Array<{ part: Part; totalQuantity: number }>> {
+  async getPartsReportByMonth(companyId: string, month: number, outstandingOnly = false): Promise<Array<{ part: Part; totalQuantity: number }>> {
     const clientsWithMaintenance = Array.from(this.clients.values())
-      .filter(client => client.userId === userId && client.selectedMonths.includes(month) && !client.inactive);
+      .filter(client => client.companyId === companyId && client.selectedMonths.includes(month) && !client.inactive);
     
     let clientIds = clientsWithMaintenance.map(c => c.id);
     
@@ -670,7 +660,7 @@ export class MemStorage implements IStorage {
       // Get all maintenance records for this month
       const allRecords = Array.from(this.maintenanceRecords.values());
       for (const record of allRecords) {
-        if (record.userId === userId && record.completedAt) {
+        if (record.companyId === companyId && record.completedAt) {
           const dueDate = new Date(record.dueDate);
           if (dueDate.getMonth() === month && dueDate.getFullYear() === currentYear) {
             completedClientIds.add(record.clientId);
@@ -727,15 +717,15 @@ export class MemStorage implements IStorage {
   }
 
   // Maintenance record methods
-  async getMaintenanceRecord(userId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined> {
+  async getMaintenanceRecord(companyId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined> {
     return Array.from(this.maintenanceRecords.values()).find(
-      record => record.userId === userId && record.clientId === clientId && record.dueDate === dueDate
+      record => record.companyId === companyId && record.clientId === clientId && record.dueDate === dueDate
     );
   }
 
-  async getLatestCompletedMaintenanceRecord(userId: string, clientId: string): Promise<MaintenanceRecord | undefined> {
+  async getLatestCompletedMaintenanceRecord(companyId: string, clientId: string): Promise<MaintenanceRecord | undefined> {
     const records = Array.from(this.maintenanceRecords.values())
-      .filter(record => record.userId === userId && record.clientId === clientId && record.completedAt);
+      .filter(record => record.companyId === companyId && record.clientId === clientId && record.completedAt);
     
     if (records.length === 0) return undefined;
     
@@ -747,9 +737,9 @@ export class MemStorage implements IStorage {
     })[0];
   }
 
-  async getAllLatestCompletedMaintenanceRecords(userId: string): Promise<Record<string, MaintenanceRecord>> {
+  async getAllLatestCompletedMaintenanceRecords(companyId: string): Promise<Record<string, MaintenanceRecord>> {
     const allRecords = Array.from(this.maintenanceRecords.values())
-      .filter(record => record.userId === userId && record.completedAt);
+      .filter(record => record.companyId === companyId && record.completedAt);
     
     const latestByClient: Record<string, MaintenanceRecord> = {};
     
@@ -763,10 +753,10 @@ export class MemStorage implements IStorage {
     return latestByClient;
   }
 
-  async getRecentlyCompletedMaintenance(userId: string, month: number, year: number): Promise<MaintenanceRecord[]> {
+  async getRecentlyCompletedMaintenance(companyId: string, month: number, year: number): Promise<MaintenanceRecord[]> {
     return Array.from(this.maintenanceRecords.values())
       .filter(record => {
-        if (record.userId !== userId) return false;
+        if (record.companyId !== companyId) return false;
         if (!record.completedAt) return false;
         const completedDate = new Date(record.completedAt);
         return completedDate.getMonth() === month && completedDate.getFullYear() === year;
@@ -778,9 +768,9 @@ export class MemStorage implements IStorage {
       });
   }
 
-  async getCompletedUnscheduledMaintenance(userId: string): Promise<MaintenanceRecord[]> {
+  async getCompletedUnscheduledMaintenance(companyId: string): Promise<MaintenanceRecord[]> {
     const completedRecords = Array.from(this.maintenanceRecords.values())
-      .filter(record => record.userId === userId && record.completedAt);
+      .filter(record => record.companyId === companyId && record.completedAt);
     
     const result = [];
     for (const record of completedRecords) {
@@ -789,7 +779,7 @@ export class MemStorage implements IStorage {
       const month = dueDate.getMonth() + 1;
       
       // Check if there was a calendar assignment for this client in this month
-      const assignment = await this.getClientCalendarAssignment(userId, record.clientId, year, month);
+      const assignment = await this.getClientCalendarAssignment(companyId, record.clientId, year, month);
       if (!assignment) {
         result.push(record);
       }
@@ -802,16 +792,17 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async createMaintenanceRecord(userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
-    // Verify that the client belongs to the userId
+  async createMaintenanceRecord(companyId: string, userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
+    // Verify that the client belongs to the company
     const client = this.clients.get(insertRecord.clientId);
-    if (!client || client.userId !== userId) {
-      throw new Error("Client not found or does not belong to user");
+    if (!client || client.companyId !== companyId) {
+      throw new Error("Client not found or does not belong to company");
     }
     
     const id = randomUUID();
     const record: MaintenanceRecord = { 
       ...insertRecord,
+      companyId,
       userId,
       id,
       completedAt: insertRecord.completedAt ?? null 
@@ -820,40 +811,45 @@ export class MemStorage implements IStorage {
     return record;
   }
 
-  async updateMaintenanceRecord(userId: string, id: string, recordUpdate: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined> {
+  async updateMaintenanceRecord(companyId: string, id: string, recordUpdate: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined> {
     const existing = this.maintenanceRecords.get(id);
-    if (!existing || existing.userId !== userId) return undefined;
+    if (!existing || existing.companyId !== companyId) return undefined;
     
     const updated: MaintenanceRecord = { ...existing, ...recordUpdate };
     this.maintenanceRecords.set(id, updated);
     return updated;
   }
 
-  async deleteMaintenanceRecord(userId: string, id: string): Promise<boolean> {
+  async deleteMaintenanceRecord(companyId: string, id: string): Promise<boolean> {
     const existing = this.maintenanceRecords.get(id);
-    if (!existing || existing.userId !== userId) return false;
+    if (!existing || existing.companyId !== companyId) return false;
     return this.maintenanceRecords.delete(id);
   }
 
   // Equipment methods
-  async getAllEquipment(userId: string): Promise<Equipment[]> {
-    return [];
-  }
-
-  async getClientEquipment(userId: string, clientId: string): Promise<Equipment[]> {
+  async getAllEquipment(companyId: string): Promise<Equipment[]> {
     return Array.from(this.equipment.values()).filter(
-      (eq) => eq.userId === userId && eq.clientId === clientId
+      (eq) => eq.companyId === companyId
     );
   }
 
-  async getEquipment(userId: string, id: string): Promise<Equipment | undefined> {
-    return undefined;
+  async getClientEquipment(companyId: string, clientId: string): Promise<Equipment[]> {
+    return Array.from(this.equipment.values()).filter(
+      (eq) => eq.companyId === companyId && eq.clientId === clientId
+    );
   }
 
-  async createEquipment(userId: string, equipment: InsertEquipment): Promise<Equipment> {
+  async getEquipment(companyId: string, id: string): Promise<Equipment | undefined> {
+    const equipment = this.equipment.get(id);
+    if (!equipment || equipment.companyId !== companyId) return undefined;
+    return equipment;
+  }
+
+  async createEquipment(companyId: string, userId: string, equipment: InsertEquipment): Promise<Equipment> {
     const id = randomUUID();
     const newEquipment: Equipment = { 
       ...equipment,
+      companyId,
       userId,
       id,
       createdAt: new Date().toISOString(),
@@ -863,29 +859,41 @@ export class MemStorage implements IStorage {
       serialNumber: equipment.serialNumber ?? null,
       notes: equipment.notes ?? null
     };
+    this.equipment.set(id, newEquipment);
     return newEquipment;
   }
 
-  async updateEquipment(userId: string, id: string, equipment: Partial<InsertEquipment>): Promise<Equipment | undefined> {
-    return undefined;
+  async updateEquipment(companyId: string, id: string, equipment: Partial<InsertEquipment>): Promise<Equipment | undefined> {
+    const existing = this.equipment.get(id);
+    if (!existing || existing.companyId !== companyId) return undefined;
+    
+    const updated: Equipment = { ...existing, ...equipment };
+    this.equipment.set(id, updated);
+    return updated;
   }
 
-  async deleteEquipment(userId: string, id: string): Promise<boolean> {
-    return false;
+  async deleteEquipment(companyId: string, id: string): Promise<boolean> {
+    const existing = this.equipment.get(id);
+    if (!existing || existing.companyId !== companyId) return false;
+    return this.equipment.delete(id);
   }
 
-  async deleteAllClientEquipment(userId: string, clientId: string): Promise<void> {
-    return;
+  async deleteAllClientEquipment(companyId: string, clientId: string): Promise<void> {
+    const toDelete = Array.from(this.equipment.entries())
+      .filter(([_, eq]) => eq.companyId === companyId && eq.clientId === clientId)
+      .map(([id]) => id);
+    
+    toDelete.forEach(id => this.equipment.delete(id));
   }
 
-  async getClientReport(userId: string, clientId: string): Promise<{ client: Client; parts: (ClientPart & { part: Part })[]; equipment: Equipment[] } | null> {
-    const client = await this.getClient(userId, clientId);
+  async getClientReport(companyId: string, clientId: string): Promise<{ client: Client; parts: (ClientPart & { part: Part })[]; equipment: Equipment[] } | null> {
+    const client = await this.getClient(companyId, clientId);
     if (!client) {
       return null;
     }
 
-    const parts = await this.getClientParts(client.companyId, clientId);
-    const equip = await this.getClientEquipment(userId, clientId);
+    const parts = await this.getClientParts(companyId, clientId);
+    const equip = await this.getClientEquipment(companyId, clientId);
 
     return {
       client,
@@ -895,14 +903,14 @@ export class MemStorage implements IStorage {
   }
 
   // Company settings methods
-  async getCompanySettings(userId: string): Promise<CompanySettings | undefined> {
+  async getCompanySettings(companyId: string): Promise<CompanySettings | undefined> {
     return Array.from(this.companySettings.values()).find(
-      (settings) => settings.userId === userId
+      (settings) => settings.companyId === companyId
     );
   }
 
-  async upsertCompanySettings(userId: string, settings: InsertCompanySettings): Promise<CompanySettings> {
-    const existing = await this.getCompanySettings(userId);
+  async upsertCompanySettings(companyId: string, userId: string, settings: InsertCompanySettings): Promise<CompanySettings> {
+    const existing = await this.getCompanySettings(companyId);
     
     if (existing) {
       const updated: CompanySettings = {
@@ -932,6 +940,7 @@ export class MemStorage implements IStorage {
       postalCode: settings.postalCode ?? null,
       phone: settings.phone ?? null,
       id,
+      companyId,
       userId,
       updatedAt: new Date().toISOString()
     };
@@ -940,25 +949,32 @@ export class MemStorage implements IStorage {
   }
 
   // Calendar assignment methods
-  async getCalendarAssignments(userId: string, year: number, month: number): Promise<CalendarAssignment[]> {
+  async getCalendarAssignments(companyId: string, year: number, month: number, assignedTechnicianId?: string): Promise<CalendarAssignment[]> {
     return Array.from(this.calendarAssignments.values()).filter(
-      (assignment) => assignment.userId === userId && assignment.year === year && assignment.month === month
+      (assignment) => {
+        if (assignment.companyId !== companyId) return false;
+        if (assignment.year !== year) return false;
+        if (assignment.month !== month) return false;
+        if (assignedTechnicianId && assignment.assignedTechnicianId !== assignedTechnicianId) return false;
+        return true;
+      }
     );
   }
 
-  async getCalendarAssignment(userId: string, id: string): Promise<CalendarAssignment | undefined> {
+  async getCalendarAssignment(companyId: string, id: string): Promise<CalendarAssignment | undefined> {
     const assignment = this.calendarAssignments.get(id);
-    if (assignment && assignment.userId === userId) {
+    if (assignment && assignment.companyId === companyId) {
       return assignment;
     }
     return undefined;
   }
 
-  async createCalendarAssignment(userId: string, insertAssignment: InsertCalendarAssignment): Promise<CalendarAssignment> {
+  async createCalendarAssignment(companyId: string, userId: string, insertAssignment: InsertCalendarAssignment): Promise<CalendarAssignment> {
     const id = randomUUID();
     const assignment: CalendarAssignment = {
       ...insertAssignment,
       id,
+      companyId,
       userId,
       day: insertAssignment.day ?? null,
       autoDueDate: insertAssignment.autoDueDate ?? false,
@@ -968,8 +984,8 @@ export class MemStorage implements IStorage {
     return assignment;
   }
 
-  async updateCalendarAssignment(userId: string, id: string, assignmentUpdate: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined> {
-    const existing = await this.getCalendarAssignment(userId, id);
+  async updateCalendarAssignment(companyId: string, id: string, assignmentUpdate: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined> {
+    const existing = await this.getCalendarAssignment(companyId, id);
     if (!existing) {
       return undefined;
     }
@@ -984,26 +1000,26 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  async deleteCalendarAssignment(userId: string, id: string): Promise<boolean> {
-    const assignment = await this.getCalendarAssignment(userId, id);
+  async deleteCalendarAssignment(companyId: string, id: string): Promise<boolean> {
+    const assignment = await this.getCalendarAssignment(companyId, id);
     if (!assignment) {
       return false;
     }
     return this.calendarAssignments.delete(id);
   }
 
-  async getClientCalendarAssignment(userId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined> {
+  async getClientCalendarAssignment(companyId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined> {
     return Array.from(this.calendarAssignments.values()).find(
-      (assignment) => assignment.userId === userId && 
+      (assignment) => assignment.companyId === companyId && 
                       assignment.clientId === clientId && 
                       assignment.year === year && 
                       assignment.month === month
     );
   }
 
-  async getUnscheduledClients(userId: string, year: number, month: number): Promise<Client[]> {
-    const allClients = await this.getAllClients(userId);
-    const assignments = await this.getCalendarAssignments(userId, year, month);
+  async getUnscheduledClients(companyId: string, year: number, month: number): Promise<Client[]> {
+    const allClients = await this.getAllClients(companyId);
+    const assignments = await this.getCalendarAssignments(companyId, year, month);
     const scheduledClientIds = new Set(assignments.map(a => a.clientId));
     
     const monthIndex = month - 1; // Convert to 0-indexed
@@ -1020,7 +1036,7 @@ export class MemStorage implements IStorage {
       
       // Check if maintenance is completed
       const latestRecord = Array.from(this.maintenanceRecords.values())
-        .filter(r => r.userId === userId && r.clientId === client.id && r.completedAt)
+        .filter(r => r.companyId === companyId && r.clientId === client.id && r.completedAt)
         .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())[0];
       
       if (latestRecord) {
@@ -1041,9 +1057,10 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async createFeedback(userId: string, userEmail: string, feedback: InsertFeedback): Promise<Feedback> {
+  async createFeedback(companyId: string, userId: string, userEmail: string, feedback: InsertFeedback): Promise<Feedback> {
     const newFeedback: Feedback = {
       id: randomUUID(),
+      companyId,
       userId,
       userEmail,
       category: feedback.category,
@@ -1062,9 +1079,9 @@ export class MemStorage implements IStorage {
     );
   }
 
-  async getUserFeedback(userId: string): Promise<Feedback[]> {
+  async getCompanyFeedback(companyId: string): Promise<Feedback[]> {
     return Array.from(this.feedback.values())
-      .filter(f => f.userId === userId)
+      .filter(f => f.companyId === companyId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
@@ -1158,15 +1175,23 @@ export class DbStorage implements IStorage {
   }
 
   async updateUserTrialDate(id: string, trialEndsAt: Date): Promise<void> {
-    await db.update(users).set({ trialEndsAt }).where(eq(users.id, id));
+    // Get user's companyId first
+    const user = await this.getUser(id);
+    if (user && user.companyId) {
+      await db.update(companies).set({ trialEndsAt }).where(eq(companies.id, user.companyId));
+    }
   }
 
   async updateUserStripeCustomer(id: string, stripeCustomerId: string): Promise<void> {
-    await db.update(users).set({ stripeCustomerId }).where(eq(users.id, id));
+    // Get user's companyId first
+    const user = await this.getUser(id);
+    if (user && user.companyId) {
+      await db.update(companies).set({ stripeCustomerId }).where(eq(companies.id, user.companyId));
+    }
   }
 
   async getTechniciansByCompanyId(companyId: string): Promise<User[]> {
-    return db.select().from(users).where(eq(users.companyId, companyId));
+    return db.select().from(users).where(and(eq(users.companyId, companyId), eq(users.role, "technician")));
   }
 
   async createInvitationToken(tokenData: any): Promise<any> {
@@ -1206,35 +1231,35 @@ export class DbStorage implements IStorage {
   }
 
   // Client methods
-  async getClient(userId: string, id: string): Promise<Client | undefined> {
-    const result = await db.select().from(clients).where(and(eq(clients.id, id), eq(clients.userId, userId))).limit(1);
+  async getClient(companyId: string, id: string): Promise<Client | undefined> {
+    const result = await db.select().from(clients).where(and(eq(clients.id, id), eq(clients.companyId, companyId))).limit(1);
     return result[0];
   }
 
-  async getAllClients(userId: string): Promise<Client[]> {
-    return db.select().from(clients).where(eq(clients.userId, userId)).orderBy(desc(clients.createdAt));
+  async getAllClients(companyId: string): Promise<Client[]> {
+    return db.select().from(clients).where(eq(clients.companyId, companyId)).orderBy(desc(clients.createdAt));
   }
 
-  async createClient(userId: string, insertClient: InsertClient): Promise<Client> {
-    const result = await db.insert(clients).values({ ...insertClient, userId }).returning();
+  async createClient(companyId: string, userId: string, insertClient: InsertClient): Promise<Client> {
+    const result = await db.insert(clients).values({ ...insertClient, companyId, userId }).returning();
     return result[0];
   }
 
-  async createClientWithParts(userId: string, insertClient: InsertClient, partsList: Array<{ partId: string; quantity: number }>): Promise<Client> {
+  async createClientWithParts(companyId: string, userId: string, insertClient: InsertClient, partsList: Array<{ partId: string; quantity: number }>): Promise<Client> {
     return await db.transaction(async (tx) => {
-      // Validate all parts exist and belong to user
+      // Validate all parts exist and belong to company
       for (const partItem of partsList) {
         const existingPart = await tx.select().from(parts).where(
-          and(eq(parts.id, partItem.partId), eq(parts.userId, userId))
+          and(eq(parts.id, partItem.partId), eq(parts.companyId, companyId))
         ).limit(1);
         
         if (!existingPart || existingPart.length === 0) {
-          throw new Error(`Part with ID ${partItem.partId} not found or does not belong to user`);
+          throw new Error(`Part with ID ${partItem.partId} not found or does not belong to company`);
         }
       }
       
       // Create the client
-      const clientResult = await tx.insert(clients).values({ ...insertClient, userId }).returning();
+      const clientResult = await tx.insert(clients).values({ ...insertClient, companyId, userId }).returning();
       const client = clientResult[0];
       
       // Bulk insert all client-part associations
@@ -1244,6 +1269,7 @@ export class DbStorage implements IStorage {
             clientId: client.id,
             partId: partItem.partId,
             quantity: partItem.quantity,
+            companyId,
             userId
           }))
         );
@@ -1253,27 +1279,27 @@ export class DbStorage implements IStorage {
     });
   }
 
-  async updateClient(userId: string, id: string, clientUpdate: Partial<InsertClient>): Promise<Client | undefined> {
-    const result = await db.update(clients).set(clientUpdate).where(and(eq(clients.id, id), eq(clients.userId, userId))).returning();
+  async updateClient(companyId: string, id: string, clientUpdate: Partial<InsertClient>): Promise<Client | undefined> {
+    const result = await db.update(clients).set(clientUpdate).where(and(eq(clients.id, id), eq(clients.companyId, companyId))).returning();
     return result[0];
   }
 
-  async deleteClient(userId: string, id: string): Promise<boolean> {
+  async deleteClient(companyId: string, id: string): Promise<boolean> {
     // Foreign key constraints with ON DELETE CASCADE will automatically delete
     // client_parts and maintenance_records, but we keep manual deletes as defensive fallback
-    await this.deleteAllClientParts(userId, id);
-    await db.delete(maintenanceRecords).where(and(eq(maintenanceRecords.clientId, id), eq(maintenanceRecords.userId, userId)));
-    const result = await db.delete(clients).where(and(eq(clients.id, id), eq(clients.userId, userId))).returning();
+    await this.deleteAllClientParts(companyId, id);
+    await db.delete(maintenanceRecords).where(and(eq(maintenanceRecords.clientId, id), eq(maintenanceRecords.companyId, companyId)));
+    const result = await db.delete(clients).where(and(eq(clients.id, id), eq(clients.companyId, companyId))).returning();
     return result.length > 0;
   }
 
-  async deleteClients(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }> {
+  async deleteClients(companyId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }> {
     const deletedIds: string[] = [];
     const notFoundIds: string[] = [];
 
-    // Verify all IDs belong to the user first
+    // Verify all IDs belong to the company first
     const clientChecks = await Promise.all(
-      ids.map(id => this.getClient(userId, id))
+      ids.map(id => this.getClient(companyId, id))
     );
     
     for (let i = 0; i < ids.length; i++) {
@@ -1286,12 +1312,12 @@ export class DbStorage implements IStorage {
       }
 
       // Delete associated data (foreign key cascades should handle this, but being defensive)
-      await this.deleteAllClientParts(userId, id);
-      await db.delete(maintenanceRecords).where(and(eq(maintenanceRecords.clientId, id), eq(maintenanceRecords.userId, userId)));
-      await db.delete(equipment).where(and(eq(equipment.clientId, id), eq(equipment.userId, userId)));
+      await this.deleteAllClientParts(companyId, id);
+      await db.delete(maintenanceRecords).where(and(eq(maintenanceRecords.clientId, id), eq(maintenanceRecords.companyId, companyId)));
+      await db.delete(equipment).where(and(eq(equipment.clientId, id), eq(equipment.companyId, companyId)));
 
       // Delete the client
-      const result = await db.delete(clients).where(and(eq(clients.id, id), eq(clients.userId, userId))).returning();
+      const result = await db.delete(clients).where(and(eq(clients.id, id), eq(clients.companyId, companyId))).returning();
       if (result.length > 0) {
         deletedIds.push(id);
       }
@@ -1301,24 +1327,24 @@ export class DbStorage implements IStorage {
   }
 
   // Part methods
-  async getPart(userId: string, id: string): Promise<Part | undefined> {
-    const result = await db.select().from(parts).where(and(eq(parts.id, id), eq(parts.userId, userId))).limit(1);
+  async getPart(companyId: string, id: string): Promise<Part | undefined> {
+    const result = await db.select().from(parts).where(and(eq(parts.id, id), eq(parts.companyId, companyId))).limit(1);
     return result[0];
   }
 
-  async getAllParts(userId: string): Promise<Part[]> {
-    return db.select().from(parts).where(eq(parts.userId, userId)).orderBy(desc(parts.createdAt));
+  async getAllParts(companyId: string): Promise<Part[]> {
+    return db.select().from(parts).where(eq(parts.companyId, companyId)).orderBy(desc(parts.createdAt));
   }
 
-  async getPartsByType(userId: string, type: string): Promise<Part[]> {
-    return db.select().from(parts).where(and(eq(parts.userId, userId), eq(parts.type, type)));
+  async getPartsByType(companyId: string, type: string): Promise<Part[]> {
+    return db.select().from(parts).where(and(eq(parts.companyId, companyId), eq(parts.type, type)));
   }
 
-  async findDuplicatePart(userId: string, insertPart: InsertPart): Promise<Part | undefined> {
+  async findDuplicatePart(companyId: string, insertPart: InsertPart): Promise<Part | undefined> {
     if (insertPart.type === 'filter') {
       const result = await db.select().from(parts)
         .where(and(
-          eq(parts.userId, userId),
+          eq(parts.companyId, companyId),
           eq(parts.type, 'filter'),
           eq(parts.filterType, insertPart.filterType ?? ''),
           eq(parts.size, insertPart.size ?? '')
@@ -1328,7 +1354,7 @@ export class DbStorage implements IStorage {
     } else if (insertPart.type === 'belt') {
       const result = await db.select().from(parts)
         .where(and(
-          eq(parts.userId, userId),
+          eq(parts.companyId, companyId),
           eq(parts.type, 'belt'),
           eq(parts.beltType, insertPart.beltType ?? ''),
           eq(parts.size, insertPart.size ?? '')
@@ -1338,7 +1364,7 @@ export class DbStorage implements IStorage {
     } else if (insertPart.type === 'other') {
       const result = await db.select().from(parts)
         .where(and(
-          eq(parts.userId, userId),
+          eq(parts.companyId, companyId),
           eq(parts.type, 'other'),
           eq(parts.name, insertPart.name ?? '')
         ))
@@ -1348,29 +1374,29 @@ export class DbStorage implements IStorage {
     return undefined;
   }
 
-  async createPart(userId: string, insertPart: InsertPart): Promise<Part> {
-    const result = await db.insert(parts).values({ ...insertPart, userId }).returning();
+  async createPart(companyId: string, userId: string, insertPart: InsertPart): Promise<Part> {
+    const result = await db.insert(parts).values({ ...insertPart, companyId, userId }).returning();
     return result[0];
   }
 
-  async updatePart(userId: string, id: string, partUpdate: Partial<InsertPart>): Promise<Part | undefined> {
-    const result = await db.update(parts).set(partUpdate).where(and(eq(parts.id, id), eq(parts.userId, userId))).returning();
+  async updatePart(companyId: string, id: string, partUpdate: Partial<InsertPart>): Promise<Part | undefined> {
+    const result = await db.update(parts).set(partUpdate).where(and(eq(parts.id, id), eq(parts.companyId, companyId))).returning();
     return result[0];
   }
 
-  async deletePart(userId: string, id: string): Promise<boolean> {
-    await db.delete(clientParts).where(and(eq(clientParts.partId, id), eq(clientParts.userId, userId)));
-    const result = await db.delete(parts).where(and(eq(parts.id, id), eq(parts.userId, userId))).returning();
+  async deletePart(companyId: string, id: string): Promise<boolean> {
+    await db.delete(clientParts).where(and(eq(clientParts.partId, id), eq(clientParts.companyId, companyId)));
+    const result = await db.delete(parts).where(and(eq(parts.id, id), eq(parts.companyId, companyId))).returning();
     return result.length > 0;
   }
 
-  async deleteParts(userId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }> {
+  async deleteParts(companyId: string, ids: string[]): Promise<{ deletedIds: string[]; notFoundIds: string[] }> {
     const deletedIds: string[] = [];
     const notFoundIds: string[] = [];
 
-    // Verify all IDs belong to the user first
+    // Verify all IDs belong to the company first
     const partChecks = await Promise.all(
-      ids.map(id => this.getPart(userId, id))
+      ids.map(id => this.getPart(companyId, id))
     );
     
     for (let i = 0; i < ids.length; i++) {
@@ -1383,10 +1409,10 @@ export class DbStorage implements IStorage {
       }
 
       // Delete all client-part associations
-      await db.delete(clientParts).where(and(eq(clientParts.partId, id), eq(clientParts.userId, userId)));
+      await db.delete(clientParts).where(and(eq(clientParts.partId, id), eq(clientParts.companyId, companyId)));
 
       // Delete the part
-      const result = await db.delete(parts).where(and(eq(parts.id, id), eq(parts.userId, userId))).returning();
+      const result = await db.delete(parts).where(and(eq(parts.id, id), eq(parts.companyId, companyId))).returning();
       if (result.length > 0) {
         deletedIds.push(id);
       }
@@ -1395,14 +1421,14 @@ export class DbStorage implements IStorage {
     return { deletedIds, notFoundIds };
   }
 
-  async seedUserParts(userId: string): Promise<void> {
+  async seedUserParts(companyId: string, userId: string): Promise<void> {
     const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
     
     for (const partData of allSeedParts) {
-      const existingPart = await this.findDuplicatePart(userId, partData);
+      const existingPart = await this.findDuplicatePart(companyId, partData);
       
       if (!existingPart) {
-        await this.createPart(userId, partData);
+        await this.createPart(companyId, userId, partData);
       }
     }
   }
@@ -1478,11 +1504,11 @@ export class DbStorage implements IStorage {
     await db.delete(clientParts).where(and(eq(clientParts.clientId, clientId), eq(clientParts.companyId, companyId)));
   }
 
-  async getPartsReportByMonth(userId: string, month: number, outstandingOnly = false): Promise<Array<{ part: Part; totalQuantity: number }>> {
+  async getPartsReportByMonth(companyId: string, month: number, outstandingOnly = false): Promise<Array<{ part: Part; totalQuantity: number }>> {
     const clientsWithMaintenance = await db.select()
       .from(clients)
       .where(and(
-        eq(clients.userId, userId),
+        eq(clients.companyId, companyId),
         sql`${month} = ANY(${clients.selectedMonths})`,
         eq(clients.inactive, false)
       ));
@@ -1502,7 +1528,7 @@ export class DbStorage implements IStorage {
       const completedRecords = await db.select()
         .from(maintenanceRecords)
         .where(and(
-          eq(maintenanceRecords.userId, userId),
+          eq(maintenanceRecords.companyId, companyId),
           inArray(maintenanceRecords.clientId, clientIds),
           sql`${maintenanceRecords.completedAt} IS NOT NULL`,
           sql`${maintenanceRecords.dueDate} >= ${startDate}`,
@@ -1522,7 +1548,7 @@ export class DbStorage implements IStorage {
       .leftJoin(parts, eq(clientParts.partId, parts.id))
       .where(and(
         inArray(clientParts.clientId, clientIds),
-        eq(clientParts.userId, userId)
+        eq(clientParts.companyId, companyId)
       ));
     
     const partsMap = new Map<string, { part: Part; totalQuantity: number }>();
@@ -1566,11 +1592,11 @@ export class DbStorage implements IStorage {
   }
 
   // Maintenance record methods
-  async getMaintenanceRecord(userId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined> {
+  async getMaintenanceRecord(companyId: string, clientId: string, dueDate: string): Promise<MaintenanceRecord | undefined> {
     const result = await db.select()
       .from(maintenanceRecords)
       .where(and(
-        eq(maintenanceRecords.userId, userId),
+        eq(maintenanceRecords.companyId, companyId),
         eq(maintenanceRecords.clientId, clientId),
         eq(maintenanceRecords.dueDate, dueDate)
       ))
@@ -1578,11 +1604,11 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getLatestCompletedMaintenanceRecord(userId: string, clientId: string): Promise<MaintenanceRecord | undefined> {
+  async getLatestCompletedMaintenanceRecord(companyId: string, clientId: string): Promise<MaintenanceRecord | undefined> {
     const result = await db.select()
       .from(maintenanceRecords)
       .where(and(
-        eq(maintenanceRecords.userId, userId),
+        eq(maintenanceRecords.companyId, companyId),
         eq(maintenanceRecords.clientId, clientId),
         sql`${maintenanceRecords.completedAt} IS NOT NULL`
       ))
@@ -1591,17 +1617,17 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getAllLatestCompletedMaintenanceRecords(userId: string): Promise<Record<string, MaintenanceRecord>> {
+  async getAllLatestCompletedMaintenanceRecords(companyId: string): Promise<Record<string, MaintenanceRecord>> {
     // Use a window function to get the latest completed record for each client
     const records = await db.execute<MaintenanceRecord>(sql`
       WITH ranked_records AS (
         SELECT *,
           ROW_NUMBER() OVER (PARTITION BY client_id ORDER BY completed_at DESC) as rn
         FROM maintenance_records
-        WHERE user_id = ${userId}
+        WHERE company_id = ${companyId}
           AND completed_at IS NOT NULL
       )
-      SELECT id, user_id, client_id, due_date, completed_at
+      SELECT id, company_id, user_id, client_id, due_date, completed_at
       FROM ranked_records
       WHERE rn = 1
     `);
@@ -1610,6 +1636,7 @@ export class DbStorage implements IStorage {
     for (const record of records.rows as any[]) {
       result[record.client_id] = {
         id: record.id,
+        companyId: record.company_id,
         userId: record.user_id,
         clientId: record.client_id,
         dueDate: record.due_date,
@@ -1620,14 +1647,14 @@ export class DbStorage implements IStorage {
     return result;
   }
 
-  async getRecentlyCompletedMaintenance(userId: string, month: number, year: number): Promise<MaintenanceRecord[]> {
+  async getRecentlyCompletedMaintenance(companyId: string, month: number, year: number): Promise<MaintenanceRecord[]> {
     const startDate = new Date(year, month, 1).toISOString();
     const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
     
     return db.select()
       .from(maintenanceRecords)
       .where(and(
-        eq(maintenanceRecords.userId, userId),
+        eq(maintenanceRecords.companyId, companyId),
         sql`${maintenanceRecords.completedAt} IS NOT NULL`,
         sql`${maintenanceRecords.completedAt} >= ${startDate}`,
         sql`${maintenanceRecords.completedAt} <= ${endDate}`
@@ -1635,11 +1662,11 @@ export class DbStorage implements IStorage {
       .orderBy(desc(maintenanceRecords.completedAt));
   }
 
-  async getCompletedUnscheduledMaintenance(userId: string): Promise<MaintenanceRecord[]> {
+  async getCompletedUnscheduledMaintenance(companyId: string): Promise<MaintenanceRecord[]> {
     const completedRecords = await db.select()
       .from(maintenanceRecords)
       .where(and(
-        eq(maintenanceRecords.userId, userId),
+        eq(maintenanceRecords.companyId, companyId),
         sql`${maintenanceRecords.completedAt} IS NOT NULL`
       ))
       .orderBy(desc(maintenanceRecords.completedAt));
@@ -1651,7 +1678,7 @@ export class DbStorage implements IStorage {
       const month = dueDate.getMonth() + 1;
       
       // Check if there was a calendar assignment for this client in this month
-      const assignment = await this.getClientCalendarAssignment(userId, record.clientId, year, month);
+      const assignment = await this.getClientCalendarAssignment(companyId, record.clientId, year, month);
       if (!assignment) {
         result.push(record);
       }
@@ -1660,86 +1687,86 @@ export class DbStorage implements IStorage {
     return result;
   }
 
-  async createMaintenanceRecord(userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
-    // Verify that the client belongs to the userId
-    const client = await this.getClient(userId, insertRecord.clientId);
+  async createMaintenanceRecord(companyId: string, userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
+    // Verify that the client belongs to the company
+    const client = await this.getClient(companyId, insertRecord.clientId);
     if (!client) {
-      throw new Error("Client not found or does not belong to user");
+      throw new Error("Client not found or does not belong to company");
     }
     
-    const result = await db.insert(maintenanceRecords).values({ ...insertRecord, userId }).returning();
+    const result = await db.insert(maintenanceRecords).values({ ...insertRecord, companyId, userId }).returning();
     return result[0];
   }
 
-  async updateMaintenanceRecord(userId: string, id: string, recordUpdate: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined> {
-    const result = await db.update(maintenanceRecords).set(recordUpdate).where(and(eq(maintenanceRecords.id, id), eq(maintenanceRecords.userId, userId))).returning();
+  async updateMaintenanceRecord(companyId: string, id: string, recordUpdate: Partial<InsertMaintenanceRecord>): Promise<MaintenanceRecord | undefined> {
+    const result = await db.update(maintenanceRecords).set(recordUpdate).where(and(eq(maintenanceRecords.id, id), eq(maintenanceRecords.companyId, companyId))).returning();
     return result[0];
   }
 
-  async deleteMaintenanceRecord(userId: string, id: string): Promise<boolean> {
-    const result = await db.delete(maintenanceRecords).where(and(eq(maintenanceRecords.id, id), eq(maintenanceRecords.userId, userId))).returning();
+  async deleteMaintenanceRecord(companyId: string, id: string): Promise<boolean> {
+    const result = await db.delete(maintenanceRecords).where(and(eq(maintenanceRecords.id, id), eq(maintenanceRecords.companyId, companyId))).returning();
     return result.length > 0;
   }
 
   // Equipment methods
-  async getAllEquipment(userId: string): Promise<Equipment[]> {
+  async getAllEquipment(companyId: string): Promise<Equipment[]> {
     return db.select()
       .from(equipment)
-      .where(eq(equipment.userId, userId))
+      .where(eq(equipment.companyId, companyId))
       .orderBy(equipment.createdAt);
   }
 
-  async getClientEquipment(userId: string, clientId: string): Promise<Equipment[]> {
+  async getClientEquipment(companyId: string, clientId: string): Promise<Equipment[]> {
     return db.select()
       .from(equipment)
       .where(and(
-        eq(equipment.userId, userId),
+        eq(equipment.companyId, companyId),
         eq(equipment.clientId, clientId)
       ))
       .orderBy(equipment.createdAt);
   }
 
-  async getEquipment(userId: string, id: string): Promise<Equipment | undefined> {
+  async getEquipment(companyId: string, id: string): Promise<Equipment | undefined> {
     const result = await db.select()
       .from(equipment)
-      .where(and(eq(equipment.id, id), eq(equipment.userId, userId)))
+      .where(and(eq(equipment.id, id), eq(equipment.companyId, companyId)))
       .limit(1);
     return result[0];
   }
 
-  async createEquipment(userId: string, insertEquipment: InsertEquipment): Promise<Equipment> {
-    // Verify that the client belongs to the userId
-    const client = await this.getClient(userId, insertEquipment.clientId);
+  async createEquipment(companyId: string, userId: string, insertEquipment: InsertEquipment): Promise<Equipment> {
+    // Verify that the client belongs to the company
+    const client = await this.getClient(companyId, insertEquipment.clientId);
     if (!client) {
-      throw new Error("Client not found or does not belong to user");
+      throw new Error("Client not found or does not belong to company");
     }
     
-    const result = await db.insert(equipment).values({ ...insertEquipment, userId }).returning();
+    const result = await db.insert(equipment).values({ ...insertEquipment, companyId, userId }).returning();
     return result[0];
   }
 
-  async updateEquipment(userId: string, id: string, equipmentUpdate: Partial<InsertEquipment>): Promise<Equipment | undefined> {
-    const result = await db.update(equipment).set(equipmentUpdate).where(and(eq(equipment.id, id), eq(equipment.userId, userId))).returning();
+  async updateEquipment(companyId: string, id: string, equipmentUpdate: Partial<InsertEquipment>): Promise<Equipment | undefined> {
+    const result = await db.update(equipment).set(equipmentUpdate).where(and(eq(equipment.id, id), eq(equipment.companyId, companyId))).returning();
     return result[0];
   }
 
-  async deleteEquipment(userId: string, id: string): Promise<boolean> {
-    const result = await db.delete(equipment).where(and(eq(equipment.id, id), eq(equipment.userId, userId))).returning();
+  async deleteEquipment(companyId: string, id: string): Promise<boolean> {
+    const result = await db.delete(equipment).where(and(eq(equipment.id, id), eq(equipment.companyId, companyId))).returning();
     return result.length > 0;
   }
 
-  async deleteAllClientEquipment(userId: string, clientId: string): Promise<void> {
-    await db.delete(equipment).where(and(eq(equipment.userId, userId), eq(equipment.clientId, clientId)));
+  async deleteAllClientEquipment(companyId: string, clientId: string): Promise<void> {
+    await db.delete(equipment).where(and(eq(equipment.companyId, companyId), eq(equipment.clientId, clientId)));
   }
 
-  async getClientReport(userId: string, clientId: string): Promise<{ client: Client; parts: (ClientPart & { part: Part })[]; equipment: Equipment[] } | null> {
-    const client = await this.getClient(userId, clientId);
+  async getClientReport(companyId: string, clientId: string): Promise<{ client: Client; parts: (ClientPart & { part: Part })[]; equipment: Equipment[] } | null> {
+    const client = await this.getClient(companyId, clientId);
     if (!client) {
       return null;
     }
 
-    const parts = await this.getClientParts(client.companyId, clientId);
-    const equip = await this.getClientEquipment(userId, clientId);
+    const parts = await this.getClientParts(companyId, clientId);
+    const equip = await this.getClientEquipment(companyId, clientId);
 
     return {
       client,
@@ -1749,62 +1776,64 @@ export class DbStorage implements IStorage {
   }
 
   // Company settings methods
-  async getCompanySettings(userId: string): Promise<CompanySettings | undefined> {
+  async getCompanySettings(companyId: string): Promise<CompanySettings | undefined> {
     const result = await db.select()
       .from(companySettings)
-      .where(eq(companySettings.userId, userId))
+      .where(eq(companySettings.companyId, companyId))
       .limit(1);
     return result[0];
   }
 
-  async upsertCompanySettings(userId: string, settings: InsertCompanySettings): Promise<CompanySettings> {
-    const existing = await this.getCompanySettings(userId);
+  async upsertCompanySettings(companyId: string, userId: string, settings: InsertCompanySettings): Promise<CompanySettings> {
+    const existing = await this.getCompanySettings(companyId);
     
     if (existing) {
       const result = await db.update(companySettings)
         .set({ ...settings, updatedAt: sql`CURRENT_TIMESTAMP` })
-        .where(eq(companySettings.userId, userId))
+        .where(eq(companySettings.companyId, companyId))
         .returning();
       return result[0];
     } else {
       const result = await db.insert(companySettings)
-        .values({ ...settings, userId })
+        .values({ ...settings, companyId, userId })
         .returning();
       return result[0];
     }
   }
 
   // Calendar assignment methods
-  async getCalendarAssignments(userId: string, year: number, month: number): Promise<CalendarAssignment[]> {
+  async getCalendarAssignments(companyId: string, year: number, month: number, assignedTechnicianId?: string): Promise<CalendarAssignment[]> {
+    const conditions = [
+      eq(calendarAssignments.companyId, companyId),
+      eq(calendarAssignments.year, year),
+      eq(calendarAssignments.month, month)
+    ];
+    
     return db.select()
       .from(calendarAssignments)
-      .where(and(
-        eq(calendarAssignments.userId, userId),
-        eq(calendarAssignments.year, year),
-        eq(calendarAssignments.month, month)
-      ));
+      .where(and(...conditions));
   }
 
-  async getCalendarAssignment(userId: string, id: string): Promise<CalendarAssignment | undefined> {
+  async getCalendarAssignment(companyId: string, id: string): Promise<CalendarAssignment | undefined> {
     const result = await db.select()
       .from(calendarAssignments)
-      .where(and(eq(calendarAssignments.id, id), eq(calendarAssignments.userId, userId)))
+      .where(and(eq(calendarAssignments.id, id), eq(calendarAssignments.companyId, companyId)))
       .limit(1);
     return result[0];
   }
 
-  async createCalendarAssignment(userId: string, companyId: string, insertAssignment: InsertCalendarAssignment): Promise<CalendarAssignment> {
-    // Verify that the client belongs to the userId
-    const client = await this.getClient(userId, insertAssignment.clientId);
+  async createCalendarAssignment(companyId: string, userId: string, insertAssignment: InsertCalendarAssignment): Promise<CalendarAssignment> {
+    // Verify that the client belongs to the company
+    const client = await this.getClient(companyId, insertAssignment.clientId);
     if (!client) {
-      throw new Error("Client not found or does not belong to user");
+      throw new Error("Client not found or does not belong to company");
     }
     
-    const result = await db.insert(calendarAssignments).values({ ...insertAssignment, userId, companyId }).returning();
+    const result = await db.insert(calendarAssignments).values({ ...insertAssignment, companyId, userId }).returning();
     return result[0];
   }
 
-  async updateCalendarAssignment(userId: string, id: string, assignmentUpdate: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined> {
+  async updateCalendarAssignment(companyId: string, id: string, assignmentUpdate: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined> {
     // Build update object with only provided fields
     const updateFields: Partial<Pick<CalendarAssignment, 'day' | 'scheduledDate' | 'autoDueDate' | 'completed' | 'assignedTechnicianIds' | 'completionNotes'>> = {};
     if (assignmentUpdate.day !== undefined) updateFields.day = assignmentUpdate.day;
@@ -1816,7 +1845,7 @@ export class DbStorage implements IStorage {
     
     const result = await db.update(calendarAssignments)
       .set(updateFields)
-      .where(and(eq(calendarAssignments.id, id), eq(calendarAssignments.userId, userId)))
+      .where(and(eq(calendarAssignments.id, id), eq(calendarAssignments.companyId, companyId)))
       .returning();
     return result[0];
   }
@@ -1873,18 +1902,18 @@ export class DbStorage implements IStorage {
     return result;
   }
 
-  async deleteCalendarAssignment(userId: string, id: string): Promise<boolean> {
+  async deleteCalendarAssignment(companyId: string, id: string): Promise<boolean> {
     const result = await db.delete(calendarAssignments)
-      .where(and(eq(calendarAssignments.id, id), eq(calendarAssignments.userId, userId)))
+      .where(and(eq(calendarAssignments.id, id), eq(calendarAssignments.companyId, companyId)))
       .returning();
     return result.length > 0;
   }
 
-  async getClientCalendarAssignment(userId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined> {
+  async getClientCalendarAssignment(companyId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined> {
     const result = await db.select()
       .from(calendarAssignments)
       .where(and(
-        eq(calendarAssignments.userId, userId),
+        eq(calendarAssignments.companyId, companyId),
         eq(calendarAssignments.clientId, clientId),
         eq(calendarAssignments.year, year),
         eq(calendarAssignments.month, month)
@@ -1893,24 +1922,24 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getUnscheduledClients(userId: string, year: number, month: number): Promise<Client[]> {
+  async getUnscheduledClients(companyId: string, year: number, month: number): Promise<Client[]> {
     const monthIndex = month - 1; // Convert to 0-indexed
     
     // Get all assignments for this month
     const assignments = await db.select()
       .from(calendarAssignments)
       .where(and(
-        eq(calendarAssignments.userId, userId),
+        eq(calendarAssignments.companyId, companyId),
         eq(calendarAssignments.year, year),
         eq(calendarAssignments.month, month)
       ));
     
     const scheduledClientIds = new Set(assignments.map(a => a.clientId));
     
-    // Get all clients for this user
+    // Get all clients for this company
     const allClients = await db.select()
       .from(clients)
-      .where(eq(clients.userId, userId));
+      .where(eq(clients.companyId, companyId));
     
     // Filter clients
     const unscheduled: Client[] = [];
@@ -1929,7 +1958,7 @@ export class DbStorage implements IStorage {
       const latestRecord = await db.select()
         .from(maintenanceRecords)
         .where(and(
-          eq(maintenanceRecords.userId, userId),
+          eq(maintenanceRecords.companyId, companyId),
           eq(maintenanceRecords.clientId, client.id),
           sql`${maintenanceRecords.completedAt} IS NOT NULL`
         ))
@@ -1956,12 +1985,12 @@ export class DbStorage implements IStorage {
     return unscheduled;
   }
 
-  async cleanupInvalidCalendarAssignments(userId: string, clientId: string, validMonths: number[]): Promise<{ removedCount: number }> {
+  async cleanupInvalidCalendarAssignments(companyId: string, clientId: string, validMonths: number[]): Promise<{ removedCount: number }> {
     // Get all calendar assignments for this client
     const allAssignments = await db.select()
       .from(calendarAssignments)
       .where(and(
-        eq(calendarAssignments.userId, userId),
+        eq(calendarAssignments.companyId, companyId),
         eq(calendarAssignments.clientId, clientId)
       ));
     
@@ -1973,7 +2002,7 @@ export class DbStorage implements IStorage {
     const completedRecords = await db.select()
       .from(maintenanceRecords)
       .where(and(
-        eq(maintenanceRecords.userId, userId),
+        eq(maintenanceRecords.companyId, companyId),
         eq(maintenanceRecords.clientId, clientId),
         sql`${maintenanceRecords.completedAt} IS NOT NULL`
       ));
@@ -2004,7 +2033,7 @@ export class DbStorage implements IStorage {
       await db.delete(calendarAssignments)
         .where(
           and(
-            eq(calendarAssignments.userId, userId),
+            eq(calendarAssignments.companyId, companyId),
             sql`${calendarAssignments.id} IN (${sql.join(assignmentsToRemove.map(id => sql`${id}`), sql`, `)})`
           )
         );
@@ -2013,8 +2042,9 @@ export class DbStorage implements IStorage {
     return { removedCount: assignmentsToRemove.length };
   }
 
-  async createFeedback(userId: string, userEmail: string, feedbackData: InsertFeedback): Promise<Feedback> {
+  async createFeedback(companyId: string, userId: string, userEmail: string, feedbackData: InsertFeedback): Promise<Feedback> {
     const result = await db.insert(feedback).values({
+      companyId,
       userId,
       userEmail,
       category: feedbackData.category,
@@ -2029,10 +2059,10 @@ export class DbStorage implements IStorage {
       .orderBy(desc(feedback.createdAt));
   }
 
-  async getUserFeedback(userId: string): Promise<Feedback[]> {
+  async getCompanyFeedback(companyId: string): Promise<Feedback[]> {
     return db.select()
       .from(feedback)
-      .where(eq(feedback.userId, userId))
+      .where(eq(feedback.companyId, companyId))
       .orderBy(desc(feedback.createdAt));
   }
 
