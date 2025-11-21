@@ -63,12 +63,11 @@ export interface IStorage {
   getTechniciansByCompanyId(companyId: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPassword(id: string, hashedPassword: string): Promise<void>;
-  updateUserRole(companyId: string, id: string, role: string): Promise<void>;
+  updateUserRole(id: string, role: string): Promise<void>;
   
   // Admin user management methods
   getAllUsers(): Promise<User[]>;
   deleteUser(id: string): Promise<boolean>;
-  updateUserAdminStatus(id: string, isAdmin: boolean): Promise<void>;
   updateUserTrialDate(id: string, trialEndsAt: Date): Promise<void>;
   updateUserStripeCustomer(id: string, stripeCustomerId: string): Promise<void>;
   
@@ -240,9 +239,9 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async updateUserRole(companyId: string, id: string, role: string): Promise<void> {
+  async updateUserRole(id: string, role: string): Promise<void> {
     const user = this.users.get(id);
-    if (user && user.companyId === companyId) {
+    if (user) {
       this.users.set(id, { ...user, role });
     }
   }
@@ -254,13 +253,6 @@ export class MemStorage implements IStorage {
 
   async deleteUser(id: string): Promise<boolean> {
     return this.users.delete(id);
-  }
-
-  async updateUserAdminStatus(id: string, isAdmin: boolean): Promise<void> {
-    const user = this.users.get(id);
-    if (user) {
-      this.users.set(id, { ...user, isAdmin });
-    }
   }
 
   async updateUserTrialDate(id: string, trialEndsAt: Date): Promise<void> {
@@ -1161,8 +1153,8 @@ export class DbStorage implements IStorage {
     return result.length > 0;
   }
 
-  async updateUserAdminStatus(id: string, isAdmin: boolean): Promise<void> {
-    await db.update(users).set({ isAdmin }).where(eq(users.id, id));
+  async updateUserRole(id: string, role: string): Promise<void> {
+    await db.update(users).set({ role }).where(eq(users.id, id));
   }
 
   async updateUserTrialDate(id: string, trialEndsAt: Date): Promise<void> {

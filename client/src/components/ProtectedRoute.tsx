@@ -16,7 +16,8 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
       if (!user) {
         setLocation("/login");
       } else if (requireAdmin && user.role !== "owner" && user.role !== "admin") {
-        setLocation("/");
+        // Redirect technicians to their dashboard
+        setLocation("/technician");
       }
     }
   }, [user, isLoading, setLocation, requireAdmin]);

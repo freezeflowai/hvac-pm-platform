@@ -51,8 +51,6 @@ export default function Admin() {
   const [, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
 
-  console.log("Admin page - Current user:", currentUser);
-
   const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
   });
@@ -86,14 +84,14 @@ export default function Admin() {
   });
 
   const toggleAdminMutation = useMutation({
-    mutationFn: async ({ userId, isAdmin }: { userId: string; isAdmin: boolean }) => {
-      await apiRequest("PATCH", `/api/admin/users/${userId}/admin`, { isAdmin });
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      await apiRequest("PATCH", `/api/admin/users/${userId}/role`, { role });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({
-        title: "Admin status updated",
-        description: "The user's admin status has been updated.",
+        title: "Role updated",
+        description: "The user's role has been updated successfully.",
       });
     },
     onError: (error: Error) => {
@@ -291,9 +289,9 @@ export default function Admin() {
                     <span className="font-medium" data-testid={`text-email-${user.id}`}>
                       {user.email}
                     </span>
-                    {user.isAdmin && (
+                    {(user.role === "owner" || user.role === "admin") && (
                       <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
-                        Admin
+                        {user.role === "owner" ? "Owner" : "Admin"}
                       </span>
                     )}
                     {user.id === currentUser.id && (
@@ -397,11 +395,12 @@ export default function Admin() {
                       <Button
                         variant="outline"
                         size="icon"
-                        disabled={toggleAdminMutation.isPending}
+                        disabled={toggleAdminMutation.isPending || user.role === "owner"}
                         data-testid={`button-toggle-admin-${user.id}`}
-                        aria-label={user.isAdmin ? "Remove admin status" : "Grant admin status"}
+                        aria-label={user.role === "admin" ? "Remove admin status" : "Grant admin status"}
+                        title={user.role === "owner" ? "Cannot modify owner role" : ""}
                       >
-                        {user.isAdmin ? (
+                        {user.role === "admin" || user.role === "owner" ? (
                           <ShieldOff className="h-4 w-4" />
                         ) : (
                           <ShieldCheck className="h-4 w-4" />
@@ -411,12 +410,12 @@ export default function Admin() {
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>
-                          {user.isAdmin ? "Remove Admin Status" : "Grant Admin Status"}
+                          {user.role === "admin" ? "Demote to Technician" : "Promote to Admin"}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                          {user.isAdmin
-                            ? "Are you sure you want to remove admin privileges from this user?"
-                            : "Are you sure you want to grant admin privileges to this user?"}
+                          {user.role === "admin"
+                            ? "Are you sure you want to demote this admin to technician? They will lose admin privileges."
+                            : "Are you sure you want to promote this technician to admin? They will gain full admin privileges."}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -425,7 +424,7 @@ export default function Admin() {
                           onClick={() =>
                             toggleAdminMutation.mutate({
                               userId: user.id,
-                              isAdmin: !user.isAdmin,
+                              role: user.role === "admin" ? "technician" : "admin",
                             })
                           }
                         >

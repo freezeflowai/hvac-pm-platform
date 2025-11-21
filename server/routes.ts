@@ -181,7 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalUsers: userCount,
         adminUsers: adminUsers.length,
         isAuthenticated: req.isAuthenticated(),
-        currentUser: req.user ? { id: req.user.id, email: req.user.email, isAdmin: req.user.isAdmin } : null,
+        currentUser: req.user ? { id: req.user.id, email: req.user.email, role: req.user.role } : null,
         sessionCookieSettings: {
           secure: isProduction,
           sameSite: "lax"
@@ -1232,12 +1232,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Cannot delete your own account" });
       }
       
-      // Check if this is the last admin
+      // Check if this is the last admin/owner
       const users = await storage.getAllUsers();
-      const adminUsers = users.filter(u => u.isAdmin);
+      const adminUsers = users.filter(u => u.role === "owner" || u.role === "admin");
       const userToDelete = users.find(u => u.id === id);
       
-      if (userToDelete?.isAdmin && adminUsers.length === 1) {
+      if ((userToDelete?.role === "owner" || userToDelete?.role === "admin") && adminUsers.length === 1) {
         return res.status(400).json({ error: "Cannot delete the last admin user" });
       }
       
@@ -1253,27 +1253,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/admin/users/:id/admin", requireAdmin, async (req, res) => {
+  app.patch("/api/admin/users/:id/role", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { isAdmin: newAdminStatus } = req.body;
+      const { role: newRole } = req.body;
       
-      if (typeof newAdminStatus !== 'boolean') {
-        return res.status(400).json({ error: "Invalid admin status" });
+      if (!newRole || !["owner", "admin", "technician"].includes(newRole)) {
+        return res.status(400).json({ error: "Invalid role. Must be owner, admin, or technician." });
       }
       
-      // If demoting from admin, check if this is the last admin
-      if (!newAdminStatus) {
+      // Prevent changing owner role
+      const userToUpdate = await storage.getUser(id);
+      if (userToUpdate?.role === "owner") {
+        return res.status(403).json({ error: "Cannot change owner role" });
+      }
+      
+      // If demoting from owner/admin, check if this is the last admin
+      if (newRole === "technician") {
         const users = await storage.getAllUsers();
-        const adminUsers = users.filter(u => u.isAdmin);
-        const userToUpdate = users.find(u => u.id === id);
+        const adminUsers = users.filter(u => u.role === "owner" || u.role === "admin");
         
-        if (userToUpdate?.isAdmin && adminUsers.length === 1) {
+        if ((userToUpdate?.role === "owner" || userToUpdate?.role === "admin") && adminUsers.length === 1) {
           return res.status(400).json({ error: "Cannot demote the last admin user" });
         }
       }
       
-      await storage.updateUserAdminStatus(id, newAdminStatus);
+      await storage.updateUserRole(id, newRole);
       res.json({ success: true });
     } catch (error) {
       console.error('Update admin status error:', error);
@@ -1701,7 +1706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/feedback", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
-      const isAdminUser = req.user!.isAdmin;
+      const isAdminUser = req.user!.role === "owner" || req.user!.role === "admin";
       
       let feedbackList;
       if (isAdminUser) {
