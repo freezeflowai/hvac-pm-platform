@@ -23,18 +23,25 @@ export default function Technician() {
   });
 
   // Fetch assignment details (parts and equipment) for selected PM
-  const { data: assignmentDetails, isLoading: isLoadingDetails } = useQuery<{ parts: any; equipment: any[] }>({
+  const { data: assignmentDetails } = useQuery<{ parts: any; equipment: any[] }>({
     queryKey: ['/api/technician/assignment', selectedPM?.id, 'details'],
     queryFn: async () => {
-      if (!selectedPM?.id) return { parts: {}, equipment: [] };
-      const response = await fetch(`/api/technician/assignment/${selectedPM.id}/details`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch assignment details');
+      if (!selectedPM?.id) throw new Error('No assignment ID');
+      try {
+        const response = await fetch(`/api/technician/assignment/${selectedPM.id}/details`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error(`Error fetching details for ${selectedPM.id}:`, error);
+        throw error;
       }
-      return response.json();
     },
     enabled: !!selectedPM?.id,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
   const handleMarkComplete = async () => {
