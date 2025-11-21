@@ -624,12 +624,12 @@ export default function Calendar() {
     if (view === "weekly" && weeklyScrollContainerRef.current && companySettings?.calendarStartHour !== undefined) {
       const startHour = companySettings.calendarStartHour;
       const scrollPosition = startHour * 64; // Each row is min-h-16 (64px)
-      // Use a longer delay to ensure DOM is fully rendered on initial load
+      // Use a longer delay to ensure API loads company settings and DOM is fully rendered
       const timeoutId = setTimeout(() => {
         if (weeklyScrollContainerRef.current) {
           weeklyScrollContainerRef.current.scrollTop = scrollPosition;
         }
-      }, 500);
+      }, 1000);
       return () => clearTimeout(timeoutId);
     }
   }, [view, companySettings?.calendarStartHour]);
