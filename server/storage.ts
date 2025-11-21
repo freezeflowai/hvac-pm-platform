@@ -1793,14 +1793,14 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async createCalendarAssignment(userId: string, insertAssignment: InsertCalendarAssignment): Promise<CalendarAssignment> {
+  async createCalendarAssignment(userId: string, companyId: string, insertAssignment: InsertCalendarAssignment): Promise<CalendarAssignment> {
     // Verify that the client belongs to the userId
     const client = await this.getClient(userId, insertAssignment.clientId);
     if (!client) {
       throw new Error("Client not found or does not belong to user");
     }
     
-    const result = await db.insert(calendarAssignments).values({ ...insertAssignment, userId }).returning();
+    const result = await db.insert(calendarAssignments).values({ ...insertAssignment, userId, companyId }).returning();
     return result[0];
   }
 

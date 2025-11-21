@@ -1462,6 +1462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/calendar/assign", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
+      const companyId = req.user!.companyId;
       const assignmentData = insertCalendarAssignmentSchema.parse(req.body);
       
       // Check if this client already has an assignment for this month
@@ -1476,7 +1477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Client already has an assignment for this month" });
       }
       
-      const assignment = await storage.createCalendarAssignment(userId, assignmentData);
+      const assignment = await storage.createCalendarAssignment(userId, companyId, assignmentData);
       
       // Update client's nextDue date
       const client = await storage.getClient(userId, assignmentData.clientId);
