@@ -6,7 +6,7 @@ import { storage } from "./storage";
 import { subscriptionService } from "./subscriptionService";
 import { routeOptimizationService } from "./routeOptimizationService";
 import { sendInvitationEmail } from "./emailService";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client, type Part, calendarAssignments } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client, type Part, calendarAssignments, clients } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
 import { db } from "./db";
@@ -2090,7 +2090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Technician endpoints
+  // Technician endpoints - get today's assignments (both pending and completed)
   app.get("/api/technician/today", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
@@ -2099,7 +2099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const month = today.getMonth() + 1;
       const day = today.getDate();
       
-      // Get both pending AND completed assignments for today
+      // Get all assignments for today (both pending AND completed)
       const allAssignmentsForDay = await db.select().from(calendarAssignments).where(and(
         eq(calendarAssignments.year, year),
         eq(calendarAssignments.month, month),
@@ -2126,8 +2126,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Check if technician is in the array
         if (techIds.includes(userId)) {
-          // Get client by companyId and clientId directly from database
-          const client = await db.select()
+          // Get client by companyId and clientId
+          const clientResult = await db.select()
             .from(clients)
             .where(and(
               eq(clients.companyId, assignment.companyId),
@@ -2135,8 +2135,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ))
             .limit(1);
           
-          if (client && client.length > 0) {
-            result.push({ id: assignment.id, client: client[0], assignment });
+          if (clientResult && clientResult.length > 0) {
+            result.push({ id: assignment.id, client: clientResult[0], assignment });
           }
         }
       }
