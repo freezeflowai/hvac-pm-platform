@@ -40,6 +40,8 @@ interface User {
   email: string;
   role: string;
   companyId: string;
+  firstName?: string | null;
+  lastName?: string | null;
 }
 
 export default function Admin() {
@@ -287,7 +289,7 @@ export default function Admin() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium" data-testid={`text-email-${user.id}`}>
-                      {user.email}
+                      {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email}
                     </span>
                     {(user.role === "owner" || user.role === "admin") && (
                       <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
@@ -341,7 +343,7 @@ export default function Admin() {
                       <DialogHeader>
                         <DialogTitle>Reset Password</DialogTitle>
                         <DialogDescription>
-                          Set a new password for {user.email}
+                          Set a new password for {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email}
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4 py-4">
