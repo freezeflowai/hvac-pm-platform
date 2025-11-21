@@ -2089,7 +2089,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/technician/today", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
+      console.log(`[API] /api/technician/today called for user ${userId}`);
       const assignments = await storage.getTechnicianTodayAssignments(userId);
+      console.log(`[API] Returning ${assignments.length} assignments for ${userId}`);
       res.json(assignments);
     } catch (error) {
       console.error("Error fetching technician today assignments:", error);

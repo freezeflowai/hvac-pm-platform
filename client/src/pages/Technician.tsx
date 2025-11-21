@@ -19,9 +19,14 @@ export default function Technician() {
 
   useEffect(() => {
     if (user?.id) {
+      console.log('[Technician] User:', user.id, user.email, user.role);
       refetch();
     }
   }, [user?.id, refetch]);
+
+  useEffect(() => {
+    console.log('[Technician] todaysPMs:', todaysPMs);
+  }, [todaysPMs]);
 
   // Get client parts for selected client
   const { data: clientParts = {} } = useQuery<Record<string, any>>({
