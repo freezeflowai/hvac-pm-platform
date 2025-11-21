@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 export function ClientDetailDialog({ 
@@ -18,7 +18,14 @@ export function ClientDetailDialog({
   onAssignTechnicians: (assignmentId: string, technicianIds: string[]) => void;
   bulkParts: Record<string, any[]>;
 }) {
-  const [selectedTechs, setSelectedTechs] = useState<string[]>(assignment?.assignedTechnicianIds || []);
+  const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
+
+  // Sync selected technicians when assignment changes
+  useEffect(() => {
+    if (assignment) {
+      setSelectedTechs(assignment.assignedTechnicianIds || []);
+    }
+  }, [assignment?.id]);
 
   const { data: technicians = [] } = useQuery<any[]>({
     queryKey: ['/api/technicians'],
