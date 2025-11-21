@@ -1829,7 +1829,6 @@ export class DbStorage implements IStorage {
     const assignments = await db.select()
       .from(calendarAssignments)
       .where(and(
-        sql`${calendarAssignments.assignedTechnicianIds} @> ARRAY[${technicianId}]`,
         eq(calendarAssignments.year, year),
         eq(calendarAssignments.month, month),
         eq(calendarAssignments.day, day),
@@ -1838,9 +1837,12 @@ export class DbStorage implements IStorage {
 
     const result = [];
     for (const assignment of assignments) {
-      const client = await this.getClient(assignment.userId, assignment.clientId);
-      if (client) {
-        result.push({ id: assignment.id, client, assignment });
+      // Check if technician is in the assignedTechnicianIds array
+      if (assignment.assignedTechnicianIds && assignment.assignedTechnicianIds.includes(technicianId)) {
+        const client = await this.getClient(assignment.userId, assignment.clientId);
+        if (client) {
+          result.push({ id: assignment.id, client, assignment });
+        }
       }
     }
     return result;
