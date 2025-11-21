@@ -15,6 +15,8 @@ import { Building2 } from "lucide-react";
 
 const signupSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -45,6 +47,8 @@ export default function Signup() {
     resolver: zodResolver(signupSchema),
     defaultValues: {
       email: "",
+      firstName: "",
+      lastName: "",
       password: "",
       confirmPassword: "",
     },
@@ -66,6 +70,8 @@ export default function Signup() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: data.email,
+          firstName: data.firstName || undefined,
+          lastName: data.lastName || undefined,
           password: data.password,
           invitationToken: invitationToken || undefined,
         }),
@@ -156,6 +162,44 @@ export default function Signup() {
           )}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {invitationToken && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            data-testid="input-first-name"
+                            placeholder="Enter your first name"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            data-testid="input-last-name"
+                            placeholder="Enter your last name"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
               <FormField
                 control={form.control}
                 name="email"

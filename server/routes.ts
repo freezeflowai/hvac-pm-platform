@@ -33,7 +33,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { email, password, invitationToken } = req.body;
+      const { email, password, invitationToken, firstName, lastName } = req.body;
       insertUserSchema.parse({ email, password });
       
       const existingUser = await storage.getUserByEmail(email);
@@ -79,6 +79,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: hashedPassword,
         companyId,
         role: userRole,
+        firstName,
+        lastName,
       });
       
       // Mark invitation as used if this was an invitation signup
