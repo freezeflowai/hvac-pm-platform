@@ -124,7 +124,7 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
     },
   ];
 
-  if (user?.role === "owner" || user?.role === "admin") {
+  if (user?.role === "owner") {
     menuItems.push({
       title: "Manage Team",
       icon: UserCheck,
