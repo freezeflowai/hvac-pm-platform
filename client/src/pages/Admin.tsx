@@ -34,103 +34,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Users as UsersIcon } from "lucide-react";
-
-function TechnicianAssignmentsTab() {
-  const { data: calendarData = { assignments: [] } } = useQuery({
-    queryKey: ['/api/calendar', new Date().getFullYear(), new Date().getMonth() + 1],
-  });
-
-  const { data: technicians = [] } = useQuery<any[]>({
-    queryKey: ['/api/technicians'],
-  });
-
-  const { data: clients = [] } = useQuery<any[]>({
-    queryKey: ['/api/clients'],
-  });
-
-  const { toast } = useToast();
-
-  const assignments = calendarData.assignments || [];
-
-  const handleAssignTechnician = async (assignmentId: string, technicianId: string | null) => {
-    try {
-      await apiRequest('PATCH', `/api/calendar/assign/${assignmentId}`, { assignedTechnicianId: technicianId });
-      toast({
-        title: "Assignment updated",
-        description: "Technician assignment has been updated.",
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update assignment",
-        variant: "destructive",
-      });
-    }
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Assign Technicians to PM Visits</CardTitle>
-        <CardDescription>Assign technicians to scheduled preventive maintenance visits</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {assignments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No assignments scheduled</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b">
-                  <tr>
-                    <th className="text-left py-2 px-3">Client</th>
-                    <th className="text-left py-2 px-3">Date</th>
-                    <th className="text-left py-2 px-3">Assigned Technician</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {assignments.map((assignment: any) => {
-                    const client = clients.find((c: any) => c.id === assignment.clientId);
-                    const assignedTech = technicians.find((t: any) => t.id === assignment.assignedTechnicianId);
-                    const techName = assignedTech?.firstName && assignedTech?.lastName 
-                      ? `${assignedTech.firstName} ${assignedTech.lastName}`
-                      : assignedTech?.email || 'Unassigned';
-
-                    return (
-                      <tr key={assignment.id} className="border-b hover:bg-muted/50">
-                        <td className="py-2 px-3">{client?.companyName || 'Unknown'}</td>
-                        <td className="py-2 px-3">{assignment.scheduledDate}</td>
-                        <td className="py-2 px-3">
-                          <Select value={assignment.assignedTechnicianId || ''} onValueChange={(value) => {
-                            handleAssignTechnician(assignment.id, value || null);
-                          }}>
-                            <SelectTrigger className="w-40 h-8 text-xs">
-                              <SelectValue placeholder="Select technician" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">Unassigned</SelectItem>
-                              {technicians.map((tech: any) => (
-                                <SelectItem key={tech.id} value={tech.id}>
-                                  {tech.firstName && tech.lastName ? `${tech.firstName} ${tech.lastName}` : tech.email}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 interface User {
   id: string;
@@ -357,9 +260,8 @@ export default function Admin() {
       <div className="p-6 mx-auto">
         <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
       
-      <Tabs defaultValue="assignments" className="w-full">
+      <Tabs defaultValue="users" className="w-full">
         <TabsList className="mb-6">
-          <TabsTrigger value="assignments" data-testid="tab-assignments">Technician Assignments</TabsTrigger>
           <TabsTrigger value="users" data-testid="tab-users">User Management</TabsTrigger>
           <TabsTrigger value="feedback" data-testid="tab-feedback">
             Feedback
@@ -370,10 +272,6 @@ export default function Admin() {
             )}
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="assignments">
-          <TechnicianAssignmentsTab />
-        </TabsContent>
 
         <TabsContent value="users">
           <Card>
