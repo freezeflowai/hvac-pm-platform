@@ -2162,13 +2162,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (completed !== undefined) updateData.completed = completed;
       if (completionNotes !== undefined) updateData.completionNotes = completionNotes;
       
-      // Verify user owns this assignment via calendar association
+      // Verify assignment exists
       const assignment = await db.select().from(calendarAssignments).where(eq(calendarAssignments.id, assignmentId)).limit(1);
       if (!assignment || assignment.length === 0) {
         return res.status(404).json({ error: "Assignment not found" });
       }
       
-      // Update the assignment
+      const assignmentData = assignment[0];
+      
+      // For technicians: check if they're assigned to this job
+      if (req.user!.role === "technician") {
+        let techIds = assignmentData.assignedTechnicianIds;
+        if (typeof techIds === 'string') {
+          try {
+            techIds = JSON.parse(techIds);
+          } catch (e) {
+            techIds = [];
+          }
+        }
+        if (!Array.isArray(techIds)) {
+          techIds = techIds ? [techIds] : [];
+        }
+        
+        if (!techIds.includes(userId)) {
+          return res.status(403).json({ error: "Not assigned to this job" });
+        }
+        
+        // Update using the owner's userId (the creator of the assignment)
+        const updated = await storage.updateCalendarAssignment(assignmentData.userId, assignmentId, updateData);
+        if (!updated) {
+          return res.status(500).json({ error: "Failed to update assignment" });
+        }
+        return res.json(updated);
+      }
+      
+      // For admins/owners: use their own userId
       const updated = await storage.updateCalendarAssignment(userId, assignmentId, updateData);
       if (!updated) {
         return res.status(404).json({ error: "Assignment not found or not authorized" });
