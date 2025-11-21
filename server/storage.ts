@@ -1839,6 +1839,8 @@ export class DbStorage implements IStorage {
     for (const assignment of assignments) {
       let techIds = assignment.assignedTechnicianIds;
       
+      console.log(`[DB CHECK] Assignment ${assignment.id}: raw techIds = ${JSON.stringify(techIds)}, searching for ${technicianId}`);
+      
       // Handle array that might be a string or actual array
       if (typeof techIds === 'string') {
         try {
@@ -1853,8 +1855,13 @@ export class DbStorage implements IStorage {
         techIds = techIds ? [techIds] : [];
       }
       
+      console.log(`[DB CHECK] After parsing: techIds = ${JSON.stringify(techIds)}, is array? ${Array.isArray(techIds)}`);
+      
       // Check if technician is in the array
-      if (techIds.includes(technicianId)) {
+      const found = techIds.includes(technicianId);
+      console.log(`[DB CHECK] includes(${technicianId}) = ${found}`);
+      
+      if (found) {
         const client = await this.getClient(assignment.companyId, assignment.clientId);
         if (client) {
           result.push({ id: assignment.id, client, assignment });
