@@ -24,6 +24,20 @@ export default function Technician() {
     gcTime: 0,
   });
 
+  // DEBUG: Log the raw data
+  useEffect(() => {
+    console.log("[FRONTEND DEBUG] Raw todaysPMs data:", todaysPMs);
+    console.log("[FRONTEND DEBUG] Total count:", todaysPMs.length);
+    todaysPMs.forEach((pm, idx) => {
+      console.log(`[FRONTEND DEBUG] PM ${idx}:`, {
+        id: pm.id,
+        clientName: pm.client?.companyName,
+        completed: pm.assignment?.completed,
+        assignmentStructure: pm.assignment
+      });
+    });
+  }, [todaysPMs]);
+
   // Fetch parts and equipment for all PMs on mount/update
   useEffect(() => {
     const fetchAllData = async () => {
@@ -142,6 +156,10 @@ export default function Technician() {
 
   const pendingPMs = todaysPMs.filter((pm: any) => !pm.assignment.completed);
   const completedPMs = todaysPMs.filter((pm: any) => pm.assignment.completed);
+
+  // DEBUG: Log filtering results
+  console.log("[FRONTEND DEBUG] Pending PMs:", pendingPMs.length, pendingPMs);
+  console.log("[FRONTEND DEBUG] Completed PMs:", completedPMs.length, completedPMs);
 
   if (isLoading) {
     return (
