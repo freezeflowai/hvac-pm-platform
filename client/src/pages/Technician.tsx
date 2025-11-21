@@ -34,15 +34,24 @@ export default function Technician() {
         try {
           const partsRes = await fetch(`/api/client-parts/${pm.client.id}`);
           if (partsRes.ok) {
-            partsMap[pm.client.id] = await partsRes.json();
-          }
-
-          const equipRes = await fetch(`/api/equipment/${pm.client.id}`);
-          if (equipRes.ok) {
-            equipmentMap[pm.client.id] = await equipRes.json();
+            const data = await partsRes.json();
+            partsMap[pm.client.id] = data;
           }
         } catch (error) {
-          console.error("Error fetching data:", error);
+          console.error("Error fetching parts:", error);
+        }
+
+        try {
+          const equipRes = await fetch(`/api/equipment/${pm.client.id}`);
+          if (equipRes.ok) {
+            const data = await equipRes.json();
+            equipmentMap[pm.client.id] = Array.isArray(data) ? data : [];
+          } else {
+            equipmentMap[pm.client.id] = [];
+          }
+        } catch (error) {
+          console.error("Error fetching equipment:", error);
+          equipmentMap[pm.client.id] = [];
         }
       }
 
