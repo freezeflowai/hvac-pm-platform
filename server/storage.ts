@@ -1449,14 +1449,18 @@ export class DbStorage implements IStorage {
 
   async addClientPart(companyId: string, userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
     // Verify that the client belongs to the companyId
-    const client = await this.getClient(companyId, insertClientPart.clientId);
-    if (!client) {
+    console.log("[addClientPart] Checking client - companyId:", companyId, "clientId:", insertClientPart.clientId);
+    const client = await db.select().from(clients).where(and(eq(clients.id, insertClientPart.clientId), eq(clients.companyId, companyId))).limit(1);
+    console.log("[addClientPart] Client lookup result:", client.length > 0 ? "found" : "not found");
+    if (!client || client.length === 0) {
       throw new Error("Client not found or does not belong to company");
     }
     
     // Verify that the part belongs to the companyId
-    const part = await this.getPart(companyId, insertClientPart.partId);
-    if (!part) {
+    console.log("[addClientPart] Checking part - companyId:", companyId, "partId:", insertClientPart.partId);
+    const part = await db.select().from(parts).where(and(eq(parts.id, insertClientPart.partId), eq(parts.companyId, companyId))).limit(1);
+    console.log("[addClientPart] Part lookup result:", part.length > 0 ? "found" : "not found");
+    if (!part || part.length === 0) {
       throw new Error("Part not found or does not belong to company");
     }
     
