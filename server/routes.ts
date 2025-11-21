@@ -2094,16 +2094,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/technician/today", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
+      const email = req.user!.email;
       const today = new Date();
       const year = today.getFullYear();
       const month = today.getMonth() + 1;
       const day = today.getDate();
-      console.log(`[API /api/technician/today] User ${userId}, Looking for assignments on ${year}-${month}-${day}`);
-      const assignments = await storage.getTechnicianTodayAssignments(userId);
-      console.log(`[API /api/technician/today] Found ${assignments.length} assignments for user ${userId}`);
-      if (assignments.length > 0) {
-        console.log(`[API /api/technician/today] First assignment:`, JSON.stringify(assignments[0]?.assignment?.assignedTechnicianIds));
+      console.log(`=== TECH LOOKUP === TechID: ${userId}, Email: ${email}, Date: ${year}-${month}-${day}`);
+      
+      // Query raw database to see what's stored
+      const allAssignmentsForDay = await db.select().from(calendarAssignments).where(and(
+        eq(calendarAssignments.year, year),
+        eq(calendarAssignments.month, month),
+        eq(calendarAssignments.day, day),
+        eq(calendarAssignments.completed, false)
+      ));
+      console.log(`=== RAW DB === Found ${allAssignmentsForDay.length} total assignments for ${year}-${month}-${day}`);
+      for (const a of allAssignmentsForDay) {
+        console.log(`  Assignment ${a.id}: assignedTechnicianIds = ${JSON.stringify(a.assignedTechnicianIds)}, type: ${typeof a.assignedTechnicianIds}`);
       }
+      
+      const assignments = await storage.getTechnicianTodayAssignments(userId);
+      console.log(`=== RESULT === Found ${assignments.length} matching assignments`);
       res.json(assignments);
     } catch (error) {
       console.error("Error fetching technician today assignments:", error);
