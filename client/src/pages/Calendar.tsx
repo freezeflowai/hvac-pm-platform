@@ -629,7 +629,7 @@ export default function Calendar() {
         if (weeklyScrollContainerRef.current) {
           weeklyScrollContainerRef.current.scrollTop = scrollPosition;
         }
-      }, 300);
+      }, 500);
       return () => clearTimeout(timeoutId);
     }
   }, [view, companySettings?.calendarStartHour]);
@@ -780,7 +780,7 @@ export default function Calendar() {
               </div>
               {weekDaysData.map((dayData) => (
                 <div key={`${dayData.dayName}-${h.hour}`} className="p-1 border-r min-h-16 bg-background">
-                  {h.hour === startHour && dayData.dayAssignments.map((assignment: any, idx: number) => {
+                  {dayData.dayAssignments.map((assignment: any, idx: number) => {
                     const client = clients.find((c: any) => c.id === assignment.clientId);
                     const isCompleted = assignment.completed;
                     return client ? (
