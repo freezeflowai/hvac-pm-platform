@@ -2099,6 +2099,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const month = today.getMonth() + 1;
       const day = today.getDate();
       
+      console.log(`[TECH] Getting assignments for tech ${userId}, date: ${year}-${month}-${day}`);
+      
       // Get all assignments for today (both pending AND completed)
       const allAssignmentsForDay = await db.select().from(calendarAssignments).where(and(
         eq(calendarAssignments.year, year),
@@ -2106,9 +2108,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         eq(calendarAssignments.day, day)
       ));
       
+      console.log(`[TECH] Found ${allAssignmentsForDay.length} total assignments for today`);
+      
       const result = [];
       for (const assignment of allAssignmentsForDay) {
         let techIds = assignment.assignedTechnicianIds;
+        
+        console.log(`[TECH] Assignment ${assignment.id}: techIds=${JSON.stringify(techIds)}, completed=${assignment.completed}`);
         
         // Handle array that might be a string or actual array
         if (typeof techIds === 'string') {
@@ -2126,6 +2132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Check if technician is in the array
         if (techIds.includes(userId)) {
+          console.log(`[TECH] Tech ${userId} IS assigned to ${assignment.id}`);
           // Get client by companyId and clientId
           const clientResult = await db.select()
             .from(clients)
@@ -2137,10 +2144,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (clientResult && clientResult.length > 0) {
             result.push({ id: assignment.id, client: clientResult[0], assignment });
+            console.log(`[TECH] Added client ${clientResult[0].companyName} to results`);
           }
+        } else {
+          console.log(`[TECH] Tech ${userId} NOT assigned to ${assignment.id}`);
         }
       }
       
+      console.log(`[TECH] Returning ${result.length} assignments for technician`);
       res.json(result);
     } catch (error) {
       console.error("Error fetching technician today assignments:", error);
