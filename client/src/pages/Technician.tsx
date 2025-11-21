@@ -11,13 +11,13 @@ export default function Technician() {
   const [selectedClient, setSelectedClient] = useState<any>(null);
 
   // Get today's assigned PMs
-  const { data: todaysPMs, isLoading } = useQuery({
+  const { data: todaysPMs = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/technician/today'],
     enabled: !!user?.id,
   });
 
   // Get client parts for selected client
-  const { data: clientParts } = useQuery({
+  const { data: clientParts = {} } = useQuery<Record<string, any>>({
     queryKey: ['/api/client-parts', selectedClient?.id],
     enabled: !!selectedClient,
   });

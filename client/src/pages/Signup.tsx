@@ -37,7 +37,7 @@ export default function Signup() {
   const invitationToken = urlParams.get('token');
 
   // Fetch invitation details if token exists
-  const { data: invitationData, isLoading: isLoadingInvitation, error: invitationError } = useQuery({
+  const { data: invitationData, isLoading: isLoadingInvitation, error: invitationError } = useQuery<any>({
     queryKey: ['/api/invitations', invitationToken],
     enabled: !!invitationToken,
     retry: false,
