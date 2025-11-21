@@ -5,6 +5,7 @@ import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import { subscriptionService } from "./subscriptionService";
 import { routeOptimizationService } from "./routeOptimizationService";
+import { sendInvitationEmail } from "./emailService";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
@@ -1906,12 +1907,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const inviteLink = `${process.env.REPLIT_DEV_DOMAIN || "http://localhost:5000"}/signup?token=${token}`;
       
-      res.json({
-        inviteLink,
-        email,
-        expiresAt,
-        message: "Invitation link generated. Share this with the technician."
-      });
+      // Get company details for email
+      const company = await storage.getCompanyById(user.companyId);
+      const companyName = company?.name || "your team";
+      
+      // Send invitation email
+      try {
+        await sendInvitationEmail(email, inviteLink, companyName, role);
+        
+        res.json({
+          inviteLink,
+          email,
+          expiresAt,
+          message: "Invitation email sent successfully!"
+        });
+      } catch (emailError: any) {
+        console.error("Failed to send invitation email:", emailError);
+        // Still return success with the link so they can manually share it
+        res.json({
+          inviteLink,
+          email,
+          expiresAt,
+          message: "Invitation created. Email failed to send - please share this link manually.",
+          emailError: emailError.message
+        });
+      }
     } catch (error: any) {
       res.status(500).json({ error: "Failed to generate invitation: " + error.message });
     }
