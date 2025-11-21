@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Mail, ChevronsRight, ChevronsLeft, Route, Users, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ChevronsRight, ChevronsLeft, Route, Users, Info } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -184,47 +184,17 @@ function DayPartsCell({ assignments, clients, dayName, date, showOnlyOutstanding
 
   const sortedParts = Object.entries(partCounts).sort(([a], [b]) => a.localeCompare(b));
 
-  const handleEmailParts = () => {
-    if (sortedParts.length === 0) {
-      toast({
-        title: "No parts",
-        description: "There are no parts scheduled for this day.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const partsList = sortedParts.map(([partName, quantity]) => `${partName} ×${quantity}`).join('\n');
-    const reportType = showOnlyOutstanding ? 'Outstanding Parts' : 'All Parts';
-    const subject = `${reportType} for ${dayName} ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-    const body = `Required Parts${showOnlyOutstanding ? ' (Outstanding Only)' : ''}:\n\n${partsList}`;
-    
-    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
-
   return (
     <div className="px-1.5 py-1 border bg-card">
       {sortedParts.length > 0 ? (
-        <>
-          <div className="space-y-0 mb-1">
-            {sortedParts.map(([partName, quantity]) => (
-              <div key={partName} className="flex items-center justify-between gap-0.5 text-[10px] leading-tight py-0.5">
-                <span className="flex-1 truncate" title={partName}>{partName}</span>
-                <span className="font-semibold text-primary shrink-0 text-[11px]">×{quantity}</span>
-              </div>
-            ))}
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleEmailParts}
-            className="h-5 px-1.5 text-[10px] w-full"
-            data-testid={`button-email-${dayName.toLowerCase()}`}
-          >
-            <Mail className="h-2.5 w-2.5 mr-0.5" />
-            Email
-          </Button>
-        </>
+        <div className="space-y-0">
+          {sortedParts.map(([partName, quantity]) => (
+            <div key={partName} className="flex items-center justify-between gap-0.5 text-[10px] leading-tight py-0.5">
+              <span className="flex-1 truncate" title={partName}>{partName}</span>
+              <span className="font-semibold text-primary shrink-0 text-[11px]">×{quantity}</span>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="text-[10px] text-muted-foreground text-center py-2">
           No parts
