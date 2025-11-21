@@ -499,6 +499,26 @@ export default function Calendar() {
     },
   });
 
+  const assignTechnicians = useMutation({
+    mutationFn: async ({ assignmentId, technicianIds }: { assignmentId: string; technicianIds: string[] }) => {
+      return apiRequest('PATCH', `/api/calendar/assign/${assignmentId}`, { assignedTechnicianIds: technicianIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+      toast({
+        title: "Updated",
+        description: "Technician assignments updated",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to assign technicians",
+        variant: "destructive",
+      });
+    },
+  });
+
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstDayOfMonth = new Date(year, month - 1, 1).getDay();
   
