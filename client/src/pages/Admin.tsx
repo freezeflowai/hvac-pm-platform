@@ -234,7 +234,7 @@ export default function Admin() {
     return <div className="p-6">Loading...</div>;
   }
 
-  if (!currentUser?.isAdmin) {
+  if (!currentUser || (currentUser.role !== "owner" && currentUser.role !== "admin")) {
     return (
       <>
         <div className="flex items-center justify-center h-screen">
