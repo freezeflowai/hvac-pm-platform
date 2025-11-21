@@ -1269,10 +1269,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (userToDelete.companyId !== user.companyId) {
           return res.status(403).json({ error: "Cannot delete users from other companies" });
         }
-      }
-      
-      if (userToDelete.role === "owner") {
-        return res.status(403).json({ error: "Cannot delete the owner account" });
+        
+        // Company owners cannot delete owner accounts
+        if (userToDelete.role === "owner") {
+          return res.status(403).json({ error: "Cannot delete the owner account" });
+        }
       }
       
       // Check if this is the last admin in the user's company
