@@ -1646,12 +1646,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getCompanySettings(userId);
       
       if (!settings) {
-        return res.json(null);
+        return res.json({ calendarStartHour: 8 });
       }
       
       res.json(settings);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Get company settings error:', error);
+      // If the column doesn't exist yet (pre-migration), return default settings
+      if (error?.message?.includes('calendar_start_hour') || error?.code === '42703') {
+        return res.json({ calendarStartHour: 8 });
+      }
       res.status(500).json({ error: "Failed to fetch company settings" });
     }
   });
