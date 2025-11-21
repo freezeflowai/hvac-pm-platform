@@ -100,6 +100,8 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     isDragging,
   } = useSortable({ id });
 
+  const [clickStart, setClickStart] = useState<{ x: number; y: number } | null>(null);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -114,24 +116,39 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     return 'bg-status-this-month/10 border-status-this-month/30';
   };
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setClickStart({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!clickStart || !inCalendar || !onClick) {
+      setClickStart(null);
+      return;
+    }
+
+    const deltaX = Math.abs(e.clientX - clickStart.x);
+    const deltaY = Math.abs(e.clientY - clickStart.y);
+
+    // If movement is less than 5 pixels, consider it a click
+    if (deltaX < 5 && deltaY < 5) {
+      console.log('Click detected on PM card');
+      onClick();
+    }
+    setClickStart(null);
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
+      {...listeners}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
       className={`text-xs px-1.5 py-1 rounded hover:shadow-md transition-all relative select-none group ${inCalendar && onClick ? 'cursor-pointer' : ''} ${getBackgroundColor()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
-      <div 
-        {...listeners}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (inCalendar && onClick) {
-            onClick();
-          }
-        }}
-        className={inCalendar ? "cursor-grab active:cursor-grabbing" : ""}
-      >
+      <div className={inCalendar ? "cursor-grab active:cursor-grabbing" : ""}>
         <div className={`font-semibold leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
         {client.location && (
           <div className={`text-muted-foreground text-[10px] leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
