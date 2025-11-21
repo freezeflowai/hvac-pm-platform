@@ -619,17 +619,18 @@ export default function Calendar() {
     };
   }, []);
 
-  // Scroll to start hour when view changes
+  // Scroll to start hour when view changes or loads
   useEffect(() => {
     if (view === "weekly" && weeklyScrollContainerRef.current && companySettings?.calendarStartHour !== undefined) {
       const startHour = companySettings.calendarStartHour;
       const scrollPosition = startHour * 64; // Each row is min-h-16 (64px)
-      // Use a longer delay to ensure DOM is fully rendered
-      setTimeout(() => {
+      // Use a longer delay to ensure DOM is fully rendered on initial load
+      const timeoutId = setTimeout(() => {
         if (weeklyScrollContainerRef.current) {
           weeklyScrollContainerRef.current.scrollTop = scrollPosition;
         }
-      }, 100);
+      }, 300);
+      return () => clearTimeout(timeoutId);
     }
   }, [view, companySettings?.calendarStartHour]);
 
