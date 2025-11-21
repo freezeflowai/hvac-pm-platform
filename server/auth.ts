@@ -2,7 +2,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
-import type { User } from "@shared/schema";
+import type { User, AuthenticatedUser } from "@shared/schema";
 
 passport.use(
   new LocalStrategy({ usernameField: 'email' }, async (email, password, done) => {
@@ -36,7 +36,27 @@ passport.deserializeUser(async (id: string, done) => {
     if (!user) {
       return done(null, false);
     }
-    done(null, user as any);
+    
+    // Fetch company data to merge subscription fields
+    const company = await storage.getCompanyById(user.companyId);
+    if (!company) {
+      return done(null, false);
+    }
+    
+    // Merge user + company subscription data
+    const authenticatedUser: AuthenticatedUser = {
+      ...user,
+      trialEndsAt: company.trialEndsAt,
+      subscriptionStatus: company.subscriptionStatus,
+      subscriptionPlan: company.subscriptionPlan,
+      stripeCustomerId: company.stripeCustomerId,
+      stripeSubscriptionId: company.stripeSubscriptionId,
+      billingInterval: company.billingInterval,
+      currentPeriodEnd: company.currentPeriodEnd,
+      cancelAtPeriodEnd: company.cancelAtPeriodEnd
+    };
+    
+    done(null, authenticatedUser as any);
   } catch (error: any) {
     console.error("Deserialize user error:", error);
     done(error);

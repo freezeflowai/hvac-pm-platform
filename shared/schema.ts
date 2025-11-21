@@ -45,15 +45,27 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  email: true,
-  password: true,
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
 }).extend({
   email: z.string().email("Please enter a valid email address"),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// Authenticated user type that merges User with Company subscription data
+export type AuthenticatedUser = User & Pick<Company, 
+  "trialEndsAt" | 
+  "subscriptionStatus" | 
+  "subscriptionPlan" | 
+  "stripeCustomerId" | 
+  "stripeSubscriptionId" | 
+  "billingInterval" | 
+  "currentPeriodEnd" | 
+  "cancelAtPeriodEnd"
+>;
 
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

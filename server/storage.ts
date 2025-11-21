@@ -63,13 +63,18 @@ export interface IStorage {
   getTechniciansByCompanyId(companyId: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPassword(id: string, hashedPassword: string): Promise<void>;
-  updateUserRole(id: string, role: string): Promise<void>;
+  validateUserInCompany(userId: string, companyId: string): Promise<boolean>;
   
   // Admin user management methods
   getAllUsers(): Promise<User[]>;
-  deleteUser(id: string): Promise<boolean>;
+  deleteUser(id: string, requesterCompanyId?: string): Promise<boolean>;
+  updateUserRole(id: string, role: string, requesterCompanyId?: string): Promise<void>;
   updateUserTrialDate(id: string, trialEndsAt: Date): Promise<void>;
   updateUserStripeCustomer(id: string, stripeCustomerId: string): Promise<void>;
+  
+  // Company subscription methods
+  updateCompanyTrial(companyId: string, trialEndsAt: Date): Promise<void>;
+  updateCompanyStripeCustomer(companyId: string, stripeCustomerId: string): Promise<void>;
   
   // Password reset token methods
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -216,13 +221,15 @@ export class MemStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
     const user: User = { 
-      ...insertUser, 
       id,
       createdAt: new Date(),
-      fullName: null,
-      firstName: null,
-      lastName: null,
-      role: 'technician'
+      companyId: insertUser.companyId,
+      email: insertUser.email,
+      password: insertUser.password,
+      role: insertUser.role || 'technician',
+      fullName: insertUser.fullName || null,
+      firstName: insertUser.firstName || null,
+      lastName: insertUser.lastName || null
     };
     this.users.set(id, user);
     return user;
@@ -235,11 +242,20 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async updateUserRole(id: string, role: string): Promise<void> {
+  async updateUserRole(id: string, role: string, requesterCompanyId?: string): Promise<void> {
     const user = this.users.get(id);
     if (user) {
+      // Validate company membership if requesterCompanyId is provided
+      if (requesterCompanyId && user.companyId !== requesterCompanyId) {
+        throw new Error("Cannot update user from another company");
+      }
       this.users.set(id, { ...user, role });
     }
+  }
+
+  async validateUserInCompany(userId: string, companyId: string): Promise<boolean> {
+    const user = await this.getUser(userId);
+    return user?.companyId === companyId;
   }
 
   // Admin user management methods
@@ -247,7 +263,14 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values());
   }
 
-  async deleteUser(id: string): Promise<boolean> {
+  async deleteUser(id: string, requesterCompanyId?: string): Promise<boolean> {
+    const user = this.users.get(id);
+    if (user) {
+      // Validate company membership if requesterCompanyId is provided
+      if (requesterCompanyId && user.companyId !== requesterCompanyId) {
+        throw new Error("Cannot delete user from another company");
+      }
+    }
     return this.users.delete(id);
   }
 
@@ -257,6 +280,22 @@ export class MemStorage implements IStorage {
 
   async updateUserStripeCustomer(id: string, stripeCustomerId: string): Promise<void> {
     // Stripe customer is now on Company, not User - this is a no-op for MemStorage
+  }
+
+  async updateCompanyTrial(companyId: string, trialEndsAt: Date): Promise<void> {
+    const company = this.companies.get(companyId);
+    if (company) {
+      company.trialEndsAt = trialEndsAt;
+      this.companies.set(companyId, company);
+    }
+  }
+
+  async updateCompanyStripeCustomer(companyId: string, stripeCustomerId: string): Promise<void> {
+    const company = this.companies.get(companyId);
+    if (company) {
+      company.stripeCustomerId = stripeCustomerId;
+      this.companies.set(companyId, company);
+    }
   }
 
   // Password reset token methods
@@ -313,6 +352,12 @@ export class MemStorage implements IStorage {
   }
 
   async createClient(companyId: string, userId: string, insertClient: InsertClient): Promise<Client> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     const id = randomUUID();
     const inactive = insertClient.inactive ?? false;
     const selectedMonths = insertClient.selectedMonths ?? [];
@@ -342,6 +387,12 @@ export class MemStorage implements IStorage {
   }
 
   async createClientWithParts(companyId: string, userId: string, insertClient: InsertClient, partsList: Array<{ partId: string; quantity: number }>): Promise<Client> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     // Validate all parts exist and belong to company before creating client
     for (const partItem of partsList) {
       const existingPart = await this.getPart(companyId, partItem.partId);
@@ -489,6 +540,12 @@ export class MemStorage implements IStorage {
   }
 
   async createPart(companyId: string, userId: string, insertPart: InsertPart): Promise<Part> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     const id = randomUUID();
     const part: Part = { 
       id,
@@ -558,6 +615,12 @@ export class MemStorage implements IStorage {
   }
 
   async seedUserParts(companyId: string, userId: string): Promise<void> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
     
     for (const partData of allSeedParts) {
@@ -605,6 +668,12 @@ export class MemStorage implements IStorage {
   }
 
   async addClientPart(companyId: string, userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     // Verify that the client belongs to the company
     const client = this.clients.get(insertClientPart.clientId);
     if (!client || client.companyId !== companyId) {
@@ -793,6 +862,12 @@ export class MemStorage implements IStorage {
   }
 
   async createMaintenanceRecord(companyId: string, userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     // Verify that the client belongs to the company
     const client = this.clients.get(insertRecord.clientId);
     if (!client || client.companyId !== companyId) {
@@ -846,6 +921,12 @@ export class MemStorage implements IStorage {
   }
 
   async createEquipment(companyId: string, userId: string, equipment: InsertEquipment): Promise<Equipment> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     const id = randomUUID();
     const newEquipment: Equipment = { 
       ...equipment,
@@ -910,6 +991,12 @@ export class MemStorage implements IStorage {
   }
 
   async upsertCompanySettings(companyId: string, userId: string, settings: InsertCompanySettings): Promise<CompanySettings> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     const existing = await this.getCompanySettings(companyId);
     
     if (existing) {
@@ -939,6 +1026,7 @@ export class MemStorage implements IStorage {
       provinceState: settings.provinceState ?? null,
       postalCode: settings.postalCode ?? null,
       phone: settings.phone ?? null,
+      calendarStartHour: settings.calendarStartHour ?? 8,
       id,
       companyId,
       userId,
@@ -950,12 +1038,20 @@ export class MemStorage implements IStorage {
 
   // Calendar assignment methods
   async getCalendarAssignments(companyId: string, year: number, month: number, assignedTechnicianId?: string): Promise<CalendarAssignment[]> {
+    // Validate that the technician belongs to the company if provided
+    if (assignedTechnicianId) {
+      const isValid = await this.validateUserInCompany(assignedTechnicianId, companyId);
+      if (!isValid) {
+        throw new Error("Technician does not belong to this company");
+      }
+    }
+    
     return Array.from(this.calendarAssignments.values()).filter(
       (assignment) => {
         if (assignment.companyId !== companyId) return false;
         if (assignment.year !== year) return false;
         if (assignment.month !== month) return false;
-        if (assignedTechnicianId && assignment.assignedTechnicianId !== assignedTechnicianId) return false;
+        if (assignedTechnicianId && !assignment.assignedTechnicianIds?.includes(assignedTechnicianId)) return false;
         return true;
       }
     );
@@ -970,6 +1066,12 @@ export class MemStorage implements IStorage {
   }
 
   async createCalendarAssignment(companyId: string, userId: string, insertAssignment: InsertCalendarAssignment): Promise<CalendarAssignment> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     const id = randomUUID();
     const assignment: CalendarAssignment = {
       ...insertAssignment,
@@ -978,7 +1080,9 @@ export class MemStorage implements IStorage {
       userId,
       day: insertAssignment.day ?? null,
       autoDueDate: insertAssignment.autoDueDate ?? false,
-      completed: insertAssignment.completed ?? false
+      completed: insertAssignment.completed ?? false,
+      assignedTechnicianIds: insertAssignment.assignedTechnicianIds ?? null,
+      completionNotes: insertAssignment.completionNotes ?? null
     };
     this.calendarAssignments.set(id, assignment);
     return assignment;
@@ -1058,6 +1162,12 @@ export class MemStorage implements IStorage {
   }
 
   async createFeedback(companyId: string, userId: string, userEmail: string, feedback: InsertFeedback): Promise<Feedback> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     const newFeedback: Feedback = {
       id: randomUUID(),
       companyId,
@@ -1163,15 +1273,40 @@ export class DbStorage implements IStorage {
     return db.select().from(users);
   }
 
-  async deleteUser(id: string): Promise<boolean> {
+  async deleteUser(id: string, requesterCompanyId?: string): Promise<boolean> {
+    // Validate company membership if requesterCompanyId is provided
+    if (requesterCompanyId) {
+      const user = await this.getUser(id);
+      if (user && user.companyId !== requesterCompanyId) {
+        throw new Error("Cannot delete user from another company");
+      }
+    }
+    
     // Foreign key constraints with ON DELETE CASCADE will automatically delete
     // all user data (clients, parts, client_parts, maintenance_records)
     const result = await db.delete(users).where(eq(users.id, id)).returning();
     return result.length > 0;
   }
 
-  async updateUserRole(id: string, role: string): Promise<void> {
+  async updateUserRole(id: string, role: string, requesterCompanyId?: string): Promise<void> {
+    // Validate company membership if requesterCompanyId is provided
+    if (requesterCompanyId) {
+      const user = await this.getUser(id);
+      if (user && user.companyId !== requesterCompanyId) {
+        throw new Error("Cannot update user from another company");
+      }
+    }
+    
     await db.update(users).set({ role }).where(eq(users.id, id));
+  }
+
+  async validateUserInCompany(userId: string, companyId: string): Promise<boolean> {
+    const user = await this.getUser(userId);
+    return user?.companyId === companyId;
+  }
+
+  async getUsersByCompanyId(companyId: string): Promise<User[]> {
+    return db.select().from(users).where(eq(users.companyId, companyId));
   }
 
   async updateUserTrialDate(id: string, trialEndsAt: Date): Promise<void> {
@@ -1188,6 +1323,14 @@ export class DbStorage implements IStorage {
     if (user && user.companyId) {
       await db.update(companies).set({ stripeCustomerId }).where(eq(companies.id, user.companyId));
     }
+  }
+
+  async updateCompanyTrial(companyId: string, trialEndsAt: Date): Promise<void> {
+    await db.update(companies).set({ trialEndsAt }).where(eq(companies.id, companyId));
+  }
+
+  async updateCompanyStripeCustomer(companyId: string, stripeCustomerId: string): Promise<void> {
+    await db.update(companies).set({ stripeCustomerId }).where(eq(companies.id, companyId));
   }
 
   async getTechniciansByCompanyId(companyId: string): Promise<User[]> {
@@ -1241,11 +1384,23 @@ export class DbStorage implements IStorage {
   }
 
   async createClient(companyId: string, userId: string, insertClient: InsertClient): Promise<Client> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     const result = await db.insert(clients).values({ ...insertClient, companyId, userId }).returning();
     return result[0];
   }
 
   async createClientWithParts(companyId: string, userId: string, insertClient: InsertClient, partsList: Array<{ partId: string; quantity: number }>): Promise<Client> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     return await db.transaction(async (tx) => {
       // Validate all parts exist and belong to company
       for (const partItem of partsList) {
@@ -1375,6 +1530,12 @@ export class DbStorage implements IStorage {
   }
 
   async createPart(companyId: string, userId: string, insertPart: InsertPart): Promise<Part> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     const result = await db.insert(parts).values({ ...insertPart, companyId, userId }).returning();
     return result[0];
   }
@@ -1422,6 +1583,12 @@ export class DbStorage implements IStorage {
   }
 
   async seedUserParts(companyId: string, userId: string): Promise<void> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     const allSeedParts = [...STANDARD_FILTERS, ...STANDARD_BELTS];
     
     for (const partData of allSeedParts) {
@@ -1474,6 +1641,12 @@ export class DbStorage implements IStorage {
   }
 
   async addClientPart(companyId: string, userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     // Verify that the client belongs to the companyId
     const client = await db.select().from(clients).where(and(eq(clients.id, insertClientPart.clientId), eq(clients.companyId, companyId))).limit(1);
     if (!client || client.length === 0) {
@@ -1688,6 +1861,12 @@ export class DbStorage implements IStorage {
   }
 
   async createMaintenanceRecord(companyId: string, userId: string, insertRecord: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     // Verify that the client belongs to the company
     const client = await this.getClient(companyId, insertRecord.clientId);
     if (!client) {
@@ -1735,6 +1914,12 @@ export class DbStorage implements IStorage {
   }
 
   async createEquipment(companyId: string, userId: string, insertEquipment: InsertEquipment): Promise<Equipment> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     // Verify that the client belongs to the company
     const client = await this.getClient(companyId, insertEquipment.clientId);
     if (!client) {
@@ -1785,6 +1970,12 @@ export class DbStorage implements IStorage {
   }
 
   async upsertCompanySettings(companyId: string, userId: string, settings: InsertCompanySettings): Promise<CompanySettings> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     const existing = await this.getCompanySettings(companyId);
     
     if (existing) {
@@ -1803,15 +1994,34 @@ export class DbStorage implements IStorage {
 
   // Calendar assignment methods
   async getCalendarAssignments(companyId: string, year: number, month: number, assignedTechnicianId?: string): Promise<CalendarAssignment[]> {
+    // Validate that the technician belongs to the company if provided
+    if (assignedTechnicianId) {
+      const isValid = await this.validateUserInCompany(assignedTechnicianId, companyId);
+      if (!isValid) {
+        throw new Error("Technician does not belong to this company");
+      }
+    }
+    
     const conditions = [
       eq(calendarAssignments.companyId, companyId),
       eq(calendarAssignments.year, year),
       eq(calendarAssignments.month, month)
     ];
     
-    return db.select()
+    // Get all assignments for the company/year/month first
+    const allAssignments = await db.select()
       .from(calendarAssignments)
       .where(and(...conditions));
+    
+    // Filter by assignedTechnicianId in JavaScript if provided
+    // (array contains check is more reliable in JS than SQL for this case)
+    if (assignedTechnicianId) {
+      return allAssignments.filter(assignment => 
+        assignment.assignedTechnicianIds?.includes(assignedTechnicianId)
+      );
+    }
+    
+    return allAssignments;
   }
 
   async getCalendarAssignment(companyId: string, id: string): Promise<CalendarAssignment | undefined> {
@@ -1823,6 +2033,12 @@ export class DbStorage implements IStorage {
   }
 
   async createCalendarAssignment(companyId: string, userId: string, insertAssignment: InsertCalendarAssignment): Promise<CalendarAssignment> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+    
     // Verify that the client belongs to the company
     const client = await this.getClient(companyId, insertAssignment.clientId);
     if (!client) {
@@ -2087,11 +2303,6 @@ export class DbStorage implements IStorage {
       .where(eq(feedback.id, id))
       .returning();
     return result.length > 0;
-  }
-
-  async createInvitationToken(tokenData: any): Promise<any> {
-    const result = await db.insert(invitationTokens).values(tokenData).returning();
-    return result[0];
   }
 
   async getInvitationByToken(token: string): Promise<any | undefined> {

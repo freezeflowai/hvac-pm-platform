@@ -6,7 +6,7 @@ import { storage } from "./storage";
 import { subscriptionService } from "./subscriptionService";
 import { routeOptimizationService } from "./routeOptimizationService";
 import { sendInvitationEmail } from "./emailService";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client, type Part, calendarAssignments, clients } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
 import { db } from "./db";
@@ -96,23 +96,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const trialDays = parseInt(process.env.TRIAL_DAYS || "30", 10);
           const trialEndsAt = new Date();
           trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
-          await storage.updateUserTrialDate(user.id, trialEndsAt);
-          user.trialEndsAt = trialEndsAt;
+          await storage.updateCompanyTrial(companyId, trialEndsAt);
         }
         
         // Seed standard parts for new company owners
         await storage.seedUserParts(user.companyId, user.id);
       }
       
+      // Fetch company data to merge subscription fields
+      const company = await storage.getCompanyById(user.companyId);
+      if (!company) {
+        return res.status(500).json({ error: "Failed to load company data" });
+      }
+      
+      // Merge user + company subscription data
+      const authenticatedUser: AuthenticatedUser = {
+        ...user,
+        trialEndsAt: company.trialEndsAt,
+        subscriptionStatus: company.subscriptionStatus,
+        subscriptionPlan: company.subscriptionPlan,
+        stripeCustomerId: company.stripeCustomerId,
+        stripeSubscriptionId: company.stripeSubscriptionId,
+        billingInterval: company.billingInterval,
+        currentPeriodEnd: company.currentPeriodEnd,
+        cancelAtPeriodEnd: company.cancelAtPeriodEnd
+      };
+      
       req.session.regenerate((err) => {
         if (err) {
           return res.status(500).json({ error: "Failed to regenerate session" });
         }
-        req.login(user, (err) => {
+        req.login(authenticatedUser, (err) => {
           if (err) {
             return res.status(500).json({ error: "Failed to login after signup" });
           }
-          res.json({ id: user.id, email: user.email, role: user.role, companyId: user.companyId });
+          res.json({ id: authenticatedUser.id, email: authenticatedUser.email, role: authenticatedUser.role, companyId: authenticatedUser.companyId });
         });
       });
     } catch (error: any) {
@@ -122,24 +140,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/auth/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
+    passport.authenticate("local", async (err: any, user: Express.User | false, info: any) => {
       if (err) {
         return res.status(500).json({ error: "Internal server error" });
       }
       if (!user) {
         return res.status(401).json({ error: info?.message || "Invalid credentials" });
       }
-      req.session.regenerate((err) => {
-        if (err) {
-          return res.status(500).json({ error: "Failed to regenerate session" });
+      
+      try {
+        // Cast user to proper User type (it's actually a User from storage)
+        const userRecord = user as unknown as User;
+        
+        // Fetch company data to merge subscription fields
+        const company = await storage.getCompanyById(userRecord.companyId);
+        if (!company) {
+          return res.status(500).json({ error: "Failed to load company data" });
         }
-        req.login(user, (err) => {
+        
+        // Merge user + company subscription data
+        const authenticatedUser: AuthenticatedUser = {
+          ...userRecord,
+          trialEndsAt: company.trialEndsAt,
+          subscriptionStatus: company.subscriptionStatus,
+          subscriptionPlan: company.subscriptionPlan,
+          stripeCustomerId: company.stripeCustomerId,
+          stripeSubscriptionId: company.stripeSubscriptionId,
+          billingInterval: company.billingInterval,
+          currentPeriodEnd: company.currentPeriodEnd,
+          cancelAtPeriodEnd: company.cancelAtPeriodEnd
+        };
+        
+        req.session.regenerate((err) => {
           if (err) {
-            return res.status(500).json({ error: "Failed to login" });
+            return res.status(500).json({ error: "Failed to regenerate session" });
           }
-          res.json({ id: user.id, email: user.email, role: user.role, companyId: user.companyId });
+          req.login(authenticatedUser, (err) => {
+            if (err) {
+              return res.status(500).json({ error: "Failed to login" });
+            }
+            res.json({ id: authenticatedUser.id, email: authenticatedUser.email, role: authenticatedUser.role, companyId: authenticatedUser.companyId });
+          });
         });
-      });
+      } catch (error) {
+        return res.status(500).json({ error: "Login failed" });
+      }
     })(req, res, next);
   });
 
@@ -1299,7 +1344,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Cannot delete the last admin user" });
       }
       
-      const deleted = await storage.deleteUser(id);
+      // Pass requesterCompanyId for non-global-admin users
+      const requesterCompanyId = user.email === "service@samcor.ca" ? undefined : user.companyId;
+      const deleted = await storage.deleteUser(id, requesterCompanyId);
       if (!deleted) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -1348,7 +1395,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      await storage.updateUserRole(id, newRole);
+      // Pass requesterCompanyId for non-global-admin users
+      const requesterCompanyId = user.email === "service@samcor.ca" ? undefined : user.companyId;
+      await storage.updateUserRole(id, newRole, requesterCompanyId);
       res.json({ success: true });
     } catch (error) {
       console.error('Update admin status error:', error);
@@ -1665,7 +1714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user!.id;
       const settingsData = insertCompanySettingsSchema.parse(req.body);
       
-      const settings = await storage.upsertCompanySettings(req.user!.companyId, settingsData);
+      const settings = await storage.upsertCompanySettings(req.user!.companyId, userId, settingsData);
       res.json(settings);
     } catch (error) {
       console.error('Update company settings error:', error);
@@ -1798,7 +1847,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isAdminUser) {
         feedbackList = await storage.getAllFeedback();
       } else {
-        feedbackList = await storage.getUserFeedback(userId);
+        feedbackList = await storage.getCompanyFeedback(req.user!.companyId);
       }
       
       res.json(feedbackList);
@@ -1887,15 +1936,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: { userId: user.id },
         });
         customerId = customer.id;
-        await storage.updateUserStripeCustomer(user.id, customerId);
+        await storage.updateCompanyStripeCustomer(user.companyId, customerId);
         
         // Refresh session with updated user
         const updatedUser = await storage.getUser(user.id);
         if (updatedUser) {
-          req.login(updatedUser, (err) => {
-            if (err) console.error("Failed to refresh session:", err);
-          });
-          user = updatedUser;
+          // Fetch company data to merge subscription fields
+          const company = await storage.getCompanyById(updatedUser.companyId);
+          if (company) {
+            // Merge user + company subscription data
+            const authenticatedUpdatedUser: AuthenticatedUser = {
+              ...updatedUser,
+              trialEndsAt: company.trialEndsAt,
+              subscriptionStatus: company.subscriptionStatus,
+              subscriptionPlan: company.subscriptionPlan,
+              stripeCustomerId: company.stripeCustomerId,
+              stripeSubscriptionId: company.stripeSubscriptionId,
+              billingInterval: company.billingInterval,
+              currentPeriodEnd: company.currentPeriodEnd,
+              cancelAtPeriodEnd: company.cancelAtPeriodEnd
+            };
+            req.login(authenticatedUpdatedUser, (err) => {
+              if (err) console.error("Failed to refresh session:", err);
+            });
+            user = authenticatedUpdatedUser;
+          }
         }
       }
 
@@ -2044,7 +2109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Cannot delete technician from another company" });
       }
 
-      const success = await storage.deleteUser(id);
+      const success = await storage.deleteUser(id, user.companyId);
       if (success) {
         res.json({ message: "Technician deleted successfully" });
       } else {
@@ -2155,7 +2220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyId = req.user!.companyId;
       
       // Get all today's assignments for this technician
-      const assignments = await storage.getTechnicianTodayAssignments(companyId, userId);
+      const assignments = await storage.getTechnicianTodayAssignments(userId);
       const clientIds = assignments.map(a => a.client.id);
       
       // Aggregate parts from all assigned clients
@@ -2194,9 +2259,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Assignment not found" });
       }
       
-      // Verify the technician is assigned to this PM (check both assignedTechnicianIds and pendingTechnicianIds)
+      // Verify the technician is assigned to this PM
       let assignedIds = assignment.assignedTechnicianIds;
-      let pendingIds = assignment.pendingTechnicianIds;
       
       // Parse assignedTechnicianIds
       if (typeof assignedIds === 'string') {
@@ -2210,20 +2274,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedIds = assignedIds ? [assignedIds] : [];
       }
       
-      // Parse pendingTechnicianIds
-      if (typeof pendingIds === 'string') {
-        try {
-          pendingIds = JSON.parse(pendingIds);
-        } catch (e) {
-          pendingIds = [];
-        }
-      }
-      if (!Array.isArray(pendingIds)) {
-        pendingIds = pendingIds ? [pendingIds] : [];
-      }
-      
-      // Check if technician is in either assigned or pending lists
-      const isAssigned = assignedIds.includes(userId) || pendingIds.includes(userId);
+      // Check if technician is in assigned list
+      const isAssigned = assignedIds.includes(userId);
       
       if (!isAssigned) {
         return res.status(403).json({ error: "Not authorized to view this assignment" });
@@ -2306,7 +2358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyId = req.user!.companyId;
       const clientId = req.params.clientId;
       
-      const items = await storage.getEquipmentByClient(companyId, clientId);
+      const items = await storage.getClientEquipment(companyId, clientId);
       res.json(items);
     } catch (error) {
       console.error("Error fetching equipment:", error);
