@@ -303,6 +303,7 @@ export default function Calendar() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [routeOptimizationOpen, setRouteOptimizationOpen] = useState(false);
   const [clientDetailOpen, setClientDetailOpen] = useState(false);
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
