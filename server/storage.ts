@@ -884,7 +884,7 @@ export class MemStorage implements IStorage {
       return null;
     }
 
-    const parts = await this.getClientParts(userId, clientId);
+    const parts = await this.getClientParts(client.companyId, clientId);
     const equip = await this.getClientEquipment(userId, clientId);
 
     return {
@@ -1449,17 +1449,13 @@ export class DbStorage implements IStorage {
 
   async addClientPart(companyId: string, userId: string, insertClientPart: InsertClientPart): Promise<ClientPart> {
     // Verify that the client belongs to the companyId
-    console.log("[addClientPart] Checking client - companyId:", companyId, "clientId:", insertClientPart.clientId);
     const client = await db.select().from(clients).where(and(eq(clients.id, insertClientPart.clientId), eq(clients.companyId, companyId))).limit(1);
-    console.log("[addClientPart] Client lookup result:", client.length > 0 ? "found" : "not found");
     if (!client || client.length === 0) {
       throw new Error("Client not found or does not belong to company");
     }
     
     // Verify that the part belongs to the companyId
-    console.log("[addClientPart] Checking part - companyId:", companyId, "partId:", insertClientPart.partId);
     const part = await db.select().from(parts).where(and(eq(parts.id, insertClientPart.partId), eq(parts.companyId, companyId))).limit(1);
-    console.log("[addClientPart] Part lookup result:", part.length > 0 ? "found" : "not found");
     if (!part || part.length === 0) {
       throw new Error("Part not found or does not belong to company");
     }
@@ -1742,7 +1738,7 @@ export class DbStorage implements IStorage {
       return null;
     }
 
-    const parts = await this.getClientParts(userId, clientId);
+    const parts = await this.getClientParts(client.companyId, clientId);
     const equip = await this.getClientEquipment(userId, clientId);
 
     return {
