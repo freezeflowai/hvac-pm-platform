@@ -101,11 +101,11 @@ function AppContent() {
   
   const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
-    enabled: Boolean(user?.id) && user?.role === "admin",
+    enabled: Boolean(user?.id),
   });
 
   const isAuthPage = ['/login', '/signup', '/request-reset', '/reset-password'].includes(location);
-  const isTechnicianPage = user?.role !== "admin";
+  const isTechnicianPage = location === '/technician' || location === '/daily-parts';
 
   const handleClientSelect = (clientId: string) => {
     window.dispatchEvent(new CustomEvent('openClientDialog', { detail: { clientId } }));
