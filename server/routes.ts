@@ -1911,27 +1911,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const company = await storage.getCompanyById(user.companyId);
       const companyName = company?.name || "your team";
       
-      // Send invitation email
+      // Attempt to send invitation email (non-blocking)
+      let emailStatus = "not_sent";
+      let emailErrorMessage: string | undefined;
+      
       try {
         await sendInvitationEmail(email, inviteLink, companyName, role);
-        
-        res.json({
-          inviteLink,
-          email,
-          expiresAt,
-          message: "Invitation email sent successfully!"
-        });
+        emailStatus = "sent";
       } catch (emailError: any) {
         console.error("Failed to send invitation email:", emailError);
-        // Still return success with the link so they can manually share it
-        res.json({
-          inviteLink,
-          email,
-          expiresAt,
-          message: "Invitation created. Email failed to send - please share this link manually.",
-          emailError: emailError.message
-        });
+        emailErrorMessage = emailError.message;
+        emailStatus = "failed";
       }
+      
+      // Always return the invite link regardless of email status
+      res.json({
+        inviteLink,
+        email,
+        expiresAt,
+        emailStatus,
+        message: emailStatus === "sent" 
+          ? "Invitation email sent successfully!" 
+          : "Invitation created. Email failed to send - please share this link manually.",
+        ...(emailErrorMessage && { emailError: emailErrorMessage })
+      });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to generate invitation: " + error.message });
     }

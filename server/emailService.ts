@@ -39,13 +39,12 @@ export async function sendInvitationEmail(
     });
 
     if (error) {
-      console.error('Resend error:', error);
       throw new Error(error.message || 'Failed to send email');
     }
 
     return { success: true, emailId: data?.id };
   } catch (error: any) {
-    console.error('Email service error:', error);
+    // Re-throw for caller to handle
     throw error;
   }
 }
