@@ -132,6 +132,10 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       isActive: location === "/manage-technicians",
       testId: "nav-manage-technicians"
     });
+  }
+  
+  // Only global admin gets the Admin menu
+  if (user?.email === "service@samcor.ca") {
     menuItems.push({
       title: "Admin",
       icon: Shield,

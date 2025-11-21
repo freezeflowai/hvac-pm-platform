@@ -1230,8 +1230,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/users", isAdmin, async (req, res) => {
     try {
       const user = req.user as any;
-      // Only return users from the same company
-      const users = await storage.getTechniciansByCompanyId(user.companyId);
+      let users;
+      
+      // Global admin (service@samcor.ca) sees all users from all companies
+      if (user.email === "service@samcor.ca") {
+        users = await storage.getAllUsers();
+      } else {
+        // Company owners only see users from their own company
+        users = await storage.getTechniciansByCompanyId(user.companyId);
+      }
+      
       // Don't send passwords to the client
       const sanitizedUsers = users.map(({ password, ...u }) => u);
       res.json(sanitizedUsers);
@@ -1250,18 +1258,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Cannot delete your own account" });
       }
       
-      // Only allow deleting users from your own company
       const userToDelete = await storage.getUser(id);
-      if (!userToDelete || userToDelete.companyId !== user.companyId) {
-        return res.status(403).json({ error: "Cannot delete users from other companies" });
+      if (!userToDelete) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Global admin (service@samcor.ca) can delete anyone except themselves
+      if (user.email !== "service@samcor.ca") {
+        // Company owners can only delete users from their own company
+        if (userToDelete.companyId !== user.companyId) {
+          return res.status(403).json({ error: "Cannot delete users from other companies" });
+        }
       }
       
       if (userToDelete.role === "owner") {
         return res.status(403).json({ error: "Cannot delete the owner account" });
       }
       
-      // Check if this is the last admin in this company
-      const companyUsers = await storage.getTechniciansByCompanyId(user.companyId);
+      // Check if this is the last admin in the user's company
+      const companyUsers = await storage.getTechniciansByCompanyId(userToDelete.companyId);
       const adminUsers = companyUsers.filter(u => u.role === "owner" || u.role === "admin");
       if ((userToDelete.role === "admin") && adminUsers.length === 1) {
         return res.status(400).json({ error: "Cannot delete the last admin user" });
@@ -1292,8 +1307,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get the user to update
       const userToUpdate = await storage.getUser(id);
       
-      // Only allow changing roles for users in your company
-      if (!userToUpdate || userToUpdate.companyId !== user.companyId) {
+      if (!userToUpdate) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Global admin can change roles for anyone, company owners only for their own company
+      if (user.email !== "service@samcor.ca" && userToUpdate.companyId !== user.companyId) {
         return res.status(403).json({ error: "Cannot change roles for users from other companies" });
       }
       
@@ -1302,9 +1321,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Cannot change owner role" });
       }
       
-      // If demoting from admin, check if this is the last admin in this company
+      // If demoting from admin, check if this is the last admin in that company
       if (newRole === "technician") {
-        const companyUsers = await storage.getTechniciansByCompanyId(user.companyId);
+        const companyUsers = await storage.getTechniciansByCompanyId(userToUpdate.companyId);
         const adminUsers = companyUsers.filter(u => u.role === "owner" || u.role === "admin");
         
         if ((userToUpdate.role === "admin") && adminUsers.length === 1) {
