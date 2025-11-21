@@ -1826,8 +1826,6 @@ export class DbStorage implements IStorage {
     const month = today.getMonth() + 1;
     const day = today.getDate();
     
-    console.log(`[Technician Today] Looking for assignments for ${technicianId} on ${year}-${month}-${day}`);
-    
     const assignments = await db.select()
       .from(calendarAssignments)
       .where(and(
@@ -1836,8 +1834,6 @@ export class DbStorage implements IStorage {
         eq(calendarAssignments.day, day),
         eq(calendarAssignments.completed, false)
       ));
-
-    console.log(`[Technician Today] Found ${assignments.length} total assignments for today`);
 
     const result = [];
     for (const assignment of assignments) {
@@ -1857,7 +1853,7 @@ export class DbStorage implements IStorage {
         techIds = techIds ? [techIds] : [];
       }
       
-      // Check if technician is in the array
+      // Check if technician is in the array (either exact match or by user ID)
       if (techIds.includes(technicianId)) {
         const client = await this.getClient(assignment.companyId, assignment.clientId);
         if (client) {
