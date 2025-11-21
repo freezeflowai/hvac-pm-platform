@@ -619,6 +619,17 @@ export default function Calendar() {
     };
   }, []);
 
+  // Scroll to start hour when view changes
+  useEffect(() => {
+    if (view === "weekly" && weeklyScrollContainerRef.current && companySettings?.calendarStartHour !== undefined) {
+      const startHour = companySettings.calendarStartHour;
+      const scrollPosition = startHour * 64; // Each row is min-h-16 (64px)
+      setTimeout(() => {
+        weeklyScrollContainerRef.current?.scrollTo({ top: scrollPosition, behavior: 'smooth' });
+      }, 0);
+    }
+  }, [view, companySettings?.calendarStartHour]);
+
   const { assignments = [], clients = [] } = data || {};
 
   // Custom collision detection that only checks drop zones (days), not individual items
@@ -757,7 +768,7 @@ export default function Calendar() {
             </div>
           ))}
         </div>
-        <div className="overflow-y-auto flex-1" style={{ scrollbarWidth: 'thin' }}>
+        <div ref={weeklyScrollContainerRef} className="overflow-y-auto flex-1" style={{ scrollbarWidth: 'thin' }}>
           {hours.map((h) => (
             <div key={h.hour} className="grid grid-cols-8 border-b">
               <div className={`p-2 text-xs font-medium border-r sticky left-0 ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
