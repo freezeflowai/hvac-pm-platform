@@ -761,8 +761,8 @@ export default function Calendar() {
     });
 
     return (
-      <div className="flex flex-col h-full">
-        <div className="grid grid-cols-8 sticky top-0 bg-background z-10 border-b">
+      <div className="flex flex-col h-full min-h-0">
+        <div className="grid grid-cols-8 sticky top-0 bg-background z-10 border-b flex-shrink-0">
           <div className="p-2 text-xs font-semibold border-r">Time</div>
           {weekDaysData.map((d) => (
             <div key={d.dayName} className="p-2 text-center border-r text-xs font-semibold">
@@ -771,7 +771,7 @@ export default function Calendar() {
             </div>
           ))}
         </div>
-        <div ref={weeklyScrollContainerRef} className="overflow-y-scroll flex-1" style={{ scrollbarWidth: 'auto', overflowX: 'hidden' }}>
+        <div ref={weeklyScrollContainerRef} className="overflow-y-scroll flex-1 min-h-0" style={{ scrollbarWidth: 'auto', overflowX: 'hidden' }}>
           {hours.map((h) => (
             <div key={h.hour} className="grid grid-cols-8 border-b">
               <div className={`p-2 text-xs font-medium border-r sticky left-0 z-20 ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
@@ -933,7 +933,7 @@ export default function Calendar() {
                     </div>
                   )}
                   {view === "weekly" && (
-                    <div className="h-full flex flex-col">
+                    <div className="h-full flex flex-col min-h-0">
                       {renderWeeklyView()}
                     </div>
                   )}
