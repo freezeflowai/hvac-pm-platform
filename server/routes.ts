@@ -61,11 +61,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId = invitation.companyId;
         userRole = invitation.role || "technician";
       } else {
-        // Regular signup - create new company and owner
+        // Regular signup - only allow the very first user to be owner
         const allUsers = await storage.getAllUsers();
         const isFirstUser = allUsers.length === 0;
         
-        // Create new company
+        if (!isFirstUser) {
+          return res.status(403).json({ 
+            error: "New accounts must be invited by an admin. Please ask your administrator to invite you." 
+          });
+        }
+        
+        // Create new company for the first/owner user
         const newCompany = await db.insert(companies).values({
           name: email.split('@')[0] + "'s Company",
         }).returning();
