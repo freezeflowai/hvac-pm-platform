@@ -24,6 +24,7 @@ export default function Technician() {
 
   const today = new Date();
   const dateStr = today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  const technicianName = user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email || 'Technician';
 
   if (isLoading) {
     return (
@@ -39,8 +40,11 @@ export default function Technician() {
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-4xl px-4 py-6">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold">Your Schedule</h1>
-          <p className="text-muted-foreground mt-1">{dateStr}</p>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-3xl font-bold">Your Schedule</h1>
+            <p className="text-sm text-muted-foreground">{technicianName}</p>
+          </div>
+          <p className="text-muted-foreground">{dateStr}</p>
         </div>
 
         {todaysPMs && todaysPMs.length > 0 ? (
