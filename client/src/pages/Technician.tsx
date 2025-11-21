@@ -28,7 +28,9 @@ export default function Technician() {
     queryFn: async () => {
       if (!selectedPM?.id) throw new Error('No assignment ID');
       try {
-        const response = await fetch(`/api/technician/assignment/${selectedPM.id}/details`);
+        const response = await fetch(`/api/technician/assignment/${selectedPM.id}/details`, {
+          credentials: 'include',
+        });
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`HTTP ${response.status}: ${errorText}`);
