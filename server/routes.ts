@@ -2151,6 +2151,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint to mark calendar assignment as complete with notes
+  app.patch("/api/calendar/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const assignmentId = req.params.id;
+      const { completed, completionNotes } = req.body;
+      
+      const updateData: any = {};
+      if (completed !== undefined) updateData.completed = completed;
+      if (completionNotes !== undefined) updateData.completionNotes = completionNotes;
+      
+      // Verify user owns this assignment via calendar association
+      const assignment = await db.select().from(calendarAssignments).where(eq(calendarAssignments.id, assignmentId)).limit(1);
+      if (!assignment || assignment.length === 0) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      
+      // Update the assignment
+      const updated = await storage.updateCalendarAssignment(userId, assignmentId, updateData);
+      if (!updated) {
+        return res.status(404).json({ error: "Assignment not found or not authorized" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating calendar assignment:", error);
+      res.status(500).json({ error: "Failed to update assignment" });
+    }
+  });
+
+  // Get equipment for a client
+  app.get("/api/equipment/:clientId", isAuthenticated, async (req, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      const clientId = req.params.clientId;
+      
+      const items = await storage.getEquipmentByClient(companyId, clientId);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching equipment:", error);
+      res.status(500).json({ error: "Failed to fetch equipment" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

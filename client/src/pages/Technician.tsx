@@ -13,6 +13,8 @@ export default function Technician() {
   const [selectedPM, setSelectedPM] = useState<any>(null);
   const [completionNotes, setCompletionNotes] = useState("");
   const [isSubmittingNotes, setIsSubmittingNotes] = useState(false);
+  const [allParts, setAllParts] = useState<Record<string, any>>({});
+  const [allEquipment, setAllEquipment] = useState<Record<string, any[]>>({});
 
   // Get today's assigned PMs
   const { data: todaysPMs = [], isLoading, refetch } = useQuery<any[]>({
@@ -22,23 +24,42 @@ export default function Technician() {
     gcTime: 0,
   });
 
+  // Fetch parts and equipment for all PMs on mount/update
+  useEffect(() => {
+    const fetchAllData = async () => {
+      const partsMap: Record<string, any> = {};
+      const equipmentMap: Record<string, any[]> = {};
+
+      for (const pm of todaysPMs) {
+        try {
+          const partsRes = await fetch(`/api/client-parts/${pm.client.id}`);
+          if (partsRes.ok) {
+            partsMap[pm.client.id] = await partsRes.json();
+          }
+
+          const equipRes = await fetch(`/api/equipment/${pm.client.id}`);
+          if (equipRes.ok) {
+            equipmentMap[pm.client.id] = await equipRes.json();
+          }
+        } catch (error) {
+          console.error("Error fetching data:", error);
+        }
+      }
+
+      setAllParts(partsMap);
+      setAllEquipment(equipmentMap);
+    };
+
+    if (todaysPMs.length > 0) {
+      fetchAllData();
+    }
+  }, [todaysPMs]);
+
   useEffect(() => {
     if (user?.id) {
       refetch();
     }
   }, [user?.id, refetch]);
-
-  // Get client parts for selected client
-  const { data: clientParts = {} } = useQuery<Record<string, any>>({
-    queryKey: ['/api/client-parts', selectedPM?.client?.id],
-    enabled: !!selectedPM?.client?.id,
-  });
-
-  // Get equipment for selected client
-  const { data: equipment = [] } = useQuery<any[]>({
-    queryKey: ['/api/equipment', selectedPM?.client?.id],
-    enabled: !!selectedPM?.client?.id,
-  });
 
   const handleMarkComplete = async () => {
     if (!selectedPM) return;
@@ -56,6 +77,7 @@ export default function Technician() {
       await refetch();
     } catch (error) {
       console.error("Failed to mark complete:", error);
+      alert("Failed to mark complete. Please try again.");
     } finally {
       setIsSubmittingNotes(false);
     }
@@ -74,6 +96,7 @@ export default function Technician() {
       await refetch();
     } catch (error) {
       console.error("Failed to uncomplete:", error);
+      alert("Failed to uncomplete. Please try again.");
     }
   };
 
@@ -97,6 +120,7 @@ export default function Technician() {
       await refetch();
     } catch (error) {
       console.error("Failed to save notes:", error);
+      alert("Failed to save notes. Please try again.");
     } finally {
       setIsSubmittingNotes(false);
     }
@@ -139,48 +163,63 @@ export default function Technician() {
           </h2>
           {pendingPMs.length > 0 ? (
             <div className="space-y-3">
-              {pendingPMs.map((pm: any) => (
-                <Card 
-                  key={pm.id} 
-                  className="cursor-pointer hover-elevate"
-                  onClick={() => {
-                    setSelectedPM(pm);
-                    setCompletionNotes("");
-                  }}
-                  data-testid={`card-pm-${pm.id}`}
-                >
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">{pm.client.companyName}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{pm.client.location}</p>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {pm.client.address && (
-                      <div className="flex items-start gap-2 text-sm">
-                        <MapPin className="h-4 w-4 mt-0.5" />
-                        <span>{pm.client.address}, {pm.client.city} {pm.client.province}</span>
+              {pendingPMs.map((pm: any) => {
+                const parts = allParts[pm.client.id] || {};
+                const equip = allEquipment[pm.client.id] || [];
+                const partCount = Object.keys(parts).length;
+                const equipCount = equip.length;
+
+                return (
+                  <Card 
+                    key={pm.id} 
+                    className="cursor-pointer hover-elevate"
+                    onClick={() => {
+                      setSelectedPM(pm);
+                      setCompletionNotes("");
+                    }}
+                    data-testid={`card-pm-${pm.id}`}
+                  >
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg">{pm.client.companyName}</CardTitle>
+                      <p className="text-sm text-muted-foreground">{pm.client.location}</p>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {pm.client.address && (
+                        <div className="flex items-start gap-2 text-sm">
+                          <MapPin className="h-4 w-4 mt-0.5" />
+                          <span>{pm.client.address}, {pm.client.city} {pm.client.province}</span>
+                        </div>
+                      )}
+                      {pm.client.phone && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Phone className="h-4 w-4" />
+                          <a href={`tel:${pm.client.phone}`} className="hover:underline">{pm.client.phone}</a>
+                        </div>
+                      )}
+                      {pm.client.email && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Mail className="h-4 w-4" />
+                          <a href={`mailto:${pm.client.email}`} className="hover:underline">{pm.client.email}</a>
+                        </div>
+                      )}
+                      <div className="flex gap-4 text-sm text-muted-foreground pt-1">
+                        {partCount > 0 && (
+                          <div className="flex items-center gap-1">
+                            <Package className="h-4 w-4" />
+                            <span>{partCount} parts</span>
+                          </div>
+                        )}
+                        {equipCount > 0 && (
+                          <div className="flex items-center gap-1">
+                            <AlertCircle className="h-4 w-4" />
+                            <span>{equipCount} equipment</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {pm.client.phone && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="h-4 w-4" />
-                        <a href={`tel:${pm.client.phone}`} className="hover:underline">{pm.client.phone}</a>
-                      </div>
-                    )}
-                    {pm.client.email && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="h-4 w-4" />
-                        <a href={`mailto:${pm.client.email}`} className="hover:underline">{pm.client.email}</a>
-                      </div>
-                    )}
-                    {Object.keys(clientParts || {}).length > 0 && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Package className="h-4 w-4" />
-                        <span>{Object.keys(clientParts || {}).length} parts needed</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <Card>
@@ -264,14 +303,14 @@ export default function Technician() {
                 </div>
               </div>
 
-              {Object.keys(clientParts || {}).length > 0 && (
+              {selectedPM && allParts[selectedPM.client.id] && Object.keys(allParts[selectedPM.client.id]).length > 0 && (
                 <div className="space-y-3">
                   <h3 className="font-semibold flex items-center gap-2">
                     <Package className="h-4 w-4" />
                     Parts for this location
                   </h3>
                   <div className="space-y-2">
-                    {Object.entries(clientParts || {}).map(([partId, data]: [string, any]) => {
+                    {Object.entries(allParts[selectedPM.client.id] || {}).map(([partId, data]: [string, any]) => {
                       if (!data || !data.part) return null;
                       return (
                         <div key={partId} className="flex justify-between text-sm p-2 bg-muted/50 rounded">
@@ -284,14 +323,14 @@ export default function Technician() {
                 </div>
               )}
 
-              {equipment && equipment.length > 0 && (
+              {selectedPM && allEquipment[selectedPM.client.id] && allEquipment[selectedPM.client.id].length > 0 && (
                 <div className="space-y-3">
                   <h3 className="font-semibold flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" />
                     Equipment
                   </h3>
                   <div className="space-y-2">
-                    {equipment.map((item: any) => (
+                    {allEquipment[selectedPM.client.id].map((item: any) => (
                       <div key={item.id} className="text-sm p-2 bg-muted/50 rounded">
                         <p className="font-medium">{item.name}</p>
                         {item.type && <p className="text-muted-foreground">Type: {item.type}</p>}

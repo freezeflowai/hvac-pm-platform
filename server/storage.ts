@@ -2089,6 +2089,13 @@ export class DbStorage implements IStorage {
       .limit(1);
     return result[0];
   }
+
+  async getEquipmentByClient(companyId: string, clientId: string): Promise<any[]> {
+    const result = await db.select()
+      .from(equipment)
+      .where(and(eq(equipment.companyId, companyId), eq(equipment.clientId, clientId)));
+    return result;
+  }
 }
 
 export const storage = new DbStorage();
