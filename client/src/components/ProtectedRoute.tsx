@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 
@@ -10,7 +11,17 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
   const { user, isLoading } = useAuth();
   const [currentLocation, setLocation] = useLocation();
 
-  // Don't do anything while loading
+  useEffect(() => {
+    // Only redirect once auth is loaded
+    if (isLoading) return;
+    
+    if (!user && currentLocation !== "/login") {
+      setLocation("/login");
+    } else if (user && requireAdmin && user.role !== "owner" && user.role !== "admin" && currentLocation !== "/technician") {
+      setLocation("/technician");
+    }
+  }, [user, isLoading, requireAdmin, currentLocation, setLocation]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -19,28 +30,13 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     );
   }
 
-  // Check auth after loading completes
   if (!user) {
-    // User not authenticated - redirect to login if not already there
-    if (currentLocation !== "/login") {
-      setLocation("/login");
-    }
     return null;
   }
 
-  // Check admin requirement
   if (requireAdmin && user.role !== "owner" && user.role !== "admin") {
-    // User is not admin - redirect to technician dashboard
-    if (currentLocation !== "/technician") {
-      setLocation("/technician");
-    }
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg text-destructive">Access denied. Admin privileges required.</div>
-      </div>
-    );
+    return null;
   }
 
-  // User is authenticated and authorized
   return <>{children}</>;
 }
