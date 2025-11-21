@@ -1255,8 +1255,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         users = await storage.getTechniciansByCompanyId(user.companyId);
       }
       
+      // Filter to only show owners and admins (not technicians)
+      const adminUsers = users.filter((u: any) => u.role === "owner" || u.role === "admin");
+      
       // Don't send passwords to the client
-      const sanitizedUsers = users.map(({ password, ...u }) => u);
+      const sanitizedUsers = adminUsers.map(({ password, ...u }: any) => u);
       res.json(sanitizedUsers);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });

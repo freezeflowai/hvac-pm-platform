@@ -14,7 +14,8 @@ import { Trash2, Copy, RotateCcw, Plus } from "lucide-react";
 interface Technician {
   id: string;
   email: string;
-  fullName: string | null;
+  firstName: string | null;
+  lastName: string | null;
   role: string;
   createdAt: string;
 }
@@ -144,10 +145,10 @@ export default function TechnicianManagementPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <h3 className="font-semibold" data-testid={`text-technician-email-${tech.id}`}>
-                            {tech.email}
+                            {tech.firstName && tech.lastName ? `${tech.firstName} ${tech.lastName}` : tech.email}
                           </h3>
-                          {tech.fullName && (
-                            <p className="text-sm text-muted-foreground">{tech.fullName}</p>
+                          {(tech.firstName || tech.lastName) && (
+                            <p className="text-sm text-muted-foreground">{tech.email}</p>
                           )}
                           <p className="text-xs text-muted-foreground mt-2">
                             Role: {tech.role} • Added: {new Date(tech.createdAt).toLocaleDateString()}
