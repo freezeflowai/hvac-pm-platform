@@ -187,15 +187,15 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
           </button>
           {showTechnicianSelect && (
             <div className="absolute bottom-4 left-0 z-50 bg-card border rounded p-1 shadow-lg w-40" onClick={(e) => e.stopPropagation()}>
-              <Select value={assignment.assignedTechnicianId || ''} onValueChange={(value) => {
-                onAssignTechnician(assignment.id, value || null);
+              <Select value={assignment.assignedTechnicianId || 'unassigned'} onValueChange={(value) => {
+                onAssignTechnician(assignment.id, value === 'unassigned' ? null : value);
                 setShowTechnicianSelect(false);
               }}>
                 <SelectTrigger className="h-7 text-xs">
                   <SelectValue placeholder="Select tech" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
                   {technicians.map((tech: any) => (
                     <SelectItem key={tech.id} value={tech.id}>
                       {tech.firstName && tech.lastName ? `${tech.firstName} ${tech.lastName}` : tech.email}
