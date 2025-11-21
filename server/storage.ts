@@ -1093,7 +1093,7 @@ export class MemStorage implements IStorage {
 }
 
 import { db } from './db';
-import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback } from '@shared/schema';
+import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback, invitationTokens } from '@shared/schema';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
@@ -1139,6 +1139,15 @@ export class DbStorage implements IStorage {
 
   async updateUserStripeCustomer(id: string, stripeCustomerId: string): Promise<void> {
     await db.update(users).set({ stripeCustomerId }).where(eq(users.id, id));
+  }
+
+  async getTechniciansByCompanyId(companyId: string): Promise<User[]> {
+    return db.select().from(users).where(eq(users.companyId, companyId));
+  }
+
+  async createInvitationToken(tokenData: any): Promise<any> {
+    const result = await db.insert(invitationTokens).values(tokenData).returning();
+    return result[0];
   }
 
   // Password reset token methods
