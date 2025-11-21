@@ -1253,12 +1253,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Cannot delete your own account" });
       }
       
-      // Check if this is the last admin/owner
+      // Check if this is the owner account
       const users = await storage.getAllUsers();
-      const adminUsers = users.filter(u => u.role === "owner" || u.role === "admin");
       const userToDelete = users.find(u => u.id === id);
       
-      if ((userToDelete?.role === "owner" || userToDelete?.role === "admin") && adminUsers.length === 1) {
+      if (userToDelete?.role === "owner") {
+        return res.status(403).json({ error: "Cannot delete the owner account" });
+      }
+      
+      // Check if this is the last admin
+      const adminUsers = users.filter(u => u.role === "owner" || u.role === "admin");
+      if ((userToDelete?.role === "admin") && adminUsers.length === 1) {
         return res.status(400).json({ error: "Cannot delete the last admin user" });
       }
       
