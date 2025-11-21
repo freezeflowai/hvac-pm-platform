@@ -2190,20 +2190,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Assignment not found" });
       }
       
-      // Verify the technician is assigned to this PM
-      let techIds = assignment.assignedTechnicianIds;
-      if (typeof techIds === 'string') {
+      // Verify the technician is assigned to this PM (check both assignedTechnicianIds and pendingTechnicianIds)
+      let assignedIds = assignment.assignedTechnicianIds;
+      let pendingIds = assignment.pendingTechnicianIds;
+      
+      // Parse assignedTechnicianIds
+      if (typeof assignedIds === 'string') {
         try {
-          techIds = JSON.parse(techIds);
+          assignedIds = JSON.parse(assignedIds);
         } catch (e) {
-          techIds = [];
+          assignedIds = [];
         }
       }
-      if (!Array.isArray(techIds)) {
-        techIds = techIds ? [techIds] : [];
+      if (!Array.isArray(assignedIds)) {
+        assignedIds = assignedIds ? [assignedIds] : [];
       }
       
-      if (!techIds.includes(userId)) {
+      // Parse pendingTechnicianIds
+      if (typeof pendingIds === 'string') {
+        try {
+          pendingIds = JSON.parse(pendingIds);
+        } catch (e) {
+          pendingIds = [];
+        }
+      }
+      if (!Array.isArray(pendingIds)) {
+        pendingIds = pendingIds ? [pendingIds] : [];
+      }
+      
+      // Check if technician is in either assigned or pending lists
+      const isAssigned = assignedIds.includes(userId) || pendingIds.includes(userId);
+      
+      if (!isAssigned) {
         return res.status(403).json({ error: "Not authorized to view this assignment" });
       }
       
