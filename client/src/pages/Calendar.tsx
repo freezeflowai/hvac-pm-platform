@@ -146,7 +146,8 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...(inCalendar && onClick ? { onClick: (e) => { e.stopPropagation(); onClick(); } } : {})}
+      onMouseDown={inCalendar && onClick ? handleMouseDown : undefined}
+      onClick={inCalendar && onClick ? handleClick : undefined}
       className={`text-xs px-1.5 py-1 rounded hover:shadow-md transition-all relative select-none group ${inCalendar && onClick ? 'cursor-pointer' : ''} ${getBackgroundColor()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
