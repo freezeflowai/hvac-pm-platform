@@ -1806,12 +1806,13 @@ export class DbStorage implements IStorage {
 
   async updateCalendarAssignment(userId: string, id: string, assignmentUpdate: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined> {
     // Build update object with only provided fields
-    const updateFields: Partial<Pick<CalendarAssignment, 'day' | 'scheduledDate' | 'autoDueDate' | 'completed' | 'assignedTechnicianIds'>> = {};
+    const updateFields: Partial<Pick<CalendarAssignment, 'day' | 'scheduledDate' | 'autoDueDate' | 'completed' | 'assignedTechnicianIds' | 'completionNotes'>> = {};
     if (assignmentUpdate.day !== undefined) updateFields.day = assignmentUpdate.day;
     if (assignmentUpdate.scheduledDate !== undefined) updateFields.scheduledDate = assignmentUpdate.scheduledDate;
     if (assignmentUpdate.autoDueDate !== undefined) updateFields.autoDueDate = assignmentUpdate.autoDueDate;
     if (assignmentUpdate.completed !== undefined) updateFields.completed = assignmentUpdate.completed;
     if (assignmentUpdate.assignedTechnicianIds !== undefined) updateFields.assignedTechnicianIds = assignmentUpdate.assignedTechnicianIds;
+    if (assignmentUpdate.completionNotes !== undefined) updateFields.completionNotes = assignmentUpdate.completionNotes;
     
     const result = await db.update(calendarAssignments)
       .set(updateFields)
