@@ -14,6 +14,8 @@ import PartsManagementPage from "@/pages/PartsManagementPage";
 import CompanySettingsPage from "@/pages/CompanySettingsPage";
 import TechnicianDashboard from "@/pages/TechnicianDashboard";
 import TechnicianManagementPage from "@/pages/TechnicianManagementPage";
+import Technician from "@/pages/Technician";
+import DailyParts from "@/pages/DailyParts";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import RequestReset from "@/pages/RequestReset";
@@ -78,7 +80,12 @@ function Router() {
       </Route>
       <Route path="/technician">
         <ProtectedRoute>
-          <TechnicianDashboard />
+          <Technician />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/daily-parts">
+        <ProtectedRoute>
+          <DailyParts />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />

@@ -1806,17 +1806,44 @@ export class DbStorage implements IStorage {
 
   async updateCalendarAssignment(userId: string, id: string, assignmentUpdate: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined> {
     // Build update object with only provided fields
-    const updateFields: Partial<Pick<CalendarAssignment, 'day' | 'scheduledDate' | 'autoDueDate' | 'completed'>> = {};
+    const updateFields: Partial<Pick<CalendarAssignment, 'day' | 'scheduledDate' | 'autoDueDate' | 'completed' | 'assignedTechnicianId'>> = {};
     if (assignmentUpdate.day !== undefined) updateFields.day = assignmentUpdate.day;
     if (assignmentUpdate.scheduledDate !== undefined) updateFields.scheduledDate = assignmentUpdate.scheduledDate;
     if (assignmentUpdate.autoDueDate !== undefined) updateFields.autoDueDate = assignmentUpdate.autoDueDate;
     if (assignmentUpdate.completed !== undefined) updateFields.completed = assignmentUpdate.completed;
+    if (assignmentUpdate.assignedTechnicianId !== undefined) updateFields.assignedTechnicianId = assignmentUpdate.assignedTechnicianId;
     
     const result = await db.update(calendarAssignments)
       .set(updateFields)
       .where(and(eq(calendarAssignments.id, id), eq(calendarAssignments.userId, userId)))
       .returning();
     return result[0];
+  }
+
+  async getTechnicianTodayAssignments(technicianId: string): Promise<Array<{ id: string; client: Client; assignment: CalendarAssignment }>> {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1;
+    const day = today.getDate();
+    
+    const assignments = await db.select()
+      .from(calendarAssignments)
+      .where(and(
+        eq(calendarAssignments.assignedTechnicianId, technicianId),
+        eq(calendarAssignments.year, year),
+        eq(calendarAssignments.month, month),
+        eq(calendarAssignments.day, day),
+        eq(calendarAssignments.completed, false)
+      ));
+
+    const result = [];
+    for (const assignment of assignments) {
+      const client = await this.getClient(assignment.userId, assignment.clientId);
+      if (client) {
+        result.push({ id: assignment.id, client, assignment });
+      }
+    }
+    return result;
   }
 
   async deleteCalendarAssignment(userId: string, id: string): Promise<boolean> {

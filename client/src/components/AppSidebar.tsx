@@ -71,8 +71,27 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
     }
   };
 
-  const menuItems = [
-    {
+  const menuItems = [];
+
+  // Simplified menu for technicians
+  if (user?.role === "technician") {
+    menuItems.push({
+      title: "My Schedule",
+      icon: Smartphone,
+      href: "/technician",
+      isActive: location === "/technician",
+      testId: "nav-technician"
+    });
+    menuItems.push({
+      title: "Daily Parts",
+      icon: Package,
+      href: "/daily-parts",
+      isActive: location === "/daily-parts",
+      testId: "nav-daily-parts"
+    });
+  } else {
+    // Admin menu
+    menuItems.push({
       title: "Dashboard",
       icon: LayoutDashboard,
       isActive: location === "/" && !isClientsTab,
@@ -84,15 +103,15 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
         }
       },
       testId: "nav-dashboard"
-    },
-    {
+    });
+    menuItems.push({
       title: "Calendar",
       icon: CalendarIcon,
       href: "/calendar",
       isActive: location === "/calendar",
       testId: "nav-calendar"
-    },
-    {
+    });
+    menuItems.push({
       title: "Clients",
       icon: Users,
       isActive: isClientsTab,
@@ -100,49 +119,42 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
         setLocation('/?tab=clients');
       },
       testId: "nav-clients"
-    },
-    {
+    });
+    menuItems.push({
       title: "Parts",
       icon: Package,
       href: "/manage-parts",
       isActive: location === "/manage-parts",
       testId: "nav-parts"
-    },
-    {
+    });
+    menuItems.push({
       title: "Reports",
       icon: FileText,
       href: "/reports",
       isActive: location === "/reports",
       testId: "nav-reports"
-    },
-    {
-      title: "Technician",
-      icon: Smartphone,
-      href: "/technician",
-      isActive: location === "/technician",
-      testId: "nav-technician"
-    },
-  ];
+    });
 
-  if (user?.role === "owner") {
-    menuItems.push({
-      title: "Manage Team",
-      icon: UserCheck,
-      href: "/manage-technicians",
-      isActive: location === "/manage-technicians",
-      testId: "nav-manage-technicians"
-    });
-  }
-  
-  // Only global admin gets the Admin menu
-  if (user?.email === "service@samcor.ca") {
-    menuItems.push({
-      title: "Admin",
-      icon: Shield,
-      href: "/admin",
-      isActive: location === "/admin",
-      testId: "nav-admin"
-    });
+    if (user?.role === "owner") {
+      menuItems.push({
+        title: "Manage Team",
+        icon: UserCheck,
+        href: "/manage-technicians",
+        isActive: location === "/manage-technicians",
+        testId: "nav-manage-technicians"
+      });
+    }
+    
+    // Only global admin gets the Admin menu
+    if (user?.email === "service@samcor.ca") {
+      menuItems.push({
+        title: "Admin",
+        icon: Shield,
+        href: "/admin",
+        isActive: location === "/admin",
+        testId: "nav-admin"
+      });
+    }
   }
 
   return (

@@ -2075,6 +2075,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Technician endpoints
+  app.get("/api/technician/today", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const assignments = await storage.getTechnicianTodayAssignments(userId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching technician today assignments:", error);
+      res.status(500).json({ error: "Failed to fetch today's assignments" });
+    }
+  });
+
+  app.get("/api/technician/daily-parts", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const companyId = req.user!.companyId;
+      
+      // Get all today's assignments for this technician
+      const assignments = await storage.getTechnicianTodayAssignments(userId);
+      const clientIds = assignments.map(a => a.client.id);
+      
+      // Aggregate parts from all assigned clients
+      const dailyParts: Record<string, { part: Part; quantity: number }> = {};
+      
+      for (const clientId of clientIds) {
+        const clientParts = await storage.getClientParts(companyId, clientId);
+        for (const cp of clientParts) {
+          if (!dailyParts[cp.partId]) {
+            dailyParts[cp.partId] = { part: cp.part, quantity: 0 };
+          }
+          dailyParts[cp.partId].quantity += cp.quantity;
+        }
+      }
+      
+      res.json(dailyParts);
+    } catch (error) {
+      console.error("Error fetching daily parts:", error);
+      res.status(500).json({ error: "Failed to fetch daily parts" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
