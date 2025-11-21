@@ -648,7 +648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
-      await storage.deleteAllClientParts(req.user!.id, req.params.id);
+      await storage.deleteAllClientParts(req.user!.companyId, req.params.id);
       const deleted = await storage.deleteClient(req.user!.id, req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Client not found" });
@@ -821,7 +821,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Client-Part routes
   app.get("/api/client-parts/bulk", isAuthenticated, async (req, res) => {
     try {
-      const bulkParts = await storage.getAllClientPartsBulk(req.user!.id);
+      const bulkParts = await storage.getAllClientPartsBulk(req.user!.companyId);
       res.json(bulkParts);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch bulk client parts" });
@@ -830,7 +830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/clients/:id/parts", isAuthenticated, async (req, res) => {
     try {
-      const clientParts = await storage.getClientParts(req.user!.id, req.params.id);
+      const clientParts = await storage.getClientParts(req.user!.companyId, req.params.id);
       res.json(clientParts);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch client parts" });
@@ -884,7 +884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/client-parts/:id", isAuthenticated, async (req, res) => {
     try {
-      const deleted = await storage.deleteClientPart(req.user!.id, req.params.id);
+      const deleted = await storage.deleteClientPart(req.user!.companyId, req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Client part not found" });
       }
@@ -931,7 +931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const clientsWithParts = await Promise.all(
         scheduledClients.map(async (client) => {
           const [clientParts, clientEquipment] = await Promise.all([
-            storage.getClientParts(req.user!.id, client.id),
+            storage.getClientParts(req.user!.companyId, client.id),
             storage.getClientEquipment(req.user!.id, client.id)
           ]);
           

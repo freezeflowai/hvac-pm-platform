@@ -684,7 +684,7 @@ export class MemStorage implements IStorage {
     const partsMap = new Map<string, { part: Part; totalQuantity: number }>();
     
     for (const clientId of clientIds) {
-      const clientParts = await this.getClientParts(userId, clientId);
+      const clientParts = await this.getClientParts(companyId, clientId);
       
       for (const cp of clientParts) {
         // Generate unique key based on part type
