@@ -3,18 +3,25 @@ import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Phone, Mail, MapPin, Package } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
 
 export default function Technician() {
   const { user } = useAuth();
   const [selectedClient, setSelectedClient] = useState<any>(null);
 
   // Get today's assigned PMs
-  const { data: todaysPMs = [], isLoading } = useQuery<any[]>({
+  const { data: todaysPMs = [], isLoading, refetch } = useQuery<any[]>({
     queryKey: ['/api/technician/today'],
     enabled: !!user?.id,
   });
+
+  useEffect(() => {
+    if (user?.id) {
+      refetch();
+    }
+  }, [user?.id, refetch]);
 
   // Get client parts for selected client
   const { data: clientParts = {} } = useQuery<Record<string, any>>({
