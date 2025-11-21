@@ -1,5 +1,5 @@
 import { db } from './db';
-import { users, subscriptionPlans, clients } from '@shared/schema';
+import { users, companies, subscriptionPlans, clients } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 
 export class SubscriptionService {
@@ -32,9 +32,13 @@ export class SubscriptionService {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user) return null;
 
+    // Get company subscription plan
+    const [company] = await db.select().from(companies).where(eq(companies.id, user.companyId));
+    if (!company) return await this.getPlanByName('trial');
+
     // If subscription plan name is set, get that plan
-    if (user.subscriptionPlan) {
-      const plan = await this.getPlanByName(user.subscriptionPlan);
+    if (company.subscriptionPlan) {
+      const plan = await this.getPlanByName(company.subscriptionPlan);
       if (plan) return plan;
     }
 
@@ -42,22 +46,22 @@ export class SubscriptionService {
     return await this.getPlanByName('trial');
   }
 
-  // Check if user's trial has expired
-  isTrialExpired(user: any): boolean {
-    if (!user.trialEndsAt) return false;
-    return new Date(user.trialEndsAt) < new Date();
+  // Check if company's trial has expired
+  isTrialExpired(company: any): boolean {
+    if (!company.trialEndsAt) return false;
+    return new Date(company.trialEndsAt) < new Date();
   }
 
-  // Check if user's subscription is active
-  isSubscriptionActive(user: any): boolean {
+  // Check if company's subscription is active
+  isSubscriptionActive(company: any): boolean {
     const activeStatuses = ['trial', 'trialing', 'active'];
     
     // Check trial expiration
-    if (user.subscriptionStatus === 'trial' && this.isTrialExpired(user)) {
+    if (company.subscriptionStatus === 'trial' && this.isTrialExpired(company)) {
       return false;
     }
 
-    return activeStatuses.includes(user.subscriptionStatus);
+    return activeStatuses.includes(company.subscriptionStatus);
   }
 
   // Get user's current location count
@@ -82,11 +86,16 @@ export class SubscriptionService {
       return { allowed: false, reason: 'User not found', current: 0, limit: 0 };
     }
 
+    const [company] = await db.select().from(companies).where(eq(companies.id, user.companyId));
+    if (!company) {
+      return { allowed: false, reason: 'Company not found', current: 0, limit: 0 };
+    }
+
     // Check if subscription is active
-    if (!this.isSubscriptionActive(user)) {
+    if (!this.isSubscriptionActive(company)) {
       return { 
         allowed: false, 
-        reason: user.subscriptionStatus === 'trial' && this.isTrialExpired(user)
+        reason: company.subscriptionStatus === 'trial' && this.isTrialExpired(company)
           ? 'Your free trial has expired. Please upgrade to continue.'
           : 'Your subscription is not active. Please update your payment method.',
         current: 0,
@@ -117,8 +126,13 @@ export class SubscriptionService {
     };
   }
 
-  // Assign plan to user
+  // Assign plan to user (updates company subscription)
   async assignPlanToUser(userId: string, planName: string, setTrial: boolean = false) {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) {
+      throw new Error('User not found');
+    }
+
     const plan = await this.getPlanByName(planName);
     if (!plan) {
       throw new Error(`Plan '${planName}' not found or not active`);
@@ -136,13 +150,13 @@ export class SubscriptionService {
     }
 
     try {
-      const result = await db.update(users)
+      await db.update(companies)
         .set(updateData)
-        .where(eq(users.id, userId));
+        .where(eq(companies.id, user.companyId));
       
       return await this.getUserPlan(userId);
     } catch (error: any) {
-      console.error("Error updating user subscription:", error);
+      console.error("Error updating company subscription:", error);
       throw new Error(`Failed to update subscription: ${error.message}`);
     }
   }
@@ -152,6 +166,7 @@ export class SubscriptionService {
     const plan = await this.getUserPlan(userId);
     const locationCount = await this.getUserLocationCount(userId);
     const [user] = await db.select().from(users).where(eq(users.id, userId));
+    const [company] = await db.select().from(companies).where(eq(companies.id, user?.companyId || ''));
 
     const percentUsed = plan && plan.locationLimit > 0 
       ? Math.round((locationCount / plan.locationLimit) * 100) 
@@ -168,8 +183,8 @@ export class SubscriptionService {
         locations: locationCount,
       },
       percentUsed,
-      trialEndsAt: user?.trialEndsAt?.toISOString() || null,
-      subscriptionStatus: user?.subscriptionStatus || null,
+      trialEndsAt: company?.trialEndsAt?.toISOString() || null,
+      subscriptionStatus: company?.subscriptionStatus || null,
     };
   }
 }
