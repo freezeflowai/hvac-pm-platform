@@ -304,14 +304,15 @@ export default function Calendar() {
   const [clientDetailOpen, setClientDetailOpen] = useState(false);
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | null>(null);
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
   const weeklyScrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollDoneRef = useRef(false);
   
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
 
-  const { data, isLoading: isLoadingCalendar } = useQuery({
+  const { data, isLoading: isLoadingCalendar, refetch: refetchCalendar } = useQuery({
     queryKey: ["/api/calendar", year, month],
     queryFn: async () => {
       const res = await fetch(`/api/calendar?year=${year}&month=${month}`);
@@ -344,8 +345,8 @@ export default function Calendar() {
         autoDueDate: false,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+    onSuccess: async () => {
+      await refetchCalendar();
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
@@ -369,8 +370,8 @@ export default function Calendar() {
         scheduledDate: new Date(year, month - 1, day).toISOString().split('T')[0],
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+    onSuccess: async () => {
+      await refetchCalendar();
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
@@ -391,8 +392,8 @@ export default function Calendar() {
     mutationFn: async (id: string) => {
       return apiRequest("DELETE", `/api/calendar/assign/${id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+    onSuccess: async () => {
+      await refetchCalendar();
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
@@ -654,20 +655,25 @@ export default function Calendar() {
     };
   }, []);
 
-  // Scroll to start hour when view changes or loads
+  // Scroll to start hour on initial weekly view load only
   useEffect(() => {
-    if (view === "weekly" && weeklyScrollContainerRef.current && companySettings?.calendarStartHour !== undefined) {
+    if (view === "weekly" && weeklyScrollContainerRef.current && companySettings?.calendarStartHour !== undefined && !scrollDoneRef.current) {
       const startHour = companySettings.calendarStartHour;
-      const scrollPosition = startHour * 64; // Each row is min-h-16 (64px)
-      // Use a longer delay to ensure API loads company settings and DOM is fully rendered
+      // Account for header row (52px) + all-day slot (52px) + account for scrolling precision
+      const headerHeight = 52;
+      const allDayHeight = 52;
+      const slotHeight = 64;
+      const scrollPosition = headerHeight + allDayHeight + (startHour * slotHeight);
+      
       const timeoutId = setTimeout(() => {
         if (weeklyScrollContainerRef.current) {
           weeklyScrollContainerRef.current.scrollTop = scrollPosition;
+          scrollDoneRef.current = true;
         }
-      }, 2000);
+      }, 500);
       return () => clearTimeout(timeoutId);
     }
-  }, [view, companySettings?.calendarStartHour]);
+  }, [view]);
 
   const { assignments = [], clients = [] } = data || {};
 
