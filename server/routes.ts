@@ -61,22 +61,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId = invitation.companyId;
         userRole = invitation.role || "technician";
       } else {
-        // Regular signup - only allow the very first user to be owner
+        // Regular signup - create new company and owner
         const allUsers = await storage.getAllUsers();
         const isFirstUser = allUsers.length === 0;
         
-        if (!isFirstUser) {
-          return res.status(403).json({ 
-            error: "New accounts must be invited by an admin. Please ask your administrator to invite you." 
-          });
-        }
-        
-        // Create new company for the first/owner user
+        // Create new company
         const newCompany = await db.insert(companies).values({
           name: email.split('@')[0] + "'s Company",
         }).returning();
         companyId = newCompany[0].id;
-        userRole = "owner";
+        userRole = isFirstUser ? "owner" : "owner"; // Each signup creates their own company as owner
       }
       
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -1906,7 +1900,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user as any;
       const technicians = await storage.getTechniciansByCompanyId(user.companyId);
-      res.json(technicians);
+      // Filter out the owner - only return actual technicians and admins
+      const filtered = technicians.filter(t => t.role !== "owner");
+      res.json(filtered);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch technicians" });
     }
