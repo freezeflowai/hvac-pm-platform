@@ -820,8 +820,8 @@ export default function Calendar() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="min-h-screen bg-background">
-        <main className={`mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
+      <div className="h-screen bg-background flex flex-col">
+        <main className={`flex flex-col flex-1 mx-auto px-4 sm:px-6 lg:px-8 py-4 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Button
@@ -914,10 +914,10 @@ export default function Calendar() {
             </div>
           </div>
 
-          <div className={`grid gap-4 ${isUnscheduledMinimized ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-4'}`} style={{ height: 'calc(100vh - 12rem)' }}>
-            <div className={`${isUnscheduledMinimized ? 'col-span-1' : 'lg:col-span-3'} flex flex-col h-full`}>
-              <Card className="h-full flex flex-col">
-                <CardContent className="flex-1 overflow-auto p-0">
+          <div className={`grid gap-4 flex-1 overflow-hidden ${isUnscheduledMinimized ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-4'}`}>
+            <div className={`${isUnscheduledMinimized ? 'col-span-1' : 'lg:col-span-3'} flex flex-col h-full min-h-0`}>
+              <Card className="h-full flex flex-col overflow-hidden">
+                <CardContent className="flex-1 overflow-hidden p-0">
                   {view === "monthly" && (
                     <div className="h-full flex flex-col">
                       <div className="grid grid-cols-7">
