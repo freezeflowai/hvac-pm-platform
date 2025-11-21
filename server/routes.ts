@@ -1509,14 +1509,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const body = req.body;
       
+      console.log(`[PATCH /api/calendar/assign] Body received:`, JSON.stringify(body));
+      
       // Handle legacy single technician ID -> convert to array
       if (body.assignedTechnicianId && !body.assignedTechnicianIds) {
         body.assignedTechnicianIds = body.assignedTechnicianId ? [body.assignedTechnicianId] : null;
       }
       
       const assignmentUpdate = updateCalendarAssignmentSchema.parse(body);
+      console.log(`[PATCH /api/calendar/assign] Parsed update:`, JSON.stringify(assignmentUpdate));
       
       const assignment = await storage.updateCalendarAssignment(userId, id, assignmentUpdate);
+      console.log(`[PATCH /api/calendar/assign] Updated assignment assignedTechnicianIds:`, assignment?.assignedTechnicianIds);
       
       if (!assignment) {
         return res.status(404).json({ error: "Assignment not found" });
