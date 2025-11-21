@@ -773,40 +773,61 @@ export default function Calendar() {
           ))}
         </div>
         <div ref={weeklyScrollContainerRef} className="overflow-y-scroll flex-1 min-h-0 max-h-full" style={{ scrollbarWidth: 'auto', overflowX: 'hidden' }}>
+          {/* All Day Slot */}
+          <div className="grid grid-cols-8 border-b bg-primary/5">
+            <div className="p-2 text-xs font-semibold border-r sticky left-0 z-20 bg-primary/10">
+              All Day
+            </div>
+            {weekDaysData.map((dayData) => {
+              const visibleAssignments = dayData.dayAssignments.slice(0, 3);
+              const hiddenCount = Math.max(0, dayData.dayAssignments.length - 3);
+              
+              return (
+                <div key={`${dayData.dayName}-allday`} className="p-1 border-r min-h-16 bg-background">
+                  {visibleAssignments.map((assignment: any) => {
+                    const client = clients.find((c: any) => c.id === assignment.clientId);
+                    const isCompleted = assignment.completed;
+                    return client ? (
+                      <DraggableClient
+                        key={assignment.id}
+                        id={assignment.id}
+                        client={client}
+                        inCalendar
+                        onClick={() => handleClientClick(client, assignment)}
+                        isCompleted={isCompleted}
+                        isOverdue={!isCompleted && new Date(assignment.scheduledDate) < new Date()}
+                        assignment={assignment}
+                      />
+                    ) : null;
+                  })}
+                  {hiddenCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-1 text-[10px] w-full"
+                      onClick={() => {
+                        // Show all assignments for this day
+                        const allForDay = dayData.dayAssignments;
+                        console.log(`Viewing all ${allForDay.length} assignments for ${dayData.dayName}`);
+                      }}
+                      data-testid={`button-view-all-${dayData.dayName}`}
+                    >
+                      +{hiddenCount} more
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Hourly Slots */}
           {hours.map((h) => (
             <div key={h.hour} className="grid grid-cols-8 border-b">
               <div className={`p-2 text-xs font-medium border-r sticky left-0 z-20 ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
                 {h.display}
               </div>
               {weekDaysData.map((dayData) => (
-                <div key={`${dayData.dayName}-${h.hour}`} className="p-1 border-r min-h-16 bg-background">
-                  {dayData.dayAssignments.map((assignment: any, idx: number) => {
-                    const client = clients.find((c: any) => c.id === assignment.clientId);
-                    const isCompleted = assignment.completed;
-                    return client ? (
-                      <div 
-                        key={assignment.id} 
-                        className={`text-xs rounded p-1 mb-1 cursor-pointer transition-all ${
-                          isCompleted 
-                            ? 'bg-primary/20 border border-primary/50 line-through opacity-60 hover:bg-primary/25' 
-                            : 'bg-primary/20 border border-primary/50 hover:bg-primary/30'
-                        }`}
-                        onClick={() => handleClientClick(client, assignment)}
-                        data-testid={`hourly-assignment-${assignment.id}`}
-                      >
-                        <div className={`font-semibold line-clamp-2 ${isCompleted ? 'line-through' : ''}`}>{client.companyName}</div>
-                        {assignment.assignedTechnicianIds?.length > 0 && technicians.length > 0 && (
-                          <div className="text-muted-foreground text-[10px]">
-                            {technicians
-                              .filter((t: any) => assignment.assignedTechnicianIds?.includes(t.id))
-                              .map((t: any) => `${t.firstName} ${t.lastName}`)
-                              .join(', ')}
-                          </div>
-                        )}
-                      </div>
-                    ) : null;
-                  })}
-                </div>
+                <div key={`${dayData.dayName}-${h.hour}`} className="p-1 border-r min-h-16 bg-background" />
               ))}
             </div>
           ))}
