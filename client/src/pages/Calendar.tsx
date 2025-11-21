@@ -325,6 +325,10 @@ export default function Calendar() {
     staleTime: 60 * 1000,
   });
 
+  const { data: technicians = [] } = useQuery<any[]>({
+    queryKey: ['/api/technicians'],
+  });
+
   const createAssignment = useMutation({
     mutationFn: async ({ clientId, day }: { clientId: string; day: number }) => {
       return apiRequest("POST", `/api/calendar/assign`, {
@@ -703,18 +707,24 @@ export default function Calendar() {
     // Get current week dates
     const today = new Date();
     const currentWeekStart = new Date(today);
-    currentWeekStart.setDate(today.getDate() - today.getDay()); // Start on Sunday
+    currentWeekStart.setDate(today.getDate() - today.getDay());
 
-    const weekDays = [];
     const weekDaysData = [];
-    
     for (let i = 0; i < 7; i++) {
       const date = new Date(currentWeekStart);
       date.setDate(currentWeekStart.getDate() + i);
-      
       const dayNumber = date.getDate();
       const isCurrentMonth = date.getMonth() === month - 1 && date.getFullYear() === year;
-      const dayAssignments = isCurrentMonth ? (assignmentsByDay[dayNumber] || []) : [];
+      let dayAssignments = isCurrentMonth ? (assignmentsByDay[dayNumber] || []) : [];
+      
+      // Filter by selected technician
+      if (selectedTechnicianId === "unassigned") {
+        dayAssignments = dayAssignments.filter((a: any) => !a.assignedTechnicianIds || a.assignedTechnicianIds.length === 0);
+      } else if (selectedTechnicianId && selectedTechnicianId !== "all") {
+        dayAssignments = dayAssignments.filter((a: any) => 
+          a.assignedTechnicianIds && a.assignedTechnicianIds.includes(selectedTechnicianId)
+        );
+      }
 
       weekDaysData.push({
         date,
@@ -723,74 +733,58 @@ export default function Calendar() {
         dayAssignments,
         dayName: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i]
       });
-
-      weekDays.push(
-        isCurrentMonth ? (
-          <DroppableDay
-            key={i}
-            day={dayNumber}
-            year={year}
-            month={month}
-            assignments={dayAssignments}
-            clients={clients}
-            onRemove={handleRemove}
-            onClientClick={handleClientClick}
-            onClearDay={handleClearDay}
-            showParts={false}
-          />
-        ) : (
-          <div key={i} className="h-full p-2 border bg-muted/10">
-            <div className="text-xs text-muted-foreground">
-              {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </div>
-          </div>
-        )
-      );
     }
 
+    const hours = Array.from({ length: 12 }, (_, i) => {
+      const h = i;
+      const ampm = h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
+      return { hour: i, display: ampm };
+    });
+
     return (
-      <>
-        <div className="grid grid-cols-7">
-          {weekDaysData.map((dayData, i) => (
-            <div key={dayData.dayName} className="text-center p-2 border bg-muted/5">
-              <div className="font-medium text-sm">{dayData.dayName}</div>
-              <div className="text-xs text-muted-foreground">
-                {dayData.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </div>
+      <div className="flex flex-col h-full">
+        <div className="grid grid-cols-8 sticky top-0 bg-background z-10 border-b">
+          <div className="p-2 text-xs font-semibold border-r">Time</div>
+          {weekDaysData.map((d) => (
+            <div key={d.dayName} className="p-2 text-center border-r text-xs font-semibold">
+              <div>{d.dayName}</div>
+              <div className="text-muted-foreground">{d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7">
-          {weekDays}
+        <div className="overflow-y-auto flex-1" style={{ scrollbarWidth: 'thin' }}>
+          {hours.map((h) => (
+            <div key={h.hour} className="grid grid-cols-8 border-b">
+              <div className="p-2 text-xs font-medium border-r bg-muted/20 sticky left-0">{h.display}</div>
+              {weekDaysData.map((dayData) => (
+                <div key={`${dayData.dayName}-${h.hour}`} className="p-1 border-r min-h-16 bg-background">
+                  {dayData.dayAssignments.map((assignment: any) => {
+                    const client = clients.find((c: any) => c.id === assignment.clientId);
+                    return client ? (
+                      <div 
+                        key={assignment.id} 
+                        className="text-xs bg-primary/20 border border-primary/50 rounded p-1 mb-1 cursor-pointer hover:bg-primary/30"
+                        onClick={() => handleClientClick(client, assignment)}
+                        data-testid={`hourly-assignment-${assignment.id}`}
+                      >
+                        <div className="font-semibold line-clamp-2">{client.companyName}</div>
+                        {assignment.assignedTechnicianIds?.length > 0 && technicians.length > 0 && (
+                          <div className="text-muted-foreground text-[10px]">
+                            {technicians
+                              .filter((t: any) => assignment.assignedTechnicianIds?.includes(t.id))
+                              .map((t: any) => `${t.firstName} ${t.lastName}`)
+                              .join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
-        
-        <div className="mt-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">Parts Order</h3>
-            <Button
-              variant={showOnlyOutstanding ? "default" : "outline"}
-              size="sm"
-              onClick={() => setShowOnlyOutstanding(!showOnlyOutstanding)}
-              className="h-7 px-2 text-xs"
-              data-testid="button-toggle-outstanding"
-            >
-              {showOnlyOutstanding ? "Outstanding Only" : "All Parts"}
-            </Button>
-          </div>
-          <div className="grid grid-cols-7 gap-2">
-            {weekDaysData.map((dayData) => (
-              <DayPartsCell
-                key={dayData.dayName}
-                assignments={dayData.isCurrentMonth ? dayData.dayAssignments : []}
-                clients={clients}
-                dayName={dayData.dayName}
-                date={dayData.date}
-                showOnlyOutstanding={showOnlyOutstanding}
-              />
-            ))}
-          </div>
-        </div>
-      </>
+      </div>
     );
   };
 
@@ -833,6 +827,22 @@ export default function Calendar() {
             </div>
 
             <div className="flex items-center gap-3">
+              {view === "weekly" && (
+                <Select value={selectedTechnicianId || "all"} onValueChange={setSelectedTechnicianId}>
+                  <SelectTrigger className="w-40 text-xs" data-testid="select-technician-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Technicians</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {technicians.map((tech: any) => (
+                      <SelectItem key={tech.id} value={tech.id}>
+                        {tech.firstName} {tech.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Button
                 variant="outline"
                 size="sm"
