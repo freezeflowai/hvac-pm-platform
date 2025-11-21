@@ -22,6 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [userInitialized, setUserInitialized] = useState(false);
 
   const { data, isLoading, isError } = useQuery<User>({
     queryKey: ["/api/auth/user"],
@@ -31,8 +32,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (data) {
       setUser(data);
+      setUserInitialized(true);
     } else if (isError || data === null) {
       setUser(null);
+      setUserInitialized(true);
     }
   }, [data, isError]);
 
@@ -84,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, isLoading: isLoading || !userInitialized, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
