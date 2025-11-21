@@ -953,36 +953,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all completed maintenance statuses
+  // Get all completed maintenance statuses (checks calendar assignments)
   app.get("/api/maintenance/statuses", isAuthenticated, async (req, res) => {
     try {
       const now = new Date();
-      const currentMonth = now.getMonth();
+      const currentMonth = now.getMonth() + 1; // 1-indexed
       const currentYear = now.getFullYear();
       
-      // Optimized: Fetch all latest completed records in a single query instead of looping
-      const latestCompletedRecords = await storage.getAllLatestCompletedMaintenanceRecords(req.user!.id);
+      // Get all calendar assignments for the current month
+      const assignments = await db.select().from(calendarAssignments).where(and(
+        eq(calendarAssignments.companyId, req.user!.companyId),
+        eq(calendarAssignments.year, currentYear),
+        eq(calendarAssignments.month, currentMonth)
+      ));
       
       const clients = await storage.getAllClients(req.user!.id);
       const statuses: Record<string, { completed: boolean; completedDueDate?: string }> = {};
       
+      // For each client, check if there's a completed assignment in the current month
       for (const client of clients) {
-        const latestCompleted = latestCompletedRecords[client.id];
+        const clientAssignment = assignments.find(a => a.clientId === client.id && a.completed);
         
-        if (latestCompleted && latestCompleted.completedAt) {
-          const completedDate = new Date(latestCompleted.completedAt);
-          const completedMonth = completedDate.getMonth();
-          const completedYear = completedDate.getFullYear();
-          
-          // Only mark as completed if the completion happened in the current month
-          if (completedMonth === currentMonth && completedYear === currentYear) {
-            statuses[client.id] = {
-              completed: true,
-              completedDueDate: latestCompleted.dueDate
-            };
-          } else {
-            statuses[client.id] = { completed: false };
-          }
+        if (clientAssignment) {
+          statuses[client.id] = {
+            completed: true,
+            completedDueDate: clientAssignment.scheduledDate
+          };
         } else {
           statuses[client.id] = { completed: false };
         }
@@ -990,6 +986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(statuses);
     } catch (error) {
+      console.error("Error fetching maintenance statuses:", error);
       res.status(500).json({ error: "Failed to fetch maintenance statuses" });
     }
   });
