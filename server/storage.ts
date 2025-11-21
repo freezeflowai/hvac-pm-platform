@@ -1841,21 +1841,30 @@ export class DbStorage implements IStorage {
 
     const result = [];
     for (const assignment of assignments) {
-      console.log(`[Technician Today] Checking assignment ${assignment.id}: techIds=${JSON.stringify(assignment.assignedTechnicianIds)}`);
-      // Check if technician is in the assignedTechnicianIds array
-      if (assignment.assignedTechnicianIds && assignment.assignedTechnicianIds.includes(technicianId)) {
-        console.log(`[Technician Today] Technician ${technicianId} IS assigned to ${assignment.id}`);
+      let techIds = assignment.assignedTechnicianIds;
+      
+      // Handle array that might be a string or actual array
+      if (typeof techIds === 'string') {
+        try {
+          techIds = JSON.parse(techIds);
+        } catch (e) {
+          techIds = [];
+        }
+      }
+      
+      // Ensure it's an array
+      if (!Array.isArray(techIds)) {
+        techIds = techIds ? [techIds] : [];
+      }
+      
+      // Check if technician is in the array
+      if (techIds.includes(technicianId)) {
         const client = await this.getClient(assignment.companyId, assignment.clientId);
         if (client) {
           result.push({ id: assignment.id, client, assignment });
-        } else {
-          console.log(`[Technician Today] Failed to get client for assignment ${assignment.id}`);
         }
-      } else {
-        console.log(`[Technician Today] Technician ${technicianId} NOT in array for ${assignment.id}`);
       }
     }
-    console.log(`[Technician Today] Returning ${result.length} assignments for technician ${technicianId}`);
     return result;
   }
 
