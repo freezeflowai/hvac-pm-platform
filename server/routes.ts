@@ -1229,9 +1229,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin routes - only accessible by admin users
   app.get("/api/admin/users", isAdmin, async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
+      const user = req.user as any;
+      // Only return users from the same company
+      const users = await storage.getTechniciansByCompanyId(user.companyId);
       // Don't send passwords to the client
-      const sanitizedUsers = users.map(({ password, ...user }) => user);
+      const sanitizedUsers = users.map(({ password, ...u }) => u);
       res.json(sanitizedUsers);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });
@@ -1241,23 +1243,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
+      const user = req.user as any;
       
       // Prevent deleting yourself
-      if (id === req.user!.id) {
+      if (id === user.id) {
         return res.status(400).json({ error: "Cannot delete your own account" });
       }
       
-      // Check if this is the owner account
-      const users = await storage.getAllUsers();
-      const userToDelete = users.find(u => u.id === id);
+      // Only allow deleting users from your own company
+      const userToDelete = await storage.getUser(id);
+      if (!userToDelete || userToDelete.companyId !== user.companyId) {
+        return res.status(403).json({ error: "Cannot delete users from other companies" });
+      }
       
-      if (userToDelete?.role === "owner") {
+      if (userToDelete.role === "owner") {
         return res.status(403).json({ error: "Cannot delete the owner account" });
       }
       
-      // Check if this is the last admin
-      const adminUsers = users.filter(u => u.role === "owner" || u.role === "admin");
-      if ((userToDelete?.role === "admin") && adminUsers.length === 1) {
+      // Check if this is the last admin in this company
+      const companyUsers = await storage.getTechniciansByCompanyId(user.companyId);
+      const adminUsers = companyUsers.filter(u => u.role === "owner" || u.role === "admin");
+      if ((userToDelete.role === "admin") && adminUsers.length === 1) {
         return res.status(400).json({ error: "Cannot delete the last admin user" });
       }
       
@@ -1277,23 +1283,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { role: newRole } = req.body;
+      const user = req.user as any;
       
       if (!newRole || !["owner", "admin", "technician"].includes(newRole)) {
         return res.status(400).json({ error: "Invalid role. Must be owner, admin, or technician." });
       }
       
-      // Prevent changing owner role
+      // Get the user to update
       const userToUpdate = await storage.getUser(id);
-      if (userToUpdate?.role === "owner") {
+      
+      // Only allow changing roles for users in your company
+      if (!userToUpdate || userToUpdate.companyId !== user.companyId) {
+        return res.status(403).json({ error: "Cannot change roles for users from other companies" });
+      }
+      
+      // Prevent changing owner role
+      if (userToUpdate.role === "owner") {
         return res.status(403).json({ error: "Cannot change owner role" });
       }
       
-      // If demoting from owner/admin, check if this is the last admin
+      // If demoting from admin, check if this is the last admin in this company
       if (newRole === "technician") {
-        const users = await storage.getAllUsers();
-        const adminUsers = users.filter(u => u.role === "owner" || u.role === "admin");
+        const companyUsers = await storage.getTechniciansByCompanyId(user.companyId);
+        const adminUsers = companyUsers.filter(u => u.role === "owner" || u.role === "admin");
         
-        if ((userToUpdate?.role === "owner" || userToUpdate?.role === "admin") && adminUsers.length === 1) {
+        if ((userToUpdate.role === "admin") && adminUsers.length === 1) {
           return res.status(400).json({ error: "Cannot demote the last admin user" });
         }
       }
