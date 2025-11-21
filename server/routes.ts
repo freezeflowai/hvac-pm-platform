@@ -953,6 +953,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all completed maintenance statuses
   app.get("/api/maintenance/statuses", isAuthenticated, async (req, res) => {
     try {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
       // Optimized: Fetch all latest completed records in a single query instead of looping
       const latestCompletedRecords = await storage.getAllLatestCompletedMaintenanceRecords(req.user!.id);
       
@@ -962,11 +966,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const client of clients) {
         const latestCompleted = latestCompletedRecords[client.id];
         
-        if (latestCompleted && latestCompleted.completedAt) {
-          statuses[client.id] = {
-            completed: true,
-            completedDueDate: latestCompleted.dueDate
-          };
+        if (latestCompleted && latestCompleted.completedAt && latestCompleted.dueDate) {
+          const dueDate = new Date(latestCompleted.dueDate);
+          const dueMonth = dueDate.getMonth();
+          const dueYear = dueDate.getFullYear();
+          
+          // Only mark as completed if the completed record is for the current month
+          if (dueMonth === currentMonth && dueYear === currentYear) {
+            statuses[client.id] = {
+              completed: true,
+              completedDueDate: latestCompleted.dueDate
+            };
+          } else {
+            statuses[client.id] = { completed: false };
+          }
         } else {
           statuses[client.id] = { completed: false };
         }
