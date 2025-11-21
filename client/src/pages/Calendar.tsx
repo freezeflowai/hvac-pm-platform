@@ -664,7 +664,7 @@ export default function Calendar() {
         if (weeklyScrollContainerRef.current) {
           weeklyScrollContainerRef.current.scrollTop = scrollPosition;
         }
-      }, 1000);
+      }, 2000);
       return () => clearTimeout(timeoutId);
     }
   }, [view, companySettings?.calendarStartHour]);
