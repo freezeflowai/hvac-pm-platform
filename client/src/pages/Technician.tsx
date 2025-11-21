@@ -15,18 +15,15 @@ export default function Technician() {
   const { data: todaysPMs = [], isLoading, refetch } = useQuery<any[]>({
     queryKey: ['/api/technician/today'],
     enabled: !!user?.id,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   useEffect(() => {
     if (user?.id) {
-      console.log('[Technician] User:', user.id, user.email, user.role);
       refetch();
     }
   }, [user?.id, refetch]);
-
-  useEffect(() => {
-    console.log('[Technician] todaysPMs:', todaysPMs);
-  }, [todaysPMs]);
 
   // Get client parts for selected client
   const { data: clientParts = {} } = useQuery<Record<string, any>>({
