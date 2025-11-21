@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Mail, ChevronsRight, ChevronsLeft, Route, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Mail, ChevronsRight, ChevronsLeft, Route, Users, Info } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -119,23 +119,30 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
       ref={setNodeRef}
       style={style}
       {...attributes}
-      onDoubleClick={(e) => {
-        e.stopPropagation();
-        if (inCalendar && onClick) {
-          console.log('Double-click detected on PM card, opening dialog');
-          onClick();
-        }
-      }}
-      className={`text-xs px-1.5 py-1 rounded hover:shadow-md transition-all relative select-none group ${inCalendar && onClick ? 'cursor-pointer' : ''} ${getBackgroundColor()}`}
+      className={`text-xs px-1.5 py-1 rounded hover:shadow-md transition-all relative select-none group ${getBackgroundColor()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
       <div 
         {...listeners}
-        className={inCalendar ? "cursor-grab active:cursor-grabbing" : ""}
+        className={inCalendar ? "cursor-grab active:cursor-grabbing flex justify-between items-start" : "flex justify-between items-start"}
       >
-        <div className={`font-semibold leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
-        {client.location && (
-          <div className={`text-muted-foreground text-[10px] leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
+        <div className="flex-1">
+          <div className={`font-semibold leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
+          {client.location && (
+            <div className={`text-muted-foreground text-[10px] leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
+          )}
+        </div>
+        {inCalendar && onClick && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick();
+            }}
+            className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-1 h-4 w-4 flex items-center justify-center hover:bg-primary/20 rounded"
+            data-testid={`button-open-client-${id}`}
+          >
+            <Info className="h-3 w-3" />
+          </button>
         )}
       </div>
     </div>
