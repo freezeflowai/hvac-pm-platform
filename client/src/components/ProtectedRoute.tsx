@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 
@@ -10,9 +10,14 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
   const [location, setLocation] = useLocation();
+  const hasCheckedAuth = useRef(false);
 
   useEffect(() => {
     if (isLoading) return;
+    
+    // Only perform auth checks once on mount, not on hot reload
+    if (hasCheckedAuth.current) return;
+    hasCheckedAuth.current = true;
     
     if (!user) {
       setLocation("/login");
@@ -20,13 +25,10 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     }
     
     if (requireAdmin && user.role !== "owner" && user.role !== "admin") {
-      // Only redirect if not already on a technician route
-      if (location !== "/technician" && location !== "/daily-parts") {
-        setLocation("/technician");
-      }
+      setLocation("/technician");
       return;
     }
-  }, [user, isLoading, requireAdmin, setLocation, location]);
+  }, [user, isLoading, requireAdmin, setLocation]);
 
   if (isLoading) {
     return (
