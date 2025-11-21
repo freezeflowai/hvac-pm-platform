@@ -567,9 +567,11 @@ export default function Calendar() {
   };
 
   const handleClientClick = (client: any, assignment: any) => {
+    console.log('handleClientClick called with:', { client, assignment });
     setSelectedClient(client);
     setSelectedAssignment(assignment);
     setClientDetailOpen(true);
+    console.log('Dialog state set to true');
   };
 
   const toggleComplete = useMutation({
