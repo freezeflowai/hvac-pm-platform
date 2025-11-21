@@ -535,49 +535,39 @@ export default function Calendar() {
         createAssignment.mutate({ clientId: activeId, day });
       }
     } else if (overId.startsWith('allday-')) {
-      // Dropped on all-day slot in weekly view
-      const dayName = overId.replace('allday-', '');
-      const targetDate = new Date(year, month - 1, 1);
-      const dayOffset = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(dayName);
-      const firstDayOfMonth = targetDate.getDay();
-      const targetDay = (7 - firstDayOfMonth) + dayOffset + 1;
+      // Dropped on all-day slot in weekly view (allday-{dayName}-{dayNumber})
+      const parts = overId.replace('allday-', '').split('-');
+      const dayName = parts[0];
+      const targetDay = parseInt(parts[1]);
       
       const isExistingAssignment = assignments.some((a: any) => a.id === activeId);
       
       if (isExistingAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
-        if (currentAssignment && currentAssignment.day !== targetDay && targetDay >= 1 && targetDay <= new Date(year, month, 0).getDate()) {
+        if (currentAssignment && currentAssignment.day !== targetDay) {
           updateAssignment.mutate({ id: activeId, day: targetDay });
         }
       } else {
         // Create new assignment from unscheduled client
-        if (targetDay >= 1 && targetDay <= new Date(year, month, 0).getDate()) {
-          createAssignment.mutate({ clientId: activeId, day: targetDay });
-        }
+        createAssignment.mutate({ clientId: activeId, day: targetDay });
       }
     } else if (overId.startsWith('weekly-')) {
-      // Dropped on hourly slot in weekly view (weekly-{dayName}-{hour})
+      // Dropped on hourly slot in weekly view (weekly-{dayName}-{hour}-{dayNumber})
       const parts = overId.replace('weekly-', '').split('-');
       const dayName = parts[0];
       const hour = parseInt(parts[1]);
-      
-      const targetDate = new Date(year, month - 1, 1);
-      const dayOffset = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(dayName);
-      const firstDayOfMonth = targetDate.getDay();
-      const targetDay = (7 - firstDayOfMonth) + dayOffset + 1;
+      const targetDay = parseInt(parts[2]);
       
       const isExistingAssignment = assignments.some((a: any) => a.id === activeId);
       
       if (isExistingAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
-        if (currentAssignment && currentAssignment.day !== targetDay && targetDay >= 1 && targetDay <= new Date(year, month, 0).getDate()) {
+        if (currentAssignment && currentAssignment.day !== targetDay) {
           updateAssignment.mutate({ id: activeId, day: targetDay });
         }
       } else {
         // Create new assignment from unscheduled client
-        if (targetDay >= 1 && targetDay <= new Date(year, month, 0).getDate()) {
-          createAssignment.mutate({ clientId: activeId, day: targetDay });
-        }
+        createAssignment.mutate({ clientId: activeId, day: targetDay });
       }
     } else if (overId === 'unscheduled-panel') {
       // Dropped on unscheduled panel - remove from calendar
@@ -768,20 +758,20 @@ export default function Calendar() {
   };
 
   // Drop zone component for all-day slots in weekly view
-  const AllDayDropZone = ({ dayName, children }: { dayName: string; children: React.ReactNode }) => {
-    const { setNodeRef } = useDroppable({ id: `allday-${dayName}` });
+  const AllDayDropZone = ({ dayName, dayNumber, children }: { dayName: string; dayNumber: number; children: React.ReactNode }) => {
+    const { setNodeRef, isOver } = useDroppable({ id: `allday-${dayName}-${dayNumber}` });
     return (
-      <div ref={setNodeRef} className="p-1 border-r min-h-16 bg-background">
+      <div ref={setNodeRef} className={`p-1 border-r min-h-16 ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`}>
         {children}
       </div>
     );
   };
 
   // Drop zone component for hourly slots in weekly view
-  const HourlyDropZone = ({ dayName, hour }: { dayName: string; hour: number }) => {
-    const { setNodeRef } = useDroppable({ id: `weekly-${dayName}-${hour}` });
+  const HourlyDropZone = ({ dayName, hour, dayNumber }: { dayName: string; hour: number; dayNumber: number }) => {
+    const { setNodeRef, isOver } = useDroppable({ id: `weekly-${dayName}-${hour}-${dayNumber}` });
     return (
-      <div ref={setNodeRef} className="p-1 border-r min-h-16 bg-background" />
+      <div ref={setNodeRef} className={`p-1 border-r min-h-16 ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`} />
     );
   };
 
@@ -846,8 +836,8 @@ export default function Calendar() {
             const hiddenCount = Math.max(0, dayData.dayAssignments.length - 3);
             
             return (
-              <AllDayDropZone key={`${dayData.dayName}-allday`} dayName={dayData.dayName}>
-                <div className="p-1 min-h-16 bg-background">
+              <AllDayDropZone key={`${dayData.dayName}-allday`} dayName={dayData.dayName} dayNumber={dayData.dayNumber}>
+                <div className="p-1">
                   {visibleAssignments.map((assignment: any) => {
                     const client = clients.find((c: any) => c.id === assignment.clientId);
                     const isCompleted = assignment.completed;
@@ -893,7 +883,7 @@ export default function Calendar() {
                 {h.display}
               </div>
               {weekDaysData.map((dayData) => (
-                <HourlyDropZone key={`${dayData.dayName}-${h.hour}`} dayName={dayData.dayName} hour={h.hour} />
+                <HourlyDropZone key={`${dayData.dayName}-${h.hour}`} dayName={dayData.dayName} hour={h.hour} dayNumber={dayData.dayNumber} />
               ))}
             </div>
           ))}
