@@ -237,6 +237,7 @@ export const companySettings = pgTable("company_settings", {
   postalCode: text("postal_code"),
   email: text("email"),
   phone: text("phone"),
+  calendarStartHour: integer("calendar_start_hour").notNull().default(8),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 

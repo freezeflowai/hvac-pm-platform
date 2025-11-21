@@ -329,6 +329,10 @@ export default function Calendar() {
     queryKey: ['/api/technicians'],
   });
 
+  const { data: companySettings } = useQuery<any>({
+    queryKey: ['/api/company-settings'],
+  });
+
   const createAssignment = useMutation({
     mutationFn: async ({ clientId, day }: { clientId: string; day: number }) => {
       return apiRequest("POST", `/api/calendar/assign`, {
@@ -709,6 +713,7 @@ export default function Calendar() {
     const currentWeekStart = new Date(today);
     currentWeekStart.setDate(today.getDate() - today.getDay());
 
+    const startHour = companySettings?.calendarStartHour || 8;
     const weekDaysData = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(currentWeekStart);
@@ -735,7 +740,7 @@ export default function Calendar() {
       });
     }
 
-    const hours = Array.from({ length: 12 }, (_, i) => {
+    const hours = Array.from({ length: 24 }, (_, i) => {
       const h = i;
       const ampm = h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
       return { hour: i, display: ampm };
@@ -755,10 +760,12 @@ export default function Calendar() {
         <div className="overflow-y-auto flex-1" style={{ scrollbarWidth: 'thin' }}>
           {hours.map((h) => (
             <div key={h.hour} className="grid grid-cols-8 border-b">
-              <div className="p-2 text-xs font-medium border-r bg-muted/20 sticky left-0">{h.display}</div>
+              <div className={`p-2 text-xs font-medium border-r sticky left-0 ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
+                {h.display}
+              </div>
               {weekDaysData.map((dayData) => (
                 <div key={`${dayData.dayName}-${h.hour}`} className="p-1 border-r min-h-16 bg-background">
-                  {dayData.dayAssignments.map((assignment: any) => {
+                  {h.hour === startHour && dayData.dayAssignments.map((assignment: any, idx: number) => {
                     const client = clients.find((c: any) => c.id === assignment.clientId);
                     return client ? (
                       <div 
@@ -828,20 +835,23 @@ export default function Calendar() {
 
             <div className="flex items-center gap-3">
               {view === "weekly" && (
-                <Select value={selectedTechnicianId || "all"} onValueChange={setSelectedTechnicianId}>
-                  <SelectTrigger className="w-40 text-xs" data-testid="select-technician-filter">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Technicians</SelectItem>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {technicians.map((tech: any) => (
-                      <SelectItem key={tech.id} value={tech.id}>
-                        {tech.firstName} {tech.lastName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <>
+                  <Select value={selectedTechnicianId || "all"} onValueChange={setSelectedTechnicianId}>
+                    <SelectTrigger className="w-40 text-xs" data-testid="select-technician-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Technicians</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {technicians.map((tech: any) => (
+                        <SelectItem key={tech.id} value={tech.id}>
+                          {tech.firstName} {tech.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">Start: {companySettings?.calendarStartHour || 8}:00</span>
+                </>
               )}
               <Button
                 variant="outline"
