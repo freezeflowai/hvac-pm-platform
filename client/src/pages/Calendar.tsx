@@ -561,7 +561,9 @@ export default function Calendar() {
   };
 
   const handleClientClick = (client: any, assignment: any) => {
-    setReportDialogClientId(client.id);
+    setSelectedClient(client);
+    setSelectedAssignment(assignment);
+    setClientDetailOpen(true);
   };
 
   const toggleComplete = useMutation({
@@ -947,55 +949,22 @@ export default function Calendar() {
           ) : null}
         </DragOverlay>
 
-        <Dialog open={!!selectedClient} onOpenChange={() => {
-          setSelectedClient(null);
-          setSelectedAssignment(null);
-        }}>
-          <DialogContent data-testid="client-detail-dialog">
-            <DialogHeader>
-              <DialogTitle>Client Details</DialogTitle>
-            </DialogHeader>
-            {selectedClient && (
-              <div className="space-y-4">
-                <div className="space-y-3">
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Company Name</div>
-                    <div className="text-base font-semibold" data-testid="dialog-company-name">
-                      {selectedClient.companyName}
-                    </div>
-                  </div>
-                  {selectedClient.location && (
-                    <div>
-                      <div className="text-sm font-medium text-muted-foreground">Location</div>
-                      <div className="text-base" data-testid="dialog-location">
-                        {selectedClient.location}
-                      </div>
-                    </div>
-                  )}
-                  {selectedClient.address && (
-                    <div>
-                      <div className="text-sm font-medium text-muted-foreground">Address</div>
-                      <div className="text-base" data-testid="dialog-address">
-                        {selectedClient.address}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {selectedAssignment && (
-                  <Button
-                    onClick={() => toggleComplete.mutate()}
-                    disabled={toggleComplete.isPending}
-                    variant={selectedAssignment.completed ? "outline" : "default"}
-                    className="w-full"
-                    data-testid="button-toggle-complete"
-                  >
-                    {selectedAssignment.completed ? "Mark as Incomplete" : "Mark as Complete"}
-                  </Button>
-                )}
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+        <ClientDetailDialog 
+          open={clientDetailOpen}
+          onOpenChange={(open) => {
+            setClientDetailOpen(open);
+            if (!open) {
+              setSelectedClient(null);
+              setSelectedAssignment(null);
+            }
+          }}
+          client={selectedClient}
+          assignment={selectedAssignment}
+          onAssignTechnicians={(assignmentId: string, technicianIds: string[]) => {
+            assignTechnicians.mutate({ assignmentId, technicianIds });
+          }}
+          bulkParts={bulkParts}
+        />
       </div>
 
       <NewAddClientDialog 
