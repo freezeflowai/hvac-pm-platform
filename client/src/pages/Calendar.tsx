@@ -761,7 +761,7 @@ export default function Calendar() {
     });
 
     return (
-      <div className="flex flex-col h-full min-h-0">
+      <div className="flex flex-col h-full min-h-0 max-h-full">
         <div className="grid grid-cols-8 sticky top-0 bg-background z-10 border-b flex-shrink-0">
           <div className="p-2 text-xs font-semibold border-r">Time</div>
           {weekDaysData.map((d) => (
@@ -771,7 +771,7 @@ export default function Calendar() {
             </div>
           ))}
         </div>
-        <div ref={weeklyScrollContainerRef} className="overflow-y-scroll flex-1 min-h-0" style={{ scrollbarWidth: 'auto', overflowX: 'hidden' }}>
+        <div ref={weeklyScrollContainerRef} className="overflow-y-scroll flex-1 min-h-0 max-h-full" style={{ scrollbarWidth: 'auto', overflowX: 'hidden' }}>
           {hours.map((h) => (
             <div key={h.hour} className="grid grid-cols-8 border-b">
               <div className={`p-2 text-xs font-medium border-r sticky left-0 z-20 ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
@@ -820,8 +820,8 @@ export default function Calendar() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="h-screen bg-background flex flex-col">
-        <main className={`flex flex-col flex-1 mx-auto px-4 sm:px-6 lg:px-8 py-4 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
+      <div className="h-screen bg-background flex flex-col overflow-hidden">
+        <main className={`flex flex-col flex-1 min-h-0 mx-auto px-4 sm:px-6 lg:px-8 py-4 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Button
@@ -914,8 +914,8 @@ export default function Calendar() {
             </div>
           </div>
 
-          <div className={`grid gap-4 flex-1 overflow-hidden ${isUnscheduledMinimized ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-4'}`}>
-            <div className={`${isUnscheduledMinimized ? 'col-span-1' : 'lg:col-span-3'} flex flex-col h-full min-h-0`}>
+          <div className={`grid gap-4 flex-1 min-h-0 overflow-hidden ${isUnscheduledMinimized ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-4'}`}>
+            <div className={`${isUnscheduledMinimized ? 'col-span-1' : 'lg:col-span-3'} flex flex-col h-full min-h-0 max-h-full`}>
               <Card className="h-full flex flex-col overflow-hidden">
                 <CardContent className="flex-1 overflow-hidden p-0">
                   {view === "monthly" && (
@@ -933,7 +933,7 @@ export default function Calendar() {
                     </div>
                   )}
                   {view === "weekly" && (
-                    <div className="h-full flex flex-col min-h-0">
+                    <div className="h-full flex flex-col min-h-0 max-h-full">
                       {renderWeeklyView()}
                     </div>
                   )}
