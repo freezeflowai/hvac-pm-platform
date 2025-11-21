@@ -19,15 +19,15 @@ passport.use(
         return done(null, false, { message: "Invalid email or password" });
       }
 
-      return done(null, user);
+      return done(null, user as any);
     } catch (error) {
       return done(error);
     }
   })
 );
 
-passport.serializeUser((user, done) => {
-  done(null, (user as User).id);
+passport.serializeUser((user: any, done) => {
+  done(null, user.id);
 });
 
 passport.deserializeUser(async (id: string, done) => {
@@ -36,7 +36,7 @@ passport.deserializeUser(async (id: string, done) => {
     if (!user) {
       return done(null, false);
     }
-    done(null, user);
+    done(null, user as any);
   } catch (error) {
     done(null, false);
   }
