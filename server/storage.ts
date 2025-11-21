@@ -1829,7 +1829,7 @@ export class DbStorage implements IStorage {
     const assignments = await db.select()
       .from(calendarAssignments)
       .where(and(
-        sql`${calendarAssignments.assignedTechnicianIds}::text[] @> ARRAY[${technicianId}]::text[]`,
+        sql`${calendarAssignments.assignedTechnicianIds} @> ARRAY[${technicianId}]`,
         eq(calendarAssignments.year, year),
         eq(calendarAssignments.month, month),
         eq(calendarAssignments.day, day),

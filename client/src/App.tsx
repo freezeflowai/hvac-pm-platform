@@ -101,10 +101,11 @@ function AppContent() {
   
   const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
-    enabled: Boolean(user?.id),
+    enabled: Boolean(user?.id) && user?.role === "admin",
   });
 
   const isAuthPage = ['/login', '/signup', '/request-reset', '/reset-password'].includes(location);
+  const isTechnicianPage = user?.role !== "admin";
 
   const handleClientSelect = (clientId: string) => {
     window.dispatchEvent(new CustomEvent('openClientDialog', { detail: { clientId } }));
@@ -140,64 +141,66 @@ function AppContent() {
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between gap-2 border-b px-4 py-2">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Search clients..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setSearchOpen(e.target.value.length > 0);
-                  }}
-                  onFocus={() => searchQuery.length > 0 && setSearchOpen(true)}
-                  onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
-                  data-testid="input-client-search"
-                  className="h-9 w-64 rounded-md border border-input bg-white dark:bg-gray-900 pl-8 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                />
-                {searchOpen && searchQuery && (
-                  <div className="absolute top-full left-0 right-0 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md outline-none z-50">
-                    <Command>
-                      <CommandList>
-                        <CommandEmpty className="py-6 text-center text-sm">No clients found.</CommandEmpty>
-                        <CommandGroup>
-                          {filteredClients.map((client) => (
-                            <CommandItem
-                              key={client.id}
-                              value={client.id}
-                              keywords={[client.companyName, client.location || '']}
-                              onSelect={() => {
-                                handleClientSelect(client.id);
-                                setSearchOpen(false);
-                                setSearchQuery("");
-                              }}
-                              data-testid={`client-search-item-${client.id}`}
-                            >
-                              <div className="flex flex-col">
-                                <span className="font-medium">{client.companyName}</span>
-                                {client.location && (
-                                  <span className="text-xs text-muted-foreground">{client.location}</span>
-                                )}
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </div>
-                )}
+            {!isTechnicianPage && (
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search clients..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setSearchOpen(e.target.value.length > 0);
+                    }}
+                    onFocus={() => searchQuery.length > 0 && setSearchOpen(true)}
+                    onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
+                    data-testid="input-client-search"
+                    className="h-9 w-64 rounded-md border border-input bg-white dark:bg-gray-900 pl-8 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  />
+                  {searchOpen && searchQuery && (
+                    <div className="absolute top-full left-0 right-0 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md outline-none z-50">
+                      <Command>
+                        <CommandList>
+                          <CommandEmpty className="py-6 text-center text-sm">No clients found.</CommandEmpty>
+                          <CommandGroup>
+                            {filteredClients.map((client) => (
+                              <CommandItem
+                                key={client.id}
+                                value={client.id}
+                                keywords={[client.companyName, client.location || '']}
+                                onSelect={() => {
+                                  handleClientSelect(client.id);
+                                  setSearchOpen(false);
+                                  setSearchQuery("");
+                                }}
+                                data-testid={`client-search-item-${client.id}`}
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{client.companyName}</span>
+                                  {client.location && (
+                                    <span className="text-xs text-muted-foreground">{client.location}</span>
+                                  )}
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </div>
+                  )}
+                </div>
+                <Button variant="default" size="default" onClick={handleAddClient} data-testid="button-add-client" className="gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  <span>Add Client</span>
+                </Button>
+                <Button variant="ghost" size="icon" asChild data-testid="button-settings">
+                  <Link href="/company-settings">
+                    <Settings className="h-4 w-4" />
+                  </Link>
+                </Button>
               </div>
-              <Button variant="default" size="default" onClick={handleAddClient} data-testid="button-add-client" className="gap-1.5">
-                <Plus className="h-4 w-4" />
-                <span>Add Client</span>
-              </Button>
-              <Button variant="ghost" size="icon" asChild data-testid="button-settings">
-                <Link href="/company-settings">
-                  <Settings className="h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
+            )}
           </header>
           <SubscriptionBanner />
           <main className="flex-1 overflow-auto">
