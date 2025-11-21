@@ -1839,12 +1839,13 @@ export class DbStorage implements IStorage {
     for (const assignment of assignments) {
       // Check if technician is in the assignedTechnicianIds array
       if (assignment.assignedTechnicianIds && assignment.assignedTechnicianIds.includes(technicianId)) {
-        const client = await this.getClient(assignment.userId, assignment.clientId);
+        const client = await this.getClient(assignment.companyId, assignment.clientId);
         if (client) {
           result.push({ id: assignment.id, client, assignment });
         }
       }
     }
+    console.log(`getTechnicianTodayAssignments for ${technicianId}: found ${result.length} assignments`);
     return result;
   }
 
