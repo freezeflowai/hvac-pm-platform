@@ -382,10 +382,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Plan name is required" });
       }
 
+      // Verify user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Verify plan exists
+      const plans = await subscriptionService.getActivePlans();
+      const planExists = plans.some(p => p.name === planName);
+      if (!planExists) {
+        const validPlans = plans.map(p => p.name).join(", ");
+        return res.status(400).json({ error: `Invalid plan name. Valid plans are: ${validPlans}` });
+      }
+
       const plan = await subscriptionService.assignPlanToUser(userId, planName, false);
       res.json({ success: true, plan });
     } catch (error: any) {
-      res.status(400).json({ error: error.message || "Failed to update subscription" });
+      console.error("Subscription update error:", error);
+      res.status(500).json({ error: error.message || "Failed to update subscription" });
     }
   });
 

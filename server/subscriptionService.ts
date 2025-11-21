@@ -121,7 +121,7 @@ export class SubscriptionService {
   async assignPlanToUser(userId: string, planName: string, setTrial: boolean = false) {
     const plan = await this.getPlanByName(planName);
     if (!plan) {
-      throw new Error(`Plan ${planName} not found`);
+      throw new Error(`Plan '${planName}' not found or not active`);
     }
 
     const updateData: any = {
@@ -135,11 +135,16 @@ export class SubscriptionService {
       updateData.trialEndsAt = trialEndsAt;
     }
 
-    await db.update(users)
-      .set(updateData)
-      .where(eq(users.id, userId));
-
-    return await this.getUserPlan(userId);
+    try {
+      const result = await db.update(users)
+        .set(updateData)
+        .where(eq(users.id, userId));
+      
+      return await this.getUserPlan(userId);
+    } catch (error: any) {
+      console.error("Error updating user subscription:", error);
+      throw new Error(`Failed to update subscription: ${error.message}`);
+    }
   }
 
   // Get subscription usage info for a user

@@ -37,8 +37,9 @@ passport.deserializeUser(async (id: string, done) => {
       return done(null, false);
     }
     done(null, user as any);
-  } catch (error) {
-    done(null, false);
+  } catch (error: any) {
+    console.error("Deserialize user error:", error);
+    done(error);
   }
 });
 

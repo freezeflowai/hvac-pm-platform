@@ -44,7 +44,7 @@ app.use(
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true,
-      secure: false,
+      secure: isProduction,
       sameSite: "lax",
     },
   })
@@ -73,7 +73,8 @@ declare global {
       id: string;
       email: string;
       password: string;
-      isAdmin: boolean;
+      role: string;
+      companyId: string;
       // Subscription fields
       trialEndsAt: Date | null;
       subscriptionStatus: string;
