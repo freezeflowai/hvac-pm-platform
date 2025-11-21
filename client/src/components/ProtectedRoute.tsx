@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 
@@ -9,23 +8,9 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
-  const [location, setLocation] = useLocation();
+  const [currentLocation, setLocation] = useLocation();
 
-  useEffect(() => {
-    if (!isLoading) {
-      console.log("ProtectedRoute check:", { user, requireAdmin, currentLocation: location });
-      if (!user) {
-        console.log("No user, redirecting to login");
-        setLocation("/login");
-      } else if (requireAdmin && user.role !== "owner" && user.role !== "admin") {
-        console.log("User role not admin/owner:", user.role, "redirecting to /technician");
-        setLocation("/technician");
-      } else if (requireAdmin) {
-        console.log("User has admin access:", user.role);
-      }
-    }
-  }, [user, isLoading, setLocation, requireAdmin]);
-
+  // Don't do anything while loading
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -34,11 +19,21 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     );
   }
 
+  // Check auth after loading completes
   if (!user) {
+    // User not authenticated - redirect to login if not already there
+    if (currentLocation !== "/login") {
+      setLocation("/login");
+    }
     return null;
   }
 
+  // Check admin requirement
   if (requireAdmin && user.role !== "owner" && user.role !== "admin") {
+    // User is not admin - redirect to technician dashboard
+    if (currentLocation !== "/technician") {
+      setLocation("/technician");
+    }
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-lg text-destructive">Access denied. Admin privileges required.</div>
@@ -46,5 +41,6 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     );
   }
 
+  // User is authenticated and authorized
   return <>{children}</>;
 }
