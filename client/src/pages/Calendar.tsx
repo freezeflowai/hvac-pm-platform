@@ -6,6 +6,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect } from "react";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import ClientReportDialog from "@/components/ClientReportDialog";
+import { ClientDetailDialog } from "@/components/ClientDetailDialog";
 import { RouteOptimizationDialog } from "@/components/RouteOptimizationDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -347,6 +348,7 @@ export default function Calendar() {
   const [showOnlyOutstanding, setShowOnlyOutstanding] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [routeOptimizationOpen, setRouteOptimizationOpen] = useState(false);
+  const [clientDetailOpen, setClientDetailOpen] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
@@ -361,6 +363,11 @@ export default function Calendar() {
       if (!res.ok) throw new Error("Failed to fetch calendar data");
       return res.json();
     }
+  });
+
+  const { data: bulkParts = {} } = useQuery<Record<string, any[]>>({
+    queryKey: ['/api/client-parts/bulk'],
+    staleTime: 60 * 1000,
   });
 
   const createAssignment = useMutation({
