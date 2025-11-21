@@ -55,6 +55,16 @@ The application uses a Material Design-inspired typography hierarchy with the In
   - User Management: Admins can promote technicians to admin via the Admin page user management interface
   - Security: No privilege escalation vulnerabilities; technicians have strict read-only access to schedules and client data
   - Technician Experience: Full read-only access to schedules, client information, parts inventory, and equipment details via mobile-optimized dashboard
+- **Technician System** (NEW): Complete technician management with role-based assignment and visibility:
+  - Technician signup flow captures first/last name and associates with email for proper identification
+  - Technician-specific pages: "My Schedule" (today's assigned jobs with client details) and "Daily Parts" (aggregated parts summary)
+  - Technician assignment UI on Calendar with dropdown for assigning PMs to specific technicians by name
+  - Backend technician list endpoint provides all company technicians for admin assignment UI
+  - Calendar assignments include `assignedTechnicianId` field to track which technician is assigned to each PM
+  - Technicians only see PMs assigned to them; unassigned PMs are not visible to technicians
+  - Database schema updated with `first_name` and `last_name` columns on users table and `assigned_technician_id` on calendar_assignments
+  - PATCH endpoint `/api/calendar/assign/{assignmentId}` allows admins to assign/unassign technicians from PMs
+  - Completion tracking uses `completedAt` date for accurate status (not `dueDate`)
 - **Subscription System (Feature Flag Controlled)**: Tiered subscription model with location limits and usage tracking:
   - **Subscription Tiers**: Free Trial (30 days, 10 locations), Silver ($40/month, 100 locations), Gold ($70/month, 200 locations), Enterprise (quote-based, unlimited locations)
   - **Database Schema**: `subscription_plans` table stores tier definitions; user subscription info tracked in `users` table fields (subscriptionPlan, subscriptionStatus, trialEndsAt)
