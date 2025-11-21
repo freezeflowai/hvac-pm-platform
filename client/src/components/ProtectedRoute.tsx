@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   useEffect(() => {
     if (isLoading) return;
@@ -20,10 +20,13 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     }
     
     if (requireAdmin && user.role !== "owner" && user.role !== "admin") {
-      setLocation("/technician");
+      // Only redirect if not already on a technician route
+      if (location !== "/technician" && location !== "/daily-parts") {
+        setLocation("/technician");
+      }
       return;
     }
-  }, [user, isLoading, requireAdmin, setLocation]);
+  }, [user, isLoading, requireAdmin, setLocation, location]);
 
   if (isLoading) {
     return (
