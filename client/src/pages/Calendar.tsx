@@ -100,15 +100,6 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     isDragging,
   } = useSortable({ id });
 
-  const [clickStartPos, setClickStartPos] = useState<{ x: number; y: number } | null>(null);
-  const [showTechnicianSelect, setShowTechnicianSelect] = useState(false);
-
-  // Fetch technicians
-  const { data: technicians = [] } = useQuery<any[]>({
-    queryKey: ['/api/technicians'],
-    enabled: inCalendar && !!assignment,
-  });
-
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -123,37 +114,24 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     return 'bg-status-this-month/10 border-status-this-month/30';
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setClickStartPos({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleClick = (e: React.MouseEvent) => {
-    // Only trigger onClick if the mouse didn't move significantly (not a drag)
-    if (onClick && clickStartPos) {
-      const deltaX = Math.abs(e.clientX - clickStartPos.x);
-      const deltaY = Math.abs(e.clientY - clickStartPos.y);
-      
-      // If movement is less than 5 pixels, consider it a click
-      if (deltaX < 5 && deltaY < 5) {
-        onClick();
-      }
-    }
-    setClickStartPos(null);
-  };
-
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
-      onMouseDown={inCalendar && onClick ? handleMouseDown : undefined}
-      onClick={inCalendar && onClick ? handleClick : undefined}
+      onClick={(e) => {
+        if (inCalendar && onClick) {
+          e.stopPropagation();
+          onClick();
+        }
+      }}
       className={`text-xs px-1.5 py-1 rounded hover:shadow-md transition-all relative select-none group ${inCalendar && onClick ? 'cursor-pointer' : ''} ${getBackgroundColor()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
       <div 
         {...listeners}
         className={inCalendar ? "cursor-grab active:cursor-grabbing" : ""}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className={`font-semibold leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
         {client.location && (
