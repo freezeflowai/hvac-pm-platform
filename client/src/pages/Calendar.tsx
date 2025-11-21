@@ -767,6 +767,24 @@ export default function Calendar() {
     return days;
   };
 
+  // Drop zone component for all-day slots in weekly view
+  const AllDayDropZone = ({ dayName, children }: { dayName: string; children: React.ReactNode }) => {
+    const { setNodeRef } = useDroppable({ id: `allday-${dayName}` });
+    return (
+      <div ref={setNodeRef} className="p-1 border-r min-h-16 bg-background">
+        {children}
+      </div>
+    );
+  };
+
+  // Drop zone component for hourly slots in weekly view
+  const HourlyDropZone = ({ dayName, hour }: { dayName: string; hour: number }) => {
+    const { setNodeRef } = useDroppable({ id: `weekly-${dayName}-${hour}` });
+    return (
+      <div ref={setNodeRef} className="p-1 border-r min-h-16 bg-background" />
+    );
+  };
+
   const renderWeeklyView = () => {
     // Get current week dates
     const today = new Date();
