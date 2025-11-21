@@ -51,6 +51,8 @@ export default function Admin() {
   const [, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
 
+  console.log("Admin page - Current user:", currentUser);
+
   const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
   });
