@@ -788,7 +788,7 @@ export default function Calendar() {
     currentWeekStart.setDate(today.getDate() - today.getDay());
 
     const startHour = companySettings?.calendarStartHour || 8;
-    const weekDaysData = [];
+    const weekDaysData: Array<{date: Date; dayNumber: number; isCurrentMonth: boolean; dayAssignments: any[]; dayName: string}> = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(currentWeekStart);
       date.setDate(currentWeekStart.getDate() + i);
