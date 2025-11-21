@@ -550,6 +550,11 @@ export default function Calendar() {
     const overId = over.id as string;
     const activeId = active.id as string;
 
+    // If dropping on the same container it started in (or no drop zone specified), it's just a click
+    if (active.data?.current?.sortable?.index === over?.data?.current?.sortable?.index && !overId.startsWith('day-') && overId !== 'unscheduled-panel') {
+      return;
+    }
+
     // Check if dropping on a day
     if (overId.startsWith('day-')) {
       const day = parseInt(overId.replace('day-', ''));
@@ -558,8 +563,11 @@ export default function Calendar() {
       const isExistingAssignment = assignments.some((a: any) => a.id === activeId);
       
       if (isExistingAssignment) {
-        // Move existing assignment
-        updateAssignment.mutate({ id: activeId, day });
+        // Only move if the assignment exists and day changed
+        const currentAssignment = assignments.find((a: any) => a.id === activeId);
+        if (currentAssignment && currentAssignment.day !== day) {
+          updateAssignment.mutate({ id: activeId, day });
+        }
       } else {
         // Create new assignment from unscheduled client
         createAssignment.mutate({ clientId: activeId, day });
