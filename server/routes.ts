@@ -6,7 +6,7 @@ import { storage } from "./storage";
 import { subscriptionService } from "./subscriptionService";
 import { routeOptimizationService } from "./routeOptimizationService";
 import { sendInvitationEmail } from "./emailService";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client, type Part } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
 import { db } from "./db";

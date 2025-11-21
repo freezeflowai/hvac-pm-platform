@@ -12,10 +12,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Mail, ChevronsRight, ChevronsLeft, Route } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Mail, ChevronsRight, ChevronsLeft, Route, Users } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { useAuth } from "@/lib/auth";
 
 function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimize }: { 
   clients: any[]; 
@@ -88,7 +89,7 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
   );
 }
 
-function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean }) {
+function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void }) {
   const {
     attributes,
     listeners,
@@ -99,6 +100,13 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
   } = useSortable({ id });
 
   const [clickStartPos, setClickStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [showTechnicianSelect, setShowTechnicianSelect] = useState(false);
+
+  // Fetch technicians
+  const { data: technicians = [] } = useQuery<any[]>({
+    queryKey: ['/api/technicians'],
+    enabled: inCalendar && !!assignment,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -149,20 +157,57 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
           <div className={`text-muted-foreground text-[10px] leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
         )}
       </div>
-      {inCalendar && onClick && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-          }}
-          className="absolute top-0.5 left-0.5 p-0.5 rounded hover:bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-          title="View details"
-          data-testid={`button-view-client-${id}`}
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </button>
+      {inCalendar && (
+        <div className="absolute top-0.5 left-0.5 right-0.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          {onClick && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onClick();
+              }}
+              className="p-0.5 rounded hover:bg-background/80 flex-1"
+              title="View details"
+              data-testid={`button-view-client-${id}`}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+          )}
+          {assignment && onAssignTechnician && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowTechnicianSelect(!showTechnicianSelect);
+              }}
+              className="p-0.5 rounded hover:bg-background/80"
+              title="Assign technician"
+              data-testid={`button-assign-tech-${id}`}
+            >
+              <Users className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      )}
+      {inCalendar && assignment && onAssignTechnician && showTechnicianSelect && (
+        <div className="absolute top-6 left-0 z-20 bg-card border rounded p-1 shadow-md w-32" onClick={(e) => e.stopPropagation()}>
+          <Select value={assignment.assignedTechnicianId || ''} onValueChange={(value) => {
+            onAssignTechnician(assignment.id, value || null);
+            setShowTechnicianSelect(false);
+          }}>
+            <SelectTrigger className="h-6 text-xs">
+              <SelectValue placeholder="Select tech" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Unassigned</SelectItem>
+              {technicians.map((tech: any) => (
+                <SelectItem key={tech.id} value={tech.id}>
+                  {tech.firstName && tech.lastName ? `${tech.firstName} ${tech.lastName}` : tech.email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       )}
     </div>
   );
@@ -296,6 +341,19 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
                 onClick={() => onClientClick(client, assignment)}
                 isCompleted={assignment.completed}
                 isOverdue={!assignment.completed && isOverdue}
+                assignment={assignment}
+                onAssignTechnician={(assignmentId: string, technicianId: string | null) => {
+                  queryClient.setQueryData(['/api/calendar', year, month], (old: any) => {
+                    if (!old) return old;
+                    return {
+                      ...old,
+                      assignments: old.assignments.map((a: any) =>
+                        a.id === assignmentId ? { ...a, assignedTechnicianId: technicianId } : a
+                      )
+                    };
+                  });
+                  apiRequest('PATCH', `/api/calendar/assign/${assignmentId}`, { assignedTechnicianId: technicianId });
+                }}
               />
               <button
                 onClick={(e) => {

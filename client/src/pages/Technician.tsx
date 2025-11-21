@@ -106,19 +106,22 @@ export default function Technician() {
                 </div>
               </div>
 
-              {clientParts && Object.keys(clientParts).length > 0 && (
+              {Object.keys(clientParts).length > 0 && (
                 <div className="space-y-3">
                   <h3 className="font-semibold flex items-center gap-2">
                     <Package className="h-4 w-4" />
                     Parts for this location
                   </h3>
                   <div className="space-y-2">
-                    {Object.entries(clientParts).map(([partId, { part, quantity }]: any) => (
-                      <div key={partId} className="flex justify-between text-sm p-2 bg-muted/50 rounded">
-                        <span>{part.name || `${part.type} - ${part.size}`}</span>
-                        <span className="font-semibold">Qty: {quantity}</span>
-                      </div>
-                    ))}
+                    {Object.entries(clientParts).map(([partId, data]: [string, any]) => {
+                      if (!data || !data.part) return null;
+                      return (
+                        <div key={partId} className="flex justify-between text-sm p-2 bg-muted/50 rounded">
+                          <span>{data.part.name || `${data.part.type} - ${data.part.size}`}</span>
+                          <span className="font-semibold">Qty: {data.quantity}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
