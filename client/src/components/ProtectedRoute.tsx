@@ -13,11 +13,15 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
 
   useEffect(() => {
     if (!isLoading) {
+      console.log("ProtectedRoute check:", { user, requireAdmin, currentLocation: location });
       if (!user) {
+        console.log("No user, redirecting to login");
         setLocation("/login");
       } else if (requireAdmin && user.role !== "owner" && user.role !== "admin") {
-        // Redirect technicians to their dashboard
+        console.log("User role not admin/owner:", user.role, "redirecting to /technician");
         setLocation("/technician");
+      } else if (requireAdmin) {
+        console.log("User has admin access:", user.role);
       }
     }
   }, [user, isLoading, setLocation, requireAdmin]);
