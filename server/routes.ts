@@ -966,13 +966,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const client of clients) {
         const latestCompleted = latestCompletedRecords[client.id];
         
-        if (latestCompleted && latestCompleted.completedAt && latestCompleted.dueDate) {
-          const dueDate = new Date(latestCompleted.dueDate);
-          const dueMonth = dueDate.getMonth();
-          const dueYear = dueDate.getFullYear();
+        if (latestCompleted && latestCompleted.completedAt) {
+          const completedDate = new Date(latestCompleted.completedAt);
+          const completedMonth = completedDate.getMonth();
+          const completedYear = completedDate.getFullYear();
           
-          // Only mark as completed if the completed record is for the current month
-          if (dueMonth === currentMonth && dueYear === currentYear) {
+          // Only mark as completed if the completion happened in the current month
+          if (completedMonth === currentMonth && completedYear === currentYear) {
             statuses[client.id] = {
               completed: true,
               completedDueDate: latestCompleted.dueDate
