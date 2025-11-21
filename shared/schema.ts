@@ -172,7 +172,7 @@ export const calendarAssignments = pgTable("calendar_assignments", {
   companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
-  assignedTechnicianId: varchar("assigned_technician_id").references(() => users.id, { onDelete: "set null" }),
+  assignedTechnicianIds: varchar("assigned_technician_ids").array(),
   year: integer("year").notNull(),
   month: integer("month").notNull(),
   day: integer("day"),
@@ -192,7 +192,8 @@ export const updateCalendarAssignmentSchema = z.object({
   scheduledDate: z.string().optional(),
   autoDueDate: z.boolean().optional(),
   completed: z.boolean().optional(),
-  assignedTechnicianId: z.string().nullable().optional(),
+  assignedTechnicianIds: z.array(z.string()).optional(),
+  assignedTechnicianId: z.string().nullable().optional(), // Legacy support
 });
 
 export type InsertCalendarAssignment = z.infer<typeof insertCalendarAssignmentSchema>;

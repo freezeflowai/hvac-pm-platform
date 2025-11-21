@@ -1506,7 +1506,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user!.id;
       const { id } = req.params;
-      const assignmentUpdate = updateCalendarAssignmentSchema.parse(req.body);
+      const body = req.body;
+      
+      // Handle legacy single technician ID -> convert to array
+      if (body.assignedTechnicianId && !body.assignedTechnicianIds) {
+        body.assignedTechnicianIds = body.assignedTechnicianId ? [body.assignedTechnicianId] : null;
+      }
+      
+      const assignmentUpdate = updateCalendarAssignmentSchema.parse(body);
       
       const assignment = await storage.updateCalendarAssignment(userId, id, assignmentUpdate);
       

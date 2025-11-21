@@ -145,68 +145,19 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className={`text-xs px-1.5 py-1 rounded hover:shadow-md transition-all relative select-none group ${getBackgroundColor()}`}
+      {...(inCalendar && onClick ? { onClick: (e) => { e.stopPropagation(); onClick(); } } : {})}
+      className={`text-xs px-1.5 py-1 rounded hover:shadow-md transition-all relative select-none group ${inCalendar && onClick ? 'cursor-pointer' : ''} ${getBackgroundColor()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
       <div 
         {...listeners}
-        className="cursor-grab active:cursor-grabbing"
+        className={inCalendar ? "cursor-grab active:cursor-grabbing" : ""}
       >
         <div className={`font-semibold leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
         {client.location && (
           <div className={`text-muted-foreground text-[10px] leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
         )}
       </div>
-      {inCalendar && onClick && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-          }}
-          className="absolute top-0.5 left-0.5 p-0.5 rounded hover:bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-          title="View details"
-          data-testid={`button-view-client-${id}`}
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </button>
-      )}
-      {inCalendar && assignment && onAssignTechnician && (
-        <>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowTechnicianSelect(!showTechnicianSelect);
-            }}
-            className="absolute bottom-0.5 left-0.5 p-0.5 rounded hover:bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-            title="Assign technician"
-            data-testid={`button-assign-tech-${id}`}
-          >
-            <Users className="w-3 h-3" />
-          </button>
-          {showTechnicianSelect && (
-            <div className="absolute bottom-4 left-0 z-50 bg-card border rounded p-1 shadow-lg w-40" onClick={(e) => e.stopPropagation()}>
-              <Select value={assignment.assignedTechnicianId || 'unassigned'} onValueChange={(value) => {
-                onAssignTechnician(assignment.id, value === 'unassigned' ? null : value);
-                setShowTechnicianSelect(false);
-              }}>
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue placeholder="Select tech" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {technicians.map((tech: any) => (
-                    <SelectItem key={tech.id} value={tech.id}>
-                      {tech.firstName && tech.lastName ? `${tech.firstName} ${tech.lastName}` : tech.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </>
-      )}
     </div>
   );
 }
