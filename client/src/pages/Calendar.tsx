@@ -303,6 +303,7 @@ export default function Calendar() {
   const [routeOptimizationOpen, setRouteOptimizationOpen] = useState(false);
   const [clientDetailOpen, setClientDetailOpen] = useState(false);
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | null>(null);
+  const [expandedAllDaySlots, setExpandedAllDaySlots] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const [location] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
@@ -776,10 +777,30 @@ export default function Calendar() {
   };
 
   // Drop zone component for hourly slots in weekly view
-  const HourlyDropZone = ({ dayName, hour, dayNumber }: { dayName: string; hour: number; dayNumber: number }) => {
+  const HourlyDropZone = ({ dayName, hour, dayNumber, dayAssignments = [] }: { dayName: string; hour: number; dayNumber: number; dayAssignments?: any[] }) => {
     const { setNodeRef, isOver } = useDroppable({ id: `weekly-${dayName}-${hour}-${dayNumber}` });
+    
+    // Filter assignments for this specific hour
+    const hourlyAssignments = (dayAssignments || []).filter((a: any) => a.scheduledHour === hour);
+    
     return (
-      <div ref={setNodeRef} className={`p-1 border-r min-h-16 ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`} />
+      <div ref={setNodeRef} className={`p-1 border-r min-h-16 ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`}>
+        {hourlyAssignments.map((assignment: any) => {
+          const client = clients.find((c: any) => c.id === assignment.clientId);
+          return client ? (
+            <DraggableClient
+              key={assignment.id}
+              id={assignment.id}
+              client={client}
+              inCalendar
+              onClick={() => handleClientClick(client, assignment)}
+              isCompleted={assignment.completed}
+              isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
+              assignment={assignment}
+            />
+          ) : null;
+        })}
+      </div>
     );
   };
 
@@ -840,8 +861,12 @@ export default function Calendar() {
             All Day
           </div>
           {weekDaysData.map((dayData) => {
-            const visibleAssignments = dayData.dayAssignments.slice(0, 3);
-            const hiddenCount = Math.max(0, dayData.dayAssignments.length - 3);
+            // Only show assignments without a scheduled hour (all-day events)
+            const allDayAssignments = dayData.dayAssignments.filter((a: any) => !a.scheduledHour);
+            const slotKey = `${dayData.dayName}-${dayData.dayNumber}`;
+            const isExpanded = expandedAllDaySlots.has(slotKey);
+            const visibleAssignments = isExpanded ? allDayAssignments : allDayAssignments.slice(0, 3);
+            const hiddenCount = Math.max(0, allDayAssignments.length - 3);
             
             return (
               <AllDayDropZone key={`${dayData.dayName}-allday`} dayName={dayData.dayName} dayNumber={dayData.dayNumber}>
@@ -862,19 +887,34 @@ export default function Calendar() {
                       />
                     ) : null;
                   })}
-                  {hiddenCount > 0 && (
+                  {hiddenCount > 0 && !isExpanded && (
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-6 px-1 text-[10px] w-full"
                       onClick={() => {
-                        // Show all assignments for this day
-                        const allForDay = dayData.dayAssignments;
-                        console.log(`Viewing all ${allForDay.length} assignments for ${dayData.dayName}`);
+                        setExpandedAllDaySlots(prev => new Set(prev).add(slotKey));
                       }}
                       data-testid={`button-view-all-${dayData.dayName}`}
                     >
                       +{hiddenCount} more
+                    </Button>
+                  )}
+                  {isExpanded && allDayAssignments.length > 3 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-1 text-[10px] w-full"
+                      onClick={() => {
+                        setExpandedAllDaySlots(prev => {
+                          const next = new Set(prev);
+                          next.delete(slotKey);
+                          return next;
+                        });
+                      }}
+                      data-testid={`button-collapse-${dayData.dayName}`}
+                    >
+                      Show less
                     </Button>
                   )}
                 </div>
@@ -891,7 +931,7 @@ export default function Calendar() {
                 {h.display}
               </div>
               {weekDaysData.map((dayData) => (
-                <HourlyDropZone key={`${dayData.dayName}-${h.hour}`} dayName={dayData.dayName} hour={h.hour} dayNumber={dayData.dayNumber} />
+                <HourlyDropZone key={`${dayData.dayName}-${h.hour}`} dayName={dayData.dayName} hour={h.hour} dayNumber={dayData.dayNumber} dayAssignments={dayData.dayAssignments} />
               ))}
             </div>
           ))}
