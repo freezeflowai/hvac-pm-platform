@@ -38,7 +38,7 @@ export const users = pgTable("users", {
   companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("technician"), // "owner", "admin", "technician"
+  role: text("role").notNull().default("technician"), // "platform_admin", "owner", "admin", "technician"
   fullName: text("full_name"),
   firstName: text("first_name"),
   lastName: text("last_name"),
@@ -84,6 +84,29 @@ export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTo
 
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
+// Audit logs for tracking impersonation and cross-tenant actions
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  platformAdminId: varchar("platform_admin_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  platformAdminEmail: text("platform_admin_email").notNull(),
+  targetCompanyId: varchar("target_company_id").references(() => companies.id, { onDelete: "set null" }),
+  targetUserId: varchar("target_user_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(), // "impersonation_start", "impersonation_stop", "cross_tenant_read", "cross_tenant_write", "auth_failure"
+  reason: text("reason"), // Required for impersonation actions
+  details: text("details"), // JSON string with additional context
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
 
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

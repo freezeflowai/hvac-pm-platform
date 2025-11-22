@@ -6,6 +6,8 @@ import { storage } from "./storage";
 import { subscriptionService } from "./subscriptionService";
 import { routeOptimizationService } from "./routeOptimizationService";
 import { sendInvitationEmail } from "./emailService";
+import { impersonationService } from "./impersonationService";
+import { requirePlatformAdmin, blockImpersonation } from "./impersonationMiddleware";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
@@ -239,6 +241,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Impersonation routes
+  app.post("/api/impersonation/start", isAuthenticated, requirePlatformAdmin, async (req, res) => {
+    try {
+      const { targetUserId, reason } = req.body;
+      
+      if (!targetUserId || !reason) {
+        return res.status(400).json({ error: "targetUserId and reason are required" });
+      }
+
+      if (reason.trim().length < 10) {
+        return res.status(400).json({ error: "Reason must be at least 10 characters" });
+      }
+
+      // Get the target user
+      const targetUser = await storage.getUser(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ error: "Target user not found" });
+      }
+
+      // Cannot impersonate another platform admin
+      if (impersonationService.isPlatformAdmin(targetUser)) {
+        return res.status(403).json({ error: "Cannot impersonate another platform admin" });
+      }
+
+      // Start impersonation session
+      const session = await impersonationService.startImpersonation(
+        req,
+        req.user!.id,
+        req.user!.email,
+        targetUserId,
+        targetUser.companyId,
+        reason
+      );
+
+      res.json({ 
+        success: true, 
+        session: {
+          targetUserId: session.targetUserId,
+          targetCompanyId: session.targetCompanyId,
+          expiresAt: session.expiresAt,
+          remainingMinutes: Math.floor((session.expiresAt - Date.now()) / 60000)
+        }
+      });
+    } catch (error) {
+      console.error("Start impersonation error:", error);
+      res.status(500).json({ error: "Failed to start impersonation" });
+    }
+  });
+
+  app.post("/api/impersonation/stop", isAuthenticated, async (req, res) => {
+    try {
+      const session = impersonationService.getActiveImpersonation(req);
+      if (!session) {
+        return res.status(400).json({ error: "No active impersonation session" });
+      }
+
+      await impersonationService.stopImpersonation(req);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Stop impersonation error:", error);
+      res.status(500).json({ error: "Failed to stop impersonation" });
+    }
+  });
+
+  app.get("/api/impersonation/status", isAuthenticated, (req, res) => {
+    const session = impersonationService.getActiveImpersonation(req);
+    if (!session) {
+      return res.json({ isImpersonating: false });
+    }
+
+    const remaining = impersonationService.getRemainingTime(req);
+    const idleRemaining = impersonationService.getIdleTimeRemaining(req);
+
+    res.json({
+      isImpersonating: true,
+      session: {
+        targetUserId: session.targetUserId,
+        targetCompanyId: session.targetCompanyId,
+        platformAdminEmail: session.platformAdminEmail,
+        reason: session.reason,
+        startedAt: session.startedAt,
+        expiresAt: session.expiresAt,
+        remainingTime: remaining,
+        idleTimeRemaining: idleRemaining
+      }
+    });
+  });
 
   // Password reset routes
   const passwordResetRequestSchema = z.object({
@@ -1288,10 +1377,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/users", isAdmin, async (req, res) => {
     try {
       const user = req.user as any;
+      // Get the actual user (not impersonated) to check platform admin status
+      const actualUser = (req as any).platformAdmin || user;
       let users;
       
-      // Global admin (service@samcor.ca) sees all users from all companies
-      if (user.email === "service@samcor.ca") {
+      // Platform admins see all users from all companies
+      if (impersonationService.isPlatformAdmin(actualUser)) {
         users = await storage.getAllUsers();
       } else {
         // Company owners only see users from their own company
@@ -1313,9 +1404,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const user = req.user as any;
+      // Get the actual user (not impersonated) to check platform admin status
+      const actualUser = (req as any).platformAdmin || user;
       
-      // Prevent deleting yourself
-      if (id === user.id) {
+      // Prevent deleting yourself (check against actual user ID, not impersonated)
+      if (id === actualUser.id) {
         return res.status(400).json({ error: "Cannot delete your own account" });
       }
       
@@ -1324,8 +1417,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
       
-      // Global admin (service@samcor.ca) can delete anyone except themselves
-      if (user.email !== "service@samcor.ca") {
+      // Platform admins can delete anyone except themselves
+      if (!impersonationService.isPlatformAdmin(actualUser)) {
         // Company owners can only delete users from their own company
         if (userToDelete.companyId !== user.companyId) {
           return res.status(403).json({ error: "Cannot delete users from other companies" });
@@ -1344,8 +1437,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Cannot delete the last admin user" });
       }
       
-      // Pass requesterCompanyId for non-global-admin users
-      const requesterCompanyId = user.email === "service@samcor.ca" ? undefined : user.companyId;
+      // Pass requesterCompanyId for non-platform-admin users
+      const requesterCompanyId = impersonationService.isPlatformAdmin(actualUser) ? undefined : user.companyId;
       const deleted = await storage.deleteUser(id, requesterCompanyId);
       if (!deleted) {
         return res.status(404).json({ error: "User not found" });
@@ -1363,6 +1456,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { role: newRole } = req.body;
       const user = req.user as any;
+      // Get the actual user (not impersonated) to check platform admin status
+      const actualUser = (req as any).platformAdmin || user;
       
       if (!newRole || !["owner", "admin", "technician"].includes(newRole)) {
         return res.status(400).json({ error: "Invalid role. Must be owner, admin, or technician." });
@@ -1375,8 +1470,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
       
-      // Global admin can change roles for anyone, company owners only for their own company
-      if (user.email !== "service@samcor.ca" && userToUpdate.companyId !== user.companyId) {
+      // Platform admins can change roles for anyone, company owners only for their own company
+      if (!impersonationService.isPlatformAdmin(actualUser) && userToUpdate.companyId !== user.companyId) {
         return res.status(403).json({ error: "Cannot change roles for users from other companies" });
       }
       
@@ -1395,8 +1490,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Pass requesterCompanyId for non-global-admin users
-      const requesterCompanyId = user.email === "service@samcor.ca" ? undefined : user.companyId;
+      // Pass requesterCompanyId for non-platform-admin users
+      const requesterCompanyId = impersonationService.isPlatformAdmin(actualUser) ? undefined : user.companyId;
       await storage.updateUserRole(id, newRole, requesterCompanyId);
       res.json({ success: true });
     } catch (error) {

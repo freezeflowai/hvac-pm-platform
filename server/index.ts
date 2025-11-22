@@ -5,6 +5,8 @@ import { Pool } from "pg";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { passport } from "./auth";
+import { impersonationMiddleware, trackActivity } from "./impersonationMiddleware";
+import { storage } from "./storage";
 
 const app = express();
 
@@ -53,6 +55,10 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Impersonation middleware - must run after authentication
+app.use(impersonationMiddleware(storage));
+app.use(trackActivity);
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
@@ -63,6 +69,16 @@ declare module 'express-session' {
   interface SessionData {
     passport?: {
       user?: string;
+    };
+    impersonation?: {
+      platformAdminId: string;
+      platformAdminEmail: string;
+      targetUserId: string;
+      targetCompanyId: string;
+      reason: string;
+      startedAt: number;
+      expiresAt: number;
+      lastActivityAt: number;
     };
   }
 }

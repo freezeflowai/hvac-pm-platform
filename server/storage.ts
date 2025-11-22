@@ -73,8 +73,8 @@ export interface IStorage {
   updateUserStripeCustomer(id: string, stripeCustomerId: string): Promise<void>;
   
   // Company subscription methods
-  updateCompanyTrial(companyId: string, trialEndsAt: Date): Promise<void>;
-  updateCompanyStripeCustomer(companyId: string, stripeCustomerId: string): Promise<void>;
+  updateCompanyTrial(companyId: string, trialEndsAt: Date, requesterCompanyId?: string): Promise<void>;
+  updateCompanyStripeCustomer(companyId: string, stripeCustomerId: string, requesterCompanyId?: string): Promise<void>;
   
   // Password reset token methods
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -282,7 +282,11 @@ export class MemStorage implements IStorage {
     // Stripe customer is now on Company, not User - this is a no-op for MemStorage
   }
 
-  async updateCompanyTrial(companyId: string, trialEndsAt: Date): Promise<void> {
+  async updateCompanyTrial(companyId: string, trialEndsAt: Date, requesterCompanyId?: string): Promise<void> {
+    // Validate company membership if requesterCompanyId is provided
+    if (requesterCompanyId && companyId !== requesterCompanyId) {
+      throw new Error("Cannot update trial for another company");
+    }
     const company = this.companies.get(companyId);
     if (company) {
       company.trialEndsAt = trialEndsAt;
@@ -290,7 +294,11 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async updateCompanyStripeCustomer(companyId: string, stripeCustomerId: string): Promise<void> {
+  async updateCompanyStripeCustomer(companyId: string, stripeCustomerId: string, requesterCompanyId?: string): Promise<void> {
+    // Validate company membership if requesterCompanyId is provided
+    if (requesterCompanyId && companyId !== requesterCompanyId) {
+      throw new Error("Cannot update Stripe customer for another company");
+    }
     const company = this.companies.get(companyId);
     if (company) {
       company.stripeCustomerId = stripeCustomerId;
@@ -1325,11 +1333,19 @@ export class DbStorage implements IStorage {
     }
   }
 
-  async updateCompanyTrial(companyId: string, trialEndsAt: Date): Promise<void> {
+  async updateCompanyTrial(companyId: string, trialEndsAt: Date, requesterCompanyId?: string): Promise<void> {
+    // Validate company membership if requesterCompanyId is provided
+    if (requesterCompanyId && companyId !== requesterCompanyId) {
+      throw new Error("Cannot update trial for another company");
+    }
     await db.update(companies).set({ trialEndsAt }).where(eq(companies.id, companyId));
   }
 
-  async updateCompanyStripeCustomer(companyId: string, stripeCustomerId: string): Promise<void> {
+  async updateCompanyStripeCustomer(companyId: string, stripeCustomerId: string, requesterCompanyId?: string): Promise<void> {
+    // Validate company membership if requesterCompanyId is provided
+    if (requesterCompanyId && companyId !== requesterCompanyId) {
+      throw new Error("Cannot update Stripe customer for another company");
+    }
     await db.update(companies).set({ stripeCustomerId }).where(eq(companies.id, companyId));
   }
 

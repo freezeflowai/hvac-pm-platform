@@ -1,7 +1,7 @@
 import { StripeSync } from 'stripe-replit-sync';
 import { getStripeSecretKey, getStripeWebhookSecret } from './stripeClient';
 import { db } from '../db';
-import { users } from '@shared/schema';
+import { companies } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
 let stripeSync: StripeSync | null = null;
@@ -51,30 +51,44 @@ export class WebhookHandlers {
         event.type === 'customer.subscription.created') {
       const subscription = event.data.object as any;
       
-      // Find user by stripe customer ID
-      const [user] = await db.select()
-        .from(users)
-        .where(eq(users.stripeCustomerId, subscription.customer));
+      // Find company by stripe customer ID
+      const [company] = await db.select()
+        .from(companies)
+        .where(eq(companies.stripeCustomerId, subscription.customer));
       
-      if (user) {
-        const updateData: any = {
-          stripeSubscriptionId: subscription.id,
-          subscriptionStatus: subscription.status,
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-          cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
-        };
-        
-        // Map Stripe subscription to plan name
-        if (subscription.items?.data?.[0]?.price?.id) {
-          const priceId = subscription.items.data[0].price.id;
-          // We'll look up the plan by stripe price ID in storage layer
-          // For now just update the subscription ID
-        }
-        
-        await db.update(users)
-          .set(updateData)
-          .where(eq(users.id, user.id));
+      if (!company) {
+        console.warn('Stripe webhook: Company not found for customer', subscription.customer);
+        return;
       }
+      
+      // Validate that the customer ID matches what we have stored for this company
+      // This prevents forged webhook events from updating the wrong company
+      if (company.stripeCustomerId !== subscription.customer) {
+        console.error('Stripe webhook validation failed: customer ID mismatch', {
+          companyId: company.id,
+          storedCustomerId: company.stripeCustomerId,
+          webhookCustomerId: subscription.customer
+        });
+        throw new Error('Stripe customer ID mismatch - potential security issue');
+      }
+      
+      const updateData: any = {
+        stripeSubscriptionId: subscription.id,
+        subscriptionStatus: subscription.status,
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
+      };
+      
+      // Map Stripe subscription to plan name
+      if (subscription.items?.data?.[0]?.price?.id) {
+        const priceId = subscription.items.data[0].price.id;
+        // We'll look up the plan by stripe price ID in storage layer
+        // For now just update the subscription ID
+      }
+      
+      await db.update(companies)
+        .set(updateData)
+        .where(eq(companies.id, company.id));
     }
     
     // Handle checkout session completed
@@ -82,18 +96,31 @@ export class WebhookHandlers {
       const session = event.data.object as any;
       
       if (session.customer && session.subscription) {
-        const [user] = await db.select()
-          .from(users)
-          .where(eq(users.stripeCustomerId, session.customer));
+        const [company] = await db.select()
+          .from(companies)
+          .where(eq(companies.stripeCustomerId, session.customer));
         
-        if (user) {
-          await db.update(users)
-            .set({
-              stripeSubscriptionId: session.subscription as string,
-              subscriptionStatus: 'active',
-            })
-            .where(eq(users.id, user.id));
+        if (!company) {
+          console.warn('Stripe webhook: Company not found for customer', session.customer);
+          return;
         }
+        
+        // Validate that the customer ID matches what we have stored for this company
+        if (company.stripeCustomerId !== session.customer) {
+          console.error('Stripe webhook validation failed: customer ID mismatch', {
+            companyId: company.id,
+            storedCustomerId: company.stripeCustomerId,
+            webhookCustomerId: session.customer
+          });
+          throw new Error('Stripe customer ID mismatch - potential security issue');
+        }
+        
+        await db.update(companies)
+          .set({
+            stripeSubscriptionId: session.subscription as string,
+            subscriptionStatus: 'active',
+          })
+          .where(eq(companies.id, company.id));
       }
     }
   }
