@@ -37,7 +37,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/signup", async (req, res) => {
     try {
       const { email, password, invitationToken, firstName, lastName } = req.body;
-      insertUserSchema.parse({ email, password });
+      
+      // Validate email and password (don't use insertUserSchema since we don't have companyId yet)
+      const signupSchema = z.object({
+        email: z.string().email("Please enter a valid email address"),
+        password: z.string().min(6, "Password must be at least 6 characters"),
+      });
+      signupSchema.parse({ email, password });
       
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
