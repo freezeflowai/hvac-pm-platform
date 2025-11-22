@@ -699,23 +699,30 @@ export default function Calendar() {
     }
   }, [view]);
 
-  // Scroll to start hour when entering weekly view
+  // Scroll to start hour when entering weekly view - wait for data to load
   useEffect(() => {
-    if (view === "weekly" && weeklyScrollContainerRef.current && companySettings?.calendarStartHour !== undefined && !scrollDoneRef.current) {
+    if (view === "weekly" && 
+        weeklyScrollContainerRef.current && 
+        companySettings?.calendarStartHour !== undefined && 
+        !scrollDoneRef.current &&
+        !isLoadingCalendar) {
+      
       const startHour = companySettings.calendarStartHour;
       // Each hourly slot is 64px (min-h-16)
       const slotHeight = 64;
       const scrollPosition = startHour * slotHeight;
       
-      // Use requestAnimationFrame to ensure DOM is ready
-      requestAnimationFrame(() => {
+      // Use setTimeout to ensure DOM is fully rendered
+      const timeoutId = setTimeout(() => {
         if (weeklyScrollContainerRef.current) {
           weeklyScrollContainerRef.current.scrollTop = scrollPosition;
           scrollDoneRef.current = true;
         }
-      });
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [view, companySettings?.calendarStartHour]);
+  }, [view, companySettings?.calendarStartHour, isLoadingCalendar]);
 
   const { assignments = [], clients = [] } = data || {};
 
