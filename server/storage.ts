@@ -1089,6 +1089,7 @@ export class MemStorage implements IStorage {
       companyId,
       userId,
       day: insertAssignment.day ?? null,
+      scheduledHour: insertAssignment.scheduledHour ?? null,
       autoDueDate: insertAssignment.autoDueDate ?? false,
       completed: insertAssignment.completed ?? false,
       assignedTechnicianIds: insertAssignment.assignedTechnicianIds ?? null,
@@ -1108,6 +1109,7 @@ export class MemStorage implements IStorage {
       ...existing,
       day: assignmentUpdate.day !== undefined ? assignmentUpdate.day : existing.day,
       scheduledDate: assignmentUpdate.scheduledDate !== undefined ? assignmentUpdate.scheduledDate : existing.scheduledDate,
+      scheduledHour: assignmentUpdate.scheduledHour !== undefined ? assignmentUpdate.scheduledHour : existing.scheduledHour,
       autoDueDate: assignmentUpdate.autoDueDate !== undefined ? assignmentUpdate.autoDueDate : existing.autoDueDate
     };
     this.calendarAssignments.set(id, updated);
@@ -2080,9 +2082,10 @@ export class DbStorage implements IStorage {
 
   async updateCalendarAssignment(companyId: string, id: string, assignmentUpdate: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined> {
     // Build update object with only provided fields
-    const updateFields: Partial<Pick<CalendarAssignment, 'day' | 'scheduledDate' | 'autoDueDate' | 'completed' | 'assignedTechnicianIds' | 'completionNotes'>> = {};
+    const updateFields: Partial<Pick<CalendarAssignment, 'day' | 'scheduledDate' | 'scheduledHour' | 'autoDueDate' | 'completed' | 'assignedTechnicianIds' | 'completionNotes'>> = {};
     if (assignmentUpdate.day !== undefined) updateFields.day = assignmentUpdate.day;
     if (assignmentUpdate.scheduledDate !== undefined) updateFields.scheduledDate = assignmentUpdate.scheduledDate;
+    if (assignmentUpdate.scheduledHour !== undefined) updateFields.scheduledHour = assignmentUpdate.scheduledHour;
     if (assignmentUpdate.autoDueDate !== undefined) updateFields.autoDueDate = assignmentUpdate.autoDueDate;
     if (assignmentUpdate.completed !== undefined) updateFields.completed = assignmentUpdate.completed;
     if (assignmentUpdate.assignedTechnicianIds !== undefined) updateFields.assignedTechnicianIds = assignmentUpdate.assignedTechnicianIds;

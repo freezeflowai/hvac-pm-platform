@@ -814,13 +814,7 @@ export default function Calendar() {
     const { setNodeRef, isOver } = useDroppable({ id: `weekly-${dayName}-${hour}-${dayNumber}` });
     
     // Filter assignments for this specific hour (explicitly check for number to handle hour 0)
-    const hourlyAssignments = (dayAssignments || []).filter((a: any) => {
-      const matches = a.scheduledHour !== null && a.scheduledHour !== undefined && a.scheduledHour === hour;
-      if (dayAssignments.length > 0 && dayNumber === 19) {
-        console.log(`[HourlyFilter] Day ${dayNumber}, Hour ${hour}: Assignment ${a.id?.slice(0, 8)} has scheduledHour=${a.scheduledHour}, matches=${matches}`);
-      }
-      return matches;
-    });
+    const hourlyAssignments = (dayAssignments || []).filter((a: any) => a.scheduledHour !== null && a.scheduledHour !== undefined && a.scheduledHour === hour);
     
     return (
       <div ref={setNodeRef} className={`p-1 border-r min-h-16 ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`}>
