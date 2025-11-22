@@ -8,7 +8,8 @@ import {
   LogOut,
   Smartphone,
   MessageCircle,
-  UserCheck
+  UserCheck,
+  ShieldAlert
 } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -142,6 +143,17 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
         href: "/manage-technicians",
         isActive: location === "/manage-technicians",
         testId: "nav-manage-technicians"
+      });
+    }
+    
+    // Platform admin gets the Support Console
+    if (user?.role === "platform_admin") {
+      menuItems.push({
+        title: "Support Console",
+        icon: ShieldAlert,
+        href: "/support-console",
+        isActive: location === "/support-console",
+        testId: "nav-support-console"
       });
     }
     
