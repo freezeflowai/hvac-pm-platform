@@ -548,7 +548,8 @@ export default function Calendar() {
       
       if (isExistingAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
-        if (currentAssignment && currentAssignment.day !== targetDay) {
+        // Update if day changed OR if moving from a time slot to all-day (scheduledHour becomes null)
+        if (currentAssignment && (currentAssignment.day !== targetDay || currentAssignment.scheduledHour !== null)) {
           updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: null });
         }
       } else {
