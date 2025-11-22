@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable, pointerWithin, CollisionDetection, useDraggable } from "@dnd-kit/core";
+import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable, pointerWithin, CollisionDetection, useDraggable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
@@ -694,6 +694,15 @@ export default function Calendar() {
 
   const { assignments = [], clients = [] } = data || {};
 
+  // Configure sensors for drag-and-drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px of movement before activating drag
+      },
+    })
+  );
+
   // Custom collision detection that only checks drop zones (days, all-day, weekly), not individual items
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
     // Filter to only check day drop zones, all-day slots, weekly slots, and the unscheduled panel
@@ -956,6 +965,7 @@ export default function Calendar() {
 
   return (
     <DndContext
+      sensors={sensors}
       collisionDetection={customCollisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
