@@ -699,30 +699,31 @@ export default function Calendar() {
     }
   }, [view]);
 
-  // Scroll to start hour when entering weekly view - wait for data to load
+  // Scroll to start hour when entering weekly view - wait for ALL data to load
   useEffect(() => {
     if (view === "weekly" && 
         weeklyScrollContainerRef.current && 
         companySettings?.calendarStartHour !== undefined && 
         !scrollDoneRef.current &&
-        !isLoadingCalendar) {
+        !isLoadingCalendar &&
+        !isLoadingUnscheduled) {
       
       const startHour = companySettings.calendarStartHour;
       // Each hourly slot is 64px (min-h-16)
       const slotHeight = 64;
       const scrollPosition = startHour * slotHeight;
       
-      // Use setTimeout to ensure DOM is fully rendered
+      // Use setTimeout to ensure DOM is fully rendered after all data loads
       const timeoutId = setTimeout(() => {
         if (weeklyScrollContainerRef.current) {
           weeklyScrollContainerRef.current.scrollTop = scrollPosition;
           scrollDoneRef.current = true;
         }
-      }, 100);
+      }, 150);
       
       return () => clearTimeout(timeoutId);
     }
-  }, [view, companySettings?.calendarStartHour, isLoadingCalendar]);
+  }, [view, companySettings?.calendarStartHour, isLoadingCalendar, isLoadingUnscheduled]);
 
   const { assignments = [], clients = [] } = data || {};
 
