@@ -780,8 +780,8 @@ export default function Calendar() {
   const HourlyDropZone = ({ dayName, hour, dayNumber, dayAssignments = [] }: { dayName: string; hour: number; dayNumber: number; dayAssignments?: any[] }) => {
     const { setNodeRef, isOver } = useDroppable({ id: `weekly-${dayName}-${hour}-${dayNumber}` });
     
-    // Filter assignments for this specific hour
-    const hourlyAssignments = (dayAssignments || []).filter((a: any) => a.scheduledHour === hour);
+    // Filter assignments for this specific hour (explicitly check for number to handle hour 0)
+    const hourlyAssignments = (dayAssignments || []).filter((a: any) => a.scheduledHour !== null && a.scheduledHour !== undefined && a.scheduledHour === hour);
     
     return (
       <div ref={setNodeRef} className={`p-1 border-r min-h-16 ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`}>
@@ -862,7 +862,7 @@ export default function Calendar() {
           </div>
           {weekDaysData.map((dayData) => {
             // Only show assignments without a scheduled hour (all-day events)
-            const allDayAssignments = dayData.dayAssignments.filter((a: any) => !a.scheduledHour);
+            const allDayAssignments = dayData.dayAssignments.filter((a: any) => a.scheduledHour === null || a.scheduledHour === undefined);
             const slotKey = `${dayData.dayName}-${dayData.dayNumber}`;
             const isExpanded = expandedAllDaySlots.has(slotKey);
             const visibleAssignments = isExpanded ? allDayAssignments : allDayAssignments.slice(0, 3);
