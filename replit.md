@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is a preventive maintenance scheduling application designed for HVAC/R contractors. Its primary purpose is to streamline the management of client contracts, schedule maintenance visits, and track parts inventory. The application aims to enhance productivity and data organization through a dashboard that provides an overview of overdue maintenance, upcoming schedules, and completed work. The business vision is to provide a robust tool for contractors to efficiently manage their maintenance operations, reduce downtime, and improve client satisfaction.
+This project is a preventive maintenance scheduling application for HVAC/R contractors. It aims to streamline client contract management, schedule maintenance visits, and track parts inventory. The application provides a dashboard for overdue maintenance, upcoming schedules, and completed work, enhancing productivity and data organization. The business vision is to offer a robust tool for efficient maintenance operations, reduced downtime, and improved client satisfaction.
 
 ## User Preferences
 
@@ -10,92 +10,32 @@ Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend Architecture
+### Frontend
 
-The frontend is built with React and TypeScript, utilizing Vite for fast development and bundling. It employs `wouter` for client-side routing. The UI is constructed using `shadcn/ui`, which is based on Radix UI primitives, styled with Tailwind CSS, and follows Material Design principles. State management and data fetching are handled by TanStack Query, while form management and validation are implemented with React Hook Form and Zod. The component structure follows an atomic design pattern, with reusable UI components and dedicated feature and page components.
+The frontend is built with React and TypeScript, using Vite for development. It features `wouter` for routing, `shadcn/ui` (based on Radix UI) styled with Tailwind CSS following Material Design principles. State management and data fetching are handled by TanStack Query, while React Hook Form and Zod manage forms and validation. The component structure follows an atomic design pattern.
 
-### Backend Architecture
+### Backend
 
-The backend is an Express.js server developed with TypeScript, adhering to a RESTful API design. Data persistence is managed using a PostgreSQL database (via Neon serverless) and Drizzle ORM for type-safe interactions. The API provides endpoints for CRUD operations on clients, parts inventory, and client-part relationships. The database schema includes tables for `clients`, `parts`, and `client_parts`, with foreign key constraints ensuring data integrity.
+The backend is an Express.js server in TypeScript, adhering to a RESTful API design. Data persistence uses a PostgreSQL database (Neon serverless) with Drizzle ORM. The API supports CRUD operations for clients, parts, and client-part relationships. Database schema includes `clients`, `parts`, and `client_parts` tables with foreign key constraints.
 
-### Design System Decisions
+### Design System
 
-The application uses a Material Design-inspired typography hierarchy with the Inter font family. Spacing and layout are consistent, employing Tailwind's spacing units and a 12-column responsive grid system with a mobile-first approach. The color system uses CSS custom properties for semantic naming and theme tokens. Key component patterns include stats cards, maintenance cards, and dialog-based forms for data entry and management.
+The application uses a Material Design-inspired typography with the Inter font family. Spacing and layout are consistent, using Tailwind's spacing units and a responsive 12-column grid system (mobile-first). The color system utilizes CSS custom properties for semantic naming. Key UI patterns include stats cards, maintenance cards, and dialog-based forms.
 
-### Technical Implementations
+### Key Features & Technical Implementations
 
-- **Data Integrity**: Foreign key constraints with CASCADE delete ensure referential integrity in the database.
-- **Automatic Parts Seeding**: The application automatically seeds 244 standard parts (106 belts A/B sizes 18-70, 138 filters with Media/Pleated/Throwaway types in various sizes with x1/x2 thickness variants) when new users sign up. The seeding is idempotent, safely skipping parts that already exist.
-- **Manual Parts Seeding**: A "Seed Standard Parts" button is available in the Parts Management page, allowing existing users to manually seed the 244 standard parts. This is particularly useful after publishing the app or for users who signed up before the seeding feature was added. The operation is idempotent and safe to run multiple times.
-- **Parts Inventory**: Comprehensive parts inventory with support for custom parts. Parts are categorized for easier selection (Filters, Belts, Other).
-- **Persistent Storage**: Migration from in-memory storage to PostgreSQL ensures data persistence across server restarts.
-- **Editable Client Parts**: Clients' associated parts can be viewed, quantities edited, and parts deleted directly within the edit interface.
-- **Monthly PM Schedule Report**: A dedicated report tab allows viewing of preventive maintenance schedules for any given month, showing client details and visual schedule indicators.
-- **Recently Completed Maintenance**: A section for recently completed maintenance with an "undo" (reopen) option and accurate completion tracking.
-- **Categorized Parts Selection**: Parts selection is organized into categories (Filters, Belts, Other) with distinct dropdowns and bulk addition capabilities for improved UX.
-- **Client Management**: Alphabetical sorting by company name across all client lists, maintenance schedules, and search results. Client deletion with confirmation and robust state management for forms and dialogs.
-- **Inactive Clients**: Clients can be marked as "Inactive" for on-call/as-needed service. Inactive clients are completely excluded from all reports (parts order reports, PM schedule reports) and scheduling displays.
-- **Maintenance Completion**: Toggle functionality to mark maintenance as complete, recording completion in `maintenanceRecords`, with options to reopen and adjust next due dates. When a PM is marked complete, the system automatically creates a calendar assignment for the next scheduled due date, preventing clients from appearing as "unscheduled" after completion.
-- **UI Compaction**: Redesigned maintenance cards to increase client density on screen by reducing padding, consolidating information, and using icon-only buttons.
-- **Parts System Redesign**: A complete overhaul of the parts inventory system, introducing type-specific fields for filters, belts, and other parts, a tabbed management interface, and updated duplicate prevention logic.
-- **CSV Import**: Clients can be imported via CSV file with an import button in the client list. The import includes basic parsing, validation, automatic nextDue calculation, and detailed import statistics. Note: Best for simple client lists; avoid complex text with line breaks for reliability.
-- **Authentication**: Fixed login bug where users had to enter credentials twice. Login now properly waits for user state to be set before redirecting using useEffect, ensuring smooth single-attempt authentication.
-- **Mobile Technician Dashboard**: A dedicated mobile-optimized view for field technicians to access their schedules and view client information. Features include:
-  - Today's schedule prominently displayed with client details
-  - 7-day upcoming schedule view with assignments grouped by date
-  - Touch-friendly card interface with large tap targets
-  - Client detail modal showing parts inventory and equipment information
-  - Fully accessible with keyboard navigation and screen reader support
-  - Responsive design optimized for mobile devices with proper breakpoints
-  - Quick access to client contact information (phone, email, address) with tap-to-call/email functionality
-- **Role-Based Access Control**: Secure implementation of admin and technician roles with complete separation of privileges:
-  - Backend: All mutating operations (POST/PUT/DELETE/PATCH) protected by requireAdmin middleware returning 403 for technicians
-  - Frontend: ProtectedRoute component automatically redirects technicians to /technician dashboard and prevents access to admin pages
-  - Signup: New accounts created as technicians by default; first user becomes admin automatically
-  - User Management: Admins can promote technicians to admin via the Admin page user management interface
-  - Security: No privilege escalation vulnerabilities; technicians have strict read-only access to schedules and client data
-  - Technician Experience: Full read-only access to schedules, client information, parts inventory, and equipment details via mobile-optimized dashboard
-- **Technician System** (NEW): Complete technician management with role-based assignment and visibility:
-  - Technician signup flow captures first/last name and associates with email for proper identification
-  - Technician-specific pages: "My Schedule" (today's assigned jobs with client details) and "Daily Parts" (aggregated parts summary)
-  - Technician assignment UI on Calendar with dropdown for assigning PMs to specific technicians by name
-  - Backend technician list endpoint provides all company technicians for admin assignment UI
-  - Calendar assignments include `assignedTechnicianId` field to track which technician is assigned to each PM
-  - Technicians only see PMs assigned to them; unassigned PMs are not visible to technicians
-  - Database schema updated with `first_name` and `last_name` columns on users table and `assigned_technician_id` on calendar_assignments
-  - PATCH endpoint `/api/calendar/assign/{assignmentId}` allows admins to assign/unassign technicians from PMs
-  - Completion tracking uses `completedAt` date for accurate status (not `dueDate`)
-- **Subscription System (Feature Flag Controlled)**: Tiered subscription model with location limits and usage tracking:
-  - **Subscription Tiers**: Free Trial (30 days, 10 locations), Silver ($40/month, 100 locations), Gold ($70/month, 200 locations), Enterprise (quote-based, unlimited locations)
-  - **Database Schema**: `subscription_plans` table stores tier definitions; user subscription info tracked in `users` table fields (subscriptionPlan, subscriptionStatus, trialEndsAt)
-  - **Backend Services**: `subscriptionService.ts` handles plan assignment, limit checking, usage calculation, and trial expiration tracking
-  - **API Endpoints**: `/api/subscriptions/plans` (list plans), `/api/subscriptions/usage` (current usage), `/api/subscriptions/can-add-location` (check limits), `/api/admin/users/:userId/subscription` (admin override)
-  - **Limit Enforcement**: Client creation and import operations check subscription limits; returns 403 with detailed error when limits exceeded
-  - **Feature Flag**: Controlled by `ENABLE_SUBSCRIPTIONS` environment variable; when disabled, no limits enforced (legacy behavior)
-  - **Admin Controls**: Admins can manually assign subscription plans to users via admin endpoints
-  - **Trial Management**: New users automatically assigned 30-day trial; trial expiration tracked and enforced on client operations
-  - **Stripe Integration Ready**: Infrastructure prepared for Stripe payment integration (client, webhook handlers, service layer) but payments not yet implemented
-  - **Usage Tracking**: Real-time location count based on active (non-inactive) clients; percentage calculation against plan limits
-- **Route Optimization**: Intelligent route planning for technician visits using OpenRouteService API:
-  - **Geocoding**: Automatically converts client addresses (address, city, province, postal code) to GPS coordinates
-  - **Route Calculation**: Uses OpenRouteService optimization API to calculate the most efficient visiting order for scheduled clients
-  - **Starting Location Input**: Dialog includes input field for starting location (office/warehouse), auto-populated from company settings
-  - **Map Visualization**: Interactive Leaflet map displays the optimized route with numbered markers, starting location icon, and route polyline
-  - **Calendar Integration**: "Optimize Route" button on Calendar page allows admins to optimize the current month's schedule
-  - **Visual Feedback**: Shows total distance, travel time, optimized client order list, and map visualization before applying changes
-  - **Smart Reordering**: Preserves existing day assignments while reordering clients to follow the optimal route
-  - **Correct Route Display**: Backend reorders geocoded clients to match optimization API results, ensuring map markers and polyline follow optimized sequence
-  - **Rate Limiting**: Built-in 1.5s delay between geocoding requests to respect OpenRouteService free tier limits (40 req/min)
-  - **Environment Variable**: Requires `OPENROUTESERVICE_API_KEY` environment variable for production use
-  - **API Endpoints**: `/api/routes/optimize` (calculate optimal route with optional starting location), `/api/routes/geocode` (single address geocoding)
-  - **Error Handling**: Gracefully handles missing addresses, geocoding failures, and API errors with user-friendly messages
-- **Automatic Calendar Cleanup on PM Month Changes**: Intelligent management of calendar assignments when client PM months are updated:
-  - **Smart Cleanup**: When a client's PM months are changed, the system automatically removes calendar assignments that are no longer valid
-  - **Preserves Completed Jobs**: All completed maintenance records remain in the calendar for historical tracking, regardless of PM month changes
-  - **Removes Only Invalid Assignments**: Only removes assignments that are both (a) not completed AND (b) in months no longer selected for PM
-  - **User Notification**: Shows a toast message indicating how many assignments were removed when cleanup occurs
-  - **Cache Invalidation**: Automatically refreshes calendar queries to reflect the cleaned-up schedule
-  - **Backend Method**: `cleanupInvalidCalendarAssignments()` in storage layer handles the cleanup logic with completed record cross-referencing
+- **Data Integrity**: Enforced via foreign key constraints with CASCADE delete.
+- **Parts Management**: Automatic and manual seeding of 244 standard parts (idempotent). Comprehensive inventory with custom parts, categorized selection (Filters, Belts, Other), and bulk addition.
+- **Client Management**: Alphabetical sorting, client deletion, and "Inactive" status to exclude clients from reports and schedules. CSV import for clients with validation and import statistics.
+- **Maintenance Scheduling**: Monthly PM schedule reports, recently completed maintenance with undo option, and automated next due date assignment upon completion.
+- **UI/UX Enhancements**: Redesigned maintenance cards for higher density and categorized parts selection for improved user experience.
+- **Authentication & Authorization**: Secure login, Role-Based Access Control (RBAC) with Admin and Technician roles. New accounts default to Technician; first user becomes Admin. Admins can promote technicians.
+- **Mobile Technician Dashboard**: Optimized view for field technicians with today's/upcoming schedules, client details, parts inventory, and equipment information. Includes tap-to-call/email.
+- **Technician System**: Technician-specific pages ("My Schedule", "Daily Parts"), assignment UI on Calendar, and PM visibility limited to assigned technicians.
+- **Subscription System (Feature Flagged)**: Tiered model (Free Trial, Silver, Gold, Enterprise) with location limits and usage tracking. Database schema includes `subscription_plans` and user subscription fields. Checks limits during client creation/import. Infrastructure ready for Stripe integration.
+- **Route Optimization**: Integrates OpenRouteService API for efficient technician routing. Converts addresses to GPS, calculates optimal visiting order, and visualizes routes on an interactive Leaflet map. Includes starting location input and smart reordering. Requires `OPENROUTESERVICE_API_KEY`.
+- **Calendar Cleanup**: Automatic removal of invalid calendar assignments when client PM months are updated, preserving completed jobs.
+- **Platform Admin Impersonation**: Secure system for platform administrators to impersonate company admins for support. Features server-side session storage, time limits, mandatory reason logging, and comprehensive audit trails. Includes an impersonation banner in the UI.
 
 ## External Dependencies
 
@@ -109,7 +49,7 @@ The application uses a Material Design-inspired typography hierarchy with the In
 - **shadcn/ui**: Pre-built component library configuration.
 - **Lucide React**: Icon library.
 - **date-fns**: Date manipulation and formatting utility.
-- **Leaflet / react-leaflet**: Interactive map visualization for route optimization.
+- **Leaflet / react-leaflet**: Interactive map visualization.
 
 ### Form & Validation
 - **React Hook Form**: Performant form state management.
@@ -127,3 +67,4 @@ The application uses a Material Design-inspired typography hierarchy with the In
 - **wouter**: Lightweight client-side routing.
 - **class-variance-authority**: Type-safe component variant management.
 - **clsx** & **tailwind-merge**: Utilities for conditional class names.
+- **OpenRouteService API**: External API for geocoding and route optimization.
