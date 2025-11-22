@@ -524,12 +524,7 @@ export default function Calendar() {
     const { active, over } = event;
     setActiveId(null);
 
-    console.log('[DragEnd] Active:', active.id, 'Over:', over?.id);
-
-    if (!over) {
-      console.log('[DragEnd] No drop target detected');
-      return;
-    }
+    if (!over) return;
 
     const overId = over.id as string;
     const activeId = active.id as string;
@@ -725,7 +720,6 @@ export default function Calendar() {
     });
     
     if (rectCollisions.length > 0) {
-      console.log('[Collision] rectIntersection found:', rectCollisions.map(c => c.id));
       return rectCollisions;
     }
 
@@ -736,17 +730,14 @@ export default function Calendar() {
     });
     
     if (pointerCollisions.length > 0) {
-      console.log('[Collision] pointerWithin found:', pointerCollisions.map(c => c.id));
       return pointerCollisions;
     }
 
     // Final fallback to closestCenter
-    const result = closestCenter({
+    return closestCenter({
       ...args,
       droppableContainers: dropZoneContainers,
     });
-    console.log('[Collision] closestCenter found:', result.map(c => c.id));
-    return result;
   }, []);
 
   if (isLoadingCalendar || isLoadingClients || isLoadingUnscheduled) {
