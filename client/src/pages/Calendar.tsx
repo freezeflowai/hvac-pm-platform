@@ -335,13 +335,14 @@ export default function Calendar() {
   });
 
   const createAssignment = useMutation({
-    mutationFn: async ({ clientId, day }: { clientId: string; day: number }) => {
+    mutationFn: async ({ clientId, day, scheduledHour }: { clientId: string; day: number; scheduledHour?: number }) => {
       return apiRequest("POST", `/api/calendar/assign`, {
         clientId,
         year,
         month,
         day,
         scheduledDate: new Date(year, month - 1, day).toISOString().split('T')[0],
+        scheduledHour: scheduledHour !== undefined ? scheduledHour : undefined,
         autoDueDate: false,
       });
     },
@@ -364,10 +365,11 @@ export default function Calendar() {
   });
 
   const updateAssignment = useMutation({
-    mutationFn: async ({ id, day }: { id: string; day: number }) => {
+    mutationFn: async ({ id, day, scheduledHour }: { id: string; day: number; scheduledHour?: number | null }) => {
       return apiRequest("PATCH", `/api/calendar/assign/${id}`, {
         day,
         scheduledDate: new Date(year, month - 1, day).toISOString().split('T')[0],
+        scheduledHour: scheduledHour !== undefined ? scheduledHour : undefined,
       });
     },
     onSuccess: async () => {
@@ -546,7 +548,7 @@ export default function Calendar() {
       if (isExistingAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
         if (currentAssignment && currentAssignment.day !== targetDay) {
-          updateAssignment.mutate({ id: activeId, day: targetDay });
+          updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: null });
         }
       } else {
         // Create new assignment from unscheduled client
@@ -563,12 +565,12 @@ export default function Calendar() {
       
       if (isExistingAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
-        if (currentAssignment && currentAssignment.day !== targetDay) {
-          updateAssignment.mutate({ id: activeId, day: targetDay });
+        if (currentAssignment && (currentAssignment.day !== targetDay || currentAssignment.scheduledHour !== hour)) {
+          updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: hour });
         }
       } else {
         // Create new assignment from unscheduled client
-        createAssignment.mutate({ clientId: activeId, day: targetDay });
+        createAssignment.mutate({ clientId: activeId, day: targetDay, scheduledHour: hour });
       }
     } else if (overId === 'unscheduled-panel') {
       // Dropped on unscheduled panel - remove from calendar
