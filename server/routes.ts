@@ -265,11 +265,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Cannot impersonate another platform admin" });
       }
 
+      // Get the actual platform admin (never use potentially impersonated user for audit logs)
+      const actualUser = (req as any).platformAdmin || req.user;
+      if (!actualUser) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
       // Start impersonation session
       const session = await impersonationService.startImpersonation(
         req,
-        req.user!.id,
-        req.user!.email,
+        actualUser.id,
+        actualUser.email,
         targetUserId,
         targetUser.companyId,
         reason
@@ -290,14 +296,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/impersonation/stop", isAuthenticated, async (req, res) => {
+  app.post("/api/impersonation/stop", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const session = impersonationService.getActiveImpersonation(req);
       if (!session) {
         return res.status(400).json({ error: "No active impersonation session" });
       }
 
-      await impersonationService.stopImpersonation(req);
+      // Get the actual platform admin (not the impersonated user)
+      const actualUser = (req as any).platformAdmin || req.user;
+      if (!actualUser) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Pass platform admin ID for verification
+      await impersonationService.stopImpersonation(req, actualUser.id);
       res.json({ success: true });
     } catch (error) {
       console.error("Stop impersonation error:", error);

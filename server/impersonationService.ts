@@ -1,10 +1,12 @@
 import type { Request } from "express";
 import { auditService } from "./auditService";
+import crypto from "crypto";
 
 const IMPERSONATION_DURATION_MS = 60 * 60 * 1000; // 60 minutes
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
 export interface ImpersonationSession {
+  sessionId: string; // Opaque identifier
   platformAdminId: string;
   platformAdminEmail: string;
   targetUserId: string;
@@ -15,14 +17,33 @@ export interface ImpersonationSession {
   expiresAt: number;
 }
 
-// Extend Express session type
+// Server-side storage for impersonation sessions (not in client-writable session)
+// In production, this should be Redis or database-backed for multi-server setups
+const activeSessions = new Map<string, ImpersonationSession>();
+
+// Extend Express session type to only store opaque session ID
 declare module "express-session" {
   interface SessionData {
-    impersonation?: ImpersonationSession;
+    impersonationSessionId?: string; // Only opaque ID, not full session data
   }
 }
 
 class ImpersonationService {
+  /**
+   * Generate a cryptographically secure session ID
+   */
+  private generateSessionId(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  /**
+   * Get session from server-side storage
+   */
+  private getSessionById(sessionId: string): ImpersonationSession | null {
+    const session = activeSessions.get(sessionId);
+    return session || null;
+  }
+
   /**
    * Start impersonation session
    */
@@ -35,7 +56,10 @@ class ImpersonationService {
     reason: string
   ): Promise<ImpersonationSession> {
     const now = Date.now();
+    const sessionId = this.generateSessionId();
+    
     const session: ImpersonationSession = {
+      sessionId,
       platformAdminId,
       platformAdminEmail,
       targetUserId,
@@ -46,8 +70,11 @@ class ImpersonationService {
       expiresAt: now + IMPERSONATION_DURATION_MS
     };
 
-    // Store in Express session
-    req.session.impersonation = session;
+    // Store in server-side Map (not client session)
+    activeSessions.set(sessionId, session);
+
+    // Only store opaque session ID in client session
+    req.session.impersonationSessionId = sessionId;
 
     // Log the impersonation start
     await auditService.logImpersonationStart(
@@ -64,11 +91,24 @@ class ImpersonationService {
 
   /**
    * Stop impersonation session
+   * Validates that the requester is the original platform admin
    */
-  async stopImpersonation(req: Request): Promise<void> {
-    const session = req.session.impersonation;
-    if (!session) {
+  async stopImpersonation(req: Request, requestingPlatformAdminId: string): Promise<void> {
+    const sessionId = req.session.impersonationSessionId;
+    if (!sessionId) {
       return;
+    }
+
+    const session = this.getSessionById(sessionId);
+    if (!session) {
+      // Session not found in server storage, just clear client session
+      delete req.session.impersonationSessionId;
+      return;
+    }
+
+    // CRITICAL: Verify the requesting platform admin is the one who started the session
+    if (session.platformAdminId !== requestingPlatformAdminId) {
+      throw new Error("Unauthorized: Only the original platform admin can stop this impersonation");
     }
 
     const duration = Date.now() - session.startedAt;
@@ -83,8 +123,11 @@ class ImpersonationService {
       duration
     );
 
-    // Clear from session
-    delete req.session.impersonation;
+    // Remove from server-side storage
+    activeSessions.delete(sessionId);
+    
+    // Clear from client session
+    delete req.session.impersonationSessionId;
   }
 
   /**
@@ -93,8 +136,16 @@ class ImpersonationService {
    * Automatically ends session if expired or idle
    */
   async checkImpersonation(req: Request): Promise<ImpersonationSession | null> {
-    const session = req.session.impersonation;
+    const sessionId = req.session.impersonationSessionId;
+    if (!sessionId) {
+      return null;
+    }
+
+    // Retrieve from server-side storage (not client session!)
+    const session = this.getSessionById(sessionId);
     if (!session) {
+      // Session ID in client but not in server = cleared/expired
+      delete req.session.impersonationSessionId;
       return null;
     }
 
@@ -109,7 +160,8 @@ class ImpersonationService {
         session.targetCompanyId,
         "expiry"
       );
-      delete req.session.impersonation;
+      activeSessions.delete(sessionId);
+      delete req.session.impersonationSessionId;
       return null;
     }
 
@@ -123,29 +175,34 @@ class ImpersonationService {
         session.targetCompanyId,
         "idle"
       );
-      delete req.session.impersonation;
+      activeSessions.delete(sessionId);
+      delete req.session.impersonationSessionId;
       return null;
     }
 
-    // Update last activity timestamp
+    // Update last activity timestamp in server storage
     session.lastActivityAt = now;
-    req.session.impersonation = session;
+    activeSessions.set(sessionId, session);
 
     return session;
   }
 
   /**
-   * Get active impersonation session info
+   * Get active impersonation session info (from server storage)
    */
   getActiveImpersonation(req: Request): ImpersonationSession | null {
-    return req.session.impersonation || null;
+    const sessionId = req.session.impersonationSessionId;
+    if (!sessionId) {
+      return null;
+    }
+    return this.getSessionById(sessionId);
   }
 
   /**
    * Get remaining time for impersonation session
    */
   getRemainingTime(req: Request): { minutes: number; seconds: number } | null {
-    const session = req.session.impersonation;
+    const session = this.getActiveImpersonation(req);
     if (!session) {
       return null;
     }
@@ -167,7 +224,7 @@ class ImpersonationService {
    * Get idle time remaining before auto-logout
    */
   getIdleTimeRemaining(req: Request): { minutes: number; seconds: number } | null {
-    const session = req.session.impersonation;
+    const session = this.getActiveImpersonation(req);
     if (!session) {
       return null;
     }
@@ -198,7 +255,7 @@ class ImpersonationService {
    * Returns the target user ID if impersonating, otherwise the current user ID
    */
   getEffectiveUserId(req: Request): string | undefined {
-    const session = req.session.impersonation;
+    const session = this.getActiveImpersonation(req);
     if (session) {
       return session.targetUserId;
     }
@@ -210,11 +267,19 @@ class ImpersonationService {
    * Returns the target company ID if impersonating, otherwise the current user's company
    */
   getEffectiveCompanyId(req: Request): string | undefined {
-    const session = req.session.impersonation;
+    const session = this.getActiveImpersonation(req);
     if (session) {
       return session.targetCompanyId;
     }
     return req.user?.companyId;
+  }
+
+  /**
+   * Get the actual platform admin user (before impersonation merge)
+   * Used for authorization checks and audit logging
+   */
+  getActualPlatformAdmin(req: Request): any {
+    return (req as any).platformAdmin || null;
   }
 }
 

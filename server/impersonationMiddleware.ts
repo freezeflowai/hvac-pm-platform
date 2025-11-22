@@ -24,7 +24,7 @@ export function impersonationMiddleware(storage: IStorage) {
         const targetUser = await storage.getUser(session.targetUserId);
         if (!targetUser) {
           // Target user no longer exists, end impersonation
-          await impersonationService.stopImpersonation(req);
+          await impersonationService.stopImpersonation(req, session.platformAdminId);
           return next();
         }
 
@@ -32,7 +32,7 @@ export function impersonationMiddleware(storage: IStorage) {
         const targetCompany = await storage.getCompanyById(session.targetCompanyId);
         if (!targetCompany) {
           // Target company no longer exists, end impersonation
-          await impersonationService.stopImpersonation(req);
+          await impersonationService.stopImpersonation(req, session.platformAdminId);
           return next();
         }
 
@@ -111,10 +111,11 @@ export function blockImpersonation(req: Request, res: Response, next: NextFuncti
 /**
  * Middleware to update last activity timestamp on each request
  * This keeps the idle timeout fresh
+ * Note: Activity tracking is now handled automatically in impersonationService.checkImpersonation()
+ * This middleware is kept for backwards compatibility but does nothing
  */
 export function trackActivity(req: Request, res: Response, next: NextFunction) {
-  if (req.session.impersonation) {
-    req.session.impersonation.lastActivityAt = Date.now();
-  }
+  // Activity tracking is now handled in checkImpersonation()
+  // which is called by impersonationMiddleware
   next();
 }
