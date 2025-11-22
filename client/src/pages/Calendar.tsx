@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable, pointerWithin, CollisionDetection } from "@dnd-kit/core";
+import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable, pointerWithin, CollisionDetection, useDraggable } from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
@@ -90,14 +90,21 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
 }
 
 function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void }) {
+  // Use useDraggable for items in the calendar (free movement between any drop zones)
+  // Use useSortable for unscheduled items (sorting within the unscheduled list)
+  const sortable = useSortable({ id, disabled: inCalendar });
+  const draggable = useDraggable({ id, disabled: !inCalendar });
+  
   const {
     attributes,
     listeners,
     setNodeRef,
     transform,
-    transition,
     isDragging,
-  } = useSortable({ id });
+  } = inCalendar ? draggable : sortable;
+  
+  // useSortable has transition, useDraggable doesn't
+  const transition = inCalendar ? undefined : (sortable.transition || undefined);
 
   const style = {
     transform: CSS.Transform.toString(transform),
