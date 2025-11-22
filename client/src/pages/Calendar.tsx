@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable, pointerWithin, CollisionDetection } from "@dnd-kit/core";
-import { useSortable } from "@dnd-kit/sortable";
+import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import ClientReportDialog from "@/components/ClientReportDialog";
@@ -786,21 +786,23 @@ export default function Calendar() {
     
     return (
       <div ref={setNodeRef} className={`p-1 border-r min-h-16 ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`}>
-        {hourlyAssignments.map((assignment: any) => {
-          const client = clients.find((c: any) => c.id === assignment.clientId);
-          return client ? (
-            <DraggableClient
-              key={assignment.id}
-              id={assignment.id}
-              client={client}
-              inCalendar
-              onClick={() => handleClientClick(client, assignment)}
-              isCompleted={assignment.completed}
-              isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
-              assignment={assignment}
-            />
-          ) : null;
-        })}
+        <SortableContext items={hourlyAssignments.map((a: any) => a.id)} strategy={verticalListSortingStrategy}>
+          {hourlyAssignments.map((assignment: any) => {
+            const client = clients.find((c: any) => c.id === assignment.clientId);
+            return client ? (
+              <DraggableClient
+                key={assignment.id}
+                id={assignment.id}
+                client={client}
+                inCalendar
+                onClick={() => handleClientClick(client, assignment)}
+                isCompleted={assignment.completed}
+                isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
+                assignment={assignment}
+              />
+            ) : null;
+          })}
+        </SortableContext>
       </div>
     );
   };
@@ -871,23 +873,24 @@ export default function Calendar() {
             
             return (
               <AllDayDropZone key={`${dayData.dayName}-allday`} dayName={dayData.dayName} dayNumber={dayData.dayNumber}>
-                <div className="p-1">
-                  {visibleAssignments.map((assignment: any) => {
-                    const client = clients.find((c: any) => c.id === assignment.clientId);
-                    const isCompleted = assignment.completed;
-                    return client ? (
-                      <DraggableClient
-                        key={assignment.id}
-                        id={assignment.id}
-                        client={client}
-                        inCalendar
-                        onClick={() => handleClientClick(client, assignment)}
-                        isCompleted={isCompleted}
-                        isOverdue={!isCompleted && new Date(assignment.scheduledDate) < new Date()}
-                        assignment={assignment}
-                      />
-                    ) : null;
-                  })}
+                <SortableContext items={visibleAssignments.map((a: any) => a.id)} strategy={verticalListSortingStrategy}>
+                  <div className="p-1">
+                    {visibleAssignments.map((assignment: any) => {
+                      const client = clients.find((c: any) => c.id === assignment.clientId);
+                      const isCompleted = assignment.completed;
+                      return client ? (
+                        <DraggableClient
+                          key={assignment.id}
+                          id={assignment.id}
+                          client={client}
+                          inCalendar
+                          onClick={() => handleClientClick(client, assignment)}
+                          isCompleted={isCompleted}
+                          isOverdue={!isCompleted && new Date(assignment.scheduledDate) < new Date()}
+                          assignment={assignment}
+                        />
+                      ) : null;
+                    })}
                   {hiddenCount > 0 && !isExpanded && (
                     <Button
                       variant="ghost"
@@ -918,7 +921,8 @@ export default function Calendar() {
                       Show less
                     </Button>
                   )}
-                </div>
+                  </div>
+                </SortableContext>
               </AllDayDropZone>
             );
           })}
