@@ -5,9 +5,10 @@ import { useAuth } from "@/lib/auth";
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
+  requirePlatformAdmin?: boolean;
 }
 
-export default function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, requireAdmin = false, requirePlatformAdmin = false }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
   const [location, setLocation] = useLocation();
   const hasCheckedAuth = useRef(false);
@@ -24,11 +25,18 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
       return;
     }
     
-    if (requireAdmin && user.role !== "owner" && user.role !== "admin") {
+    // Platform admin check (most restrictive)
+    if (requirePlatformAdmin && user.role !== "platform_admin") {
+      setLocation("/");
+      return;
+    }
+    
+    // Regular admin check
+    if (requireAdmin && user.role !== "owner" && user.role !== "admin" && user.role !== "platform_admin") {
       setLocation("/technician");
       return;
     }
-  }, [user, isLoading, requireAdmin, setLocation]);
+  }, [user, isLoading, requireAdmin, requirePlatformAdmin, setLocation]);
 
   if (isLoading) {
     return (
@@ -42,7 +50,13 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     return null;
   }
 
-  if (requireAdmin && user.role !== "owner" && user.role !== "admin") {
+  // Platform admin check
+  if (requirePlatformAdmin && user.role !== "platform_admin") {
+    return null;
+  }
+
+  // Regular admin check (platform admins also pass this check)
+  if (requireAdmin && user.role !== "owner" && user.role !== "admin" && user.role !== "platform_admin") {
     return null;
   }
 

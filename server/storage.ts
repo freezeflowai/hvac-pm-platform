@@ -164,6 +164,8 @@ export interface IStorage {
   
   // Company methods
   getCompanyById(id: string): Promise<any | undefined>;
+  getAllCompanies(): Promise<any[]>;
+  updateCompany(companyId: string, updates: Partial<any>): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -1248,6 +1250,17 @@ export class MemStorage implements IStorage {
 
   async getCompanyById(id: string): Promise<any | undefined> {
     return this.companies.get(id);
+  }
+
+  async getAllCompanies(): Promise<any[]> {
+    return Array.from(this.companies.values());
+  }
+
+  async updateCompany(companyId: string, updates: Partial<any>): Promise<void> {
+    const company = this.companies.get(companyId);
+    if (company) {
+      this.companies.set(companyId, { ...company, ...updates });
+    }
   }
 }
 
@@ -2345,6 +2358,14 @@ export class DbStorage implements IStorage {
       .where(eq(companies.id, id))
       .limit(1);
     return result[0];
+  }
+
+  async getAllCompanies(): Promise<any[]> {
+    return db.select().from(companies);
+  }
+
+  async updateCompany(companyId: string, updates: Partial<any>): Promise<void> {
+    await db.update(companies).set(updates).where(eq(companies.id, companyId));
   }
 
   async getEquipmentByClient(companyId: string, clientId: string): Promise<any[]> {

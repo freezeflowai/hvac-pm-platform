@@ -9,6 +9,7 @@ import Dashboard from "@/pages/Dashboard";
 import Calendar from "@/pages/Calendar";
 import Reports from "@/pages/Reports";
 import Admin from "@/pages/Admin";
+import SupportConsole from "@/pages/SupportConsole";
 import AddClientPage from "@/pages/AddClientPage";
 import PartsManagementPage from "@/pages/PartsManagementPage";
 import CompanySettingsPage from "@/pages/CompanySettingsPage";
@@ -57,6 +58,11 @@ function Router() {
       <Route path="/admin">
         <ProtectedRoute requireAdmin>
           <Admin />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/support-console">
+        <ProtectedRoute requirePlatformAdmin>
+          <SupportConsole />
         </ProtectedRoute>
       </Route>
       <Route path="/add-client">

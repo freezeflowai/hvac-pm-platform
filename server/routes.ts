@@ -7,6 +7,7 @@ import { subscriptionService } from "./subscriptionService";
 import { routeOptimizationService } from "./routeOptimizationService";
 import { sendInvitationEmail } from "./emailService";
 import { impersonationService } from "./impersonationService";
+import { auditService } from "./auditService";
 import { requirePlatformAdmin, blockImpersonation } from "./impersonationMiddleware";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
@@ -340,6 +341,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
         idleTimeRemaining: idleRemaining
       }
     });
+  });
+
+  // Support Console routes (Platform Admin only)
+  app.get("/api/admin/companies", isAuthenticated, requirePlatformAdmin, async (req, res) => {
+    try {
+      const companies = await storage.getAllCompanies();
+      
+      // Get user count and location count for each company
+      const companiesWithStats = await Promise.all(
+        companies.map(async (company: any) => {
+          const users = await storage.getUsersByCompanyId(company.id);
+          const clients = await storage.getAllClients(company.id);
+          const activeClients = clients.filter((c: Client) => !c.inactive);
+          
+          return {
+            ...company,
+            userCount: users.length,
+            locationCount: activeClients.length,
+            totalClients: clients.length
+          };
+        })
+      );
+
+      res.json(companiesWithStats);
+    } catch (error) {
+      console.error("Get companies error:", error);
+      res.status(500).json({ error: "Failed to fetch companies" });
+    }
+  });
+
+  app.get("/api/admin/companies/:companyId", isAuthenticated, requirePlatformAdmin, async (req, res) => {
+    try {
+      const { companyId } = req.params;
+      
+      const company = await storage.getCompanyById(companyId);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      const users = await storage.getUsersByCompanyId(companyId);
+      const clients = await storage.getAllClients(companyId);
+      const activeClients = clients.filter((c: Client) => !c.inactive);
+
+      res.json({
+        company,
+        users,
+        stats: {
+          userCount: users.length,
+          locationCount: activeClients.length,
+          totalClients: clients.length,
+          inactiveClients: clients.filter((c: Client) => c.inactive).length
+        }
+      });
+    } catch (error) {
+      console.error("Get company details error:", error);
+      res.status(500).json({ error: "Failed to fetch company details" });
+    }
+  });
+
+  app.get("/api/admin/audit-logs", isAuthenticated, requirePlatformAdmin, async (req, res) => {
+    try {
+      const { companyId, action, limit = 100 } = req.query;
+      
+      let logs;
+      if (companyId && typeof companyId === 'string') {
+        logs = await auditService.getLogsForCompany(companyId, Number(limit));
+      } else if (action && typeof action === 'string') {
+        // Filter by action type if needed
+        const allLogs = await auditService.getRecentLogs(Number(limit));
+        logs = allLogs.filter((log: any) => log.action === action);
+      } else {
+        logs = await auditService.getRecentLogs(Number(limit));
+      }
+
+      res.json(logs);
+    } catch (error) {
+      console.error("Get audit logs error:", error);
+      res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  app.patch("/api/admin/companies/:companyId/trial", isAuthenticated, requirePlatformAdmin, blockImpersonation, async (req, res) => {
+    try {
+      const { companyId } = req.params;
+      const { days } = req.body;
+
+      if (!days || typeof days !== 'number' || days <= 0) {
+        return res.status(400).json({ error: "Valid days value required" });
+      }
+
+      const actualUser = (req as any).platformAdmin || req.user;
+      const newTrialEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+      await storage.updateCompanyTrial(companyId, newTrialEnd, actualUser.companyId);
+
+      // Log the trial adjustment
+      await auditService.logTrialAdjustment(
+        actualUser.id,
+        actualUser.email,
+        companyId,
+        { daysAdded: days, newTrialEnd: newTrialEnd.toISOString() },
+        req
+      );
+
+      res.json({ success: true, newTrialEnd });
+    } catch (error) {
+      console.error("Update trial error:", error);
+      res.status(500).json({ error: "Failed to update trial" });
+    }
+  });
+
+  app.patch("/api/admin/companies/:companyId/subscription", isAuthenticated, requirePlatformAdmin, blockImpersonation, async (req, res) => {
+    try {
+      const { companyId } = req.params;
+      const { plan, status } = req.body;
+
+      if (!plan || !status) {
+        return res.status(400).json({ error: "Plan and status are required" });
+      }
+
+      const actualUser = (req as any).platformAdmin || req.user;
+
+      const company = await storage.getCompanyById(companyId);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      // Update subscription
+      await storage.updateCompany(companyId, {
+        subscriptionPlan: plan,
+        subscriptionStatus: status
+      });
+
+      // Log the billing adjustment
+      await auditService.logBillingAdjustment(
+        actualUser.id,
+        actualUser.email,
+        companyId,
+        { plan, status, previousPlan: company.subscriptionPlan, previousStatus: company.subscriptionStatus },
+        req
+      );
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Update subscription error:", error);
+      res.status(500).json({ error: "Failed to update subscription" });
+    }
   });
 
   // Password reset routes
