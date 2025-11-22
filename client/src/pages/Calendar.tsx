@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable, pointerWithin, CollisionDetection, useDraggable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable, pointerWithin, CollisionDetection, useDraggable, PointerSensor, useSensor, useSensors, rectIntersection } from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
@@ -713,7 +713,17 @@ export default function Calendar() {
       }
     );
 
-    // Use pointer-first approach for precision
+    // Use rectIntersection for better grid layout support
+    const rectCollisions = rectIntersection({
+      ...args,
+      droppableContainers: dropZoneContainers,
+    });
+    
+    if (rectCollisions.length > 0) {
+      return rectCollisions;
+    }
+
+    // Fallback to pointerWithin
     const pointerCollisions = pointerWithin({
       ...args,
       droppableContainers: dropZoneContainers,
@@ -723,7 +733,7 @@ export default function Calendar() {
       return pointerCollisions;
     }
 
-    // Fallback to closestCenter
+    // Final fallback to closestCenter
     return closestCenter({
       ...args,
       droppableContainers: dropZoneContainers,
@@ -969,6 +979,7 @@ export default function Calendar() {
       collisionDetection={customCollisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      autoScroll={{ threshold: { x: 0.2, y: 0.2 } }}
     >
       <div className="h-screen bg-background flex flex-col">
         <main className={`flex flex-col flex-1 min-h-0 mx-auto px-4 sm:px-6 lg:px-8 py-4 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
