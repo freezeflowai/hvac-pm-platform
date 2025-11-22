@@ -786,23 +786,21 @@ export default function Calendar() {
     
     return (
       <div ref={setNodeRef} className={`p-1 border-r min-h-16 ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`}>
-        <SortableContext items={hourlyAssignments.map((a: any) => a.id)} strategy={verticalListSortingStrategy}>
-          {hourlyAssignments.map((assignment: any) => {
-            const client = clients.find((c: any) => c.id === assignment.clientId);
-            return client ? (
-              <DraggableClient
-                key={assignment.id}
-                id={assignment.id}
-                client={client}
-                inCalendar
-                onClick={() => handleClientClick(client, assignment)}
-                isCompleted={assignment.completed}
-                isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
-                assignment={assignment}
-              />
-            ) : null;
-          })}
-        </SortableContext>
+        {hourlyAssignments.map((assignment: any) => {
+          const client = clients.find((c: any) => c.id === assignment.clientId);
+          return client ? (
+            <DraggableClient
+              key={assignment.id}
+              id={assignment.id}
+              client={client}
+              inCalendar
+              onClick={() => handleClientClick(client, assignment)}
+              isCompleted={assignment.completed}
+              isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
+              assignment={assignment}
+            />
+          ) : null;
+        })}
       </div>
     );
   };
@@ -873,24 +871,23 @@ export default function Calendar() {
             
             return (
               <AllDayDropZone key={`${dayData.dayName}-allday`} dayName={dayData.dayName} dayNumber={dayData.dayNumber}>
-                <SortableContext items={visibleAssignments.map((a: any) => a.id)} strategy={verticalListSortingStrategy}>
-                  <div className="p-1">
-                    {visibleAssignments.map((assignment: any) => {
-                      const client = clients.find((c: any) => c.id === assignment.clientId);
-                      const isCompleted = assignment.completed;
-                      return client ? (
-                        <DraggableClient
-                          key={assignment.id}
-                          id={assignment.id}
-                          client={client}
-                          inCalendar
-                          onClick={() => handleClientClick(client, assignment)}
-                          isCompleted={isCompleted}
-                          isOverdue={!isCompleted && new Date(assignment.scheduledDate) < new Date()}
-                          assignment={assignment}
-                        />
-                      ) : null;
-                    })}
+                <div className="p-1">
+                  {visibleAssignments.map((assignment: any) => {
+                    const client = clients.find((c: any) => c.id === assignment.clientId);
+                    const isCompleted = assignment.completed;
+                    return client ? (
+                      <DraggableClient
+                        key={assignment.id}
+                        id={assignment.id}
+                        client={client}
+                        inCalendar
+                        onClick={() => handleClientClick(client, assignment)}
+                        isCompleted={isCompleted}
+                        isOverdue={!isCompleted && new Date(assignment.scheduledDate) < new Date()}
+                        assignment={assignment}
+                      />
+                    ) : null;
+                  })}
                   {hiddenCount > 0 && !isExpanded && (
                     <Button
                       variant="ghost"
@@ -921,8 +918,7 @@ export default function Calendar() {
                       Show less
                     </Button>
                   )}
-                  </div>
-                </SortableContext>
+                </div>
               </AllDayDropZone>
             );
           })}
