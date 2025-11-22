@@ -63,26 +63,28 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
           </Button>
         </CardHeader>
         <CardContent className="flex-1 min-h-0 p-4 pt-2">
-          <div 
-            ref={setNodeRef}
-            className="space-y-2 h-full overflow-y-auto pr-2"
-            style={{ scrollbarWidth: 'thin' }}
-            data-testid="unscheduled-panel"
-          >
-            {clients.map((client: any) => (
-              <DraggableClient
-                key={client.id}
-                id={client.id}
-                client={client}
-                onClick={() => onClientClick?.(client.id)}
-              />
-            ))}
-            {clients.length === 0 && (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                All clients scheduled
-              </div>
-            )}
-          </div>
+          <SortableContext items={clients.map((c: any) => c.id)} strategy={verticalListSortingStrategy}>
+            <div 
+              ref={setNodeRef}
+              className="space-y-2 h-full overflow-y-auto pr-2"
+              style={{ scrollbarWidth: 'thin' }}
+              data-testid="unscheduled-panel"
+            >
+              {clients.map((client: any) => (
+                <DraggableClient
+                  key={client.id}
+                  id={client.id}
+                  client={client}
+                  onClick={() => onClientClick?.(client.id)}
+                />
+              ))}
+              {clients.length === 0 && (
+                <div className="text-sm text-muted-foreground text-center py-8">
+                  All clients scheduled
+                </div>
+              )}
+            </div>
+          </SortableContext>
         </CardContent>
       </Card>
     </div>
@@ -90,10 +92,14 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
 }
 
 function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void }) {
-  // Use useDraggable for items in the calendar (free movement between any drop zones)
-  // Use useSortable for unscheduled items (sorting within the unscheduled list)
-  const sortable = useSortable({ id, disabled: inCalendar });
-  const draggable = useDraggable({ id, disabled: !inCalendar });
+  // Calendar items: use ONLY useDraggable for unrestricted movement
+  // Unscheduled items: use ONLY useSortable for sorting in panel
+  const draggableResult = inCalendar ? useDraggable({ 
+    id,
+    data: { type: 'assignment', assignmentId: id }
+  }) : null;
+  
+  const sortableResult = !inCalendar ? useSortable({ id }) : null;
   
   const {
     attributes,
@@ -101,10 +107,10 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     setNodeRef,
     transform,
     isDragging,
-  } = inCalendar ? draggable : sortable;
+  } = (inCalendar ? draggableResult : sortableResult)!;
   
   // useSortable has transition, useDraggable doesn't
-  const transition = inCalendar ? undefined : (sortable.transition || undefined);
+  const transition = sortableResult?.transition;
 
   const style = {
     transform: CSS.Transform.toString(transform),
