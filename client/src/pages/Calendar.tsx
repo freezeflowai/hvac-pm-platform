@@ -348,6 +348,26 @@ export default function Calendar() {
     queryKey: ['/api/company-settings'],
   });
 
+  const updateCompanySettings = useMutation({
+    mutationFn: async (settings: any) => {
+      return apiRequest("POST", "/api/company-settings", settings);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/company-settings'] });
+      toast({
+        title: "Settings updated",
+        description: "Calendar start time has been updated",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update settings",
+        variant: "destructive",
+      });
+    },
+  });
+
   const createAssignment = useMutation({
     mutationFn: async ({ clientId, day, scheduledHour }: { clientId: string; day: number; scheduledHour?: number }) => {
       return apiRequest("POST", `/api/calendar/assign`, {
@@ -672,25 +692,30 @@ export default function Calendar() {
     };
   }, []);
 
-  // Scroll to start hour on initial weekly view load only
+  // Reset scroll flag when switching away from weekly view
+  useEffect(() => {
+    if (view !== "weekly") {
+      scrollDoneRef.current = false;
+    }
+  }, [view]);
+
+  // Scroll to start hour when entering weekly view
   useEffect(() => {
     if (view === "weekly" && weeklyScrollContainerRef.current && companySettings?.calendarStartHour !== undefined && !scrollDoneRef.current) {
       const startHour = companySettings.calendarStartHour;
-      // Account for header row (52px) + all-day slot (52px) + account for scrolling precision
-      const headerHeight = 52;
-      const allDayHeight = 52;
+      // Each hourly slot is 64px (min-h-16)
       const slotHeight = 64;
-      const scrollPosition = headerHeight + allDayHeight + (startHour * slotHeight);
+      const scrollPosition = startHour * slotHeight;
       
-      const timeoutId = setTimeout(() => {
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
         if (weeklyScrollContainerRef.current) {
           weeklyScrollContainerRef.current.scrollTop = scrollPosition;
           scrollDoneRef.current = true;
         }
-      }, 500);
-      return () => clearTimeout(timeoutId);
+      });
     }
-  }, [view]);
+  }, [view, companySettings?.calendarStartHour]);
 
   const { assignments = [], clients = [] } = data || {};
 
@@ -1030,7 +1055,28 @@ export default function Calendar() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <span className="text-xs text-muted-foreground">Start: {companySettings?.calendarStartHour || 8}:00</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Start:</span>
+                    <Select 
+                      value={String(companySettings?.calendarStartHour || 8)} 
+                      onValueChange={(value) => {
+                        const newStartHour = parseInt(value, 10);
+                        updateCompanySettings.mutate({ calendarStartHour: newStartHour });
+                        scrollDoneRef.current = false; // Reset scroll flag to trigger re-scroll
+                      }}
+                    >
+                      <SelectTrigger className="w-20 text-xs h-8" data-testid="select-start-hour">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+                          <SelectItem key={hour} value={String(hour)}>
+                            {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </>
               )}
               <Button
