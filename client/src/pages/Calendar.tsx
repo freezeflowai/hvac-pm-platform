@@ -326,12 +326,20 @@ export default function Calendar() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
 
+  // Helper to get Monday of the week
+  const getMondayOfWeek = (date: Date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const daysToMonday = day === 0 ? 6 : day - 1; // Sunday = 6 days back, Monday = 0 days back
+    d.setDate(d.getDate() - daysToMonday);
+    return d;
+  };
+
   // Calculate which months to fetch based on view
   const getMonthsToFetch = () => {
     if (view === "weekly") {
-      // Get the week range
-      const weekStart = new Date(currentDate);
-      weekStart.setDate(currentDate.getDate() - currentDate.getDay());
+      // Get the week range (Monday to Sunday)
+      const weekStart = getMondayOfWeek(currentDate);
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
       
@@ -940,9 +948,8 @@ export default function Calendar() {
   };
 
   const renderWeeklyView = () => {
-    // Get week dates based on currentDate
-    const currentWeekStart = new Date(currentDate);
-    currentWeekStart.setDate(currentDate.getDate() - currentDate.getDay());
+    // Get week dates based on currentDate (Monday to Sunday)
+    const currentWeekStart = getMondayOfWeek(currentDate);
 
     const startHour = companySettings?.calendarStartHour || 8;
     const weekDaysData: Array<{date: Date; dayNumber: number; monthNumber: number; yearNumber: number; dayAssignments: any[]; dayName: string}> = [];
