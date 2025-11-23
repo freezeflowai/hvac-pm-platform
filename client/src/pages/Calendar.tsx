@@ -326,12 +326,62 @@ export default function Calendar() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
 
+  // Calculate which months to fetch based on view
+  const getMonthsToFetch = () => {
+    if (view === "weekly") {
+      // Get the week range
+      const weekStart = new Date(currentDate);
+      weekStart.setDate(currentDate.getDate() - currentDate.getDay());
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      
+      // Collect unique year-month combinations
+      const months = new Set<string>();
+      const current = new Date(weekStart);
+      while (current <= weekEnd) {
+        months.add(`${current.getFullYear()}-${current.getMonth() + 1}`);
+        current.setDate(current.getDate() + 1);
+      }
+      return Array.from(months).map(m => {
+        const [y, mo] = m.split('-').map(Number);
+        return { year: y, month: mo };
+      });
+    }
+    return [{ year, month }];
+  };
+
   const { data, isLoading: isLoadingCalendar, refetch: refetchCalendar } = useQuery({
-    queryKey: ["/api/calendar", year, month],
+    queryKey: ["/api/calendar", view, year, month, currentDate.getTime()],
     queryFn: async () => {
-      const res = await fetch(`/api/calendar?year=${year}&month=${month}`);
-      if (!res.ok) throw new Error("Failed to fetch calendar data");
-      return res.json();
+      const monthsToFetch = getMonthsToFetch();
+      
+      // Fetch all needed months in parallel
+      const results = await Promise.all(
+        monthsToFetch.map(async ({ year: y, month: m }) => {
+          const res = await fetch(`/api/calendar?year=${y}&month=${m}`);
+          if (!res.ok) throw new Error("Failed to fetch calendar data");
+          return res.json();
+        })
+      );
+      
+      // Merge results
+      if (results.length === 1) {
+        return results[0];
+      }
+      
+      // Combine assignments and clients from all months
+      const allAssignments = results.flatMap(r => r.assignments || []);
+      const allClients = results.flatMap(r => r.clients || []);
+      
+      // Deduplicate clients by ID
+      const uniqueClients = Array.from(
+        new Map(allClients.map(c => [c.id, c])).values()
+      );
+      
+      return {
+        assignments: allAssignments,
+        clients: uniqueClients
+      };
     }
   });
 
@@ -890,19 +940,25 @@ export default function Calendar() {
   };
 
   const renderWeeklyView = () => {
-    // Get current week dates
-    const today = new Date();
-    const currentWeekStart = new Date(today);
-    currentWeekStart.setDate(today.getDate() - today.getDay());
+    // Get week dates based on currentDate
+    const currentWeekStart = new Date(currentDate);
+    currentWeekStart.setDate(currentDate.getDate() - currentDate.getDay());
 
     const startHour = companySettings?.calendarStartHour || 8;
-    const weekDaysData: Array<{date: Date; dayNumber: number; isCurrentMonth: boolean; dayAssignments: any[]; dayName: string}> = [];
+    const weekDaysData: Array<{date: Date; dayNumber: number; monthNumber: number; yearNumber: number; dayAssignments: any[]; dayName: string}> = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(currentWeekStart);
       date.setDate(currentWeekStart.getDate() + i);
       const dayNumber = date.getDate();
-      const isCurrentMonth = date.getMonth() === month - 1 && date.getFullYear() === year;
-      let dayAssignments = isCurrentMonth ? (assignmentsByDay[dayNumber] || []) : [];
+      const monthNumber = date.getMonth() + 1;
+      const yearNumber = date.getFullYear();
+      
+      // Get assignments for this specific day from the fetched data
+      let dayAssignments = assignments.filter((a: any) => 
+        a.year === yearNumber && 
+        a.month === monthNumber && 
+        a.day === dayNumber
+      );
       
       // Filter by selected technician
       if (selectedTechnicianId === "unassigned") {
@@ -916,7 +972,8 @@ export default function Calendar() {
       weekDaysData.push({
         date,
         dayNumber,
-        isCurrentMonth,
+        monthNumber,
+        yearNumber,
         dayAssignments,
         dayName: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i]
       });
