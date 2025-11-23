@@ -1,7 +1,12 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { Plus, X } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export function ClientDetailDialog({ 
   open, 
@@ -19,11 +24,14 @@ export function ClientDetailDialog({
   bulkParts: Record<string, any[]>;
 }) {
   const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const { toast } = useToast();
 
-  // Sync selected technicians when assignment changes
+  // Sync selected technicians and completion status when assignment changes
   useEffect(() => {
     if (assignment) {
       setSelectedTechs(assignment.assignedTechnicianIds || []);
+      setIsCompleted(assignment.completed || false);
     }
   }, [assignment?.id]);
 
@@ -34,80 +42,254 @@ export function ClientDetailDialog({
 
   const clientParts = bulkParts[client?.id] || [];
 
-  const handleTechnicianChange = (techId: string, checked: boolean) => {
-    const newTechs = checked 
-      ? [...selectedTechs, techId]
-      : selectedTechs.filter(id => id !== techId);
+  const toggleComplete = useMutation({
+    mutationFn: async (completed: boolean) => {
+      if (!assignment) return;
+      return apiRequest("PATCH", `/api/calendar/assign/${assignment.id}`, {
+        completed
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      toast({
+        title: isCompleted ? "Marked as incomplete" : "Marked as complete",
+        description: isCompleted ? "Job moved back to active" : "Job marked as completed"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update status",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleToggleComplete = () => {
+    const newStatus = !isCompleted;
+    setIsCompleted(newStatus);
+    toggleComplete.mutate(newStatus);
+  };
+
+  const handleTechnicianToggle = (techId: string) => {
+    const newTechs = selectedTechs.includes(techId)
+      ? selectedTechs.filter(id => id !== techId)
+      : [...selectedTechs, techId];
     setSelectedTechs(newTechs);
     onAssignTechnicians(assignment.id, newTechs);
   };
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  };
+
+  // Format full address
+  const fullAddress = [
+    client?.address,
+    client?.city,
+    client?.province,
+    client?.postalCode
+  ].filter(Boolean).join(', ');
+
+  // Calculate line items
+  const pmPrice = 450.00; // Default PM price
+  const lineItems = [
+    { quantity: 1, description: "Preventive Maintenance", price: pmPrice }
+  ];
+
+  // Group parts by type
+  const filterParts = clientParts.filter((cp: any) => cp.part?.type === 'filter');
+  const beltParts = clientParts.filter((cp: any) => cp.part?.type === 'belt');
+  
+  if (filterParts.length > 0) {
+    const totalFilters = filterParts.reduce((sum: number, cp: any) => sum + (cp.quantity || 0), 0);
+    lineItems.push({ quantity: totalFilters, description: "Filter(s)", price: 0 });
+  }
+  
+  if (beltParts.length > 0) {
+    const totalBelts = beltParts.reduce((sum: number, cp: any) => sum + (cp.quantity || 0), 0);
+    lineItems.push({ quantity: totalBelts, description: "Belt(s)", price: 0 });
+  }
+
+  const totalCost = lineItems.reduce((sum, item) => sum + item.price, 0);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
+        <button
+          onClick={() => onOpenChange(false)}
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+          data-testid="button-close-dialog"
+        >
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </button>
+
         <DialogHeader>
-          <DialogTitle>{client?.companyName}</DialogTitle>
+          <DialogTitle className="text-base font-semibold pr-6">
+            {client?.companyName} - Preventive Maintenance - Pulley Replacement
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground font-normal">Visit</p>
         </DialogHeader>
-        <div className="space-y-4">
-          {client?.location && (
-            <div>
-              <p className="text-xs text-muted-foreground">Location</p>
-              <p className="text-sm font-medium">{client.location}</p>
-            </div>
-          )}
-          {client?.address && (
-            <div>
-              <p className="text-xs text-muted-foreground">Address</p>
-              <p className="text-sm">{client.address}{client.city ? `, ${client.city}` : ''}</p>
-            </div>
-          )}
-          
+
+        <div className="space-y-4 pt-2">
+          {/* Completed Checkbox */}
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="completed"
+              checked={isCompleted}
+              onCheckedChange={handleToggleComplete}
+              data-testid="checkbox-completed"
+            />
+            <label
+              htmlFor="completed"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              Completed
+            </label>
+          </div>
+
+          {/* Details Section */}
           <div>
-            <p className="text-xs text-muted-foreground mb-2">Parts Inventory</p>
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {clientParts.length > 0 ? (
-                clientParts.map((cp: any) => {
-                  const part = cp.part;
-                  let label = '';
-                  if (part?.type === 'filter') {
-                    label = `${part.filterType} ${part.size}`;
-                  } else if (part?.type === 'belt') {
-                    label = `Belt ${part.beltType} ${part.size}`;
-                  } else {
-                    label = part?.name || 'Unknown';
-                  }
-                  return (
-                    <div key={cp.id} className="flex justify-between text-xs items-center gap-2">
-                      <span>{label}</span>
-                      <Badge variant="secondary" className="text-xs">{cp.quantity}</Badge>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-xs text-muted-foreground">No parts assigned</p>
-              )}
+            <h3 className="text-sm font-semibold mb-1">Details</h3>
+            <div className="flex gap-2 text-sm">
+              <Link href={`/clients/${client?.id}`}>
+                <a className="text-primary hover:underline" data-testid="link-client-details">
+                  {client?.companyName}
+                </a>
+              </Link>
+              <span className="text-muted-foreground">-</span>
+              <Link href={`/jobs/${assignment?.id}`}>
+                <a className="text-primary hover:underline" data-testid="link-job-details">
+                  Job #{assignment?.id?.slice(0, 6)}
+                </a>
+              </Link>
             </div>
           </div>
 
+          {/* Team Section */}
           <div>
-            <p className="text-xs text-muted-foreground mb-2">Assign Technicians</p>
+            <h3 className="text-sm font-semibold mb-2">Team</h3>
             <div className="space-y-2">
-              {technicians.length > 0 ? (
-                technicians.map((tech: any) => (
-                  <label key={tech.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedTechs.includes(tech.id)}
-                      onChange={(e) => handleTechnicianChange(tech.id, e.target.checked)}
-                      className="w-4 h-4"
-                    />
-                    <span>{tech.firstName && tech.lastName ? `${tech.firstName} ${tech.lastName}` : tech.email}</span>
-                  </label>
-                ))
-              ) : (
-                <p className="text-xs text-muted-foreground">No technicians available</p>
-              )}
+              {selectedTechs.map((techId) => {
+                const tech = technicians.find((t: any) => t.id === techId);
+                if (!tech) return null;
+                const techName = tech.firstName && tech.lastName 
+                  ? `${tech.firstName} ${tech.lastName}` 
+                  : tech.email;
+                return (
+                  <div 
+                    key={techId} 
+                    className="flex items-center justify-between gap-2 text-sm p-2 rounded border"
+                    data-testid={`team-member-${techId}`}
+                  >
+                    <span>{techName}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => handleTechnicianToggle(techId)}
+                      data-testid={`button-remove-tech-${techId}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                );
+              })}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-8 h-8 p-0"
+                onClick={() => {
+                  // Show available technicians to add
+                  const availableTechs = technicians.filter((t: any) => !selectedTechs.includes(t.id));
+                  if (availableTechs.length > 0) {
+                    handleTechnicianToggle(availableTechs[0].id);
+                  }
+                }}
+                data-testid="button-add-technician"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
+          </div>
+
+          {/* Location Section */}
+          {fullAddress && (
+            <div>
+              <h3 className="text-sm font-semibold mb-1">Location</h3>
+              <p className="text-sm" data-testid="text-location">{fullAddress}</p>
+            </div>
+          )}
+
+          {/* Start and End Dates */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h3 className="text-sm font-semibold mb-1">Start</h3>
+              <p className="text-sm" data-testid="text-start-date">
+                {assignment?.scheduledDate ? formatDate(assignment.scheduledDate) : "Not scheduled"}
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold mb-1">End</h3>
+              <p className="text-sm" data-testid="text-end-date">
+                {assignment?.scheduledDate ? formatDate(assignment.scheduledDate) : "Not scheduled"}
+              </p>
+            </div>
+          </div>
+
+          {/* Line Items */}
+          <div>
+            <h3 className="text-sm font-semibold mb-2">Line items</h3>
+            <div className="space-y-2 bg-muted/30 rounded-md p-3">
+              {lineItems.map((item, index) => (
+                <div 
+                  key={index} 
+                  className="flex justify-between text-sm"
+                  data-testid={`line-item-${index}`}
+                >
+                  <span>{item.quantity}× {item.description}</span>
+                  <span className="font-medium">${item.price.toFixed(2)}</span>
+                </div>
+              ))}
+              <div className="border-t pt-2 mt-2">
+                <div className="flex justify-between text-sm font-semibold">
+                  <span>Total</span>
+                  <span data-testid="text-total-cost">${totalCost.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                // TODO: Open edit dialog
+                toast({
+                  title: "Edit",
+                  description: "Edit functionality coming soon"
+                });
+              }}
+              data-testid="button-edit"
+            >
+              Edit
+            </Button>
+            <Button
+              variant="default"
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => {
+                // Navigate to full details page
+                window.location.href = `/clients/${client?.id}`;
+              }}
+              data-testid="button-view-details"
+            >
+              View Details
+            </Button>
           </div>
         </div>
       </DialogContent>
