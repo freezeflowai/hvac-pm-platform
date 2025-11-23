@@ -330,34 +330,6 @@ export default function Calendar() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
 
-  // Helper to calculate parts from assignments
-  const calculateParts = (assignments: any[]) => {
-    const partsList: Array<{ description: string; quantity: number }> = [];
-    
-    assignments.forEach((assignment: any) => {
-      const clientPartsList = bulkParts[assignment.clientId] || [];
-      clientPartsList.forEach((cp: any) => {
-        const part = cp.part;
-        let partLabel = '';
-        
-        if (part?.type === 'filter') {
-          partLabel = `${part.filterType || 'Filter'} ${part.size || ''}`.trim();
-        } else if (part?.type === 'belt') {
-          partLabel = `Belt ${part.beltType || ''} ${part.size || ''}`.trim();
-        } else {
-          partLabel = part?.name || 'Other Part';
-        }
-        
-        partsList.push({ 
-          description: partLabel,
-          quantity: cp.quantity || 1
-        });
-      });
-    });
-    
-    return partsList;
-  };
-
   // Helper to get Monday of the week
   const getMondayOfWeek = (date: Date) => {
     const d = new Date(date);
@@ -425,10 +397,38 @@ export default function Calendar() {
     }
   });
 
-  const { data: bulkParts = {} } = useQuery<Record<string, any[]>>({
+  const { data: bulkParts = {}, isLoading: isLoadingParts } = useQuery<Record<string, any[]>>({
     queryKey: ['/api/client-parts/bulk'],
     staleTime: 60 * 1000,
   });
+
+  // Helper to calculate parts from assignments
+  const calculateParts = (assignments: any[]) => {
+    const partsList: Array<{ description: string; quantity: number }> = [];
+    
+    assignments.forEach((assignment: any) => {
+      const clientPartsList = bulkParts[assignment.clientId] || [];
+      clientPartsList.forEach((cp: any) => {
+        const part = cp.part;
+        let partLabel = '';
+        
+        if (part?.type === 'filter') {
+          partLabel = `${part.filterType || 'Filter'} ${part.size || ''}`.trim();
+        } else if (part?.type === 'belt') {
+          partLabel = `Belt ${part.beltType || ''} ${part.size || ''}`.trim();
+        } else {
+          partLabel = part?.name || 'Other Part';
+        }
+        
+        partsList.push({ 
+          description: partLabel,
+          quantity: cp.quantity || 1
+        });
+      });
+    });
+    
+    return partsList;
+  };
 
   const { data: technicians = [] } = useQuery<any[]>({
     queryKey: ['/api/technicians'],
@@ -1046,6 +1046,13 @@ export default function Calendar() {
                     size="sm"
                     className="h-6 px-2 text-[10px] w-full"
                     onClick={() => {
+                      if (isLoadingParts) {
+                        toast({
+                          title: "Loading parts data",
+                          description: "Please wait while parts are being loaded",
+                        });
+                        return;
+                      }
                       const parts = calculateParts(d.dayAssignments);
                       setPartsDialogTitle(`Parts for ${d.dayName}, ${d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`);
                       setPartsDialogParts(parts);
@@ -1252,6 +1259,13 @@ export default function Calendar() {
                     variant="outline"
                     size="sm"
                     onClick={() => {
+                      if (isLoadingParts) {
+                        toast({
+                          title: "Loading parts data",
+                          description: "Please wait while parts are being loaded",
+                        });
+                        return;
+                      }
                       // Calculate all parts for the week
                       const weekStart = getMondayOfWeek(currentDate);
                       const weekEnd = new Date(weekStart);
