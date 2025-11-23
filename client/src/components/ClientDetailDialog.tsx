@@ -3,10 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
 import { Plus, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import ClientReportDialog from "@/components/ClientReportDialog";
 
 export function ClientDetailDialog({ 
   open, 
@@ -25,6 +25,7 @@ export function ClientDetailDialog({
 }) {
   const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [showClientReport, setShowClientReport] = useState(false);
   const { toast } = useToast();
 
   // Sync selected technicians and completion status when assignment changes
@@ -93,25 +94,31 @@ export function ClientDetailDialog({
     client?.postalCode
   ].filter(Boolean).join(', ');
 
-  // Calculate line items
+  // Calculate line items - PM plus actual parts
   const pmPrice = 450.00; // Default PM price
-  const lineItems = [
+  const lineItems: Array<{ quantity: number; description: string; price: number }> = [
     { quantity: 1, description: "Preventive Maintenance", price: pmPrice }
   ];
 
-  // Group parts by type
-  const filterParts = clientParts.filter((cp: any) => cp.part?.type === 'filter');
-  const beltParts = clientParts.filter((cp: any) => cp.part?.type === 'belt');
-  
-  if (filterParts.length > 0) {
-    const totalFilters = filterParts.reduce((sum: number, cp: any) => sum + (cp.quantity || 0), 0);
-    lineItems.push({ quantity: totalFilters, description: "Filter(s)", price: 0 });
-  }
-  
-  if (beltParts.length > 0) {
-    const totalBelts = beltParts.reduce((sum: number, cp: any) => sum + (cp.quantity || 0), 0);
-    lineItems.push({ quantity: totalBelts, description: "Belt(s)", price: 0 });
-  }
+  // Add each part as a separate line item
+  clientParts.forEach((cp: any) => {
+    const part = cp.part;
+    let partLabel = '';
+    
+    if (part?.type === 'filter') {
+      partLabel = `${part.filterType || 'Filter'} ${part.size || ''}`.trim();
+    } else if (part?.type === 'belt') {
+      partLabel = `Belt ${part.beltType || ''} ${part.size || ''}`.trim();
+    } else {
+      partLabel = part?.name || 'Other Part';
+    }
+    
+    lineItems.push({ 
+      quantity: cp.quantity || 1, 
+      description: partLabel, 
+      price: 0 
+    });
+  });
 
   const totalCost = lineItems.reduce((sum, item) => sum + item.price, 0);
 
@@ -129,7 +136,7 @@ export function ClientDetailDialog({
 
         <DialogHeader>
           <DialogTitle className="text-base font-semibold pr-6">
-            {client?.companyName} - Preventive Maintenance - Pulley Replacement
+            {client?.companyName} - Preventive Maintenance
           </DialogTitle>
           <p className="text-sm text-muted-foreground font-normal">Visit</p>
         </DialogHeader>
@@ -155,17 +162,17 @@ export function ClientDetailDialog({
           <div>
             <h3 className="text-sm font-semibold mb-1">Details</h3>
             <div className="flex gap-2 text-sm">
-              <Link href={`/clients/${client?.id}`}>
-                <span className="text-primary hover:underline cursor-pointer" data-testid="link-client-details">
-                  {client?.companyName}
-                </span>
-              </Link>
+              <span 
+                className="text-primary hover:underline cursor-pointer" 
+                onClick={() => setShowClientReport(true)}
+                data-testid="link-client-details"
+              >
+                {client?.companyName}
+              </span>
               <span className="text-muted-foreground">-</span>
-              <Link href={`/jobs/${assignment?.id}`}>
-                <span className="text-primary hover:underline cursor-pointer" data-testid="link-job-details">
-                  Job #{assignment?.id?.slice(0, 6)}
-                </span>
-              </Link>
+              <span className="text-muted-foreground" data-testid="text-job-id">
+                Job #{assignment?.id?.slice(0, 6)}
+              </span>
             </div>
           </div>
 
@@ -293,6 +300,12 @@ export function ClientDetailDialog({
           </div>
         </div>
       </DialogContent>
+
+      <ClientReportDialog
+        clientId={showClientReport ? client?.id : null}
+        open={showClientReport}
+        onOpenChange={setShowClientReport}
+      />
     </Dialog>
   );
 }
