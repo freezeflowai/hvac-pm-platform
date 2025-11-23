@@ -1242,7 +1242,7 @@ export default function Calendar() {
                           </div>
                         ))}
                       </div>
-                      <div className="grid grid-cols-7 auto-rows-[minmax(6rem,max-content)] content-start">
+                      <div className="grid grid-cols-7 auto-rows-fr flex-1 min-h-0">
                         {renderMonthlyView()}
                       </div>
                     </div>
