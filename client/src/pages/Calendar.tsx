@@ -996,12 +996,31 @@ export default function Calendar() {
       <div className="flex flex-col h-full min-h-0 max-h-full">
         <div className="grid grid-cols-8 sticky top-0 bg-background z-10 border-b flex-shrink-0">
           <div className="p-2 text-xs font-semibold border-r">Time</div>
-          {weekDaysData.map((d) => (
-            <div key={d.dayName} className="p-2 text-center border-r text-xs font-semibold">
-              <div>{d.dayName}</div>
-              <div className="text-muted-foreground">{d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-            </div>
-          ))}
+          {weekDaysData.map((d) => {
+            // Calculate total parts for this day
+            const dayParts = d.dayAssignments.reduce((total: number, assignment: any) => {
+              const clientPartsList = bulkParts[assignment.clientId] || [];
+              const partCount = clientPartsList.reduce((sum: number, cp: any) => sum + (cp.quantity || 0), 0);
+              return total + partCount;
+            }, 0);
+
+            return (
+              <div key={d.dayName} className="p-2 text-center border-r text-xs font-semibold space-y-1">
+                <div>{d.dayName}</div>
+                <div className="text-muted-foreground">{d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                {dayParts > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-[10px] w-full"
+                    data-testid={`button-parts-${d.dayName}`}
+                  >
+                    {dayParts} parts
+                  </Button>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* All Day Slot - Pinned outside scrollable area */}
