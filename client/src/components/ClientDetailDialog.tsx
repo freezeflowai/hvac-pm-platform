@@ -50,11 +50,11 @@ export function ClientDetailDialog({
         completed
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, completed) => {
       queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
       toast({
-        title: isCompleted ? "Marked as incomplete" : "Marked as complete",
-        description: isCompleted ? "Job moved back to active" : "Job marked as completed"
+        title: completed ? "Marked as complete" : "Marked as incomplete",
+        description: completed ? "Job marked as completed" : "Job moved back to active"
       });
     },
     onError: (error: any) => {
@@ -94,11 +94,8 @@ export function ClientDetailDialog({
     client?.postalCode
   ].filter(Boolean).join(', ');
 
-  // Calculate line items - PM plus actual parts
-  const pmPrice = 450.00; // Default PM price
-  const lineItems: Array<{ quantity: number; description: string; price: number }> = [
-    { quantity: 1, description: "Preventive Maintenance", price: pmPrice }
-  ];
+  // Build parts list - only actual parts, no PM line item
+  const partsList: Array<{ quantity: number; description: string }> = [];
 
   // Add each part as a separate line item
   clientParts.forEach((cp: any) => {
@@ -113,14 +110,11 @@ export function ClientDetailDialog({
       partLabel = part?.name || 'Other Part';
     }
     
-    lineItems.push({ 
+    partsList.push({ 
       quantity: cp.quantity || 1, 
-      description: partLabel, 
-      price: 0 
+      description: partLabel
     });
   });
-
-  const totalCost = lineItems.reduce((sum, item) => sum + item.price, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -247,26 +241,24 @@ export function ClientDetailDialog({
             </div>
           </div>
 
-          {/* Line Items */}
+          {/* Parts */}
           <div>
-            <h3 className="text-sm font-semibold mb-2">Line items</h3>
+            <h3 className="text-sm font-semibold mb-2">Parts</h3>
             <div className="space-y-2 bg-muted/30 rounded-md p-3">
-              {lineItems.map((item, index) => (
-                <div 
-                  key={index} 
-                  className="flex justify-between text-sm"
-                  data-testid={`line-item-${index}`}
-                >
-                  <span>{item.quantity}× {item.description}</span>
-                  <span className="font-medium">${item.price.toFixed(2)}</span>
-                </div>
-              ))}
-              <div className="border-t pt-2 mt-2">
-                <div className="flex justify-between text-sm font-semibold">
-                  <span>Total</span>
-                  <span data-testid="text-total-cost">${totalCost.toFixed(2)}</span>
-                </div>
-              </div>
+              {partsList.length > 0 ? (
+                partsList.map((item, index) => (
+                  <div 
+                    key={index} 
+                    className="flex justify-between text-sm"
+                    data-testid={`part-item-${index}`}
+                  >
+                    <span>{item.description}</span>
+                    <span className="font-medium">{item.quantity}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No parts assigned</p>
+              )}
             </div>
           </div>
 
