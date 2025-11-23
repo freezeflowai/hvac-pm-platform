@@ -261,35 +261,6 @@ export function ClientDetailDialog({
               )}
             </div>
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => {
-                // TODO: Open edit dialog
-                toast({
-                  title: "Edit",
-                  description: "Edit functionality coming soon"
-                });
-              }}
-              data-testid="button-edit"
-            >
-              Edit
-            </Button>
-            <Button
-              variant="default"
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => {
-                // Navigate to full details page
-                window.location.href = `/clients/${client?.id}`;
-              }}
-              data-testid="button-view-details"
-            >
-              View Details
-            </Button>
-          </div>
         </div>
       </DialogContent>
 
