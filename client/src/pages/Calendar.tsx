@@ -245,7 +245,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
       data-testid={`calendar-day-${day}`}
     >
       <div className="text-sm text-muted-foreground mb-1 px-0.5">{day}</div>
-      <div className="space-y-1 flex-1 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+      <div className="space-y-1 flex-1">
         {assignments.map((assignment: any) => {
           const client = clients.find((c: any) => c.id === assignment.clientId);
           return client ? (
