@@ -1039,7 +1039,7 @@ export default function Calendar() {
             return (
               <div key={d.dayName} className="p-2 text-center border-r text-xs font-semibold space-y-1">
                 <div>{d.dayName}</div>
-                <div className="text-muted-foreground">{d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                <div className="text-muted-foreground">{d.date.getDate()}</div>
                 {dayParts > 0 && (
                   <Button
                     variant="outline"
