@@ -245,7 +245,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
       data-testid={`calendar-day-${day}`}
     >
       <div className="text-sm text-muted-foreground mb-1 px-0.5">{day}</div>
-      <div className="space-y-1 flex-1">
+      <div className="space-y-1 flex-1 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
         {assignments.map((assignment: any) => {
           const client = clients.find((c: any) => c.id === assignment.clientId);
           return client ? (
@@ -1242,7 +1242,7 @@ export default function Calendar() {
                           </div>
                         ))}
                       </div>
-                      <div className="grid grid-cols-7 auto-rows-[minmax(6rem,max-content)] content-start">
+                      <div className="grid grid-cols-7 auto-rows-[8rem] content-start">
                         {renderMonthlyView()}
                       </div>
                     </div>
