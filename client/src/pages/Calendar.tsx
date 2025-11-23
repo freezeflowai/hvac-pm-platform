@@ -987,7 +987,7 @@ export default function Calendar() {
 
     return (
       <div className="flex flex-col h-full min-h-0 max-h-full">
-        <div className="grid sticky top-0 bg-background z-10 border-b flex-shrink-0" style={{ gridTemplateColumns: '5rem repeat(7, 1fr)' }}>
+        <div className="grid grid-cols-8 sticky top-0 bg-background z-10 border-b flex-shrink-0">
           <div className="p-2 text-xs font-semibold border-r">Time</div>
           {weekDaysData.map((d) => (
             <div key={d.dayName} className="p-2 text-center border-r text-xs font-semibold">
@@ -998,7 +998,7 @@ export default function Calendar() {
         </div>
 
         {/* All Day Slot - Pinned outside scrollable area */}
-        <div className="border-b bg-primary/5 flex-shrink-0" style={{ display: 'grid', gridTemplateColumns: '5rem repeat(7, 1fr)' }}>
+        <div className="grid grid-cols-8 border-b bg-primary/5 flex-shrink-0">
           <div className="p-2 text-xs font-semibold border-r sticky left-0 z-20 bg-primary/10">
             All Day
           </div>
@@ -1068,7 +1068,7 @@ export default function Calendar() {
         {/* Scrollable Hourly Slots */}
         <div ref={weeklyScrollContainerRef} className="overflow-y-scroll flex-1 min-h-0 max-h-full" style={{ scrollbarWidth: 'auto', overflowX: 'hidden' }}>
           {hours.map((h) => (
-            <div key={h.hour} className="border-b" style={{ display: 'grid', gridTemplateColumns: '5rem repeat(7, 1fr)' }}>
+            <div key={h.hour} className="grid grid-cols-8 border-b">
               <div className={`p-2 text-xs font-medium border-r sticky left-0 z-20 ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
                 {h.display}
               </div>
@@ -1242,7 +1242,7 @@ export default function Calendar() {
                           </div>
                         ))}
                       </div>
-                      <div className="grid grid-cols-7 auto-rows-[8rem] content-start">
+                      <div className="grid grid-cols-7 auto-rows-[minmax(6rem,max-content)] content-start">
                         {renderMonthlyView()}
                       </div>
                     </div>
