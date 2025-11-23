@@ -525,15 +525,34 @@ export default function Calendar() {
     "July", "August", "September", "October", "November", "December"];
 
   const previousMonth = () => {
-    setCurrentDate(new Date(year, month - 2, 1));
+    if (view === "weekly") {
+      // Navigate to previous week
+      const newDate = new Date(currentDate);
+      newDate.setDate(newDate.getDate() - 7);
+      setCurrentDate(newDate);
+      scrollDoneRef.current = false; // Reset scroll to trigger re-scroll to start hour
+    } else {
+      // Navigate to previous month
+      setCurrentDate(new Date(year, month - 2, 1));
+    }
   };
 
   const nextMonth = () => {
-    setCurrentDate(new Date(year, month, 1));
+    if (view === "weekly") {
+      // Navigate to next week
+      const newDate = new Date(currentDate);
+      newDate.setDate(newDate.getDate() + 7);
+      setCurrentDate(newDate);
+      scrollDoneRef.current = false; // Reset scroll to trigger re-scroll to start hour
+    } else {
+      // Navigate to next month
+      setCurrentDate(new Date(year, month, 1));
+    }
   };
 
   const goToToday = () => {
     setCurrentDate(new Date());
+    scrollDoneRef.current = false; // Reset scroll to trigger re-scroll to start hour
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -1022,18 +1041,42 @@ export default function Calendar() {
                 variant="outline"
                 size="icon"
                 onClick={previousMonth}
-                data-testid="button-previous-month"
+                data-testid={view === "weekly" ? "button-previous-week" : "button-previous-month"}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <h2 className="text-2xl font-bold">
-                {monthNames[month - 1]} {year}
+                {view === "weekly" ? (
+                  (() => {
+                    const weekStart = new Date(currentDate);
+                    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+                    const weekEnd = new Date(weekStart);
+                    weekEnd.setDate(weekEnd.getDate() + 6);
+                    
+                    const startMonth = monthNames[weekStart.getMonth()];
+                    const endMonth = monthNames[weekEnd.getMonth()];
+                    const startDay = weekStart.getDate();
+                    const endDay = weekEnd.getDate();
+                    const startYear = weekStart.getFullYear();
+                    const endYear = weekEnd.getFullYear();
+                    
+                    if (startYear !== endYear) {
+                      return `${startMonth} ${startDay}, ${startYear} - ${endMonth} ${endDay}, ${endYear}`;
+                    } else if (startMonth !== endMonth) {
+                      return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${endYear}`;
+                    } else {
+                      return `${startMonth} ${startDay}-${endDay}, ${endYear}`;
+                    }
+                  })()
+                ) : (
+                  `${monthNames[month - 1]} ${year}`
+                )}
               </h2>
               <Button
                 variant="outline"
                 size="icon"
                 onClick={nextMonth}
-                data-testid="button-next-month"
+                data-testid={view === "weekly" ? "button-next-week" : "button-next-month"}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
