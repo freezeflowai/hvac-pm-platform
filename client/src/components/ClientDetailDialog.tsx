@@ -25,7 +25,7 @@ export function ClientDetailDialog({
 }) {
   const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
   const [isCompleted, setIsCompleted] = useState(false);
-  const [showClientReport, setShowClientReport] = useState(false);
+  const [reportClientId, setReportClientId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Sync selected technicians and completion status when assignment changes
@@ -164,7 +164,7 @@ export function ClientDetailDialog({
             <div className="flex gap-2 text-sm">
               <span 
                 className="text-primary hover:underline cursor-pointer" 
-                onClick={() => setShowClientReport(true)}
+                onClick={() => setReportClientId(client?.id)}
                 data-testid="link-client-details"
               >
                 {client?.companyName}
@@ -302,9 +302,13 @@ export function ClientDetailDialog({
       </DialogContent>
 
       <ClientReportDialog
-        clientId={showClientReport ? client?.id : null}
-        open={showClientReport}
-        onOpenChange={setShowClientReport}
+        clientId={reportClientId}
+        open={!!reportClientId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReportClientId(null);
+          }
+        }}
       />
     </Dialog>
   );
