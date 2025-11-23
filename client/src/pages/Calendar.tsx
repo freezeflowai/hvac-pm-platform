@@ -982,7 +982,7 @@ export default function Calendar() {
         monthNumber,
         yearNumber,
         dayAssignments,
-        dayName: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i]
+        dayName: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i]
       });
     }
 
@@ -1112,8 +1112,7 @@ export default function Calendar() {
               <h2 className="text-2xl font-bold">
                 {view === "weekly" ? (
                   (() => {
-                    const weekStart = new Date(currentDate);
-                    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+                    const weekStart = getMondayOfWeek(currentDate);
                     const weekEnd = new Date(weekStart);
                     weekEnd.setDate(weekEnd.getDate() + 6);
                     
