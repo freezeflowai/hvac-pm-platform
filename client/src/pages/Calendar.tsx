@@ -7,6 +7,7 @@ import NewAddClientDialog from "@/components/NewAddClientDialog";
 import ClientReportDialog from "@/components/ClientReportDialog";
 import { ClientDetailDialog } from "@/components/ClientDetailDialog";
 import { RouteOptimizationDialog } from "@/components/RouteOptimizationDialog";
+import { PartsDialog } from "@/components/PartsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -317,6 +318,9 @@ export default function Calendar() {
   const [clientDetailOpen, setClientDetailOpen] = useState(false);
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | null>(null);
   const [expandedAllDaySlots, setExpandedAllDaySlots] = useState<Set<string>>(new Set());
+  const [partsDialogOpen, setPartsDialogOpen] = useState(false);
+  const [partsDialogTitle, setPartsDialogTitle] = useState("");
+  const [partsDialogParts, setPartsDialogParts] = useState<Array<{ description: string; quantity: number }>>([]);
   const { toast } = useToast();
   const [location] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
@@ -325,6 +329,34 @@ export default function Calendar() {
   
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
+
+  // Helper to calculate parts from assignments
+  const calculateParts = (assignments: any[]) => {
+    const partsList: Array<{ description: string; quantity: number }> = [];
+    
+    assignments.forEach((assignment: any) => {
+      const clientPartsList = bulkParts[assignment.clientId] || [];
+      clientPartsList.forEach((cp: any) => {
+        const part = cp.part;
+        let partLabel = '';
+        
+        if (part?.type === 'filter') {
+          partLabel = `${part.filterType || 'Filter'} ${part.size || ''}`.trim();
+        } else if (part?.type === 'belt') {
+          partLabel = `Belt ${part.beltType || ''} ${part.size || ''}`.trim();
+        } else {
+          partLabel = part?.name || 'Other Part';
+        }
+        
+        partsList.push({ 
+          description: partLabel,
+          quantity: cp.quantity || 1
+        });
+      });
+    });
+    
+    return partsList;
+  };
 
   // Helper to get Monday of the week
   const getMondayOfWeek = (date: Date) => {
@@ -1013,6 +1045,12 @@ export default function Calendar() {
                     variant="outline"
                     size="sm"
                     className="h-6 px-2 text-[10px] w-full"
+                    onClick={() => {
+                      const parts = calculateParts(d.dayAssignments);
+                      setPartsDialogTitle(`Parts for ${d.dayName}, ${d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`);
+                      setPartsDialogParts(parts);
+                      setPartsDialogOpen(true);
+                    }}
                     data-testid={`button-parts-${d.dayName}`}
                   >
                     {dayParts} parts
@@ -1210,6 +1248,26 @@ export default function Calendar() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Calculate all parts for the week
+                      const weekStart = getMondayOfWeek(currentDate);
+                      const weekEnd = new Date(weekStart);
+                      weekEnd.setDate(weekEnd.getDate() + 6);
+                      
+                      const allAssignments = assignments || [];
+                      const parts = calculateParts(allAssignments);
+                      
+                      setPartsDialogTitle(`Parts for Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`);
+                      setPartsDialogParts(parts);
+                      setPartsDialogOpen(true);
+                    }}
+                    data-testid="button-weekly-parts"
+                  >
+                    Week Parts
+                  </Button>
                 </>
               )}
               <Button
@@ -1455,6 +1513,13 @@ export default function Calendar() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PartsDialog
+        open={partsDialogOpen}
+        onOpenChange={setPartsDialogOpen}
+        title={partsDialogTitle}
+        parts={partsDialogParts}
+      />
     </DndContext>
   );
 }
