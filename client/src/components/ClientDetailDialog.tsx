@@ -156,15 +156,15 @@ export function ClientDetailDialog({
             <h3 className="text-sm font-semibold mb-1">Details</h3>
             <div className="flex gap-2 text-sm">
               <Link href={`/clients/${client?.id}`}>
-                <a className="text-primary hover:underline" data-testid="link-client-details">
+                <span className="text-primary hover:underline cursor-pointer" data-testid="link-client-details">
                   {client?.companyName}
-                </a>
+                </span>
               </Link>
               <span className="text-muted-foreground">-</span>
               <Link href={`/jobs/${assignment?.id}`}>
-                <a className="text-primary hover:underline" data-testid="link-job-details">
+                <span className="text-primary hover:underline cursor-pointer" data-testid="link-job-details">
                   Job #{assignment?.id?.slice(0, 6)}
-                </a>
+                </span>
               </Link>
             </div>
           </div>
