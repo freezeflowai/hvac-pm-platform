@@ -6,14 +6,14 @@ import { neonConfig } from '@neondatabase/serverless';
 
 neonConfig.webSocketConstructor = ws;
 
-// Old database connection (current DATABASE_URL)
-const OLD_DB_URL = process.env.DATABASE_URL;
+// Old database connection (the one with your data)
+const OLD_DB_URL = 'postgresql://neondb_owner:npg_EgN2MlYnfSk0@ep-flat-dream-aet8mzr6.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require';
 
-// New database connection (provided by user)
-const NEW_DB_URL = process.env.NEW_DATABASE_URL || 'postgresql://neondb_owner:npg_EgN2MlYnfSk0@ep-flat-dream-aet8mzr6.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require';
+// New database connection (current empty DATABASE_URL in this Repl)
+const NEW_DB_URL = process.env.DATABASE_URL;
 
-if (!OLD_DB_URL) {
-  throw new Error('DATABASE_URL (old database) must be set');
+if (!NEW_DB_URL) {
+  throw new Error('DATABASE_URL (new database) must be set');
 }
 
 async function migrateData() {
