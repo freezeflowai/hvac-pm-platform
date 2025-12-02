@@ -9,12 +9,14 @@ import { sendInvitationEmail } from "./emailService";
 import { impersonationService } from "./impersonationService";
 import { auditService } from "./auditService";
 import { requirePlatformAdmin, blockImpersonation } from "./impersonationMiddleware";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, insertJobNoteSchema, updateJobNoteSchema, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
 import { db } from "./db";
 import { and, eq } from "drizzle-orm";
 import Stripe from "stripe";
+import * as fs from "fs";
+import * as path from "path";
 
 // Initialize Stripe (optional - will be undefined if keys not set)
 let stripe: Stripe | undefined;
@@ -1981,6 +1983,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Delete calendar assignment error:', error);
       res.status(500).json({ error: "Failed to delete calendar assignment" });
+    }
+  });
+
+  // Job notes routes
+  app.get("/api/job-notes/:assignmentId", isAuthenticated, async (req, res) => {
+    try {
+      const { assignmentId } = req.params;
+      const notes = await storage.getJobNotes(req.user!.companyId, assignmentId);
+      res.json(notes);
+    } catch (error) {
+      console.error('Get job notes error:', error);
+      res.status(500).json({ error: "Failed to get job notes" });
+    }
+  });
+
+  app.post("/api/job-notes", isAuthenticated, async (req, res) => {
+    try {
+      const noteData = insertJobNoteSchema.parse(req.body);
+      const note = await storage.createJobNote(req.user!.companyId, req.user!.id, noteData);
+      res.status(201).json(note);
+    } catch (error) {
+      console.error('Create job note error:', error);
+      res.status(500).json({ error: "Failed to create job note" });
+    }
+  });
+
+  app.patch("/api/job-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const noteData = updateJobNoteSchema.parse(req.body);
+      const note = await storage.updateJobNote(req.user!.companyId, id, noteData);
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error('Update job note error:', error);
+      res.status(500).json({ error: "Failed to update job note" });
+    }
+  });
+
+  app.delete("/api/job-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteJobNote(req.user!.companyId, id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete job note error:', error);
+      res.status(500).json({ error: "Failed to delete job note" });
+    }
+  });
+
+  // Image upload for job notes (base64 data URL)
+  app.post("/api/job-notes/upload-image", isAuthenticated, async (req, res) => {
+    try {
+      const { imageData, assignmentId } = req.body;
+      
+      if (!imageData || !assignmentId) {
+        return res.status(400).json({ error: "Image data and assignment ID are required" });
+      }
+      
+      // Parse base64 data URL
+      const matches = imageData.match(/^data:image\/(\w+);base64,(.+)$/);
+      if (!matches) {
+        return res.status(400).json({ error: "Invalid image data format" });
+      }
+      
+      const extension = matches[1];
+      const base64Data = matches[2];
+      const buffer = Buffer.from(base64Data, 'base64');
+      
+      // Create uploads directory if it doesn't exist
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'job-notes');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      
+      // Generate unique filename
+      const filename = `${assignmentId}-${Date.now()}-${randomBytes(4).toString('hex')}.${extension}`;
+      const filepath = path.join(uploadsDir, filename);
+      
+      // Save file
+      fs.writeFileSync(filepath, buffer);
+      
+      // Return URL path
+      const imageUrl = `/uploads/job-notes/${filename}`;
+      res.json({ imageUrl });
+    } catch (error) {
+      console.error('Upload image error:', error);
+      res.status(500).json({ error: "Failed to upload image" });
     }
   });
 

@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import { Pool } from "pg";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { passport } from "./auth";
@@ -9,6 +10,9 @@ import { impersonationMiddleware, trackActivity } from "./impersonationMiddlewar
 import { storage } from "./storage";
 
 const app = express();
+
+// Serve static uploads directory for job note images
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Detect if running in production (published app)
 const isProduction = process.env.NODE_ENV === "production" || !!process.env.REPLIT_DEPLOYMENT;

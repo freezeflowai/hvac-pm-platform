@@ -19,7 +19,10 @@ import {
   type InsertCalendarAssignment,
   type UpdateCalendarAssignment,
   type Feedback,
-  type InsertFeedback
+  type InsertFeedback,
+  type JobNote,
+  type InsertJobNote,
+  type UpdateJobNote
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { STANDARD_BELTS, STANDARD_FILTERS } from "./seed-data";
@@ -151,6 +154,13 @@ export interface IStorage {
   getUnscheduledClients(companyId: string, year: number, month: number): Promise<Client[]>;
   getPastIncompleteAssignments(companyId: string): Promise<CalendarAssignment[]>;
   
+  // Job notes methods
+  getJobNotes(companyId: string, assignmentId: string): Promise<JobNote[]>;
+  getJobNote(companyId: string, id: string): Promise<JobNote | undefined>;
+  createJobNote(companyId: string, userId: string, note: InsertJobNote): Promise<JobNote>;
+  updateJobNote(companyId: string, id: string, note: UpdateJobNote): Promise<JobNote | undefined>;
+  deleteJobNote(companyId: string, id: string): Promise<boolean>;
+  
   // Feedback methods
   createFeedback(companyId: string, userId: string, userEmail: string, feedback: InsertFeedback): Promise<Feedback>;
   getAllFeedback(): Promise<Feedback[]>;
@@ -183,6 +193,7 @@ export class MemStorage implements IStorage {
   private feedback: Map<string, Feedback>;
   private invitationTokens: Map<string, any>;
   private companies: Map<string, any>;
+  private jobNotes: Map<string, JobNote>;
 
   constructor() {
     this.users = new Map();
@@ -197,6 +208,7 @@ export class MemStorage implements IStorage {
     this.calendarAssignments = new Map();
     this.invitationTokens = new Map();
     this.companies = new Map();
+    this.jobNotes = new Map();
   }
 
   // User methods
@@ -1289,10 +1301,65 @@ export class MemStorage implements IStorage {
       this.companies.set(companyId, { ...company, ...updates });
     }
   }
+
+  // Job notes methods
+  async getJobNotes(companyId: string, assignmentId: string): Promise<JobNote[]> {
+    return Array.from(this.jobNotes.values())
+      .filter(note => note.companyId === companyId && note.assignmentId === assignmentId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getJobNote(companyId: string, id: string): Promise<JobNote | undefined> {
+    const note = this.jobNotes.get(id);
+    if (note && note.companyId === companyId) {
+      return note;
+    }
+    return undefined;
+  }
+
+  async createJobNote(companyId: string, userId: string, note: InsertJobNote): Promise<JobNote> {
+    const id = randomUUID();
+    const now = new Date();
+    const newNote: JobNote = {
+      id,
+      companyId,
+      userId,
+      assignmentId: note.assignmentId,
+      noteText: note.noteText,
+      imageUrl: note.imageUrl || null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.jobNotes.set(id, newNote);
+    return newNote;
+  }
+
+  async updateJobNote(companyId: string, id: string, note: UpdateJobNote): Promise<JobNote | undefined> {
+    const existing = this.jobNotes.get(id);
+    if (!existing || existing.companyId !== companyId) {
+      return undefined;
+    }
+    const updated: JobNote = {
+      ...existing,
+      ...note,
+      updatedAt: new Date(),
+    };
+    this.jobNotes.set(id, updated);
+    return updated;
+  }
+
+  async deleteJobNote(companyId: string, id: string): Promise<boolean> {
+    const note = this.jobNotes.get(id);
+    if (note && note.companyId === companyId) {
+      this.jobNotes.delete(id);
+      return true;
+    }
+    return false;
+  }
 }
 
 import { db } from './db';
-import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback, invitationTokens, companies } from '@shared/schema';
+import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback, invitationTokens, companies, jobNotes } from '@shared/schema';
 import { eq, and, desc, inArray, sql, or, lt } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
@@ -2432,6 +2499,51 @@ export class DbStorage implements IStorage {
       .from(equipment)
       .where(and(eq(equipment.companyId, companyId), eq(equipment.clientId, clientId)));
     return result;
+  }
+
+  // Job notes methods
+  async getJobNotes(companyId: string, assignmentId: string): Promise<JobNote[]> {
+    return db.select()
+      .from(jobNotes)
+      .where(and(eq(jobNotes.companyId, companyId), eq(jobNotes.assignmentId, assignmentId)))
+      .orderBy(desc(jobNotes.createdAt));
+  }
+
+  async getJobNote(companyId: string, id: string): Promise<JobNote | undefined> {
+    const result = await db.select()
+      .from(jobNotes)
+      .where(and(eq(jobNotes.id, id), eq(jobNotes.companyId, companyId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createJobNote(companyId: string, userId: string, note: InsertJobNote): Promise<JobNote> {
+    const result = await db.insert(jobNotes).values({
+      companyId,
+      userId,
+      assignmentId: note.assignmentId,
+      noteText: note.noteText,
+      imageUrl: note.imageUrl || null,
+    }).returning();
+    return result[0];
+  }
+
+  async updateJobNote(companyId: string, id: string, note: UpdateJobNote): Promise<JobNote | undefined> {
+    const result = await db.update(jobNotes)
+      .set({
+        ...note,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(jobNotes.id, id), eq(jobNotes.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteJobNote(companyId: string, id: string): Promise<boolean> {
+    const result = await db.delete(jobNotes)
+      .where(and(eq(jobNotes.id, id), eq(jobNotes.companyId, companyId)))
+      .returning();
+    return result.length > 0;
   }
 }
 
