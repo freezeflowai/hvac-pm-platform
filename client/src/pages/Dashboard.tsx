@@ -4,7 +4,7 @@ import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
 import ClientReportDialog from "@/components/ClientReportDialog";
-import { ClientDetailDialog } from "@/components/ClientDetailDialog";
+import { JobDetailDialog } from "@/components/JobDetailDialog";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import { AlertCircle, Calendar, CalendarX, CheckCircle, Clock, Package, Settings, Search, Building2, FileText, Download, Users, ChevronDown } from "lucide-react";
 import MaintenanceCard, { MaintenanceItem } from "@/components/MaintenanceCard";
@@ -860,7 +860,7 @@ export default function Dashboard() {
         onOpenChange={(open) => !open && setReportDialogClientId(null)}
       />
 
-      <ClientDetailDialog
+      <JobDetailDialog
         open={jobDialogOpen}
         onOpenChange={(open) => {
           setJobDialogOpen(open);

@@ -5,7 +5,7 @@ import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import ClientReportDialog from "@/components/ClientReportDialog";
-import { ClientDetailDialog } from "@/components/ClientDetailDialog";
+import { JobDetailDialog } from "@/components/JobDetailDialog";
 import { RouteOptimizationDialog } from "@/components/RouteOptimizationDialog";
 import { PartsDialog } from "@/components/PartsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1392,7 +1392,7 @@ export default function Calendar() {
           ) : null}
         </DragOverlay>
 
-        <ClientDetailDialog 
+        <JobDetailDialog 
           open={clientDetailOpen}
           onOpenChange={(open) => {
             setClientDetailOpen(open);

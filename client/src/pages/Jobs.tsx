@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Search, ChevronDown, ChevronUp, ArrowUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -90,7 +92,22 @@ function formatAddress(client: Client | undefined): string {
   return parts.join(", ") || "No address";
 }
 
+interface ClientPart {
+  id: string;
+  partId: string;
+  quantity: number;
+  part?: {
+    id: string;
+    type: string;
+    filterType?: string | null;
+    beltType?: string | null;
+    size?: string | null;
+    name?: string | null;
+  };
+}
+
 export default function Jobs() {
+  const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<JobStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("schedule");
@@ -105,6 +122,26 @@ export default function Jobs() {
       });
       if (!res.ok) throw new Error("Failed to fetch jobs");
       return res.json();
+    },
+  });
+
+  const { data: bulkParts = {} } = useQuery<Record<string, ClientPart[]>>({
+    queryKey: ["/api/client-parts/bulk"],
+    staleTime: 60 * 1000,
+  });
+
+  const assignTechniciansMutation = useMutation({
+    mutationFn: async ({ assignmentId, technicianIds }: { assignmentId: string; technicianIds: string[] }) => {
+      return apiRequest("PATCH", `/api/calendar/assign/${assignmentId}`, {
+        assignedTechnicianIds: technicianIds
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/all"] });
+      toast({ title: "Updated", description: "Technicians assigned successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to assign technicians", variant: "destructive" });
     },
   });
 
@@ -352,6 +389,10 @@ export default function Jobs() {
         open={!!selectedJob}
         onOpenChange={(open) => {
           if (!open) setSelectedJob(null);
+        }}
+        bulkParts={bulkParts}
+        onAssignTechnicians={(assignmentId: string, technicianIds: string[]) => {
+          assignTechniciansMutation.mutate({ assignmentId, technicianIds });
         }}
       />
     </div>
