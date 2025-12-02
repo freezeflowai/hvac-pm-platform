@@ -1,12 +1,17 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Calendar as CalendarIcon, AlertCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ClientReportDialog from "@/components/ClientReportDialog";
+import { format } from "date-fns";
 
 export function ClientDetailDialog({ 
   open, 
@@ -26,13 +31,23 @@ export function ClientDetailDialog({
   const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
   const [isCompleted, setIsCompleted] = useState(false);
   const [reportClientId, setReportClientId] = useState<string | null>(null);
+  const [notes, setNotes] = useState("");
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const { toast } = useToast();
 
-  // Sync selected technicians and completion status when assignment changes
+  // Sync selected technicians, completion status, notes and date when assignment changes
   useEffect(() => {
     if (assignment) {
       setSelectedTechs(assignment.assignedTechnicianIds || []);
       setIsCompleted(assignment.completed || false);
+      setNotes(assignment.completionNotes || "");
+      setSelectedDate(assignment.scheduledDate ? new Date(assignment.scheduledDate) : undefined);
+    } else {
+      setSelectedTechs([]);
+      setIsCompleted(false);
+      setNotes("");
+      setSelectedDate(undefined);
     }
   }, [assignment?.id]);
 
@@ -68,6 +83,100 @@ export function ClientDetailDialog({
       });
     }
   });
+
+  const updateDate = useMutation({
+    mutationFn: async (newDate: Date) => {
+      if (!assignment) return;
+      const year = newDate.getFullYear();
+      const month = newDate.getMonth() + 1;
+      const day = newDate.getDate();
+      return apiRequest("PATCH", `/api/calendar/assign/${assignment.id}`, {
+        year,
+        month,
+        day,
+        scheduledDate: newDate.toISOString().split('T')[0]
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar/overdue'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar/unscheduled'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/maintenance/statuses'] });
+      toast({
+        title: "Date updated",
+        description: "Job has been rescheduled"
+      });
+      setDatePickerOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update date",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const unscheduleJob = useMutation({
+    mutationFn: async () => {
+      if (!assignment) return;
+      return apiRequest("DELETE", `/api/calendar/assign/${assignment.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar/overdue'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar/unscheduled'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/maintenance/statuses'] });
+      toast({
+        title: "Job unscheduled",
+        description: "Job has been removed from the calendar"
+      });
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to unschedule job",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const updateNotes = useMutation({
+    mutationFn: async (newNotes: string) => {
+      if (!assignment) return;
+      return apiRequest("PATCH", `/api/calendar/assign/${assignment.id}`, {
+        completionNotes: newNotes
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      toast({
+        title: "Notes saved",
+        description: "Job notes have been updated"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save notes",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date);
+      updateDate.mutate(date);
+    }
+  };
+
+  const handleNotesBlur = () => {
+    if (notes !== (assignment?.completionNotes || "")) {
+      updateNotes.mutate(notes);
+    }
+  };
 
   const handleToggleComplete = () => {
     const newStatus = !isCompleted;
@@ -228,20 +337,85 @@ export function ClientDetailDialog({
             </div>
           )}
 
-          {/* Start and End Dates */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h3 className="text-sm font-semibold mb-1">Start</h3>
-              <p className="text-sm" data-testid="text-start-date">
-                {assignment?.scheduledDate ? formatDate(assignment.scheduledDate) : "Not scheduled"}
-              </p>
+          {/* Status Section */}
+          <div>
+            <h3 className="text-sm font-semibold mb-2">Status</h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              {assignment ? (
+                <>
+                  {/* Date Status Badge */}
+                  {(() => {
+                    const scheduledDate = assignment.scheduledDate ? new Date(assignment.scheduledDate) : null;
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const isOverdue = scheduledDate && scheduledDate < today && !assignment.completed;
+                    
+                    return (
+                      <Badge 
+                        variant={isOverdue ? "destructive" : assignment.completed ? "default" : "secondary"}
+                        className="flex items-center gap-1"
+                        data-testid="badge-job-status"
+                      >
+                        {isOverdue && <AlertCircle className="h-3 w-3" />}
+                        {assignment.completed ? "Completed" : isOverdue ? "Overdue" : "Scheduled"}
+                      </Badge>
+                    );
+                  })()}
+                  
+                  {/* Date Picker */}
+                  <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="h-7 gap-1"
+                        data-testid="button-change-date"
+                      >
+                        <CalendarIcon className="h-3 w-3" />
+                        {selectedDate ? format(selectedDate, "MMM d, yyyy") : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={handleDateSelect}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  
+                  {/* Unschedule Button */}
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="h-7 text-destructive hover:text-destructive"
+                    onClick={() => unscheduleJob.mutate()}
+                    disabled={unscheduleJob.isPending}
+                    data-testid="button-unschedule"
+                  >
+                    Unschedule
+                  </Button>
+                </>
+              ) : (
+                <Badge variant="outline" data-testid="badge-unscheduled">
+                  Unscheduled
+                </Badge>
+              )}
             </div>
-            <div>
-              <h3 className="text-sm font-semibold mb-1">End</h3>
-              <p className="text-sm" data-testid="text-end-date">
-                {assignment?.scheduledDate ? formatDate(assignment.scheduledDate) : "Not scheduled"}
-              </p>
-            </div>
+          </div>
+
+          {/* Notes Section */}
+          <div>
+            <h3 className="text-sm font-semibold mb-2">Job Notes</h3>
+            <Textarea
+              placeholder="Add notes about this job..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={handleNotesBlur}
+              className="min-h-[80px] text-sm"
+              data-testid="textarea-job-notes"
+            />
           </div>
 
           {/* Parts */}
