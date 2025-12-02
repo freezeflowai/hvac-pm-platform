@@ -19,6 +19,14 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+// Helper function to parse date string as local date (not UTC)
+// This prevents timezone issues where "2025-12-05" becomes December 4th in local time
+function parseLocalDate(dateStr: string): Date {
+  if (!dateStr) return new Date();
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
 // Helper function to calculate next due date based on selected months
 function calculateNextDueDate(selectedMonths: number[], inactive: boolean): Date | null {
   if (inactive || selectedMonths.length === 0) {
@@ -354,8 +362,9 @@ export default function Dashboard() {
   );
   
   // Map of clientId -> scheduledDate from calendar assignments (only scheduled ones)
+  // Use parseLocalDate to avoid timezone issues where UTC dates shift to previous day
   const clientScheduledDates = new Map(
-    scheduledAssignments.map((a: any) => [a.clientId, new Date(a.scheduledDate)])
+    scheduledAssignments.map((a: any) => [a.clientId, parseLocalDate(a.scheduledDate)])
   );
 
   // Clients with PM this month
@@ -419,7 +428,8 @@ export default function Dashboard() {
         return false;
       }
       // Check if the assignment has been rescheduled to a future date
-      const scheduledDate = new Date(assignment.scheduledDate);
+      // Use parseLocalDate to avoid timezone issues
+      const scheduledDate = parseLocalDate(assignment.scheduledDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       // Only include if still actually overdue (scheduled date is in the past)
@@ -430,7 +440,7 @@ export default function Dashboard() {
       companyName: client.companyName || 'Unknown',
       location: client.location,
       selectedMonths: client.selectedMonths || [],
-      nextDue: new Date(assignment.scheduledDate),
+      nextDue: parseLocalDate(assignment.scheduledDate),
       status: "overdue" as const,
       assignmentId: assignment.id,
       originalMonth: assignment.month,
