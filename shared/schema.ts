@@ -228,11 +228,11 @@ export const updateCalendarAssignmentSchema = z.object({
   year: z.number().int().optional(),
   month: z.number().int().min(1).max(12).optional(),
   day: z.number().int().min(1).max(31).nullable().optional(),
-  scheduledDate: z.string().optional(),
+  scheduledDate: z.string().nullable().optional(),
   scheduledHour: z.number().int().min(0).max(23).nullable().optional(),
   autoDueDate: z.boolean().optional(),
   completed: z.boolean().optional(),
-  completionNotes: z.string().optional(),
+  completionNotes: z.string().nullable().optional(),
   assignedTechnicianIds: z.array(z.string()).optional(),
   assignedTechnicianId: z.string().nullable().optional(), // Legacy support
 });

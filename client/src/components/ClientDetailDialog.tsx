@@ -120,9 +120,9 @@ export function ClientDetailDialog({
   const unscheduleJob = useMutation({
     mutationFn: async () => {
       if (!assignment) return;
+      // Just clear day and hour - keep scheduledDate as a placeholder since it's required in DB
       return apiRequest("PATCH", `/api/calendar/assign/${assignment.id}`, {
         day: null,
-        scheduledDate: null,
         scheduledHour: null
       });
     },
@@ -349,12 +349,15 @@ export function ClientDetailDialog({
                 <>
                   {/* Date Status Badge */}
                   {(() => {
-                    const hasScheduledDate = selectedDate || assignment.scheduledDate;
-                    const scheduledDate = hasScheduledDate ? new Date(selectedDate || assignment.scheduledDate) : null;
+                    // Check if job has a scheduled day (day being null means unscheduled)
+                    const hasScheduledDay = selectedDate || (assignment.day != null);
+                    const scheduledDate = hasScheduledDay && (selectedDate || assignment.scheduledDate) 
+                      ? new Date(selectedDate || assignment.scheduledDate) 
+                      : null;
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
                     const isOverdue = scheduledDate && scheduledDate < today && !assignment.completed;
-                    const isUnscheduled = !hasScheduledDate && !assignment.completed;
+                    const isUnscheduled = !hasScheduledDay && !assignment.completed;
                     
                     return (
                       <Badge 
@@ -391,8 +394,8 @@ export function ClientDetailDialog({
                     </PopoverContent>
                   </Popover>
                   
-                  {/* Unschedule Button - only show if job is scheduled */}
-                  {(selectedDate || assignment.scheduledDate) && (
+                  {/* Unschedule Button - only show if job is scheduled (has a day) */}
+                  {(selectedDate || assignment.day != null) && (
                     <Button 
                       variant="ghost" 
                       size="sm"
