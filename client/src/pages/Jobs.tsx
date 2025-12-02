@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { JobDetailDialog } from "@/components/JobDetailDialog";
 
 interface CalendarAssignment {
   id: string;
@@ -94,6 +95,7 @@ export default function Jobs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("schedule");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [selectedJob, setSelectedJob] = useState<{ assignment: CalendarAssignment; client: Client | undefined } | null>(null);
 
   const { data: calendarData, isLoading: isCalendarLoading } = useQuery<{ assignments: CalendarAssignment[]; clients: Client[] }>({
     queryKey: ["/api/calendar/all"],
@@ -197,6 +199,24 @@ export default function Jobs() {
     }
   };
 
+  const handleRowClick = (job: typeof filteredAndSortedJobs[0]) => {
+    setSelectedJob({
+      assignment: {
+        id: job.id,
+        clientId: job.clientId,
+        year: job.year,
+        month: job.month,
+        day: job.day,
+        scheduledDate: job.scheduledDate,
+        scheduledHour: job.scheduledHour,
+        completed: job.completed,
+        completionNotes: job.completionNotes,
+        assignedTechnicianIds: job.assignedTechnicianIds,
+      },
+      client: job.client,
+    });
+  };
+
   const SortableHeader = ({ field, children, testId }: { field: SortField; children: React.ReactNode; testId: string }) => (
     <TableHead 
       className="cursor-pointer hover:bg-muted/50 select-none"
@@ -287,7 +307,12 @@ export default function Jobs() {
               </TableRow>
             ) : (
               filteredAndSortedJobs.map((job) => (
-                <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
+                <TableRow 
+                  key={job.id} 
+                  className="cursor-pointer hover-elevate"
+                  onClick={() => handleRowClick(job)}
+                  data-testid={`row-job-${job.id}`}
+                >
                   <TableCell className="font-medium" data-testid={`text-client-${job.id}`}>
                     {job.client?.companyName || "Unknown Client"}
                   </TableCell>
@@ -320,6 +345,15 @@ export default function Jobs() {
       <div className="text-sm text-muted-foreground" data-testid="text-job-count">
         Showing {filteredAndSortedJobs.length} job{filteredAndSortedJobs.length !== 1 ? 's' : ''}
       </div>
+
+      <JobDetailDialog
+        assignment={selectedJob?.assignment || null}
+        client={selectedJob?.client}
+        open={!!selectedJob}
+        onOpenChange={(open) => {
+          if (!open) setSelectedJob(null);
+        }}
+      />
     </div>
   );
 }
