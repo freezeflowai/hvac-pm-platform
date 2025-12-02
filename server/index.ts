@@ -108,7 +108,7 @@ declare global {
   }
 }
 app.use(express.json({
-  limit: '10mb',
+  limit: '5mb',
   verify: (req, _res, buf) => {
     req.rawBody = buf;
   }

@@ -342,9 +342,16 @@ export function JobDetailDialog({
     });
   };
 
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      toast({ title: "Image too large", description: "Maximum size is 5MB", variant: "destructive" });
+      e.target.value = "";
+      return;
+    }
     const reader = new FileReader();
     reader.onloadend = () => setNewNoteImage(reader.result as string);
     reader.readAsDataURL(file);
@@ -353,6 +360,11 @@ export function JobDetailDialog({
   const handleEditImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      toast({ title: "Image too large", description: "Maximum size is 5MB", variant: "destructive" });
+      e.target.value = "";
+      return;
+    }
     const reader = new FileReader();
     reader.onloadend = () => setEditingNoteImage(reader.result as string);
     reader.readAsDataURL(file);

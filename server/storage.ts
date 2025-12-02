@@ -146,6 +146,7 @@ export interface IStorage {
   // Calendar assignment methods
   getCalendarAssignments(companyId: string, year: number, month: number, assignedTechnicianId?: string): Promise<CalendarAssignment[]>;
   getAllCalendarAssignments(companyId: string): Promise<CalendarAssignment[]>;
+  getAllCalendarAssignmentsPaginated(companyId: string, options: { limit?: number; offset?: number; status?: string; search?: string }): Promise<{ assignments: CalendarAssignment[]; total: number; hasMore: boolean }>;
   getCalendarAssignment(companyId: string, id: string): Promise<CalendarAssignment | undefined>;
   createCalendarAssignment(companyId: string, userId: string, assignment: InsertCalendarAssignment): Promise<CalendarAssignment>;
   updateCalendarAssignment(companyId: string, id: string, assignment: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined>;
@@ -1085,6 +1086,25 @@ export class MemStorage implements IStorage {
     return Array.from(this.calendarAssignments.values()).filter(
       (assignment) => assignment.companyId === companyId
     );
+  }
+
+  async getAllCalendarAssignmentsPaginated(companyId: string, options: { limit?: number; offset?: number; status?: string; search?: string }): Promise<{ assignments: CalendarAssignment[]; total: number; hasMore: boolean }> {
+    const { limit, offset = 0, status, search } = options;
+    let assignments = Array.from(this.calendarAssignments.values()).filter(
+      (assignment) => assignment.companyId === companyId
+    );
+    
+    const total = assignments.length;
+    
+    if (limit !== undefined) {
+      assignments = assignments.slice(offset, offset + limit);
+    }
+    
+    return {
+      assignments,
+      total,
+      hasMore: limit !== undefined ? offset + limit < total : false
+    };
   }
 
   async getCalendarAssignment(companyId: string, id: string): Promise<CalendarAssignment | undefined> {
@@ -2151,6 +2171,34 @@ export class DbStorage implements IStorage {
     return await db.select()
       .from(calendarAssignments)
       .where(eq(calendarAssignments.companyId, companyId));
+  }
+
+  async getAllCalendarAssignmentsPaginated(companyId: string, options: { limit?: number; offset?: number; status?: string; search?: string }): Promise<{ assignments: CalendarAssignment[]; total: number; hasMore: boolean }> {
+    const { limit, offset = 0 } = options;
+    
+    // Get total count
+    const countResult = await db.select({ count: sql<number>`count(*)` })
+      .from(calendarAssignments)
+      .where(eq(calendarAssignments.companyId, companyId));
+    const total = Number(countResult[0]?.count || 0);
+    
+    // Build query with pagination
+    let query = db.select()
+      .from(calendarAssignments)
+      .where(eq(calendarAssignments.companyId, companyId))
+      .orderBy(desc(calendarAssignments.scheduledDate), desc(calendarAssignments.year), desc(calendarAssignments.month));
+    
+    if (limit !== undefined) {
+      query = query.limit(limit).offset(offset) as typeof query;
+    }
+    
+    const assignments = await query;
+    
+    return {
+      assignments,
+      total,
+      hasMore: limit !== undefined ? offset + assignments.length < total : false
+    };
   }
 
   async getCalendarAssignment(companyId: string, id: string): Promise<CalendarAssignment | undefined> {

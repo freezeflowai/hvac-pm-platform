@@ -1726,14 +1726,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Calendar assignment routes
   
-  // Get all calendar assignments (for Jobs page)
+  // Get all calendar assignments (for Jobs page) - supports pagination
   app.get("/api/calendar/all", isAuthenticated, async (req, res) => {
     try {
       const companyId = req.user!.companyId;
-      const assignments = await storage.getAllCalendarAssignments(companyId);
+      const limit = parseInt(req.query.limit as string) || undefined;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const status = req.query.status as string | undefined;
+      const search = req.query.search as string | undefined;
+      
+      const result = await storage.getAllCalendarAssignmentsPaginated(companyId, { limit, offset, status, search });
       const clients = await storage.getAllClients(companyId);
       
-      res.json({ assignments, clients });
+      res.json({ 
+        assignments: result.assignments, 
+        clients, 
+        total: result.total,
+        hasMore: result.hasMore
+      });
     } catch (error) {
       console.error('Get all calendar assignments error:', error);
       res.status(500).json({ error: "Failed to fetch jobs" });
@@ -2047,15 +2057,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Image data and assignment ID are required" });
       }
       
-      // Parse base64 data URL
-      const matches = imageData.match(/^data:image\/(\w+);base64,(.+)$/);
+      // Parse base64 data URL - handle various image formats including jpeg, jpg, png, gif, webp, heic, heif
+      const matches = imageData.match(/^data:image\/([a-zA-Z0-9.+-]+);base64,(.+)$/);
       if (!matches) {
-        return res.status(400).json({ error: "Invalid image data format" });
+        console.error('Image data format mismatch. Data prefix:', typeof imageData === 'string' ? imageData.substring(0, 60) : 'not a string');
+        return res.status(400).json({ error: "Invalid image data format. Please try a different image." });
       }
       
-      const extension = matches[1];
+      let extension = matches[1].toLowerCase();
+      // Normalize extension names
+      if (extension === 'jpeg') extension = 'jpg';
+      
       const base64Data = matches[2];
       const buffer = Buffer.from(base64Data, 'base64');
+      
+      // Check file size (5MB limit)
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (buffer.length > maxSize) {
+        return res.status(400).json({ error: "Image too large. Maximum size is 5MB." });
+      }
       
       // Create uploads directory if it doesn't exist
       const uploadsDir = path.join(process.cwd(), 'uploads', 'job-notes');

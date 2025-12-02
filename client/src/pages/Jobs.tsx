@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Search, ChevronDown, ChevronUp, ArrowUpDown } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, ArrowUpDown, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -106,6 +106,8 @@ interface ClientPart {
   };
 }
 
+const ITEMS_PER_PAGE = 50;
+
 export default function Jobs() {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<JobStatus>("all");
@@ -113,8 +115,10 @@ export default function Jobs() {
   const [sortField, setSortField] = useState<SortField>("schedule");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedJob, setSelectedJob] = useState<{ assignment: CalendarAssignment; client: Client | undefined } | null>(null);
+  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const loaderRef = useRef<HTMLDivElement>(null);
 
-  const { data: calendarData, isLoading: isCalendarLoading } = useQuery<{ assignments: CalendarAssignment[]; clients: Client[] }>({
+  const { data: calendarData, isLoading: isCalendarLoading } = useQuery<{ assignments: CalendarAssignment[]; clients: Client[]; total?: number }>({
     queryKey: ["/api/calendar/all"],
     queryFn: async () => {
       const res = await fetch('/api/calendar/all', {
@@ -227,6 +231,37 @@ export default function Jobs() {
     return jobs;
   }, [calendarData?.assignments, clientMap, statusFilter, searchQuery, sortField, sortDirection]);
 
+  // Reset visible count when filters or sort changes
+  useEffect(() => {
+    setVisibleCount(ITEMS_PER_PAGE);
+  }, [statusFilter, searchQuery, sortField, sortDirection]);
+
+  // Visible jobs (paginated)
+  const visibleJobs = useMemo(() => {
+    return filteredAndSortedJobs.slice(0, visibleCount);
+  }, [filteredAndSortedJobs, visibleCount]);
+
+  const hasMore = visibleCount < filteredAndSortedJobs.length;
+
+  // Intersection observer for infinite scroll
+  const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
+    const target = entries[0];
+    if (target.isIntersecting && hasMore) {
+      setVisibleCount(prev => Math.min(prev + ITEMS_PER_PAGE, filteredAndSortedJobs.length));
+    }
+  }, [hasMore, filteredAndSortedJobs.length]);
+
+  useEffect(() => {
+    const option = {
+      root: null,
+      rootMargin: "100px",
+      threshold: 0.1,
+    };
+    const observer = new IntersectionObserver(handleObserver, option);
+    if (loaderRef.current) observer.observe(loaderRef.current);
+    return () => observer.disconnect();
+  }, [handleObserver]);
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(prev => prev === "asc" ? "desc" : "asc");
@@ -336,14 +371,14 @@ export default function Jobs() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredAndSortedJobs.length === 0 ? (
+            {visibleJobs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-8 text-muted-foreground" data-testid="text-no-jobs">
                   No jobs found
                 </TableCell>
               </TableRow>
             ) : (
-              filteredAndSortedJobs.map((job) => (
+              visibleJobs.map((job) => (
                 <TableRow 
                   key={job.id} 
                   className="cursor-pointer hover-elevate"
@@ -379,8 +414,18 @@ export default function Jobs() {
         </Table>
       </div>
 
+      {hasMore && (
+        <div 
+          ref={loaderRef} 
+          className="flex justify-center py-4"
+          data-testid="loader-more-jobs"
+        >
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
       <div className="text-sm text-muted-foreground" data-testid="text-job-count">
-        Showing {filteredAndSortedJobs.length} job{filteredAndSortedJobs.length !== 1 ? 's' : ''}
+        Showing {visibleJobs.length} of {filteredAndSortedJobs.length} job{filteredAndSortedJobs.length !== 1 ? 's' : ''}
       </div>
 
       <JobDetailDialog
