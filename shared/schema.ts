@@ -359,3 +359,32 @@ export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans
 
 export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
 export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+
+// Job notes table - stores multiple timestamped notes per assignment with optional images
+export const jobNotes = pgTable("job_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  assignmentId: varchar("assignment_id").notNull().references(() => calendarAssignments.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  noteText: text("note_text").notNull(),
+  imageUrl: text("image_url"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertJobNoteSchema = createInsertSchema(jobNotes).omit({
+  id: true,
+  companyId: true,
+  userId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateJobNoteSchema = z.object({
+  noteText: z.string().optional(),
+  imageUrl: z.string().nullable().optional(),
+});
+
+export type InsertJobNote = z.infer<typeof insertJobNoteSchema>;
+export type UpdateJobNote = z.infer<typeof updateJobNoteSchema>;
+export type JobNote = typeof jobNotes.$inferSelect;
