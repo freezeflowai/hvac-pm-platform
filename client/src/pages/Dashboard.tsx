@@ -346,13 +346,16 @@ export default function Dashboard() {
   }
 
   // Get scheduled client IDs and their scheduled dates for current month
+  // Only include assignments that have a day set (not unscheduled)
+  const scheduledAssignments = calendarData.assignments.filter((a: any) => a.day != null);
+  
   const scheduledClientIds = new Set(
-    calendarData.assignments.map((a: any) => a.clientId)
+    scheduledAssignments.map((a: any) => a.clientId)
   );
   
-  // Map of clientId -> scheduledDate from calendar assignments
+  // Map of clientId -> scheduledDate from calendar assignments (only scheduled ones)
   const clientScheduledDates = new Map(
-    calendarData.assignments.map((a: any) => [a.clientId, new Date(a.scheduledDate)])
+    scheduledAssignments.map((a: any) => [a.clientId, new Date(a.scheduledDate)])
   );
 
   // Clients with PM this month
@@ -405,10 +408,14 @@ export default function Dashboard() {
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
   // Convert past months' overdue assignments to MaintenanceItem format
-  // Filter out any with missing client data, completed assignments, or rescheduled to future dates
+  // Filter out any with missing client data, completed assignments, unscheduled items, or rescheduled to future dates
   const pastMonthOverdueItems: MaintenanceItem[] = overdueFromPast
     .filter(({ assignment, client }) => {
       if (!client || !client.id || assignment.completed || client.inactive) {
+        return false;
+      }
+      // Exclude unscheduled items (day is null)
+      if (assignment.day == null) {
         return false;
       }
       // Check if the assignment has been rescheduled to a future date
