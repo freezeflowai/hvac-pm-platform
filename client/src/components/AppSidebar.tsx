@@ -1,6 +1,7 @@
 import { 
   LayoutDashboard, 
   Calendar as CalendarIcon, 
+  ClipboardList,
   Users, 
   Package, 
   FileText, 
@@ -111,6 +112,13 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       href: "/calendar",
       isActive: location === "/calendar",
       testId: "nav-calendar"
+    });
+    menuItems.push({
+      title: "Jobs",
+      icon: ClipboardList,
+      href: "/jobs",
+      isActive: location === "/jobs",
+      testId: "nav-jobs"
     });
     menuItems.push({
       title: "Clients",

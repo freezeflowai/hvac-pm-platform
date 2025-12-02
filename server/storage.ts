@@ -142,6 +142,7 @@ export interface IStorage {
   
   // Calendar assignment methods
   getCalendarAssignments(companyId: string, year: number, month: number, assignedTechnicianId?: string): Promise<CalendarAssignment[]>;
+  getAllCalendarAssignments(companyId: string): Promise<CalendarAssignment[]>;
   getCalendarAssignment(companyId: string, id: string): Promise<CalendarAssignment | undefined>;
   createCalendarAssignment(companyId: string, userId: string, assignment: InsertCalendarAssignment): Promise<CalendarAssignment>;
   updateCalendarAssignment(companyId: string, id: string, assignment: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined>;
@@ -1065,6 +1066,12 @@ export class MemStorage implements IStorage {
         if (assignedTechnicianId && !assignment.assignedTechnicianIds?.includes(assignedTechnicianId)) return false;
         return true;
       }
+    );
+  }
+
+  async getAllCalendarAssignments(companyId: string): Promise<CalendarAssignment[]> {
+    return Array.from(this.calendarAssignments.values()).filter(
+      (assignment) => assignment.companyId === companyId
     );
   }
 
@@ -2071,6 +2078,12 @@ export class DbStorage implements IStorage {
     }
     
     return allAssignments;
+  }
+
+  async getAllCalendarAssignments(companyId: string): Promise<CalendarAssignment[]> {
+    return await db.select()
+      .from(calendarAssignments)
+      .where(eq(calendarAssignments.companyId, companyId));
   }
 
   async getCalendarAssignment(companyId: string, id: string): Promise<CalendarAssignment | undefined> {

@@ -1723,6 +1723,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Calendar assignment routes
+  
+  // Get all calendar assignments (for Jobs page)
+  app.get("/api/calendar/all", isAuthenticated, async (req, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      const assignments = await storage.getAllCalendarAssignments(companyId);
+      const clients = await storage.getAllClients(companyId);
+      
+      res.json({ assignments, clients });
+    } catch (error) {
+      console.error('Get all calendar assignments error:', error);
+      res.status(500).json({ error: "Failed to fetch jobs" });
+    }
+  });
+
   app.get("/api/calendar", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;

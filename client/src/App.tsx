@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Dashboard from "@/pages/Dashboard";
 import Calendar from "@/pages/Calendar";
+import Jobs from "@/pages/Jobs";
 import Reports from "@/pages/Reports";
 import Admin from "@/pages/Admin";
 import SupportConsole from "@/pages/SupportConsole";
@@ -48,6 +49,11 @@ function Router() {
       <Route path="/calendar">
         <ProtectedRoute requireAdmin>
           <Calendar />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/jobs">
+        <ProtectedRoute requireAdmin>
+          <Jobs />
         </ProtectedRoute>
       </Route>
       <Route path="/reports">
