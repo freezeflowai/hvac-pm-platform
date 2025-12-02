@@ -94,7 +94,7 @@ export function ClientDetailDialog({
         year,
         month,
         day,
-        scheduledDate: newDate.toISOString().split('T')[0]
+        scheduledDate: format(newDate, 'yyyy-MM-dd')
       });
     },
     onSuccess: () => {
@@ -120,9 +120,14 @@ export function ClientDetailDialog({
   const unscheduleJob = useMutation({
     mutationFn: async () => {
       if (!assignment) return;
-      return apiRequest("DELETE", `/api/calendar/assign/${assignment.id}`);
+      return apiRequest("PATCH", `/api/calendar/assign/${assignment.id}`, {
+        day: null,
+        scheduledDate: null,
+        scheduledHour: null
+      });
     },
     onSuccess: () => {
+      setSelectedDate(undefined);
       queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
       queryClient.invalidateQueries({ queryKey: ['/api/calendar/overdue'] });
       queryClient.invalidateQueries({ queryKey: ['/api/calendar/unscheduled'] });
@@ -131,7 +136,6 @@ export function ClientDetailDialog({
         title: "Job unscheduled",
         description: "Job has been removed from the calendar"
       });
-      onOpenChange(false);
     },
     onError: (error: any) => {
       toast({
@@ -345,19 +349,21 @@ export function ClientDetailDialog({
                 <>
                   {/* Date Status Badge */}
                   {(() => {
-                    const scheduledDate = assignment.scheduledDate ? new Date(assignment.scheduledDate) : null;
+                    const hasScheduledDate = selectedDate || assignment.scheduledDate;
+                    const scheduledDate = hasScheduledDate ? new Date(selectedDate || assignment.scheduledDate) : null;
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
                     const isOverdue = scheduledDate && scheduledDate < today && !assignment.completed;
+                    const isUnscheduled = !hasScheduledDate && !assignment.completed;
                     
                     return (
                       <Badge 
-                        variant={isOverdue ? "destructive" : assignment.completed ? "default" : "secondary"}
+                        variant={isOverdue ? "destructive" : assignment.completed ? "default" : isUnscheduled ? "outline" : "secondary"}
                         className="flex items-center gap-1"
                         data-testid="badge-job-status"
                       >
                         {isOverdue && <AlertCircle className="h-3 w-3" />}
-                        {assignment.completed ? "Completed" : isOverdue ? "Overdue" : "Scheduled"}
+                        {assignment.completed ? "Completed" : isOverdue ? "Overdue" : isUnscheduled ? "Unscheduled" : "Scheduled"}
                       </Badge>
                     );
                   })()}
@@ -385,17 +391,19 @@ export function ClientDetailDialog({
                     </PopoverContent>
                   </Popover>
                   
-                  {/* Unschedule Button */}
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    className="h-7 text-destructive hover:text-destructive"
-                    onClick={() => unscheduleJob.mutate()}
-                    disabled={unscheduleJob.isPending}
-                    data-testid="button-unschedule"
-                  >
-                    Unschedule
-                  </Button>
+                  {/* Unschedule Button - only show if job is scheduled */}
+                  {(selectedDate || assignment.scheduledDate) && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="h-7 text-destructive hover:text-destructive"
+                      onClick={() => unscheduleJob.mutate()}
+                      disabled={unscheduleJob.isPending}
+                      data-testid="button-unschedule"
+                    >
+                      Unschedule
+                    </Button>
+                  )}
                 </>
               ) : (
                 <Badge variant="outline" data-testid="badge-unscheduled">
