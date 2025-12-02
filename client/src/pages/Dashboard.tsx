@@ -4,6 +4,7 @@ import StatsCard from "@/components/StatsCard";
 import MaintenanceSection from "@/components/MaintenanceSection";
 import ClientListTable from "@/components/ClientListTable";
 import ClientReportDialog from "@/components/ClientReportDialog";
+import { ClientDetailDialog } from "@/components/ClientDetailDialog";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import { AlertCircle, Calendar, CalendarX, CheckCircle, Clock, Package, Settings, Search, Building2, FileText, Download, Users, ChevronDown } from "lucide-react";
 import MaintenanceCard, { MaintenanceItem } from "@/components/MaintenanceCard";
@@ -102,6 +103,9 @@ export default function Dashboard() {
     completed: true,
   });
   const [reportDialogClientId, setReportDialogClientId] = useState<string | null>(null);
+  const [jobDialogOpen, setJobDialogOpen] = useState(false);
+  const [selectedJobClient, setSelectedJobClient] = useState<any>(null);
+  const [selectedJobAssignment, setSelectedJobAssignment] = useState<any>(null);
   
   const overdueRef = useRef<HTMLDivElement>(null);
   const thisMonthRef = useRef<HTMLDivElement>(null);
@@ -142,6 +146,18 @@ export default function Dashboard() {
         credentials: 'include',
       });
       if (!res.ok) throw new Error("Failed to fetch calendar data");
+      return res.json();
+    },
+  });
+
+  // Fetch overdue PMs from past months (persistent overdue)
+  const { data: overdueFromPast = [] } = useQuery<{ assignment: any; client: any }[]>({
+    queryKey: ["/api/calendar/overdue"],
+    queryFn: async () => {
+      const res = await fetch('/api/calendar/overdue', {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to fetch overdue assignments");
       return res.json();
     },
   });
@@ -237,6 +253,54 @@ export default function Dashboard() {
     setSearchOpen(false);
     setReportDialogClientId(clientId);
   };
+
+  // Handle clicking on a PM to open job dialog
+  const handleOpenJobDialog = (clientId: string) => {
+    // Extract actual client ID if it's a composite ID (format: clientId|date or clientId|year-month-day)
+    const actualClientId = clientId.includes('|') ? clientId.split('|')[0] : clientId;
+    
+    // Find the client
+    const client = clients.find(c => c.id === actualClientId);
+    if (!client) return;
+    
+    // Find the assignment for this client - check current month first
+    let assignment = calendarData?.assignments.find((a: any) => a.clientId === actualClientId);
+    
+    // If not found in current month, check overdue assignments from past months
+    if (!assignment) {
+      const overdueItem = overdueFromPast.find(item => item.client.id === actualClientId);
+      if (overdueItem) {
+        assignment = overdueItem.assignment;
+      }
+    }
+    
+    setSelectedJobClient(client);
+    setSelectedJobAssignment(assignment || null);
+    setJobDialogOpen(true);
+  };
+
+  // Mutation for assigning technicians
+  const assignTechniciansMutation = useMutation({
+    mutationFn: async ({ assignmentId, technicianIds }: { assignmentId: string; technicianIds: string[] }) => {
+      return apiRequest("PATCH", `/api/calendar/assign/${assignmentId}`, {
+        assignedTechnicianIds: technicianIds
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+      toast({
+        title: "Updated",
+        description: "Technicians assigned successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to assign technicians",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Helper to check if client has PM scheduled for current month
   const hasCurrentMonthPM = (selectedMonths: number[]): boolean => {
@@ -340,9 +404,33 @@ export default function Dashboard() {
     }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
+  // Convert past months' overdue assignments to MaintenanceItem format
+  // Filter out any with missing client data or already completed assignments
+  const pastMonthOverdueItems: MaintenanceItem[] = overdueFromPast
+    .filter(({ assignment, client }) => 
+      client && 
+      client.id && 
+      !assignment.completed &&
+      !client.inactive
+    )
+    .map(({ assignment, client }) => ({
+      id: `${client.id}|${assignment.year}-${String(assignment.month).padStart(2, '0')}-15`,
+      companyName: client.companyName || 'Unknown',
+      location: client.location,
+      selectedMonths: client.selectedMonths || [],
+      nextDue: new Date(assignment.scheduledDate),
+      status: "overdue" as const,
+      assignmentId: assignment.id,
+      originalMonth: assignment.month,
+      originalYear: assignment.year,
+    }));
+
   // Overdue/upcoming only from SCHEDULED clients - exclude completed items
-  const overdueItems = scheduledMaintenanceItems
+  // Combine current month overdue with persistent overdue from past months
+  const currentMonthOverdueItems = scheduledMaintenanceItems
     .filter(item => item.status === "overdue" && !completionStatuses[item.id]?.completed);
+  
+  const overdueItems = [...pastMonthOverdueItems, ...currentMonthOverdueItems];
   
   const thisMonthItems = scheduledMaintenanceItems
     .filter(item => {
@@ -440,6 +528,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/reports/schedule"] });
       queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance/statuses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/overdue"] });
       
       if (data.completed) {
         toast({
@@ -545,7 +634,7 @@ export default function Dashboard() {
                                   item={item}
                                   onMarkComplete={handleMarkComplete}
                                   onEdit={handleEditClient}
-                                  onViewReport={setReportDialogClientId}
+                                  onViewReport={handleOpenJobDialog}
                                   parts={clientParts[item.id] || []}
                                   isCompleted={completionStatuses[item.id]?.completed || false}
                                   isScheduled={true}
@@ -587,7 +676,7 @@ export default function Dashboard() {
                                   item={item}
                                   onMarkComplete={handleMarkComplete}
                                   onEdit={handleEditClient}
-                                  onViewReport={setReportDialogClientId}
+                                  onViewReport={handleOpenJobDialog}
                                   parts={clientParts[item.id] || []}
                                   isCompleted={completionStatuses[item.id]?.completed || false}
                                   isScheduled={true}
@@ -648,7 +737,7 @@ export default function Dashboard() {
                                 item={item}
                                 onMarkComplete={handleMarkComplete}
                                 onEdit={handleEditClient}
-                                onViewReport={setReportDialogClientId}
+                                onViewReport={handleOpenJobDialog}
                                 parts={clientParts[item.id] || []}
                                 isCompleted={completionStatuses[item.id]?.completed || false}
                                 isScheduled={scheduledClientIds.has(item.id)}
@@ -706,7 +795,7 @@ export default function Dashboard() {
                             item={item}
                             onMarkComplete={handleMarkComplete}
                             onEdit={handleEditClient}
-                            onViewReport={setReportDialogClientId}
+                            onViewReport={handleOpenJobDialog}
                             parts={clientParts[item.id] || []}
                             isCompleted={true}
                             isScheduled={true}
@@ -747,6 +836,23 @@ export default function Dashboard() {
         clientId={reportDialogClientId}
         open={!!reportDialogClientId}
         onOpenChange={(open) => !open && setReportDialogClientId(null)}
+      />
+
+      <ClientDetailDialog
+        open={jobDialogOpen}
+        onOpenChange={(open) => {
+          setJobDialogOpen(open);
+          if (!open) {
+            setSelectedJobClient(null);
+            setSelectedJobAssignment(null);
+          }
+        }}
+        client={selectedJobClient}
+        assignment={selectedJobAssignment}
+        onAssignTechnicians={(assignmentId: string, technicianIds: string[]) => {
+          assignTechniciansMutation.mutate({ assignmentId, technicianIds });
+        }}
+        bulkParts={clientParts}
       />
 
       <NewAddClientDialog 

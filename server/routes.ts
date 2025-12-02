@@ -1773,6 +1773,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/calendar/overdue", isAuthenticated, async (req, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      const overdueAssignments = await storage.getPastIncompleteAssignments(companyId);
+      const clients = await storage.getAllClients(companyId);
+      
+      // Combine assignments with client data
+      const overdueWithClients = overdueAssignments.map(assignment => {
+        const client = clients.find(c => c.id === assignment.clientId);
+        return { assignment, client };
+      }).filter(item => item.client); // Filter out any with missing clients
+      
+      res.json(overdueWithClients);
+    } catch (error) {
+      console.error('Get overdue assignments error:', error);
+      res.status(500).json({ error: "Failed to fetch overdue assignments" });
+    }
+  });
+
   app.post("/api/calendar/assign", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;

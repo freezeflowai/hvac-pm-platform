@@ -11,6 +11,9 @@ export interface MaintenanceItem {
   selectedMonths: number[];
   nextDue: Date;
   status: "overdue" | "upcoming" | "completed";
+  assignmentId?: string;
+  originalMonth?: number;
+  originalYear?: number;
 }
 
 interface MaintenanceCardProps {

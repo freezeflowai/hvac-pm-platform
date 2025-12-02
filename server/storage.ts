@@ -148,6 +148,7 @@ export interface IStorage {
   deleteCalendarAssignment(companyId: string, id: string): Promise<boolean>;
   getClientCalendarAssignment(companyId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined>;
   getUnscheduledClients(companyId: string, year: number, month: number): Promise<Client[]>;
+  getPastIncompleteAssignments(companyId: string): Promise<CalendarAssignment[]>;
   
   // Feedback methods
   createFeedback(companyId: string, userId: string, userEmail: string, feedback: InsertFeedback): Promise<Feedback>;
@@ -1173,6 +1174,23 @@ export class MemStorage implements IStorage {
     });
   }
 
+  async getPastIncompleteAssignments(companyId: string): Promise<CalendarAssignment[]> {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1; // 1-indexed
+    
+    return Array.from(this.calendarAssignments.values()).filter(assignment => {
+      if (assignment.companyId !== companyId) return false;
+      if (assignment.completed) return false;
+      
+      // Check if the assignment is from a past month
+      if (assignment.year < currentYear) return true;
+      if (assignment.year === currentYear && assignment.month < currentMonth) return true;
+      
+      return false;
+    });
+  }
+
   async createFeedback(companyId: string, userId: string, userEmail: string, feedback: InsertFeedback): Promise<Feedback> {
     // Validate user belongs to company
     const isValid = await this.validateUserInCompany(userId, companyId);
@@ -1268,7 +1286,7 @@ export class MemStorage implements IStorage {
 
 import { db } from './db';
 import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback, invitationTokens, companies } from '@shared/schema';
-import { eq, and, desc, inArray, sql } from 'drizzle-orm';
+import { eq, and, desc, inArray, sql, or, lt } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
   // User methods
@@ -2231,6 +2249,29 @@ export class DbStorage implements IStorage {
     }
     
     return unscheduled;
+  }
+
+  async getPastIncompleteAssignments(companyId: string): Promise<CalendarAssignment[]> {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1; // 1-indexed
+    
+    // Get all incomplete assignments from past months
+    const result = await db.select()
+      .from(calendarAssignments)
+      .where(and(
+        eq(calendarAssignments.companyId, companyId),
+        eq(calendarAssignments.completed, false),
+        or(
+          lt(calendarAssignments.year, currentYear),
+          and(
+            eq(calendarAssignments.year, currentYear),
+            lt(calendarAssignments.month, currentMonth)
+          )
+        )
+      ));
+    
+    return result;
   }
 
   async cleanupInvalidCalendarAssignments(companyId: string, clientId: string, validMonths: number[]): Promise<{ removedCount: number }> {
