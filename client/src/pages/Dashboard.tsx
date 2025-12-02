@@ -405,14 +405,19 @@ export default function Dashboard() {
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
   // Convert past months' overdue assignments to MaintenanceItem format
-  // Filter out any with missing client data or already completed assignments
+  // Filter out any with missing client data, completed assignments, or rescheduled to future dates
   const pastMonthOverdueItems: MaintenanceItem[] = overdueFromPast
-    .filter(({ assignment, client }) => 
-      client && 
-      client.id && 
-      !assignment.completed &&
-      !client.inactive
-    )
+    .filter(({ assignment, client }) => {
+      if (!client || !client.id || assignment.completed || client.inactive) {
+        return false;
+      }
+      // Check if the assignment has been rescheduled to a future date
+      const scheduledDate = new Date(assignment.scheduledDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      // Only include if still actually overdue (scheduled date is in the past)
+      return scheduledDate < today;
+    })
     .map(({ assignment, client }) => ({
       id: `${client.id}|${assignment.year}-${String(assignment.month).padStart(2, '0')}-15`,
       companyName: client.companyName || 'Unknown',

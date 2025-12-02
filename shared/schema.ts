@@ -225,6 +225,8 @@ export const insertCalendarAssignmentSchema = createInsertSchema(calendarAssignm
 });
 
 export const updateCalendarAssignmentSchema = z.object({
+  year: z.number().int().optional(),
+  month: z.number().int().min(1).max(12).optional(),
   day: z.number().int().min(1).max(31).nullable().optional(),
   scheduledDate: z.string().optional(),
   scheduledHour: z.number().int().min(0).max(23).nullable().optional(),

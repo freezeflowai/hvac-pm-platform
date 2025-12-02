@@ -2100,7 +2100,9 @@ export class DbStorage implements IStorage {
 
   async updateCalendarAssignment(companyId: string, id: string, assignmentUpdate: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined> {
     // Build update object with only provided fields
-    const updateFields: Partial<Pick<CalendarAssignment, 'day' | 'scheduledDate' | 'scheduledHour' | 'autoDueDate' | 'completed' | 'assignedTechnicianIds' | 'completionNotes'>> = {};
+    const updateFields: Partial<Pick<CalendarAssignment, 'year' | 'month' | 'day' | 'scheduledDate' | 'scheduledHour' | 'autoDueDate' | 'completed' | 'assignedTechnicianIds' | 'completionNotes'>> = {};
+    if (assignmentUpdate.year !== undefined) updateFields.year = assignmentUpdate.year;
+    if (assignmentUpdate.month !== undefined) updateFields.month = assignmentUpdate.month;
     if (assignmentUpdate.day !== undefined) updateFields.day = assignmentUpdate.day;
     if (assignmentUpdate.scheduledDate !== undefined) updateFields.scheduledDate = assignmentUpdate.scheduledDate;
     if (assignmentUpdate.scheduledHour !== undefined) updateFields.scheduledHour = assignmentUpdate.scheduledHour;

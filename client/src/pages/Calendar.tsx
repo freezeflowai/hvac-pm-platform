@@ -489,16 +489,21 @@ export default function Calendar() {
   });
 
   const updateAssignment = useMutation({
-    mutationFn: async ({ id, day, scheduledHour }: { id: string; day: number; scheduledHour?: number | null }) => {
+    mutationFn: async ({ id, day, scheduledHour, targetYear, targetMonth }: { id: string; day: number; scheduledHour?: number | null; targetYear?: number; targetMonth?: number }) => {
+      const updateYear = targetYear ?? year;
+      const updateMonth = targetMonth ?? month;
       return apiRequest("PATCH", `/api/calendar/assign/${id}`, {
+        year: updateYear,
+        month: updateMonth,
         day,
-        scheduledDate: new Date(year, month - 1, day).toISOString().split('T')[0],
+        scheduledDate: new Date(updateYear, updateMonth - 1, day).toISOString().split('T')[0],
         scheduledHour: scheduledHour !== undefined ? scheduledHour : undefined,
       });
     },
     onSuccess: async () => {
       await refetchCalendar();
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/overdue"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Updated",
@@ -751,8 +756,10 @@ export default function Calendar() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/overdue"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance/recently-completed"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance/statuses"] });
       setSelectedClient(null);
       setSelectedAssignment(null);
       toast({
