@@ -52,6 +52,9 @@ export function ClientDetailDialog({
     },
     onSuccess: (_data, completed) => {
       queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar/overdue'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/maintenance/statuses'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/maintenance/recently-completed'] });
       toast({
         title: completed ? "Marked as complete" : "Marked as incomplete",
         description: completed ? "Job marked as completed" : "Job moved back to active"
