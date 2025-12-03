@@ -38,13 +38,17 @@ const MONTHS = [
 ];
 
 const getPartDisplayName = (part: Part): string => {
-  if (part.type === 'filter') {
-    return `${part.filterType || 'Filter'} ${part.size || ''}`.trim();
-  } else if (part.type === 'belt') {
-    return `Belt ${part.beltType || ''} ${part.size || ''}`.trim();
+  if (part.filterType) {
+    return `${part.filterType} ${part.size || ''}`.trim();
+  } else if (part.beltType) {
+    return `Belt ${part.beltType} ${part.size || ''}`.trim();
   } else {
-    return part.name || part.description || 'Other Part';
+    return part.name || part.description || 'Item';
   }
+};
+
+const getItemCategory = (part: Part): 'product' | 'service' => {
+  return part.type === 'service' ? 'service' : 'product';
 };
 
 export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewAddClientDialogProps) {
@@ -67,13 +71,13 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
     inactive: false,
   });
 
-  const [partRows, setPartRows] = useState<{ partId: string; quantity: number; type: string }[]>([]);
+  const [partRows, setPartRows] = useState<{ partId: string; quantity: number; category: 'product' | 'service' }[]>([]);
   const [equipmentRows, setEquipmentRows] = useState<{ name: string; type: string; serialNumber: string; location: string }[]>([]);
-  const [activePartsType, setActivePartsType] = useState<string>("filter");
+  const [activePartsCategory, setActivePartsCategory] = useState<'product' | 'service'>("product");
   const [openPartRowIndex, setOpenPartRowIndex] = useState<number | null>(null);
 
   const { data: partsResponse } = useQuery<{ items: Part[]; total: number }>({
-    queryKey: ['/api/parts'],
+    queryKey: ['/api/parts?limit=1000'],
   });
   const availableParts = partsResponse?.items ?? [];
 
@@ -86,11 +90,10 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
     queryKey: ['/api/subscriptions/can-add-location'],
   });
 
-  const partsByType = useMemo(() => {
+  const partsByCategory = useMemo(() => {
     return {
-      filter: availableParts.filter((p: Part) => p.type === 'filter'),
-      belt: availableParts.filter((p: Part) => p.type === 'belt'),
-      other: availableParts.filter((p: Part) => p.type === 'other'),
+      product: availableParts.filter((p: Part) => p.type !== 'service'),
+      service: availableParts.filter((p: Part) => p.type === 'service'),
     };
   }, [availableParts]);
 
@@ -109,7 +112,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
   };
 
   const handleAddPart = () => {
-    setPartRows([...partRows, { partId: '', quantity: 1, type: activePartsType }]);
+    setPartRows([...partRows, { partId: '', quantity: 1, category: activePartsCategory }]);
   };
 
   const handleUpdatePart = (index: number, field: 'partId' | 'quantity', value: string | number) => {
@@ -122,7 +125,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
         updatedRows[index] = { 
           ...row, 
           partId: value as string,
-          type: selectedPart.type
+          category: getItemCategory(selectedPart)
         };
       }
     } else {
@@ -314,8 +317,8 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="info" data-testid="tab-client-info">Client Information</TabsTrigger>
-            <TabsTrigger value="filters" data-testid="tab-filters">Filters</TabsTrigger>
-            <TabsTrigger value="belts" data-testid="tab-belts">Belts</TabsTrigger>
+            <TabsTrigger value="products" data-testid="tab-products">Products</TabsTrigger>
+            <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
           </TabsList>
 
           <div className="flex-1 overflow-y-auto pr-4">
@@ -503,15 +506,15 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
               </div>
             </TabsContent>
 
-            <TabsContent value="filters" className="space-y-3 mt-4 pb-6">
+            <TabsContent value="products" className="space-y-3 mt-4 pb-6">
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Filters</Label>
-                {partRows.filter(row => row.type === 'filter').map((row, idx) => {
+                <Label className="text-sm font-medium">Products</Label>
+                {partRows.filter(row => row.category === 'product').map((row) => {
                   const actualIndex = partRows.indexOf(row);
                   const selectedPart = availableParts.find(p => p.id === row.partId);
                   
                   return (
-                    <div key={actualIndex} className="flex gap-2 items-center" data-testid={`row-filter-${actualIndex}`}>
+                    <div key={actualIndex} className="flex gap-2 items-center" data-testid={`row-product-${actualIndex}`}>
                       <Popover 
                         open={openPartRowIndex === actualIndex} 
                         onOpenChange={(open) => setOpenPartRowIndex(open ? actualIndex : null)}
@@ -524,30 +527,38 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
                               "flex-1 justify-between",
                               !row.partId && "text-muted-foreground"
                             )}
-                            data-testid={`button-select-filter-${actualIndex}`}
+                            data-testid={`button-select-product-${actualIndex}`}
                           >
-                            {selectedPart ? getPartDisplayName(selectedPart) : "Select filter"}
+                            {selectedPart ? getPartDisplayName(selectedPart) : "Select product"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[300px] p-0">
                           <Command>
-                            <CommandInput placeholder="Search filters..." />
+                            <CommandInput placeholder="Search products..." />
                             <CommandList>
-                              <CommandEmpty>No filters found.</CommandEmpty>
+                              <CommandEmpty>No products found.</CommandEmpty>
                               <CommandGroup>
                                 <ScrollArea className="h-72">
-                                  {partsByType.filter.map((part: Part) => {
+                                  {partsByCategory.product.map((part: Part) => {
                                     const displayName = getPartDisplayName(part);
                                     return (
                                       <CommandItem
                                         key={part.id}
                                         value={displayName}
+                                        keywords={[
+                                          part.type,
+                                          part.filterType || '',
+                                          part.beltType || '',
+                                          part.size || '',
+                                          part.name || '',
+                                          displayName
+                                        ]}
                                         onSelect={() => {
                                           handleUpdatePart(actualIndex, 'partId', part.id);
                                           setOpenPartRowIndex(null);
                                         }}
-                                        data-testid={`option-filter-${part.id}`}
+                                        data-testid={`option-product-${part.id}`}
                                       >
                                         <Check
                                           className={cn(
@@ -572,7 +583,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
                         value={row.quantity}
                         onChange={(e) => handleUpdatePart(actualIndex, 'quantity', parseInt(e.target.value) || 1)}
                         className="w-20"
-                        data-testid={`input-filter-quantity-${actualIndex}`}
+                        data-testid={`input-product-quantity-${actualIndex}`}
                       />
                       
                       <Button
@@ -580,7 +591,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDeletePart(actualIndex)}
-                        data-testid={`button-delete-filter-${actualIndex}`}
+                        data-testid={`button-delete-product-${actualIndex}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -593,27 +604,27 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setActivePartsType('filter');
+                    setActivePartsCategory('product');
                     handleAddPart();
                   }}
                   className="w-full"
-                  data-testid="button-add-filter"
+                  data-testid="button-add-product"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Filter
+                  Add Product
                 </Button>
               </div>
             </TabsContent>
 
-            <TabsContent value="belts" className="space-y-3 mt-4 pb-6">
+            <TabsContent value="services" className="space-y-3 mt-4 pb-6">
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Belts</Label>
-                {partRows.filter(row => row.type === 'belt').map((row, idx) => {
+                <Label className="text-sm font-medium">Services</Label>
+                {partRows.filter(row => row.category === 'service').map((row) => {
                   const actualIndex = partRows.indexOf(row);
                   const selectedPart = availableParts.find(p => p.id === row.partId);
                   
                   return (
-                    <div key={actualIndex} className="flex gap-2 items-center" data-testid={`row-belt-${actualIndex}`}>
+                    <div key={actualIndex} className="flex gap-2 items-center" data-testid={`row-service-${actualIndex}`}>
                       <Popover 
                         open={openPartRowIndex === actualIndex} 
                         onOpenChange={(open) => setOpenPartRowIndex(open ? actualIndex : null)}
@@ -626,20 +637,20 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
                               "flex-1 justify-between",
                               !row.partId && "text-muted-foreground"
                             )}
-                            data-testid={`button-select-belt-${actualIndex}`}
+                            data-testid={`button-select-service-${actualIndex}`}
                           >
-                            {selectedPart ? getPartDisplayName(selectedPart) : "Select belt"}
+                            {selectedPart ? getPartDisplayName(selectedPart) : "Select service"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[300px] p-0">
                           <Command>
-                            <CommandInput placeholder="Search belts..." />
+                            <CommandInput placeholder="Search services..." />
                             <CommandList>
-                              <CommandEmpty>No belts found.</CommandEmpty>
+                              <CommandEmpty>No services found.</CommandEmpty>
                               <CommandGroup>
                                 <ScrollArea className="h-72">
-                                  {partsByType.belt.map((part: Part) => {
+                                  {partsByCategory.service.map((part: Part) => {
                                     const displayName = getPartDisplayName(part);
                                     return (
                                       <CommandItem
@@ -649,7 +660,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
                                           handleUpdatePart(actualIndex, 'partId', part.id);
                                           setOpenPartRowIndex(null);
                                         }}
-                                        data-testid={`option-belt-${part.id}`}
+                                        data-testid={`option-service-${part.id}`}
                                       >
                                         <Check
                                           className={cn(
@@ -674,7 +685,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
                         value={row.quantity}
                         onChange={(e) => handleUpdatePart(actualIndex, 'quantity', parseInt(e.target.value) || 1)}
                         className="w-20"
-                        data-testid={`input-belt-quantity-${actualIndex}`}
+                        data-testid={`input-service-quantity-${actualIndex}`}
                       />
                       
                       <Button
@@ -682,7 +693,7 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDeletePart(actualIndex)}
-                        data-testid={`button-delete-belt-${actualIndex}`}
+                        data-testid={`button-delete-service-${actualIndex}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -695,14 +706,14 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setActivePartsType('belt');
+                    setActivePartsCategory('service');
                     handleAddPart();
                   }}
                   className="w-full"
-                  data-testid="button-add-belt"
+                  data-testid="button-add-service"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Belt
+                  Add Service
                 </Button>
               </div>
             </TabsContent>

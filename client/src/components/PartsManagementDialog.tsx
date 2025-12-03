@@ -59,7 +59,7 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
   const { data: partsResponse, isLoading } = useQuery<{ items: Part[]; total: number }>({
-    queryKey: ["/api/parts"],
+    queryKey: ["/api/parts?limit=1000"],
   });
   const parts = partsResponse?.items ?? [];
 
@@ -69,7 +69,7 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
       return await res.json();
     },
     onSuccess: (data: { created: Part[]; errors?: Array<{ index: number; error: string }> }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/api/parts') });
       
       if (data.errors && data.errors.length > 0) {
         toast({
@@ -98,7 +98,7 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/api/parts') });
       toast({
         title: "Part deleted",
         description: "The part has been deleted successfully.",
@@ -122,7 +122,7 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
       const { deletedCount, notFoundCount } = data;
       
       // Invalidate all related queries
-      queryClient.invalidateQueries({ queryKey: ['/api/parts'] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/api/parts') });
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       
       if (deletedCount > 0) {
