@@ -32,6 +32,7 @@ import ClientReportDialog from "@/components/ClientReportDialog";
 interface CalendarAssignment {
   id: string;
   clientId: string;
+  jobNumber: number;
   year: number;
   month: number;
   day: number | null;
@@ -465,7 +466,7 @@ export function JobDetailDialog({
               {client?.companyName || "Unknown Client"} - Preventive Maintenance
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              Job #{assignment.id.slice(-6).toUpperCase()}
+              Job #{assignment.jobNumber}
             </DialogDescription>
           </DialogHeader>
 
@@ -497,7 +498,7 @@ export function JobDetailDialog({
                 </span>
                 <span className="text-muted-foreground">-</span>
                 <span className="text-muted-foreground" data-testid="text-job-id">
-                  Job #{assignment.id.slice(-6).toUpperCase()}
+                  Job #{assignment.jobNumber}
                 </span>
               </div>
             </div>

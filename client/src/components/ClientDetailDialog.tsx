@@ -281,7 +281,7 @@ export function ClientDetailDialog({
               </span>
               <span className="text-muted-foreground">-</span>
               <span className="text-muted-foreground" data-testid="text-job-id">
-                Job #{assignment?.id?.slice(0, 6)}
+                Job #{assignment?.jobNumber}
               </span>
             </div>
           </div>

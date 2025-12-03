@@ -139,7 +139,12 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
         {...listeners}
         className={inCalendar ? "cursor-grab active:cursor-grabbing" : ""}
       >
-        <div className={`font-semibold leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</div>
+        <div className="flex items-center gap-1">
+          <span className={`font-semibold leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</span>
+          {inCalendar && assignment?.jobNumber && (
+            <span className="text-[9px] text-muted-foreground font-normal">#{assignment.jobNumber}</span>
+          )}
+        </div>
         {client.location && (
           <div className={`text-muted-foreground text-[10px] leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
         )}

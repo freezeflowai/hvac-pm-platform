@@ -1125,12 +1125,21 @@ export class MemStorage implements IStorage {
       throw new Error("User does not belong to this company");
     }
     
+    // Get next job number for this company
+    const companyAssignments = Array.from(this.calendarAssignments.values())
+      .filter(a => a.companyId === companyId);
+    const maxJobNumber = companyAssignments.length > 0 
+      ? Math.max(...companyAssignments.map(a => a.jobNumber))
+      : 9999;
+    const jobNumber = maxJobNumber + 1;
+    
     const id = randomUUID();
     const assignment: CalendarAssignment = {
       ...insertAssignment,
       id,
       companyId,
       userId,
+      jobNumber,
       day: insertAssignment.day ?? null,
       scheduledHour: insertAssignment.scheduledHour ?? null,
       autoDueDate: insertAssignment.autoDueDate ?? false,
@@ -1382,7 +1391,7 @@ export class MemStorage implements IStorage {
 }
 
 import { db } from './db';
-import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback, invitationTokens, companies, jobNotes } from '@shared/schema';
+import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback, invitationTokens, companies, jobNotes, companyCounters } from '@shared/schema';
 import { eq, and, desc, inArray, sql, or, lt } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
@@ -2225,8 +2234,40 @@ export class DbStorage implements IStorage {
       throw new Error("Client not found or does not belong to company");
     }
     
-    const result = await db.insert(calendarAssignments).values({ ...insertAssignment, companyId, userId }).returning();
-    return result[0];
+    // Use transaction to ensure atomic job number generation and assignment creation
+    // This prevents gaps in job numbers if the insert fails
+    return await db.transaction(async (tx) => {
+      // Get next job number atomically using upsert
+      const counterResult = await tx.insert(companyCounters)
+        .values({ companyId, nextJobNumber: 10001 })
+        .onConflictDoUpdate({
+          target: companyCounters.companyId,
+          set: { nextJobNumber: sql`${companyCounters.nextJobNumber} + 1` }
+        })
+        .returning();
+      
+      // The job number is the value before increment (nextJobNumber - 1 after the update, or 10000 for new)
+      let jobNumber: number;
+      if (counterResult[0]) {
+        // If we just created the counter, job number is 10000; otherwise it's the pre-increment value
+        const currentNext = counterResult[0].nextJobNumber;
+        jobNumber = currentNext - 1; // The job number is the value we just "consumed"
+      } else {
+        // Fallback: get current max and use next
+        const maxResult = await tx.select({ max: sql<number>`COALESCE(MAX(job_number), 9999)` })
+          .from(calendarAssignments)
+          .where(eq(calendarAssignments.companyId, companyId));
+        jobNumber = (maxResult[0]?.max || 9999) + 1;
+      }
+      
+      const result = await tx.insert(calendarAssignments).values({ 
+        ...insertAssignment, 
+        companyId, 
+        userId,
+        jobNumber 
+      }).returning();
+      return result[0];
+    });
   }
 
   async updateCalendarAssignment(companyId: string, id: string, assignmentUpdate: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined> {
