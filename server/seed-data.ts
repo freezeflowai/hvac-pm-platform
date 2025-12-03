@@ -12,7 +12,8 @@ const generateBelts = (): InsertPart[] => {
   return belts;
 };
 
-// Generate filter sizes with x1 and x2 thickness variants
+// Generate filter sizes with x1 and x2 thickness variants as products
+// M = Media, P = Pleated, T = Throwaway
 const generateFilters = (): InsertPart[] => {
   const filters: InsertPart[] = [];
   
@@ -23,8 +24,12 @@ const generateFilters = (): InsertPart[] => {
     "20x20", "20x24", "20x25", "20x30", "24x24", "24x30", "25x25"
   ];
   
-  // Filter types that need x1 and x2 variants
-  const filterTypes = ["Media", "Pleated", "Throwaway"];
+  // Filter types with their abbreviations
+  const filterTypes = [
+    { abbrev: "M", name: "Media" },
+    { abbrev: "P", name: "Pleated" },
+    { abbrev: "T", name: "Throwaway" }
+  ];
   
   // Thickness variants
   const thicknesses = ["1", "2"];
@@ -33,9 +38,8 @@ const generateFilters = (): InsertPart[] => {
     for (const baseSize of baseSizes) {
       for (const thickness of thicknesses) {
         filters.push({
-          type: "filter",
-          filterType,
-          size: `${baseSize}x${thickness}`
+          type: "product",
+          name: `${filterType.abbrev} Filter ${baseSize}x${thickness}`
         });
       }
     }

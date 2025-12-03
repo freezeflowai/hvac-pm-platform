@@ -3,7 +3,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -259,21 +258,13 @@ export default function ProductsServicesManager() {
     }
   };
 
-  const filterParts = parts.filter(p => p.type === "filter");
   const productServiceParts = parts.filter(p => p.type === "service" || p.type === "product");
 
   const getPartDisplay = (part: Part) => {
-    if (part.type === "filter") {
-      return {
-        primary: `${part.filterType} Filter`,
-        secondary: part.size || "",
-      };
-    } else {
-      return {
-        primary: part.name || "",
-        secondary: part.description || "",
-      };
-    }
+    return {
+      primary: part.name || "",
+      secondary: part.description || "",
+    };
   };
 
   const SelectionControls = ({ items, label }: { items: Part[]; label: string }) => (
@@ -375,65 +366,37 @@ export default function ProductsServicesManager() {
 
   return (
     <div className="space-y-6" data-testid="products-services-manager">
-      <Tabs defaultValue="products" className="w-full">
-        <TabsList className="grid grid-cols-2 w-fit" data-testid="tabs-products">
-          <TabsTrigger value="products" data-testid="tab-products">Products/Services</TabsTrigger>
-          <TabsTrigger value="filters" data-testid="tab-filters">Filters</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="products" className="space-y-4 mt-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Products & Services</h3>
-            <Button
-              size="sm"
-              onClick={handleOpenAddDialog}
-              data-testid="button-add-product"
-              className="gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Add New
-            </Button>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Products & Services</h3>
+          <Button
+            size="sm"
+            onClick={handleOpenAddDialog}
+            data-testid="button-add-product"
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add New
+          </Button>
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <SelectionControls items={productServiceParts} label="products" />
+        </div>
+        
+        <BulkDeleteBar />
+        
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : productServiceParts.length > 0 ? (
+          <ItemGrid items={productServiceParts} />
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <p>No products or services added yet</p>
+            <p className="text-sm mt-1">Click "Add New" to create your first product or service</p>
           </div>
-          
-          <div className="flex items-center justify-between">
-            <SelectionControls items={productServiceParts} label="products" />
-          </div>
-          
-          <BulkDeleteBar />
-          
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          ) : productServiceParts.length > 0 ? (
-            <ItemGrid items={productServiceParts} />
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No products or services added yet</p>
-              <p className="text-sm mt-1">Click "Add New" to create your first product or service</p>
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="filters" className="space-y-4 mt-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold">Filters</h3>
-              <p className="text-sm text-muted-foreground">Auto-seeded filter inventory. Use "Seed Standard Parts" to restore defaults.</p>
-            </div>
-            <SelectionControls items={filterParts} label="filters" />
-          </div>
-          
-          <BulkDeleteBar />
-          
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          ) : filterParts.length > 0 ? (
-            <ItemGrid items={filterParts} />
-          ) : (
-            <p className="text-sm text-muted-foreground">No filters added yet. Click "Seed Standard Parts" above to add the default inventory.</p>
-          )}
-        </TabsContent>
-
-      </Tabs>
+        )}
+      </div>
 
       <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>
         <DialogContent className="sm:max-w-[500px]" data-testid="dialog-product">
