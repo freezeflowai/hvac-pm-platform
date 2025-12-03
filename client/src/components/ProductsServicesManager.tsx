@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, Pencil, Search, Loader2, Package, Wrench } from "lucide-react";
+import { Trash2, Plus, Pencil, Search, Loader2, Package, Wrench, Download, Upload, FileText } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -85,8 +85,12 @@ export default function ProductsServicesManager() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeTab, setActiveTab] = useState<TabCategory>("products");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFileContent, setImportFileContent] = useState("");
+  const [importFileName, setImportFileName] = useState("");
   const productsLoaderRef = useRef<HTMLDivElement>(null);
   const servicesLoaderRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Debounce search
   useEffect(() => {
@@ -248,6 +252,104 @@ export default function ProductsServicesManager() {
       });
     },
   });
+
+  const importMutation = useMutation({
+    mutationFn: async (csvData: string) => {
+      const res = await apiRequest("POST", "/api/parts/import", { csvData, skipDuplicates: true });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
+      const { imported, skipped, errors } = data;
+      
+      let description = `Imported ${imported} item${imported !== 1 ? 's' : ''}.`;
+      if (skipped > 0) {
+        description += ` Skipped ${skipped} duplicate${skipped !== 1 ? 's' : ''}.`;
+      }
+      if (errors && errors.length > 0) {
+        description += ` ${errors.length} error${errors.length !== 1 ? 's' : ''}.`;
+      }
+      
+      toast({
+        title: imported > 0 ? "Import Complete" : "Import Finished",
+        description,
+        variant: imported > 0 ? "default" : "destructive",
+      });
+      
+      setImportDialogOpen(false);
+      setImportFileContent("");
+      setImportFileName("");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to import products/services.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleExport = async () => {
+    try {
+      const category = activeTab === "products" ? "products" : "services";
+      const response = await fetch(`/api/parts/export?category=${category}`, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) throw new Error("Export failed");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${category}_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Export Complete",
+        description: `${activeTab === "products" ? "Products" : "Services"} exported successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export data.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith('.csv')) {
+      toast({
+        title: "Invalid File",
+        description: "Please select a CSV file.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      setImportFileContent(content);
+      setImportFileName(file.name);
+      setImportDialogOpen(true);
+    };
+    reader.readAsText(file);
+    
+    if (event.target) event.target.value = '';
+  };
+
+  const handleImport = () => {
+    if (!importFileContent) return;
+    importMutation.mutate(importFileContent);
+  };
 
   const handleSelectAll = (partsToSelect: Part[]) => {
     setSelectedIds(new Set(partsToSelect.map(p => p.id)));
@@ -541,8 +643,8 @@ export default function ProductsServicesManager() {
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <h3 className="font-semibold">Products & Services</h3>
-          <div className="flex items-center gap-2 flex-1 max-w-md">
-            <div className="relative flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder={activeTab === "products" ? "Search products, filters, belts..." : "Search services..."}
@@ -552,6 +654,34 @@ export default function ProductsServicesManager() {
                 data-testid="input-search-products"
               />
             </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept=".csv"
+              className="hidden"
+              data-testid="input-file-import"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              data-testid="button-import"
+              className="gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Import
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleExport}
+              data-testid="button-export"
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
             <Button
               size="sm"
               onClick={handleOpenAddDialog}
@@ -752,6 +882,64 @@ export default function ProductsServicesManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-import">
+          <DialogHeader>
+            <DialogTitle>Import Products & Services</DialogTitle>
+            <DialogDescription>
+              Import products and services from a CSV file.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
+              <FileText className="h-8 w-8 text-muted-foreground" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm truncate">{importFileName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {importFileContent.split('\n').length - 1} rows to import
+                </p>
+              </div>
+            </div>
+            
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p className="font-medium">Expected CSV columns:</p>
+              <ul className="list-disc list-inside text-xs space-y-0.5">
+                <li><span className="font-medium">name</span> (required) - Product or service name</li>
+                <li><span className="font-medium">type</span> (required) - "product" or "service"</li>
+                <li><span className="font-medium">description</span> - Optional description</li>
+                <li><span className="font-medium">unit_price</span> - Selling price</li>
+                <li><span className="font-medium">cost</span> - Your cost</li>
+                <li><span className="font-medium">tax_exempt</span> - "true" or "false"</li>
+              </ul>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setImportDialogOpen(false);
+                setImportFileContent("");
+                setImportFileName("");
+              }}
+              data-testid="button-cancel-import"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleImport}
+              disabled={importMutation.isPending}
+              data-testid="button-confirm-import"
+              className="gap-2"
+            >
+              {importMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

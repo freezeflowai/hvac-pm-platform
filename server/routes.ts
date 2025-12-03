@@ -1164,6 +1164,210 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export products/services to CSV
+  app.get("/api/parts/export", isAuthenticated, async (req, res) => {
+    try {
+      const category = typeof req.query.category === 'string' ? req.query.category : 'all';
+      const parts = await storage.getAllParts(req.user!.companyId);
+      
+      // Filter by category
+      let filtered: typeof parts;
+      if (category === 'products') {
+        filtered = parts.filter(p => p.type === 'product');
+      } else if (category === 'services') {
+        filtered = parts.filter(p => p.type === 'service');
+      } else {
+        filtered = parts.filter(p => p.type === 'product' || p.type === 'service');
+      }
+      
+      // Sort alphabetically
+      filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      
+      // Create CSV
+      const escapeCSV = (value: string | null | undefined) => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+      
+      const headers = ['name', 'description', 'type', 'unit_price', 'cost', 'tax_exempt'];
+      const rows = filtered.map(p => [
+        escapeCSV(p.name),
+        escapeCSV(p.description),
+        escapeCSV(p.type),
+        escapeCSV(p.unitPrice),
+        escapeCSV(p.cost),
+        p.taxExempt ? 'true' : 'false'
+      ].join(','));
+      
+      const csv = [headers.join(','), ...rows].join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="products_services_${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to export products/services" });
+    }
+  });
+
+  // Import products/services from CSV
+  app.post("/api/parts/import", isAuthenticated, async (req, res) => {
+    try {
+      const requestSchema = z.object({
+        csvData: z.string(),
+        skipDuplicates: z.boolean().optional().default(true)
+      });
+      const { csvData, skipDuplicates } = requestSchema.parse(req.body);
+      
+      // Parse CSV values (handles quoted values properly)
+      const parseCSVLine = (line: string): string[] => {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+              current += '"';
+              i++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+      
+      // Split lines, keeping empty lines for accurate row numbers
+      const allLines = csvData.split(/\r?\n/);
+      const lines: { index: number; content: string }[] = [];
+      
+      for (let i = 0; i < allLines.length; i++) {
+        if (allLines[i].trim()) {
+          lines.push({ index: i, content: allLines[i] });
+        }
+      }
+      
+      if (lines.length < 2) {
+        return res.status(400).json({ error: "CSV must have a header row and at least one data row" });
+      }
+      
+      // Parse header using the same CSV parser
+      const headerValues = parseCSVLine(lines[0].content);
+      const headers = headerValues.map(h => h.toLowerCase().replace(/^"|"$/g, '').trim());
+      
+      // Validate required headers
+      const requiredHeaders = ['name', 'type'];
+      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+      if (missingHeaders.length > 0) {
+        return res.status(400).json({ error: `Missing required columns: ${missingHeaders.join(', ')}` });
+      }
+      
+      // Validation schema for import rows
+      const importRowSchema = z.object({
+        type: z.enum(['product', 'service']),
+        name: z.string().min(1, 'Name is required'),
+        description: z.string().nullable().optional(),
+        unitPrice: z.string().nullable().optional(),
+        cost: z.string().nullable().optional(),
+        taxExempt: z.boolean().optional().default(false)
+      });
+      
+      const results = {
+        imported: 0,
+        skipped: 0,
+        errors: [] as { row: number; error: string }[]
+      };
+      
+      // Process data rows
+      for (let i = 1; i < lines.length; i++) {
+        const { index, content } = lines[i];
+        const rowNumber = index + 1; // 1-based row number for user display
+        const values = parseCSVLine(content);
+        
+        // Skip completely empty rows
+        if (values.every(v => !v)) continue;
+        
+        try {
+          // Map values to headers
+          const row: Record<string, string> = {};
+          headers.forEach((h, idx) => {
+            row[h] = values[idx] !== undefined ? values[idx] : '';
+          });
+          
+          // Extract and normalize values
+          const name = row['name']?.trim();
+          const typeRaw = (row['type'] || '').toLowerCase().trim();
+          const description = row['description']?.trim() || null;
+          const unitPrice = row['unit_price']?.trim() || row['unitprice']?.trim() || row['price']?.trim() || null;
+          const cost = row['cost']?.trim() || null;
+          const taxExemptRaw = (row['tax_exempt'] || row['taxexempt'] || '').toLowerCase().trim();
+          const taxExempt = ['true', 'yes', '1', 'y'].includes(taxExemptRaw);
+          
+          // Validate type
+          if (typeRaw !== 'product' && typeRaw !== 'service') {
+            results.errors.push({ row: rowNumber, error: `Type must be "product" or "service", got "${row['type'] || '(empty)'}"` });
+            continue;
+          }
+          
+          // Build part data for validation
+          const partData = {
+            type: typeRaw as 'product' | 'service',
+            name: name || '',
+            description,
+            unitPrice,
+            cost,
+            taxExempt
+          };
+          
+          // Validate with schema
+          const validationResult = importRowSchema.safeParse(partData);
+          if (!validationResult.success) {
+            const errorMessages = validationResult.error.errors.map(e => e.message).join(', ');
+            results.errors.push({ row: rowNumber, error: errorMessages });
+            continue;
+          }
+          
+          const validatedData = validationResult.data;
+          
+          // Check for duplicate (case-insensitive name check)
+          const existingPart = await storage.findDuplicatePart(req.user!.companyId, validatedData);
+          if (existingPart) {
+            if (skipDuplicates) {
+              results.skipped++;
+              continue;
+            } else {
+              results.errors.push({ row: rowNumber, error: `"${validatedData.name}" already exists` });
+              continue;
+            }
+          }
+          
+          await storage.createPart(req.user!.companyId, req.user!.id, validatedData);
+          results.imported++;
+        } catch (err) {
+          results.errors.push({ row: rowNumber, error: 'Invalid data format' });
+        }
+      }
+      
+      res.json(results);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+      res.status(500).json({ error: "Failed to import products/services" });
+    }
+  });
+
   // Client-Part routes
   app.get("/api/client-parts/bulk", isAuthenticated, async (req, res) => {
     try {
