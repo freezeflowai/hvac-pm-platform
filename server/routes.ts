@@ -990,7 +990,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const search = typeof req.query.search === 'string' ? req.query.search : '';
       const category = typeof req.query.category === 'string' ? req.query.category : 'all';
-      const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 1000);
       const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
       
       const parts = await storage.getAllParts(req.user!.companyId);
