@@ -58,9 +58,10 @@ export default function PartsManagementDialog({ onCancel }: PartsManagementDialo
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
-  const { data: parts = [], isLoading } = useQuery<Part[]>({
+  const { data: partsResponse, isLoading } = useQuery<{ items: Part[]; total: number }>({
     queryKey: ["/api/parts"],
   });
+  const parts = partsResponse?.items ?? [];
 
   const bulkCreateMutation = useMutation({
     mutationFn: async (parts: Partial<Part>[]) => {

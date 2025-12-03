@@ -104,9 +104,10 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
   const [activePartsType, setActivePartsType] = useState<string>("filter");
   const [openPartRowIndex, setOpenPartRowIndex] = useState<number | null>(null);
 
-  const { data: availableParts = [] } = useQuery<Part[]>({
+  const { data: partsResponse } = useQuery<{ items: Part[]; total: number }>({
     queryKey: ['/api/parts'],
   });
+  const availableParts = partsResponse?.items ?? [];
 
   const { data: clientParts = [] } = useQuery<ClientPart[]>({
     queryKey: ['/api/clients', client.id, 'parts'],

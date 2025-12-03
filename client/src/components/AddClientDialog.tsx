@@ -89,9 +89,10 @@ export default function AddClientDialog({ onSubmit, onCancel, editData }: AddCli
   const [openRowIndex, setOpenRowIndex] = useState<number | null>(null);
   const [isAdditionalOptionsOpen, setIsAdditionalOptionsOpen] = useState(false);
   
-  const { data: availableParts = [] } = useQuery<Part[]>({
+  const { data: partsResponse } = useQuery<{ items: Part[]; total: number }>({
     queryKey: ['/api/parts'],
   });
+  const availableParts = partsResponse?.items ?? [];
   
   const partsByType = useMemo(() => {
     return {

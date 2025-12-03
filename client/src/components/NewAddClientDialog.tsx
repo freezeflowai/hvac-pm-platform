@@ -72,9 +72,10 @@ export default function NewAddClientDialog({ open, onOpenChange, onSaved }: NewA
   const [activePartsType, setActivePartsType] = useState<string>("filter");
   const [openPartRowIndex, setOpenPartRowIndex] = useState<number | null>(null);
 
-  const { data: availableParts = [] } = useQuery<Part[]>({
+  const { data: partsResponse } = useQuery<{ items: Part[]; total: number }>({
     queryKey: ['/api/parts'],
   });
+  const availableParts = partsResponse?.items ?? [];
 
   const { data: canAddLocation } = useQuery<{
     allowed: boolean;
