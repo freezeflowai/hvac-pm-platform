@@ -648,69 +648,37 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+        {/* Compact header banner for past unscheduled jobs */}
+        {pastUnscheduledItems.length > 0 && (
+          <div 
+            className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20"
+            data-testid="alert-past-unscheduled"
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
+              <span className="text-sm font-medium">
+                {pastUnscheduledItems.length} unscheduled job{pastUnscheduledItems.length > 1 ? 's' : ''} from previous month{pastUnscheduledItems.length > 1 ? 's' : ''}
+              </span>
+              <span className="text-xs text-muted-foreground hidden sm:inline">
+                ({pastUnscheduledItems.map(item => item.companyName).join(', ')})
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button 
+                size="sm" 
+                variant="default"
+                onClick={rescheduleAllToCurrentMonth}
+                disabled={rescheduleToCurrentMonthMutation.isPending}
+                data-testid="button-reschedule-all"
+              >
+                {rescheduleToCurrentMonthMutation.isPending ? 'Moving...' : `Move to ${new Date().toLocaleString('default', { month: 'short' })}`}
+              </Button>
+            </div>
+          </div>
+        )}
+
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsContent value="schedule" className="space-y-6">
-            {/* Alert banner for past unscheduled jobs */}
-            {pastUnscheduledItems.length > 0 && (
-              <Alert variant="destructive" className="border-status-overdue bg-status-overdue/10" data-testid="alert-past-unscheduled">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle className="flex items-center justify-between">
-                  <span>Action Required: {pastUnscheduledItems.length} job{pastUnscheduledItems.length > 1 ? 's' : ''} from previous month{pastUnscheduledItems.length > 1 ? 's' : ''}</span>
-                </AlertTitle>
-                <AlertDescription className="mt-2">
-                  <div className="flex flex-col gap-3">
-                    <p className="text-sm">
-                      The following jobs were not scheduled in their original month and need attention:
-                    </p>
-                    <ul className="text-sm space-y-2 max-h-48 overflow-y-auto">
-                      {pastUnscheduledItems.map((item) => (
-                        <li key={item.assignmentId} className="flex items-center justify-between gap-2 p-2 rounded-md bg-background/50">
-                          <div className="flex flex-col">
-                            <span className="font-medium">{item.companyName}</span>
-                            <span className="text-xs text-muted-foreground">
-                              From {new Date(item.originalYear, item.originalMonth - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}
-                            </span>
-                          </div>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => rescheduleToCurrentMonthMutation.mutate(item.assignmentId)}
-                            disabled={rescheduleToCurrentMonthMutation.isPending}
-                            data-testid={`button-reschedule-${item.assignmentId}`}
-                          >
-                            <ArrowRight className="h-3 w-3 mr-1" />
-                            Move
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="flex gap-2 mt-1 pt-2 border-t">
-                      {pastUnscheduledItems.length > 1 && (
-                        <Button 
-                          size="sm" 
-                          variant="default"
-                          onClick={rescheduleAllToCurrentMonth}
-                          disabled={rescheduleToCurrentMonthMutation.isPending}
-                          data-testid="button-reschedule-all"
-                        >
-                          <ArrowRight className="h-4 w-4 mr-2" />
-                          Move All to This Month ({pastUnscheduledItems.length})
-                        </Button>
-                      )}
-                      <Button 
-                        size="sm" 
-                        variant="ghost"
-                        onClick={() => setLocation('/calendar')}
-                        data-testid="button-go-to-calendar"
-                      >
-                        View in Calendar
-                      </Button>
-                    </div>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <StatsCard 
                 title="Overdue" 
