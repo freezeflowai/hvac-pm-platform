@@ -34,6 +34,7 @@ interface CalendarAssignment {
   completed: boolean;
   completionNotes: string | null;
   assignedTechnicianIds: string[] | null;
+  jobNumber: number;
 }
 
 interface Client {
@@ -76,9 +77,8 @@ function getJobStatus(assignment: CalendarAssignment): { label: string; variant:
   return { label: "Upcoming", variant: "default", priority: 1 };
 }
 
-function formatJobNumber(id: string): string {
-  const shortId = id.slice(-6).toUpperCase();
-  return `#${shortId}`;
+function formatJobNumber(jobNumber: number): string {
+  return `#${jobNumber}`;
 }
 
 function formatAddress(client: Client | undefined): string {
@@ -193,7 +193,7 @@ export default function Jobs() {
       jobs = jobs.filter(job => {
         const clientName = job.client?.companyName?.toLowerCase() || "";
         const address = formatAddress(job.client).toLowerCase();
-        const jobNumber = formatJobNumber(job.id).toLowerCase();
+        const jobNumber = formatJobNumber(job.jobNumber).toLowerCase();
         const notes = job.completionNotes?.toLowerCase() || "";
         return clientName.includes(query) || address.includes(query) || jobNumber.includes(query) || notes.includes(query);
       });
@@ -206,7 +206,7 @@ export default function Jobs() {
           comparison = (a.client?.companyName || "").localeCompare(b.client?.companyName || "");
           break;
         case "jobNumber":
-          comparison = a.id.localeCompare(b.id);
+          comparison = a.jobNumber - b.jobNumber;
           break;
         case "schedule":
           if (a.day === null && b.day === null) {
@@ -284,6 +284,7 @@ export default function Jobs() {
         completed: job.completed,
         completionNotes: job.completionNotes,
         assignedTechnicianIds: job.assignedTechnicianIds,
+        jobNumber: job.jobNumber,
       },
       client: job.client,
     });
@@ -389,7 +390,7 @@ export default function Jobs() {
                     {job.client?.companyName || "Unknown Client"}
                   </TableCell>
                   <TableCell data-testid={`text-jobnumber-${job.id}`}>
-                    <div className="font-mono text-sm">{formatJobNumber(job.id)}</div>
+                    <div className="font-mono text-sm">{formatJobNumber(job.jobNumber)}</div>
                     {job.completionNotes && (
                       <div className="text-xs text-muted-foreground truncate max-w-[200px]">
                         {job.completionNotes}
