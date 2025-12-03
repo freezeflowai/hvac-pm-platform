@@ -23,8 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, Pencil } from "lucide-react";
-import { useState } from "react";
+import { Trash2, Plus, Pencil, Search } from "lucide-react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -69,6 +69,7 @@ export default function ProductsServicesManager() {
   const [formData, setFormData] = useState<ProductFormData>(defaultFormData);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Part | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: parts = [], isLoading } = useQuery<Part[]>({
     queryKey: ["/api/parts"],
@@ -258,7 +259,20 @@ export default function ProductsServicesManager() {
     }
   };
 
-  const productServiceParts = parts.filter(p => p.type === "service" || p.type === "product");
+  const productServiceParts = useMemo(() => {
+    const allProducts = parts.filter(p => p.type === "service" || p.type === "product");
+    
+    if (!searchQuery.trim()) {
+      return allProducts;
+    }
+    
+    const query = searchQuery.toLowerCase();
+    return allProducts.filter(p => {
+      const name = (p.name || "").toLowerCase();
+      const description = (p.description || "").toLowerCase();
+      return name.includes(query) || description.includes(query);
+    });
+  }, [parts, searchQuery]);
 
   const getPartDisplay = (part: Part) => {
     return {
@@ -367,21 +381,38 @@ export default function ProductsServicesManager() {
   return (
     <div className="space-y-6" data-testid="products-services-manager">
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <h3 className="font-semibold">Products & Services</h3>
-          <Button
-            size="sm"
-            onClick={handleOpenAddDialog}
-            data-testid="button-add-product"
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add New
-          </Button>
+          <div className="flex items-center gap-2 flex-1 max-w-md">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search products, services, filters, belts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-products"
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={handleOpenAddDialog}
+              data-testid="button-add-product"
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add New
+            </Button>
+          </div>
         </div>
         
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <SelectionControls items={productServiceParts} label="products" />
+          {searchQuery && (
+            <span className="text-sm text-muted-foreground">
+              {productServiceParts.length} result{productServiceParts.length !== 1 ? 's' : ''} found
+            </span>
+          )}
         </div>
         
         <BulkDeleteBar />
