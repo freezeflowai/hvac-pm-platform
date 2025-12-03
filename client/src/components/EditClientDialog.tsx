@@ -75,8 +75,12 @@ const getPartDisplayName = (part: Part): string => {
   } else if (part.type === 'belt') {
     return `Belt ${part.beltType || ''} ${part.size || ''}`.trim();
   } else {
-    return part.name || part.description || 'Other Part';
+    return part.name || part.description || 'Item';
   }
+};
+
+const getItemCategory = (type: string): 'product' | 'service' => {
+  return type === 'service' ? 'service' : 'product';
 };
 
 export default function EditClientDialog({ client, open, onOpenChange, onSaved }: EditClientDialogProps) {
@@ -99,9 +103,9 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
     inactive: client.inactive,
   });
 
-  const [partRows, setPartRows] = useState<{ partId: string; quantity: number; type: string; id?: string }[]>([]);
+  const [partRows, setPartRows] = useState<{ partId: string; quantity: number; category: 'product' | 'service'; id?: string }[]>([]);
   const [equipmentRows, setEquipmentRows] = useState<{ name: string; type: string; serialNumber: string; location: string; id?: string }[]>([]);
-  const [activePartsType, setActivePartsType] = useState<string>("filter");
+  const [activePartsCategory, setActivePartsCategory] = useState<'product' | 'service'>("product");
   const [openPartRowIndex, setOpenPartRowIndex] = useState<number | null>(null);
 
   const { data: partsResponse } = useQuery<{ items: Part[]; total: number }>({
@@ -119,11 +123,10 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
     enabled: open,
   });
 
-  const partsByType = useMemo(() => {
+  const partsByCategory = useMemo(() => {
     return {
-      filter: availableParts.filter((p: Part) => p.type === 'filter'),
-      belt: availableParts.filter((p: Part) => p.type === 'belt'),
-      other: availableParts.filter((p: Part) => p.type === 'other'),
+      product: availableParts.filter((p: Part) => p.type !== 'service'),
+      service: availableParts.filter((p: Part) => p.type === 'service'),
     };
   }, [availableParts]);
 
@@ -135,7 +138,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
           id: cp.id,
           partId: cp.partId,
           quantity: cp.quantity,
-          type: part?.type || 'other'
+          category: getItemCategory(part?.type || 'product')
         };
       }));
     }
@@ -189,7 +192,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
   };
 
   const handleAddPart = () => {
-    setPartRows([...partRows, { partId: '', quantity: 1, type: activePartsType }]);
+    setPartRows([...partRows, { partId: '', quantity: 1, category: activePartsCategory }]);
   };
 
   const handleUpdatePart = (index: number, field: 'partId' | 'quantity', value: string | number) => {
@@ -202,7 +205,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
         updatedRows[index] = { 
           ...row, 
           partId: value as string,
-          type: selectedPart.type
+          category: getItemCategory(selectedPart.type)
         };
       }
     } else {
@@ -510,16 +513,15 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
             </TabsContent>
 
             <TabsContent value="parts" className="space-y-4 mt-0 pb-4">
-              <Tabs value={activePartsType} onValueChange={setActivePartsType} className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="filter" data-testid="tab-filter">Filters</TabsTrigger>
-                  <TabsTrigger value="belt" data-testid="tab-belt">Belts</TabsTrigger>
-                  <TabsTrigger value="other" data-testid="tab-other">Other</TabsTrigger>
+              <Tabs value={activePartsCategory} onValueChange={(v) => setActivePartsCategory(v as 'product' | 'service')} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="product" data-testid="tab-products">Products</TabsTrigger>
+                  <TabsTrigger value="service" data-testid="tab-services">Services</TabsTrigger>
                 </TabsList>
                 
-                {(['filter', 'belt', 'other'] as const).map((type) => (
-                  <TabsContent key={type} value={type} className="space-y-2">
-                    {partRows.filter(row => row.type === type).map((row, globalIndex) => {
+                {(['product', 'service'] as const).map((category) => (
+                  <TabsContent key={category} value={category} className="space-y-2">
+                    {partRows.filter(row => row.category === category).map((row) => {
                       const actualIndex = partRows.indexOf(row);
                       const selectedPart = availableParts.find(p => p.id === row.partId);
                       
@@ -539,18 +541,18 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
                                 )}
                                 data-testid={`button-select-part-${actualIndex}`}
                               >
-                                {selectedPart ? getPartDisplayName(selectedPart) : "Select part"}
+                                {selectedPart ? getPartDisplayName(selectedPart) : `Select ${category}`}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[300px] p-0">
                               <Command>
-                                <CommandInput placeholder="Search parts..." />
+                                <CommandInput placeholder={`Search ${category}s...`} />
                                 <CommandList>
-                                  <CommandEmpty>No parts found.</CommandEmpty>
+                                  <CommandEmpty>No {category}s found.</CommandEmpty>
                                   <CommandGroup>
                                     <ScrollArea className="h-72">
-                                      {partsByType[type].map((part: Part) => {
+                                      {partsByCategory[category].map((part: Part) => {
                                         const displayName = getPartDisplayName(part);
                                         return (
                                           <CommandItem
@@ -615,10 +617,10 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
                       size="sm"
                       onClick={handleAddPart}
                       className="w-full"
-                      data-testid={`button-add-${type}`}
+                      data-testid={`button-add-${category}`}
                     >
                       <Plus className="h-4 w-4 mr-2" />
-                      Add {type === 'filter' ? 'Filter' : type === 'belt' ? 'Belt' : 'Other Part'}
+                      Add {category === 'product' ? 'Product' : 'Service'}
                     </Button>
                   </TabsContent>
                 ))}

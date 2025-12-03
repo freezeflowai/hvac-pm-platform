@@ -550,10 +550,15 @@ export function JobDetailDialog({
               </div>
             )}
 
-            {fullAddress && (
+            {(client?.location || fullAddress) && (
               <div>
                 <h3 className="text-sm font-semibold mb-1">Location</h3>
-                <p className="text-sm" data-testid="text-location">{fullAddress}</p>
+                {client?.location && (
+                  <p className="text-sm font-medium" data-testid="text-site-location">{client.location}</p>
+                )}
+                {fullAddress && (
+                  <p className="text-sm text-muted-foreground" data-testid="text-address">{fullAddress}</p>
+                )}
               </div>
             )}
 
