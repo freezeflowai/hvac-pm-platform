@@ -1,20 +1,11 @@
-import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import PartsManagementDialog from "@/components/PartsManagementDialog";
-import NewAddClientDialog from "@/components/NewAddClientDialog";
+import ProductsServicesManager from "@/components/ProductsServicesManager";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
 export default function PartsManagementPage() {
-  const [, setLocation] = useLocation();
-  const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
   const { toast } = useToast();
-
-  const { data: allClients = [] } = useQuery<any[]>({
-    queryKey: ["/api/clients"],
-  });
 
   const seedPartsMutation = useMutation({
     mutationFn: async () => {
@@ -39,12 +30,11 @@ export default function PartsManagementPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      
       <main className="container mx-auto p-6">
         <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Manage Parts Inventory</h1>
-            <p className="text-muted-foreground">Add and manage parts for maintenance schedules.</p>
+            <h1 className="text-2xl font-bold">Products & Services</h1>
+            <p className="text-muted-foreground">Manage your products, services, filters and belts.</p>
           </div>
           <div className="flex flex-col items-end gap-1">
             <p className="text-xs text-muted-foreground text-right">
@@ -55,22 +45,15 @@ export default function PartsManagementPage() {
               disabled={seedPartsMutation.isPending}
               data-testid="button-seed-parts"
               size="sm"
+              variant="outline"
             >
-              {seedPartsMutation.isPending ? "Seeding..." : "Seed Parts"}
+              {seedPartsMutation.isPending ? "Seeding..." : "Seed Standard Parts"}
             </Button>
           </div>
         </div>
 
-        <PartsManagementDialog onCancel={() => setLocation("/")} />
+        <ProductsServicesManager />
       </main>
-
-      <NewAddClientDialog 
-        open={addClientDialogOpen}
-        onOpenChange={setAddClientDialogOpen}
-        onSaved={() => {
-          queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
-        }}
-      />
     </div>
   );
 }

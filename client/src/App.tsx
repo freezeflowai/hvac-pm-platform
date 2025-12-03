@@ -76,7 +76,7 @@ function Router() {
           <AddClientPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/manage-parts">
+      <Route path="/products">
         <ProtectedRoute requireAdmin>
           <PartsManagementPage />
         </ProtectedRoute>

@@ -143,16 +143,20 @@ export const parts = pgTable("parts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  type: text("type").notNull(), // "filter", "belt", or "other"
+  type: text("type").notNull(), // "filter", "belt", "other", "service", "product"
   // Filter-specific fields
   filterType: text("filter_type"), // "Pleated", "Media", "Ecology", "Throwaway", "Other"
   // Belt-specific fields
   beltType: text("belt_type"), // "A", "B", "Other"
   // Shared between filters and belts
   size: text("size"),
-  // Other parts fields
+  // Other parts/products/services fields
   name: text("name"),
   description: text("description"),
+  // Pricing fields (for products and services)
+  cost: text("cost"), // Cost price in dollars (stored as text to preserve decimals)
+  unitPrice: text("unit_price"), // Selling price in dollars
+  taxExempt: boolean("tax_exempt").default(false),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 

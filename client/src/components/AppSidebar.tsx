@@ -130,11 +130,11 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       testId: "nav-clients"
     });
     menuItems.push({
-      title: "Parts",
+      title: "Products & Services",
       icon: Package,
-      href: "/manage-parts",
-      isActive: location === "/manage-parts",
-      testId: "nav-parts"
+      href: "/products",
+      isActive: location === "/products",
+      testId: "nav-products"
     });
     menuItems.push({
       title: "Reports",

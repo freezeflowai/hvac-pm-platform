@@ -556,7 +556,7 @@ export class MemStorage implements IStorage {
         return part.filterType === insertPart.filterType && part.size === insertPart.size;
       } else if (insertPart.type === 'belt') {
         return part.beltType === insertPart.beltType && part.size === insertPart.size;
-      } else if (insertPart.type === 'other') {
+      } else if (insertPart.type === 'other' || insertPart.type === 'service' || insertPart.type === 'product') {
         return part.name === insertPart.name;
       }
       
@@ -582,6 +582,9 @@ export class MemStorage implements IStorage {
       size: insertPart.size ?? null,
       name: insertPart.name ?? null,
       description: insertPart.description ?? null,
+      cost: insertPart.cost ?? null,
+      unitPrice: insertPart.unitPrice ?? null,
+      taxExempt: insertPart.taxExempt ?? false,
       createdAt: new Date().toISOString()
     };
     this.parts.set(id, part);
@@ -1659,11 +1662,11 @@ export class DbStorage implements IStorage {
         ))
         .limit(1);
       return result[0];
-    } else if (insertPart.type === 'other') {
+    } else if (insertPart.type === 'other' || insertPart.type === 'service' || insertPart.type === 'product') {
       const result = await db.select().from(parts)
         .where(and(
           eq(parts.companyId, companyId),
-          eq(parts.type, 'other'),
+          eq(parts.type, insertPart.type),
           eq(parts.name, insertPart.name ?? '')
         ))
         .limit(1);
