@@ -211,6 +211,7 @@ export const calendarAssignments = pgTable("calendar_assignments", {
   companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  jobNumber: integer("job_number").notNull(),
   assignedTechnicianIds: varchar("assigned_technician_ids").array(),
   year: integer("year").notNull(),
   month: integer("month").notNull(),
@@ -222,10 +223,18 @@ export const calendarAssignments = pgTable("calendar_assignments", {
   completionNotes: text("completion_notes"),
 });
 
+// Company counters table - tracks sequential counters per company (e.g., job numbers)
+export const companyCounters = pgTable("company_counters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().unique().references(() => companies.id, { onDelete: "cascade" }),
+  nextJobNumber: integer("next_job_number").notNull().default(10000),
+});
+
 export const insertCalendarAssignmentSchema = createInsertSchema(calendarAssignments).omit({
   id: true,
   companyId: true,
   userId: true,
+  jobNumber: true,
 });
 
 export const updateCalendarAssignmentSchema = z.object({
