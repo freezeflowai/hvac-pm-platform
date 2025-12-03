@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, Pencil, Search, Loader2 } from "lucide-react";
+import { Trash2, Plus, Pencil, Search, Loader2, Package, Wrench } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -70,6 +71,8 @@ interface PartsResponse {
 
 const ITEMS_PER_PAGE = 50;
 
+type TabCategory = "products" | "services";
+
 export default function ProductsServicesManager() {
   const { toast } = useToast();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -81,7 +84,9 @@ export default function ProductsServicesManager() {
   const [productToDelete, setProductToDelete] = useState<Part | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const loaderRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<TabCategory>("products");
+  const productsLoaderRef = useRef<HTMLDivElement>(null);
+  const servicesLoaderRef = useRef<HTMLDivElement>(null);
 
   // Debounce search
   useEffect(() => {
@@ -91,22 +96,23 @@ export default function ProductsServicesManager() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const {
-    data,
-    isLoading,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
-  } = useInfiniteQuery<PartsResponse>({
-    queryKey: ["/api/parts", debouncedSearch],
+  // Clear selection when tab changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [activeTab]);
+
+  // Products query
+  const productsQuery = useInfiniteQuery<PartsResponse>({
+    queryKey: ["/api/parts", "products", debouncedSearch],
     queryFn: async ({ pageParam = 0 }) => {
       const params = new URLSearchParams({
         limit: String(ITEMS_PER_PAGE),
         offset: String(pageParam),
         search: debouncedSearch,
+        category: "products",
       });
       const res = await fetch(`/api/parts?${params}`, { credentials: 'include' });
-      if (!res.ok) throw new Error("Failed to fetch parts");
+      if (!res.ok) throw new Error("Failed to fetch products");
       return res.json();
     },
     getNextPageParam: (lastPage) => {
@@ -117,6 +123,33 @@ export default function ProductsServicesManager() {
     },
     initialPageParam: 0,
   });
+
+  // Services query
+  const servicesQuery = useInfiniteQuery<PartsResponse>({
+    queryKey: ["/api/parts", "services", debouncedSearch],
+    queryFn: async ({ pageParam = 0 }) => {
+      const params = new URLSearchParams({
+        limit: String(ITEMS_PER_PAGE),
+        offset: String(pageParam),
+        search: debouncedSearch,
+        category: "services",
+      });
+      const res = await fetch(`/api/parts?${params}`, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch services");
+      return res.json();
+    },
+    getNextPageParam: (lastPage) => {
+      if (lastPage.hasMore) {
+        return lastPage.offset + lastPage.limit;
+      }
+      return undefined;
+    },
+    initialPageParam: 0,
+  });
+
+  // Get current tab's data
+  const currentQuery = activeTab === "products" ? productsQuery : servicesQuery;
+  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = currentQuery;
 
   // Flatten pages into single array
   const parts = data?.pages.flatMap(page => page.items) ?? [];
@@ -306,24 +339,35 @@ export default function ProductsServicesManager() {
     }
   };
 
-  // Intersection observer for infinite scroll
-  const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
+  // Intersection observer for infinite scroll - Products tab
+  const handleProductsObserver = useCallback((entries: IntersectionObserverEntry[]) => {
     const target = entries[0];
-    if (target.isIntersecting && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
+    if (target.isIntersecting && productsQuery.hasNextPage && !productsQuery.isFetchingNextPage) {
+      productsQuery.fetchNextPage();
     }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [productsQuery.hasNextPage, productsQuery.isFetchingNextPage, productsQuery.fetchNextPage]);
 
   useEffect(() => {
-    const option = {
-      root: null,
-      rootMargin: "100px",
-      threshold: 0.1,
-    };
-    const observer = new IntersectionObserver(handleObserver, option);
-    if (loaderRef.current) observer.observe(loaderRef.current);
+    const option = { root: null, rootMargin: "100px", threshold: 0.1 };
+    const observer = new IntersectionObserver(handleProductsObserver, option);
+    if (productsLoaderRef.current) observer.observe(productsLoaderRef.current);
     return () => observer.disconnect();
-  }, [handleObserver]);
+  }, [handleProductsObserver]);
+
+  // Intersection observer for infinite scroll - Services tab
+  const handleServicesObserver = useCallback((entries: IntersectionObserverEntry[]) => {
+    const target = entries[0];
+    if (target.isIntersecting && servicesQuery.hasNextPage && !servicesQuery.isFetchingNextPage) {
+      servicesQuery.fetchNextPage();
+    }
+  }, [servicesQuery.hasNextPage, servicesQuery.isFetchingNextPage, servicesQuery.fetchNextPage]);
+
+  useEffect(() => {
+    const option = { root: null, rootMargin: "100px", threshold: 0.1 };
+    const observer = new IntersectionObserver(handleServicesObserver, option);
+    if (servicesLoaderRef.current) observer.observe(servicesLoaderRef.current);
+    return () => observer.disconnect();
+  }, [handleServicesObserver]);
 
   const getPartDisplay = (part: Part) => {
     return {
@@ -429,6 +473,69 @@ export default function ProductsServicesManager() {
     </div>
   );
 
+  const productsTotal = productsQuery.data?.pages[0]?.total ?? 0;
+  const servicesTotal = servicesQuery.data?.pages[0]?.total ?? 0;
+  const productsParts = productsQuery.data?.pages.flatMap(page => page.items) ?? [];
+  const servicesParts = servicesQuery.data?.pages.flatMap(page => page.items) ?? [];
+
+  const TabContent = ({ 
+    items, 
+    loaderRef, 
+    query, 
+    tabTotal, 
+    emptyLabel 
+  }: { 
+    items: Part[]; 
+    loaderRef: React.RefObject<HTMLDivElement | null>; 
+    query: typeof productsQuery;
+    tabTotal: number;
+    emptyLabel: string;
+  }) => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <SelectionControls items={items} label={emptyLabel} />
+        {debouncedSearch && (
+          <span className="text-sm text-muted-foreground">
+            {tabTotal} result{tabTotal !== 1 ? 's' : ''} found
+          </span>
+        )}
+      </div>
+      
+      <BulkDeleteBar />
+      
+      {query.isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : items.length > 0 ? (
+        <>
+          <ItemGrid items={items} />
+          <div ref={loaderRef} className="flex justify-center py-4">
+            {query.isFetchingNextPage && (
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            )}
+            {!query.hasNextPage && items.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                Showing all {tabTotal} items
+              </span>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="text-center py-8 text-muted-foreground">
+          {debouncedSearch ? (
+            <p>No results found for "{debouncedSearch}"</p>
+          ) : (
+            <>
+              <p>No {emptyLabel} added yet</p>
+              <p className="text-sm mt-1">Click "Add New" to create your first {emptyLabel.slice(0, -1)}</p>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6" data-testid="products-services-manager">
       <div className="space-y-4">
@@ -438,7 +545,7 @@ export default function ProductsServicesManager() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search products, services, filters, belts..."
+                placeholder={activeTab === "products" ? "Search products, filters, belts..." : "Search services..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -457,47 +564,38 @@ export default function ProductsServicesManager() {
           </div>
         </div>
         
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <SelectionControls items={parts} label="products" />
-          {debouncedSearch && (
-            <span className="text-sm text-muted-foreground">
-              {total} result{total !== 1 ? 's' : ''} found
-            </span>
-          )}
-        </div>
-        
-        <BulkDeleteBar />
-        
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : parts.length > 0 ? (
-          <>
-            <ItemGrid items={parts} />
-            <div ref={loaderRef} className="flex justify-center py-4">
-              {isFetchingNextPage && (
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              )}
-              {!hasNextPage && parts.length > 0 && (
-                <span className="text-sm text-muted-foreground">
-                  Showing all {total} items
-                </span>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            {debouncedSearch ? (
-              <p>No results found for "{debouncedSearch}"</p>
-            ) : (
-              <>
-                <p>No products or services added yet</p>
-                <p className="text-sm mt-1">Click "Add New" to create your first product or service</p>
-              </>
-            )}
-          </div>
-        )}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabCategory)} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="products" data-testid="tab-products" className="gap-2">
+              <Package className="h-4 w-4" />
+              Products ({productsTotal})
+            </TabsTrigger>
+            <TabsTrigger value="services" data-testid="tab-services" className="gap-2">
+              <Wrench className="h-4 w-4" />
+              Services ({servicesTotal})
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="products" className="mt-4">
+            <TabContent 
+              items={productsParts} 
+              loaderRef={productsLoaderRef} 
+              query={productsQuery}
+              tabTotal={productsTotal}
+              emptyLabel="products"
+            />
+          </TabsContent>
+          
+          <TabsContent value="services" className="mt-4">
+            <TabContent 
+              items={servicesParts} 
+              loaderRef={servicesLoaderRef} 
+              query={servicesQuery}
+              tabTotal={servicesTotal}
+              emptyLabel="services"
+            />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>

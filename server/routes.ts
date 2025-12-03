@@ -989,13 +989,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/parts", isAuthenticated, async (req, res) => {
     try {
       const search = typeof req.query.search === 'string' ? req.query.search : '';
+      const category = typeof req.query.category === 'string' ? req.query.category : 'all';
       const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
       const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
       
       const parts = await storage.getAllParts(req.user!.companyId);
       
-      // Filter to product/service types only
-      let filtered = parts.filter(p => p.type === 'product' || p.type === 'service');
+      // Filter by category
+      let filtered: typeof parts;
+      if (category === 'products') {
+        // Products include: product type (filters, belts, and other physical items)
+        filtered = parts.filter(p => p.type === 'product');
+      } else if (category === 'services') {
+        // Services are service-type items
+        filtered = parts.filter(p => p.type === 'service');
+      } else {
+        // All products and services
+        filtered = parts.filter(p => p.type === 'product' || p.type === 'service');
+      }
       
       // Apply search filter
       if (search.trim()) {
