@@ -6,7 +6,8 @@ import ClientListTable from "@/components/ClientListTable";
 import ClientReportDialog from "@/components/ClientReportDialog";
 import { JobDetailDialog } from "@/components/JobDetailDialog";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
-import { AlertCircle, Calendar, CalendarX, CheckCircle, Clock, Package, Settings, Search, Building2, FileText, Download, Users, ChevronDown } from "lucide-react";
+import { AlertCircle, Calendar, CalendarX, CheckCircle, Clock, Package, Settings, Search, Building2, FileText, Download, Users, ChevronDown, AlertTriangle, ArrowRight } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import MaintenanceCard, { MaintenanceItem } from "@/components/MaintenanceCard";
 import { Client } from "@/components/ClientListTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -220,6 +221,52 @@ export default function Dashboard() {
       });
     },
   });
+
+  // Mutation to reschedule past unscheduled jobs to current month
+  const rescheduleToCurrentMonthMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      const res = await apiRequest("PATCH", `/api/calendar/assign/${assignmentId}`, {
+        year: currentYear,
+        month: currentMonth,
+        day: null, // Keep it unscheduled but in current month
+        scheduledDate: `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/overdue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance/statuses"] });
+      toast({
+        title: "Job rescheduled",
+        description: "The job has been moved to the current month.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to reschedule job.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reschedule all past unscheduled jobs to current month
+  const rescheduleAllToCurrentMonth = async () => {
+    try {
+      for (const item of pastUnscheduledItems) {
+        await rescheduleToCurrentMonthMutation.mutateAsync(item.assignmentId);
+      }
+      toast({
+        title: "All jobs rescheduled",
+        description: `${pastUnscheduledItems.length} jobs have been moved to the current month.`,
+      });
+    } catch (error) {
+      // Individual errors are already handled by the mutation
+    }
+  };
 
   const clients: Client[] = dbClients
     .map(c => ({
@@ -447,6 +494,24 @@ export default function Dashboard() {
       originalYear: assignment.year,
     }));
 
+  // Past months' UNSCHEDULED items (day is null) - these need attention
+  const pastUnscheduledItems = overdueFromPast
+    .filter(({ assignment, client }) => {
+      if (!client || !client.id || assignment.completed || client.inactive) {
+        return false;
+      }
+      // Only include unscheduled items (day is null)
+      return assignment.day == null;
+    })
+    .map(({ assignment, client }) => ({
+      assignmentId: assignment.id,
+      clientId: client.id,
+      companyName: client.companyName || 'Unknown',
+      location: client.location,
+      originalMonth: assignment.month,
+      originalYear: assignment.year,
+    }));
+
   // Overdue/upcoming only from SCHEDULED clients - exclude completed items
   // Combine current month overdue with persistent overdue from past months
   const currentMonthOverdueItems = scheduledMaintenanceItems
@@ -585,6 +650,67 @@ export default function Dashboard() {
       <main className="mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsContent value="schedule" className="space-y-6">
+            {/* Alert banner for past unscheduled jobs */}
+            {pastUnscheduledItems.length > 0 && (
+              <Alert variant="destructive" className="border-status-overdue bg-status-overdue/10" data-testid="alert-past-unscheduled">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle className="flex items-center justify-between">
+                  <span>Action Required: {pastUnscheduledItems.length} job{pastUnscheduledItems.length > 1 ? 's' : ''} from previous month{pastUnscheduledItems.length > 1 ? 's' : ''}</span>
+                </AlertTitle>
+                <AlertDescription className="mt-2">
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm">
+                      The following jobs were not scheduled in their original month and need attention:
+                    </p>
+                    <ul className="text-sm space-y-2 max-h-48 overflow-y-auto">
+                      {pastUnscheduledItems.map((item) => (
+                        <li key={item.assignmentId} className="flex items-center justify-between gap-2 p-2 rounded-md bg-background/50">
+                          <div className="flex flex-col">
+                            <span className="font-medium">{item.companyName}</span>
+                            <span className="text-xs text-muted-foreground">
+                              From {new Date(item.originalYear, item.originalMonth - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}
+                            </span>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => rescheduleToCurrentMonthMutation.mutate(item.assignmentId)}
+                            disabled={rescheduleToCurrentMonthMutation.isPending}
+                            data-testid={`button-reschedule-${item.assignmentId}`}
+                          >
+                            <ArrowRight className="h-3 w-3 mr-1" />
+                            Move
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex gap-2 mt-1 pt-2 border-t">
+                      {pastUnscheduledItems.length > 1 && (
+                        <Button 
+                          size="sm" 
+                          variant="default"
+                          onClick={rescheduleAllToCurrentMonth}
+                          disabled={rescheduleToCurrentMonthMutation.isPending}
+                          data-testid="button-reschedule-all"
+                        >
+                          <ArrowRight className="h-4 w-4 mr-2" />
+                          Move All to This Month ({pastUnscheduledItems.length})
+                        </Button>
+                      )}
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        onClick={() => setLocation('/calendar')}
+                        data-testid="button-go-to-calendar"
+                      >
+                        View in Calendar
+                      </Button>
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <StatsCard 
                 title="Overdue" 
