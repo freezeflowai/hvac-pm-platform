@@ -70,10 +70,10 @@ const MONTHS = [
 ];
 
 const getPartDisplayName = (part: Part): string => {
-  if (part.type === 'filter') {
-    return `${part.filterType || 'Filter'} ${part.size || ''}`.trim();
-  } else if (part.type === 'belt') {
-    return `Belt ${part.beltType || ''} ${part.size || ''}`.trim();
+  if (part.filterType) {
+    return `${part.filterType} ${part.size || ''}`.trim();
+  } else if (part.beltType) {
+    return `Belt ${part.beltType} ${part.size || ''}`.trim();
   } else {
     return part.name || part.description || 'Item';
   }
@@ -109,7 +109,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
   const [openPartRowIndex, setOpenPartRowIndex] = useState<number | null>(null);
 
   const { data: partsResponse } = useQuery<{ items: Part[]; total: number }>({
-    queryKey: ['/api/parts'],
+    queryKey: ['/api/parts?limit=1000'],
   });
   const availableParts = partsResponse?.items ?? [];
 
