@@ -1,12 +1,12 @@
 import { InsertPart } from "@shared/schema";
 
-// Generate belt sizes 18-70 for both A and B types
+// Generate belt sizes 18-70 for both A and B types as products
 const generateBelts = (): InsertPart[] => {
   const belts: InsertPart[] = [];
   
   for (let size = 18; size <= 70; size++) {
-    belts.push({ type: "belt", beltType: "A", size: size.toString() });
-    belts.push({ type: "belt", beltType: "B", size: size.toString() });
+    belts.push({ type: "product", name: `Belt A${size}` });
+    belts.push({ type: "product", name: `Belt B${size}` });
   }
   
   return belts;

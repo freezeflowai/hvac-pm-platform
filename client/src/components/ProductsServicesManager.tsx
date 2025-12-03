@@ -260,18 +260,12 @@ export default function ProductsServicesManager() {
   };
 
   const filterParts = parts.filter(p => p.type === "filter");
-  const beltParts = parts.filter(p => p.type === "belt");
   const productServiceParts = parts.filter(p => p.type === "service" || p.type === "product");
 
   const getPartDisplay = (part: Part) => {
     if (part.type === "filter") {
       return {
         primary: `${part.filterType} Filter`,
-        secondary: part.size || "",
-      };
-    } else if (part.type === "belt") {
-      return {
-        primary: `${part.beltType} Belt`,
         secondary: part.size || "",
       };
     } else {
@@ -382,10 +376,9 @@ export default function ProductsServicesManager() {
   return (
     <div className="space-y-6" data-testid="products-services-manager">
       <Tabs defaultValue="products" className="w-full">
-        <TabsList className="grid grid-cols-3 w-fit" data-testid="tabs-products">
+        <TabsList className="grid grid-cols-2 w-fit" data-testid="tabs-products">
           <TabsTrigger value="products" data-testid="tab-products">Products/Services</TabsTrigger>
           <TabsTrigger value="filters" data-testid="tab-filters">Filters</TabsTrigger>
-          <TabsTrigger value="belts" data-testid="tab-belts">Belts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-4 mt-4">
@@ -440,25 +433,6 @@ export default function ProductsServicesManager() {
           )}
         </TabsContent>
 
-        <TabsContent value="belts" className="space-y-4 mt-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold">Belts</h3>
-              <p className="text-sm text-muted-foreground">Auto-seeded belt inventory. Use "Seed Standard Parts" to restore defaults.</p>
-            </div>
-            <SelectionControls items={beltParts} label="belts" />
-          </div>
-          
-          <BulkDeleteBar />
-          
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          ) : beltParts.length > 0 ? (
-            <ItemGrid items={beltParts} />
-          ) : (
-            <p className="text-sm text-muted-foreground">No belts added yet. Click "Seed Standard Parts" above to add the default inventory.</p>
-          )}
-        </TabsContent>
       </Tabs>
 
       <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>
