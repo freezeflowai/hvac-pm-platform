@@ -23,9 +23,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, Pencil, Search } from "lucide-react";
-import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { Trash2, Plus, Pencil, Search, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -60,6 +60,16 @@ const defaultFormData: ProductFormData = {
   taxExempt: false,
 };
 
+interface PartsResponse {
+  items: Part[];
+  total: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+const ITEMS_PER_PAGE = 50;
+
 export default function ProductsServicesManager() {
   const { toast } = useToast();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -70,10 +80,47 @@ export default function ProductsServicesManager() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Part | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const loaderRef = useRef<HTMLDivElement>(null);
 
-  const { data: parts = [], isLoading } = useQuery<Part[]>({
-    queryKey: ["/api/parts"],
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery<PartsResponse>({
+    queryKey: ["/api/parts", debouncedSearch],
+    queryFn: async ({ pageParam = 0 }) => {
+      const params = new URLSearchParams({
+        limit: String(ITEMS_PER_PAGE),
+        offset: String(pageParam),
+        search: debouncedSearch,
+      });
+      const res = await fetch(`/api/parts?${params}`, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch parts");
+      return res.json();
+    },
+    getNextPageParam: (lastPage) => {
+      if (lastPage.hasMore) {
+        return lastPage.offset + lastPage.limit;
+      }
+      return undefined;
+    },
+    initialPageParam: 0,
   });
+
+  // Flatten pages into single array
+  const parts = data?.pages.flatMap(page => page.items) ?? [];
+  const total = data?.pages[0]?.total ?? 0;
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Part>) => {
@@ -259,20 +306,24 @@ export default function ProductsServicesManager() {
     }
   };
 
-  const productServiceParts = useMemo(() => {
-    const allProducts = parts.filter(p => p.type === "service" || p.type === "product");
-    
-    if (!searchQuery.trim()) {
-      return allProducts;
+  // Intersection observer for infinite scroll
+  const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
+    const target = entries[0];
+    if (target.isIntersecting && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
     }
-    
-    const query = searchQuery.toLowerCase();
-    return allProducts.filter(p => {
-      const name = (p.name || "").toLowerCase();
-      const description = (p.description || "").toLowerCase();
-      return name.includes(query) || description.includes(query);
-    });
-  }, [parts, searchQuery]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  useEffect(() => {
+    const option = {
+      root: null,
+      rootMargin: "100px",
+      threshold: 0.1,
+    };
+    const observer = new IntersectionObserver(handleObserver, option);
+    if (loaderRef.current) observer.observe(loaderRef.current);
+    return () => observer.disconnect();
+  }, [handleObserver]);
 
   const getPartDisplay = (part: Part) => {
     return {
@@ -407,10 +458,10 @@ export default function ProductsServicesManager() {
         </div>
         
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <SelectionControls items={productServiceParts} label="products" />
-          {searchQuery && (
+          <SelectionControls items={parts} label="products" />
+          {debouncedSearch && (
             <span className="text-sm text-muted-foreground">
-              {productServiceParts.length} result{productServiceParts.length !== 1 ? 's' : ''} found
+              {total} result{total !== 1 ? 's' : ''} found
             </span>
           )}
         </div>
@@ -418,13 +469,33 @@ export default function ProductsServicesManager() {
         <BulkDeleteBar />
         
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        ) : productServiceParts.length > 0 ? (
-          <ItemGrid items={productServiceParts} />
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : parts.length > 0 ? (
+          <>
+            <ItemGrid items={parts} />
+            <div ref={loaderRef} className="flex justify-center py-4">
+              {isFetchingNextPage && (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              )}
+              {!hasNextPage && parts.length > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  Showing all {total} items
+                </span>
+              )}
+            </div>
+          </>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
-            <p>No products or services added yet</p>
-            <p className="text-sm mt-1">Click "Add New" to create your first product or service</p>
+            {debouncedSearch ? (
+              <p>No results found for "{debouncedSearch}"</p>
+            ) : (
+              <>
+                <p>No products or services added yet</p>
+                <p className="text-sm mt-1">Click "Add New" to create your first product or service</p>
+              </>
+            )}
           </div>
         )}
       </div>

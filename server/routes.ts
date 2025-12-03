@@ -988,8 +988,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Part routes
   app.get("/api/parts", isAuthenticated, async (req, res) => {
     try {
+      const search = typeof req.query.search === 'string' ? req.query.search : '';
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
+      const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+      
       const parts = await storage.getAllParts(req.user!.companyId);
-      res.json(parts);
+      
+      // Filter to product/service types only
+      let filtered = parts.filter(p => p.type === 'product' || p.type === 'service');
+      
+      // Apply search filter
+      if (search.trim()) {
+        const query = search.toLowerCase();
+        filtered = filtered.filter(p => {
+          const name = (p.name || '').toLowerCase();
+          const description = (p.description || '').toLowerCase();
+          return name.includes(query) || description.includes(query);
+        });
+      }
+      
+      // Sort alphabetically by name
+      filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      
+      // Paginate
+      const total = filtered.length;
+      const paginated = filtered.slice(offset, offset + limit);
+      const hasMore = offset + limit < total;
+      
+      res.json({
+        items: paginated,
+        total,
+        offset,
+        limit,
+        hasMore
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch parts" });
     }
