@@ -998,14 +998,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter by category
       let filtered: typeof parts;
       if (category === 'products') {
-        // Products include: product type (filters, belts, and other physical items)
-        filtered = parts.filter(p => p.type === 'product');
+        // Products include: filter, belt, other, and product types (physical items)
+        filtered = parts.filter(p => ['filter', 'belt', 'other', 'product'].includes(p.type));
       } else if (category === 'services') {
         // Services are service-type items
         filtered = parts.filter(p => p.type === 'service');
       } else {
-        // All products and services
-        filtered = parts.filter(p => p.type === 'product' || p.type === 'service');
+        // All items (no category filter for 'all')
+        filtered = parts;
       }
       
       // Apply search filter
@@ -1173,11 +1173,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter by category
       let filtered: typeof parts;
       if (category === 'products') {
-        filtered = parts.filter(p => p.type === 'product');
+        // Products include: filter, belt, other, and product types (physical items)
+        filtered = parts.filter(p => ['filter', 'belt', 'other', 'product'].includes(p.type));
       } else if (category === 'services') {
         filtered = parts.filter(p => p.type === 'service');
       } else {
-        filtered = parts.filter(p => p.type === 'product' || p.type === 'service');
+        // All items (no category filter for 'all')
+        filtered = parts;
       }
       
       // Sort alphabetically
