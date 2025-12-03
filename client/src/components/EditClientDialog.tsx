@@ -103,7 +103,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
     inactive: client.inactive,
   });
 
-  const [partRows, setPartRows] = useState<{ partId: string; quantity: number; category: 'product' | 'service'; id?: string }[]>([]);
+  const [partRows, setPartRows] = useState<{ partId: string; quantity: number; category: 'product' | 'service'; id?: string; part?: Part }[]>([]);
   const [equipmentRows, setEquipmentRows] = useState<{ name: string; type: string; serialNumber: string; location: string; id?: string }[]>([]);
   const [activePartsCategory, setActivePartsCategory] = useState<'product' | 'service'>("product");
   const [openPartRowIndex, setOpenPartRowIndex] = useState<number | null>(null);
@@ -132,15 +132,22 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
 
   useEffect(() => {
     if (open && clientParts) {
-      setPartRows(clientParts.map(cp => {
-        const part = availableParts.find(p => p.id === cp.partId);
-        return {
-          id: cp.id,
-          partId: cp.partId,
-          quantity: cp.quantity,
-          category: getItemCategory(part?.type || 'product')
-        };
-      }));
+      if (clientParts.length > 0) {
+        setPartRows(clientParts.map(cp => {
+          const partFromResponse = cp.part;
+          const partFromAvailable = availableParts.find(p => p.id === cp.partId);
+          const part = partFromAvailable || partFromResponse;
+          return {
+            id: cp.id,
+            partId: cp.partId,
+            quantity: cp.quantity,
+            category: getItemCategory(part?.type || 'product'),
+            part: part
+          };
+        }));
+      } else {
+        setPartRows([]);
+      }
     }
   }, [open, clientParts, availableParts]);
 
@@ -205,7 +212,8 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
         updatedRows[index] = { 
           ...row, 
           partId: value as string,
-          category: getItemCategory(selectedPart.type)
+          category: getItemCategory(selectedPart.type),
+          part: selectedPart
         };
       }
     } else {
@@ -523,7 +531,7 @@ export default function EditClientDialog({ client, open, onOpenChange, onSaved }
                   <TabsContent key={category} value={category} className="space-y-2">
                     {partRows.filter(row => row.category === category).map((row) => {
                       const actualIndex = partRows.indexOf(row);
-                      const selectedPart = availableParts.find(p => p.id === row.partId);
+                      const selectedPart = row.part || availableParts.find(p => p.id === row.partId);
                       
                       return (
                         <div key={actualIndex} className="flex gap-2 items-center" data-testid={`row-part-${actualIndex}`}>
