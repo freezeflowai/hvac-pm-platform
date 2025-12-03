@@ -1983,13 +1983,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const offset = parseInt(req.query.offset as string) || 0;
       const status = req.query.status as string | undefined;
       const search = req.query.search as string | undefined;
+      const includePending = req.query.includePending === 'true';
       
       const result = await storage.getAllCalendarAssignmentsPaginated(companyId, { limit, offset, status, search });
       const clients = await storage.getAllClients(companyId);
       
+      // Get pending clients (clients needing work this month without assignments)
+      // Note: getUnscheduledClients already filters out clients with assignments for the current month
+      let pendingClients: typeof clients = [];
+      if (includePending) {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1; // 1-indexed for API
+        // getUnscheduledClients already checks if client has ANY assignment for this month
+        // (including those with day=NULL), so we don't need additional filtering
+        pendingClients = await storage.getUnscheduledClients(companyId, currentYear, currentMonth);
+      }
+      
       res.json({ 
         assignments: result.assignments, 
         clients, 
+        pendingClients,
         total: result.total,
         hasMore: result.hasMore
       });

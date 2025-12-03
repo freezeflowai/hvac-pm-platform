@@ -47,7 +47,11 @@ interface Client {
   postalCode: string | null;
 }
 
-type JobStatus = "all" | "late" | "upcoming" | "completed" | "unscheduled";
+interface PendingClient extends Client {
+  isPending: true;
+}
+
+type JobStatus = "all" | "late" | "upcoming" | "completed" | "unscheduled" | "pending";
 type SortField = "client" | "jobNumber" | "schedule" | "status";
 type SortDirection = "asc" | "desc";
 
@@ -118,14 +122,45 @@ export default function Jobs() {
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const loaderRef = useRef<HTMLDivElement>(null);
 
-  const { data: calendarData, isLoading: isCalendarLoading } = useQuery<{ assignments: CalendarAssignment[]; clients: Client[]; total?: number }>({
-    queryKey: ["/api/calendar/all"],
+  const { data: calendarData, isLoading: isCalendarLoading } = useQuery<{ 
+    assignments: CalendarAssignment[]; 
+    clients: Client[]; 
+    pendingClients?: Client[];
+    total?: number 
+  }>({
+    queryKey: ["/api/calendar/all?includePending=true"],
     queryFn: async () => {
-      const res = await fetch('/api/calendar/all', {
+      const res = await fetch('/api/calendar/all?includePending=true', {
         credentials: 'include',
       });
       if (!res.ok) throw new Error("Failed to fetch jobs");
       return res.json();
+    },
+  });
+
+  // Mutation to create a job for pending clients
+  const createJobMutation = useMutation({
+    mutationFn: async (clientId: string) => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const scheduledDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      
+      return apiRequest("POST", "/api/calendar/assign", {
+        clientId,
+        year,
+        month,
+        day: null,
+        scheduledDate,
+        scheduledHour: null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/all?includePending=true"] });
+      toast({ title: "Job Created", description: "Job created successfully. You can now schedule it." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create job", variant: "destructive" });
     },
   });
 
@@ -141,7 +176,7 @@ export default function Jobs() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/all?includePending=true"] });
       toast({ title: "Updated", description: "Technicians assigned successfully" });
     },
     onError: () => {
@@ -157,18 +192,67 @@ export default function Jobs() {
     return map;
   }, [calendarData?.clients]);
 
-  const filteredAndSortedJobs = useMemo(() => {
-    if (!calendarData?.assignments) return [];
+  // Type for job items (both existing assignments and pending clients)
+  type JobItem = {
+    id: string;
+    clientId: string;
+    year: number;
+    month: number;
+    day: number | null;
+    scheduledDate: string;
+    scheduledHour: number | null;
+    completed: boolean;
+    completionNotes: string | null;
+    assignedTechnicianIds: string[] | null;
+    jobNumber: number;
+    client: Client | undefined;
+    statusInfo: { label: string; variant: "default" | "destructive" | "secondary" | "outline"; priority: number };
+    isPending?: boolean;
+  };
 
-    let jobs = calendarData.assignments.map(assignment => {
-      const client = clientMap.get(assignment.clientId);
-      const status = getJobStatus(assignment);
-      return {
-        ...assignment,
+  const filteredAndSortedJobs = useMemo(() => {
+    let jobs: JobItem[] = [];
+    
+    // Add existing assignments
+    if (calendarData?.assignments) {
+      jobs = calendarData.assignments.map(assignment => {
+        const client = clientMap.get(assignment.clientId);
+        const status = getJobStatus(assignment);
+        return {
+          ...assignment,
+          client,
+          statusInfo: status,
+          isPending: false,
+        };
+      });
+    }
+
+    // Add pending clients (clients needing work this month without jobs)
+    if (calendarData?.pendingClients) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const scheduledDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      
+      const pendingJobs: JobItem[] = calendarData.pendingClients.map(client => ({
+        id: `pending-${client.id}`,
+        clientId: client.id,
+        year,
+        month,
+        day: null,
+        scheduledDate,
+        scheduledHour: null,
+        completed: false,
+        completionNotes: null,
+        assignedTechnicianIds: null,
+        jobNumber: 0, // No job number yet
         client,
-        statusInfo: status,
-      };
-    });
+        statusInfo: { label: "Needs Job", variant: "outline" as const, priority: 4 },
+        isPending: true,
+      }));
+      
+      jobs = [...jobs, ...pendingJobs];
+    }
 
     if (statusFilter !== "all") {
       jobs = jobs.filter(job => {
@@ -181,7 +265,9 @@ export default function Jobs() {
           case "completed":
             return status === "completed";
           case "unscheduled":
-            return status === "unscheduled";
+            return status === "unscheduled" || status === "needs job";
+          case "pending":
+            return status === "needs job";
           default:
             return true;
         }
@@ -193,7 +279,7 @@ export default function Jobs() {
       jobs = jobs.filter(job => {
         const clientName = job.client?.companyName?.toLowerCase() || "";
         const address = formatAddress(job.client).toLowerCase();
-        const jobNumber = formatJobNumber(job.jobNumber).toLowerCase();
+        const jobNumber = job.jobNumber ? formatJobNumber(job.jobNumber).toLowerCase() : "";
         const notes = job.completionNotes?.toLowerCase() || "";
         return clientName.includes(query) || address.includes(query) || jobNumber.includes(query) || notes.includes(query);
       });
@@ -206,14 +292,18 @@ export default function Jobs() {
           comparison = (a.client?.companyName || "").localeCompare(b.client?.companyName || "");
           break;
         case "jobNumber":
+          // Pending jobs (jobNumber 0) should sort last
+          if (a.isPending && !b.isPending) return 1;
+          if (!a.isPending && b.isPending) return -1;
           comparison = a.jobNumber - b.jobNumber;
           break;
         case "schedule":
-          if (a.day === null && b.day === null) {
+          // Pending jobs sort with unscheduled
+          if (a.isPending && b.isPending) {
             comparison = 0;
-          } else if (a.day === null) {
+          } else if (a.isPending || a.day === null) {
             comparison = 1;
-          } else if (b.day === null) {
+          } else if (b.isPending || b.day === null) {
             comparison = -1;
           } else {
             const dateA = parseLocalDate(a.scheduledDate);
@@ -229,7 +319,7 @@ export default function Jobs() {
     });
 
     return jobs;
-  }, [calendarData?.assignments, clientMap, statusFilter, searchQuery, sortField, sortDirection]);
+  }, [calendarData?.assignments, calendarData?.pendingClients, clientMap, statusFilter, searchQuery, sortField, sortDirection]);
 
   // Reset visible count when filters or sort changes
   useEffect(() => {
@@ -272,6 +362,11 @@ export default function Jobs() {
   };
 
   const handleRowClick = (job: typeof filteredAndSortedJobs[0]) => {
+    // Don't open dialog for pending clients - they need a job created first
+    if (job.isPending) {
+      return;
+    }
+    
     setSelectedJob({
       assignment: {
         id: job.id,
@@ -288,6 +383,11 @@ export default function Jobs() {
       },
       client: job.client,
     });
+  };
+  
+  const handleCreateJob = (clientId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    createJobMutation.mutate(clientId);
   };
 
   const SortableHeader = ({ field, children, testId }: { field: SortField; children: React.ReactNode; testId: string }) => (
@@ -313,6 +413,7 @@ export default function Jobs() {
     { value: "upcoming", label: "Upcoming" },
     { value: "completed", label: "Completed" },
     { value: "unscheduled", label: "Unscheduled" },
+    { value: "pending", label: "Needs Job" },
   ];
 
   if (isCalendarLoading) {
@@ -382,7 +483,7 @@ export default function Jobs() {
               visibleJobs.map((job) => (
                 <TableRow 
                   key={job.id} 
-                  className="cursor-pointer hover-elevate"
+                  className={job.isPending ? "bg-muted/30" : "cursor-pointer hover-elevate"}
                   onClick={() => handleRowClick(job)}
                   data-testid={`row-job-${job.id}`}
                 >
@@ -390,18 +491,35 @@ export default function Jobs() {
                     {job.client?.companyName || "Unknown Client"}
                   </TableCell>
                   <TableCell data-testid={`text-jobnumber-${job.id}`}>
-                    <div className="font-mono text-sm">{formatJobNumber(job.jobNumber)}</div>
-                    {job.completionNotes && (
-                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">
-                        {job.completionNotes}
-                      </div>
+                    {job.isPending ? (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={(e) => handleCreateJob(job.clientId, e)}
+                        disabled={createJobMutation.isPending}
+                        data-testid={`button-create-job-${job.clientId}`}
+                      >
+                        {createJobMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                        ) : null}
+                        Create Job
+                      </Button>
+                    ) : (
+                      <>
+                        <div className="font-mono text-sm">{formatJobNumber(job.jobNumber)}</div>
+                        {job.completionNotes && (
+                          <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            {job.completionNotes}
+                          </div>
+                        )}
+                      </>
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground" data-testid={`text-property-${job.id}`}>
                     {formatAddress(job.client)}
                   </TableCell>
                   <TableCell data-testid={`text-schedule-${job.id}`}>
-                    {job.day !== null ? format(parseLocalDate(job.scheduledDate), "MMMM d, yyyy") : "Not scheduled"}
+                    {job.isPending ? "Needs scheduling" : (job.day !== null ? format(parseLocalDate(job.scheduledDate), "MMMM d, yyyy") : "Not scheduled")}
                   </TableCell>
                   <TableCell data-testid={`badge-status-${job.id}`}>
                     <Badge variant={job.statusInfo.variant}>
