@@ -171,6 +171,21 @@ export default function Dashboard() {
     },
   });
 
+  // Fetch previous month's calendar to check for missing assignments
+  const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+  const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+  
+  const { data: prevMonthCalendarData } = useQuery<{ assignments: any[]; clients: any[] }>({
+    queryKey: ["/api/calendar", prevYear, prevMonth],
+    queryFn: async () => {
+      const res = await fetch(`/api/calendar?year=${prevYear}&month=${prevMonth}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to fetch previous month calendar");
+      return res.json();
+    },
+  });
+
 
   const { data: clientParts = {} } = useQuery<Record<string, ClientPart[]>>({
     queryKey: ["/api/client-parts/bulk"],
@@ -224,14 +239,27 @@ export default function Dashboard() {
 
   // Mutation to reschedule past unscheduled jobs to current month
   const rescheduleToCurrentMonthMutation = useMutation({
-    mutationFn: async (assignmentId: string) => {
-      const res = await apiRequest("PATCH", `/api/calendar/assign/${assignmentId}`, {
-        year: currentYear,
-        month: currentMonth,
-        day: null, // Keep it unscheduled but in current month
-        scheduledDate: `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`,
-      });
-      return res.json();
+    mutationFn: async (item: { assignmentId: string | null; clientId: string; hasAssignment: boolean }) => {
+      if (item.hasAssignment && item.assignmentId) {
+        // Update existing assignment
+        const res = await apiRequest("PATCH", `/api/calendar/assign/${item.assignmentId}`, {
+          year: currentYear,
+          month: currentMonth,
+          day: null,
+          scheduledDate: `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`,
+        });
+        return res.json();
+      } else {
+        // Create new assignment for client that was never scheduled
+        const res = await apiRequest("POST", `/api/calendar/assign`, {
+          clientId: item.clientId,
+          year: currentYear,
+          month: currentMonth,
+          day: null,
+          scheduledDate: `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`,
+        });
+        return res.json();
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
@@ -240,14 +268,14 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance/statuses"] });
       toast({
-        title: "Job rescheduled",
-        description: "The job has been moved to the current month.",
+        title: "Job moved",
+        description: "The job has been added to the current month.",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to reschedule job.",
+        description: "Failed to move job.",
         variant: "destructive",
       });
     },
@@ -257,11 +285,15 @@ export default function Dashboard() {
   const rescheduleAllToCurrentMonth = async () => {
     try {
       for (const item of pastUnscheduledItems) {
-        await rescheduleToCurrentMonthMutation.mutateAsync(item.assignmentId);
+        await rescheduleToCurrentMonthMutation.mutateAsync({
+          assignmentId: item.assignmentId,
+          clientId: item.clientId,
+          hasAssignment: item.hasAssignment,
+        });
       }
       toast({
-        title: "All jobs rescheduled",
-        description: `${pastUnscheduledItems.length} jobs have been moved to the current month.`,
+        title: "All jobs moved",
+        description: `${pastUnscheduledItems.length} jobs have been added to the current month.`,
       });
     } catch (error) {
       // Individual errors are already handled by the mutation
@@ -494,13 +526,13 @@ export default function Dashboard() {
       originalYear: assignment.year,
     }));
 
-  // Past months' UNSCHEDULED items (day is null) - these need attention
-  const pastUnscheduledItems = overdueFromPast
+  // Past months' UNSCHEDULED items - these need attention
+  // 1. Items with calendar entry but day is null (from overdueFromPast)
+  const existingUnscheduledFromPast = overdueFromPast
     .filter(({ assignment, client }) => {
       if (!client || !client.id || assignment.completed || client.inactive) {
         return false;
       }
-      // Only include unscheduled items (day is null)
       return assignment.day == null;
     })
     .map(({ assignment, client }) => ({
@@ -510,7 +542,34 @@ export default function Dashboard() {
       location: client.location,
       originalMonth: assignment.month,
       originalYear: assignment.year,
+      hasAssignment: true,
     }));
+
+  // 2. Clients with previous month in selectedMonths but NO calendar entry at all
+  const prevMonthAssignedClientIds = new Set(
+    (prevMonthCalendarData?.assignments || []).map((a: any) => a.clientId)
+  );
+  
+  const missingPrevMonthPMs = clients
+    .filter(c => {
+      if (c.inactive) return false;
+      if (!c.selectedMonths.includes(prevMonth)) return false;
+      if (prevMonthAssignedClientIds.has(c.id)) return false;
+      if (completionStatuses[c.id]?.completed) return false;
+      return true;
+    })
+    .map(c => ({
+      assignmentId: null,
+      clientId: c.id,
+      companyName: c.companyName || 'Unknown',
+      location: c.location,
+      originalMonth: prevMonth,
+      originalYear: prevYear,
+      hasAssignment: false,
+    }));
+
+  // Combine both sources
+  const pastUnscheduledItems = [...existingUnscheduledFromPast, ...missingPrevMonthPMs];
 
   // Overdue/upcoming only from SCHEDULED clients - exclude completed items
   // Combine current month overdue with persistent overdue from past months
