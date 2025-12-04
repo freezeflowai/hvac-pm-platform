@@ -19,11 +19,15 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 
-function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimize }: { 
+const MONTH_ABBREV = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimize, currentMonth, currentYear }: { 
   clients: any[]; 
   onClientClick?: (clientId: string) => void;
   isMinimized: boolean;
   onToggleMinimize: () => void;
+  currentMonth: number;
+  currentYear: number;
 }) {
   const { setNodeRef } = useDroppable({ id: 'unscheduled-panel' });
 
@@ -64,21 +68,30 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
           </Button>
         </CardHeader>
         <CardContent className="flex-1 min-h-0 p-4 pt-2">
-          <SortableContext items={clients.map((c: any) => c.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={clients.map((c: any) => c.assignmentId || c.id)} strategy={verticalListSortingStrategy}>
             <div 
               ref={setNodeRef}
               className="space-y-2 h-full overflow-y-auto pr-2"
               style={{ scrollbarWidth: 'thin' }}
               data-testid="unscheduled-panel"
             >
-              {clients.map((client: any) => (
-                <DraggableClient
-                  key={client.id}
-                  id={client.id}
-                  client={client}
-                  onClick={() => onClientClick?.(client.id)}
-                />
-              ))}
+              {clients.map((client: any) => {
+                // Only show off-month badge if there's an existing assignment from a different month
+                const hasAssignment = client.assignmentId !== null;
+                const isOffMonth = hasAssignment && (client.assignmentMonth !== currentMonth || client.assignmentYear !== currentYear);
+                const monthLabel = isOffMonth ? `${MONTH_ABBREV[client.assignmentMonth - 1]}${client.assignmentYear !== currentYear ? ` '${String(client.assignmentYear).slice(-2)}` : ''}` : null;
+                
+                return (
+                  <DraggableClient
+                    key={client.assignmentId || client.id}
+                    id={client.assignmentId || client.id}
+                    client={client}
+                    onClick={() => onClientClick?.(client.id)}
+                    monthLabel={monthLabel}
+                    isOffMonth={isOffMonth}
+                  />
+                );
+              })}
               {clients.length === 0 && (
                 <div className="text-sm text-muted-foreground text-center py-8">
                   All clients scheduled
@@ -92,7 +105,7 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
   );
 }
 
-function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void }) {
+function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician, monthLabel, isOffMonth }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void; monthLabel?: string | null; isOffMonth?: boolean }) {
   // Calendar items: use ONLY useDraggable for unrestricted movement
   // Unscheduled items: use ONLY useSortable for sorting in panel
   const draggableResult = inCalendar ? useDraggable({ 
@@ -119,9 +132,12 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     opacity: isDragging ? 0.5 : 1,
   };
 
-  // Color coding: red = overdue, blue = this month (scheduled), primary = completed
+  // Color coding: red = overdue, orange = off-month unscheduled, blue = this month (scheduled), primary = completed
   const getBackgroundColor = () => {
-    if (!inCalendar) return 'bg-status-unscheduled/10 border border-status-unscheduled/30';
+    if (!inCalendar) {
+      if (isOffMonth) return 'bg-status-overdue/10 border border-status-overdue/30';
+      return 'bg-status-unscheduled/10 border border-status-unscheduled/30';
+    }
     if (isCompleted) return 'bg-primary/10 border-primary/30';
     if (isOverdue) return 'bg-status-overdue/10 border-status-overdue/30';
     return 'bg-status-this-month/10 border-status-this-month/30';
@@ -143,6 +159,9 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
           <span className={`font-semibold leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</span>
           {inCalendar && assignment?.jobNumber && (
             <span className="text-[9px] text-muted-foreground font-normal">#{assignment.jobNumber}</span>
+          )}
+          {!inCalendar && monthLabel && (
+            <span className="text-[9px] bg-status-overdue/20 text-status-overdue px-1 py-0.5 rounded font-medium">{monthLabel}</span>
           )}
         </div>
         {client.location && (
@@ -673,12 +692,14 @@ export default function Calendar() {
       return;
     }
 
+    // Check if this is an existing assignment (in current month) or an unscheduled item with an existing assignment
+    const isExistingAssignment = assignments.some((a: any) => a.id === activeId);
+    const unscheduledItem = unscheduledClients.find((c: any) => c.assignmentId === activeId);
+    const isUnscheduledWithAssignment = !!unscheduledItem;
+
     // Check if dropping on a monthly view day
     if (overId.startsWith('day-')) {
       const day = parseInt(overId.replace('day-', ''));
-      
-      // Check if the activeId is an assignment ID (exists in assignments) or a client ID (from unscheduled)
-      const isExistingAssignment = assignments.some((a: any) => a.id === activeId);
       
       if (isExistingAssignment) {
         // Only move if the assignment exists and day changed
@@ -686,8 +707,11 @@ export default function Calendar() {
         if (currentAssignment && currentAssignment.day !== day) {
           updateAssignment.mutate({ id: activeId, day });
         }
+      } else if (isUnscheduledWithAssignment) {
+        // Update existing unscheduled assignment (may be from different month) to current month/day
+        updateAssignment.mutate({ id: activeId, day, targetMonth: month, targetYear: year });
       } else {
-        // Create new assignment from unscheduled client
+        // Create new assignment from unscheduled client (no existing assignment)
         createAssignment.mutate({ clientId: activeId, day });
       }
     } else if (overId.startsWith('allday-')) {
@@ -696,14 +720,15 @@ export default function Calendar() {
       const dayName = parts[0];
       const targetDay = parseInt(parts[1]);
       
-      const isExistingAssignment = assignments.some((a: any) => a.id === activeId);
-      
       if (isExistingAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
         // Update if day changed OR if moving from a time slot to all-day (scheduledHour becomes null)
         if (currentAssignment && (currentAssignment.day !== targetDay || currentAssignment.scheduledHour !== null)) {
           updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: null });
         }
+      } else if (isUnscheduledWithAssignment) {
+        // Update existing unscheduled assignment to current month/day
+        updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: null, targetMonth: month, targetYear: year });
       } else {
         // Create new assignment from unscheduled client
         createAssignment.mutate({ clientId: activeId, day: targetDay });
@@ -715,20 +740,20 @@ export default function Calendar() {
       const hour = parseInt(parts[1]);
       const targetDay = parseInt(parts[2]);
       
-      const isExistingAssignment = assignments.some((a: any) => a.id === activeId);
-      
       if (isExistingAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
         if (currentAssignment && (currentAssignment.day !== targetDay || currentAssignment.scheduledHour !== hour)) {
           updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: hour });
         }
+      } else if (isUnscheduledWithAssignment) {
+        // Update existing unscheduled assignment to current month/day/hour
+        updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: hour, targetMonth: month, targetYear: year });
       } else {
         // Create new assignment from unscheduled client
         createAssignment.mutate({ clientId: activeId, day: targetDay, scheduledHour: hour });
       }
     } else if (overId === 'unscheduled-panel') {
       // Dropped on unscheduled panel - remove from calendar
-      const isExistingAssignment = assignments.some((a: any) => a.id === activeId);
       if (isExistingAssignment) {
         deleteAssignment.mutate(activeId);
       }
@@ -1372,6 +1397,8 @@ export default function Calendar() {
                   onClientClick={setReportDialogClientId}
                   isMinimized={isUnscheduledMinimized}
                   onToggleMinimize={() => setIsUnscheduledMinimized(!isUnscheduledMinimized)}
+                  currentMonth={month}
+                  currentYear={year}
                 />
               </div>
             )}
@@ -1383,6 +1410,8 @@ export default function Calendar() {
               onClientClick={setReportDialogClientId}
               isMinimized={isUnscheduledMinimized}
               onToggleMinimize={() => setIsUnscheduledMinimized(!isUnscheduledMinimized)}
+              currentMonth={month}
+              currentYear={year}
             />
           )}
         </main>

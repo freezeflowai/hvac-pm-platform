@@ -153,6 +153,7 @@ export interface IStorage {
   deleteCalendarAssignment(companyId: string, id: string): Promise<boolean>;
   getClientCalendarAssignment(companyId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined>;
   getUnscheduledClients(companyId: string, year: number, month: number): Promise<Client[]>;
+  getAllUnscheduledAssignments(companyId: string): Promise<Array<{ client: Client; assignment: CalendarAssignment }>>;
   getPastIncompleteAssignments(companyId: string): Promise<CalendarAssignment[]>;
   
   // Job notes methods
@@ -1222,6 +1223,26 @@ export class MemStorage implements IStorage {
       }
       
       return true;
+    });
+  }
+
+  async getAllUnscheduledAssignments(companyId: string): Promise<Array<{ client: Client; assignment: CalendarAssignment }>> {
+    const allClients = await this.getAllClients(companyId);
+    const allAssignments = Array.from(this.calendarAssignments.values())
+      .filter(a => a.companyId === companyId && a.day === null && !a.completed);
+    
+    const result: Array<{ client: Client; assignment: CalendarAssignment }> = [];
+    
+    for (const assignment of allAssignments) {
+      const client = allClients.find(c => c.id === assignment.clientId);
+      if (client && !client.inactive) {
+        result.push({ client, assignment });
+      }
+    }
+    
+    return result.sort((a, b) => {
+      if (a.assignment.year !== b.assignment.year) return a.assignment.year - b.assignment.year;
+      return a.assignment.month - b.assignment.month;
     });
   }
 
@@ -2442,6 +2463,38 @@ export class DbStorage implements IStorage {
     }
     
     return unscheduled;
+  }
+
+  async getAllUnscheduledAssignments(companyId: string): Promise<Array<{ client: Client; assignment: CalendarAssignment }>> {
+    // Get all unscheduled assignments (day = null, completed = false)
+    const assignments = await db.select()
+      .from(calendarAssignments)
+      .where(and(
+        eq(calendarAssignments.companyId, companyId),
+        eq(calendarAssignments.completed, false),
+        sql`${calendarAssignments.day} IS NULL`
+      ))
+      .orderBy(calendarAssignments.year, calendarAssignments.month);
+    
+    // Get client data for each assignment
+    const result: Array<{ client: Client; assignment: CalendarAssignment }> = [];
+    
+    for (const assignment of assignments) {
+      const client = await db.select()
+        .from(clients)
+        .where(and(
+          eq(clients.id, assignment.clientId),
+          eq(clients.companyId, companyId)
+        ))
+        .limit(1);
+      
+      // Only include if client exists and is not inactive
+      if (client.length > 0 && !client[0].inactive) {
+        result.push({ client: client[0], assignment });
+      }
+    }
+    
+    return result;
   }
 
   async getPastIncompleteAssignments(companyId: string): Promise<CalendarAssignment[]> {
