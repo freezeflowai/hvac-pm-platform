@@ -546,15 +546,21 @@ export default function Dashboard() {
     }));
 
   // 2. Clients with previous month in selectedMonths but NO calendar entry at all
+  // AND not already scheduled for the current month
   const prevMonthAssignedClientIds = new Set(
     (prevMonthCalendarData?.assignments || []).map((a: any) => a.clientId)
+  );
+  
+  const currentMonthAssignedClientIds = new Set(
+    (calendarData?.assignments || []).map((a: any) => a.clientId)
   );
   
   const missingPrevMonthPMs = clients
     .filter(c => {
       if (c.inactive) return false;
       if (!c.selectedMonths.includes(prevMonth)) return false;
-      if (prevMonthAssignedClientIds.has(c.id)) return false;
+      if (prevMonthAssignedClientIds.has(c.id)) return false; // Already has Nov entry
+      if (currentMonthAssignedClientIds.has(c.id)) return false; // Already scheduled for Dec
       if (completionStatuses[c.id]?.completed) return false;
       return true;
     })
