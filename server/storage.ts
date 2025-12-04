@@ -2374,7 +2374,20 @@ export class DbStorage implements IStorage {
         eq(calendarAssignments.month, month)
       ));
     
-    const scheduledClientIds = new Set(assignments.map(a => a.clientId));
+    // Only consider clients with a specific day as "scheduled"
+    // Clients with day = null still need to appear in the unscheduled panel
+    const scheduledClientIds = new Set(
+      assignments
+        .filter(a => a.day !== null && !a.completed)
+        .map(a => a.clientId)
+    );
+    
+    // Track clients that have unscheduled assignments (day = null)
+    const unscheduledAssignmentClientIds = new Set(
+      assignments
+        .filter(a => a.day === null && !a.completed)
+        .map(a => a.clientId)
+    );
     
     // Get all clients for this company
     const allClients = await db.select()
@@ -2388,11 +2401,17 @@ export class DbStorage implements IStorage {
       // Exclude inactive clients
       if (client.inactive) continue;
       
-      // Exclude clients not scheduled for this month
-      if (!client.selectedMonths?.includes(monthIndex)) continue;
-      
-      // Exclude clients already scheduled
+      // Exclude clients already scheduled with a specific day
       if (scheduledClientIds.has(client.id)) continue;
+      
+      // Include clients that have unscheduled assignments (day = null)
+      if (unscheduledAssignmentClientIds.has(client.id)) {
+        unscheduled.push(client);
+        continue;
+      }
+      
+      // Exclude clients not scheduled for this month (and don't have an unscheduled assignment)
+      if (!client.selectedMonths?.includes(monthIndex)) continue;
       
       // Check if maintenance is completed for this month
       const latestRecord = await db.select()
