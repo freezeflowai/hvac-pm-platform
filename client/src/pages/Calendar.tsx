@@ -81,6 +81,12 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
                 const isOffMonth = hasAssignment && (client.assignmentMonth !== currentMonth || client.assignmentYear !== currentYear);
                 const monthLabel = isOffMonth ? `${MONTH_ABBREV[client.assignmentMonth - 1]}${client.assignmentYear !== currentYear ? ` '${String(client.assignmentYear).slice(-2)}` : ''}` : null;
                 
+                // Determine if this is a PAST month (overdue) vs future month
+                const isPastMonth = hasAssignment && (
+                  client.assignmentYear < currentYear || 
+                  (client.assignmentYear === currentYear && client.assignmentMonth < currentMonth)
+                );
+                
                 return (
                   <DraggableClient
                     key={client.assignmentId || client.id}
@@ -89,6 +95,7 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
                     onClick={() => onClientClick?.(client.id)}
                     monthLabel={monthLabel}
                     isOffMonth={isOffMonth}
+                    isPastMonth={isPastMonth}
                   />
                 );
               })}
@@ -105,7 +112,7 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
   );
 }
 
-function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician, monthLabel, isOffMonth }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void; monthLabel?: string | null; isOffMonth?: boolean }) {
+function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician, monthLabel, isOffMonth, isPastMonth }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void; monthLabel?: string | null; isOffMonth?: boolean; isPastMonth?: boolean }) {
   // Calendar items: use ONLY useDraggable for unrestricted movement
   // Unscheduled items: use ONLY useSortable for sorting in panel
   const draggableResult = inCalendar ? useDraggable({ 
@@ -132,10 +139,11 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     opacity: isDragging ? 0.5 : 1,
   };
 
-  // Color coding: red = overdue, orange = off-month unscheduled, blue = this month (scheduled), primary = completed
+  // Color coding: red/orange = past month (overdue), muted = future month, blue = this month (scheduled), primary = completed
   const getBackgroundColor = () => {
     if (!inCalendar) {
-      if (isOffMonth) return 'bg-status-overdue/10 border border-status-overdue/30';
+      if (isPastMonth) return 'bg-status-overdue/10 border border-status-overdue/30';
+      if (isOffMonth) return 'bg-muted/50 border border-muted-foreground/20';
       return 'bg-status-unscheduled/10 border border-status-unscheduled/30';
     }
     if (isCompleted) return 'bg-primary/10 border-primary/30';
@@ -161,7 +169,7 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
             <span className="text-[9px] text-muted-foreground font-normal">#{assignment.jobNumber}</span>
           )}
           {!inCalendar && monthLabel && (
-            <span className="text-[9px] bg-status-overdue/20 text-status-overdue px-1 py-0.5 rounded font-medium">{monthLabel}</span>
+            <span className={`text-[9px] px-1 py-0.5 rounded font-medium ${isPastMonth ? 'bg-status-overdue/20 text-status-overdue' : 'bg-muted text-muted-foreground'}`}>{monthLabel}</span>
           )}
         </div>
         {client.location && (
