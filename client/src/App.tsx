@@ -115,7 +115,7 @@ function AppContent() {
 
   // Fetch unscheduled backlog to check for past-month items
   const { data: unscheduledBacklog = [] } = useQuery<any[]>({
-    queryKey: ["/api/calendar/unscheduled/all"],
+    queryKey: ["/api/calendar/unscheduled"],
     enabled: Boolean(user?.id),
   });
 
