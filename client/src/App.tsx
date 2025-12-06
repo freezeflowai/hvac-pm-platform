@@ -29,7 +29,7 @@ import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Search, Plus, Settings } from "lucide-react";
+import { Search, Plus, Settings, AlertTriangle, X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -111,6 +111,21 @@ function AppContent() {
   const { user } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [overdueAlertMinimized, setOverdueAlertMinimized] = useState(false);
+
+  // Fetch unscheduled backlog to check for past-month items
+  const { data: unscheduledBacklog = [] } = useQuery<any[]>({
+    queryKey: ["/api/calendar/unscheduled/all"],
+    enabled: Boolean(user?.id),
+  });
+
+  // Filter for past-month items only
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const pastUnscheduledCount = unscheduledBacklog.filter(item => 
+    item.year < currentYear || (item.year === currentYear && item.month < currentMonth)
+  ).length;
   
   const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
@@ -154,6 +169,43 @@ function AppContent() {
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between gap-2 border-b px-4 py-2">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
+            
+            {/* Minimizable overdue jobs alert */}
+            {!isTechnicianPage && pastUnscheduledCount > 0 && (
+              overdueAlertMinimized ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOverdueAlertMinimized(false)}
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  data-testid="button-expand-overdue-alert"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-medium">{pastUnscheduledCount}</span>
+                  <ChevronRight className="h-3 w-3" />
+                </Button>
+              ) : (
+                <div 
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-destructive/10 border border-destructive/20"
+                  data-testid="alert-past-unscheduled-header"
+                >
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
+                  <span className="text-sm font-medium">
+                    {pastUnscheduledCount} overdue job{pastUnscheduledCount > 1 ? 's' : ''}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setOverdueAlertMinimized(true)}
+                    data-testid="button-minimize-overdue-alert"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )
+            )}
+            
             {!isTechnicianPage && (
               <div className="flex items-center gap-2">
                 <div className="relative">

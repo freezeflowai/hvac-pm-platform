@@ -237,69 +237,6 @@ export default function Dashboard() {
     },
   });
 
-  // Mutation to reschedule past unscheduled jobs to current month
-  const rescheduleToCurrentMonthMutation = useMutation({
-    mutationFn: async (item: { assignmentId: string | null; clientId: string; hasAssignment: boolean }) => {
-      if (item.hasAssignment && item.assignmentId) {
-        // Update existing assignment
-        const res = await apiRequest("PATCH", `/api/calendar/assign/${item.assignmentId}`, {
-          year: currentYear,
-          month: currentMonth,
-          day: null,
-          scheduledDate: `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`,
-        });
-        return res.json();
-      } else {
-        // Create new assignment for client that was never scheduled
-        const res = await apiRequest("POST", `/api/calendar/assign`, {
-          clientId: item.clientId,
-          year: currentYear,
-          month: currentMonth,
-          day: null,
-          scheduledDate: `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`,
-        });
-        return res.json();
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/overdue"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/maintenance/statuses"] });
-      toast({
-        title: "Job moved",
-        description: "The job has been added to the current month.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to move job.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Reschedule all past unscheduled jobs to current month
-  const rescheduleAllToCurrentMonth = async () => {
-    try {
-      for (const item of pastUnscheduledItems) {
-        await rescheduleToCurrentMonthMutation.mutateAsync({
-          assignmentId: item.assignmentId,
-          clientId: item.clientId,
-          hasAssignment: item.hasAssignment,
-        });
-      }
-      toast({
-        title: "All jobs moved",
-        description: `${pastUnscheduledItems.length} jobs have been added to the current month.`,
-      });
-    } catch (error) {
-      // Individual errors are already handled by the mutation
-    }
-  };
-
   const clients: Client[] = dbClients
     .map(c => ({
       id: c.id,
@@ -713,34 +650,6 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
-        {/* Compact header banner for past unscheduled jobs */}
-        {pastUnscheduledItems.length > 0 && (
-          <div 
-            className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20"
-            data-testid="alert-past-unscheduled"
-          >
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
-              <span className="text-sm font-medium">
-                {pastUnscheduledItems.length} unscheduled job{pastUnscheduledItems.length > 1 ? 's' : ''} from previous month{pastUnscheduledItems.length > 1 ? 's' : ''}
-              </span>
-              <span className="text-xs text-muted-foreground hidden sm:inline">
-                ({pastUnscheduledItems.map(item => item.companyName).join(', ')})
-              </span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button 
-                size="sm" 
-                variant="default"
-                onClick={rescheduleAllToCurrentMonth}
-                disabled={rescheduleToCurrentMonthMutation.isPending}
-                data-testid="button-reschedule-all"
-              >
-                {rescheduleToCurrentMonthMutation.isPending ? 'Moving...' : `Move to ${new Date().toLocaleString('default', { month: 'short' })}`}
-              </Button>
-            </div>
-          </div>
-        )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsContent value="schedule" className="space-y-6">
