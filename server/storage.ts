@@ -1305,8 +1305,10 @@ export class MemStorage implements IStorage {
     }
     
     // 2. Find clients missing assignments for their selected months
-    // For current year: check months >= currentMonth
-    // For next year: check months < currentMonth (the next occurrence of those months)
+    // Only show current month and next month (1 month lookahead)
+    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+    const nextMonthYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+    
     for (const client of allClients) {
       if (client.inactive) continue;
       if (!client.selectedMonths || client.selectedMonths.length === 0) continue;
@@ -1314,9 +1316,15 @@ export class MemStorage implements IStorage {
       for (const monthIndex of client.selectedMonths) {
         const month = monthIndex + 1; // Convert 0-indexed to 1-indexed
         
-        // Determine which year this month occurrence falls in
-        // If month < currentMonth, it's next year; otherwise it's current year
-        const targetYear = month < currentMonth ? currentYear + 1 : currentYear;
+        // Only include current month or next month
+        const isCurrentMonth = month === currentMonth;
+        const isNextMonth = month === nextMonth;
+        
+        if (!isCurrentMonth && !isNextMonth) {
+          continue;
+        }
+        
+        const targetYear = isCurrentMonth ? currentYear : nextMonthYear;
         
         // Check if assignment exists for this client/year/month
         const existingAssignment = allAssignments.find(a => 
@@ -2649,8 +2657,10 @@ export class DbStorage implements IStorage {
     }
     
     // 2. Find clients missing assignments for their selected months
-    // For current year: check months >= currentMonth
-    // For next year: check months < currentMonth (the next occurrence of those months)
+    // Only show current month and next month (1 month lookahead)
+    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+    const nextMonthYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+    
     for (const client of allClients) {
       if (client.inactive) continue;
       if (!client.selectedMonths || client.selectedMonths.length === 0) continue;
@@ -2658,9 +2668,15 @@ export class DbStorage implements IStorage {
       for (const monthIndex of client.selectedMonths) {
         const month = monthIndex + 1; // Convert 0-indexed to 1-indexed
         
-        // Determine which year this month occurrence falls in
-        // If month < currentMonth, it's next year; otherwise it's current year
-        const targetYear = month < currentMonth ? currentYear + 1 : currentYear;
+        // Only include current month or next month
+        const isCurrentMonth = month === currentMonth;
+        const isNextMonth = month === nextMonth;
+        
+        if (!isCurrentMonth && !isNextMonth) {
+          continue;
+        }
+        
+        const targetYear = isCurrentMonth ? currentYear : nextMonthYear;
         
         // Check if assignment exists for this client/year/month
         const existingAssignment = allAssignments.find(a => 
