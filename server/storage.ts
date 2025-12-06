@@ -165,6 +165,7 @@ export interface IStorage {
     status: 'existing' | 'missing';
   }>>;
   getPastIncompleteAssignments(companyId: string): Promise<CalendarAssignment[]>;
+  getOldUnscheduledAssignments(companyId: string): Promise<CalendarAssignment[]>;
   
   // Job notes methods
   getJobNotes(companyId: string, assignmentId: string): Promise<JobNote[]>;
@@ -1285,9 +1286,29 @@ export class MemStorage implements IStorage {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
     
-    // 1. Add all day=null incomplete assignments (existing unscheduled)
+    // Calculate month boundaries (prev, current, next)
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const prevMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+    const nextMonthYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+    
+    // Helper to check if a year/month is within our 3-month window (prev, current, next)
+    const isWithinWindow = (year: number, month: number): boolean => {
+      // Previous month
+      if (year === prevMonthYear && month === prevMonth) return true;
+      // Current month
+      if (year === currentYear && month === currentMonth) return true;
+      // Next month
+      if (year === nextMonthYear && month === nextMonth) return true;
+      return false;
+    };
+    
+    // 1. Add all day=null incomplete assignments that are within our window (existing unscheduled)
     for (const assignment of allAssignments) {
       if (assignment.day === null && !assignment.completed) {
+        // Only include if within our 3-month window
+        if (!isWithinWindow(assignment.year, assignment.month)) continue;
+        
         const client = allClients.find(c => c.id === assignment.clientId);
         if (client && !client.inactive) {
           result.push({
@@ -1305,10 +1326,7 @@ export class MemStorage implements IStorage {
     }
     
     // 2. Find clients missing assignments for their selected months
-    // Include: past months in current year, current month, and next month
-    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
-    const nextMonthYear = currentMonth === 12 ? currentYear + 1 : currentYear;
-    
+    // Only include: previous month, current month, and next month
     for (const client of allClients) {
       if (client.inactive) continue;
       if (!client.selectedMonths || client.selectedMonths.length === 0) continue;
@@ -1316,19 +1334,24 @@ export class MemStorage implements IStorage {
       for (const monthIndex of client.selectedMonths) {
         const month = monthIndex + 1; // Convert 0-indexed to 1-indexed
         
-        // Include past months in current year, current month, and next month
-        const isPastMonthThisYear = month < currentMonth;
+        // Only include previous month, current month, and next month
+        const isPrevMonth = month === prevMonth;
         const isCurrentMonth = month === currentMonth;
         const isNextMonth = month === nextMonth;
         
-        if (!isPastMonthThisYear && !isCurrentMonth && !isNextMonth) {
+        if (!isPrevMonth && !isCurrentMonth && !isNextMonth) {
           continue;
         }
         
-        // Past months are in current year, current month is current year, next month could be next year
-        const targetYear = isNextMonth && nextMonth < currentMonth ? currentYear + 1 : currentYear;
+        // Determine target year based on which month bucket
+        let targetYear = currentYear;
+        if (isPrevMonth) {
+          targetYear = prevMonthYear;
+        } else if (isNextMonth) {
+          targetYear = nextMonthYear;
+        }
         
-        // Check if assignment exists for this client/year/month
+        // Check if assignment exists for this client/year/month (any assignment, including completed)
         const existingAssignment = allAssignments.find(a => 
           a.clientId === client.id && 
           a.year === targetYear && 
@@ -1370,6 +1393,27 @@ export class MemStorage implements IStorage {
       // Check if the assignment is from a past month
       if (assignment.year < currentYear) return true;
       if (assignment.year === currentYear && assignment.month < currentMonth) return true;
+      
+      return false;
+    });
+  }
+  
+  // Get old unscheduled assignments (older than previous month) that need user action
+  async getOldUnscheduledAssignments(companyId: string): Promise<CalendarAssignment[]> {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1; // 1-indexed
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const prevMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    
+    return Array.from(this.calendarAssignments.values()).filter(assignment => {
+      if (assignment.companyId !== companyId) return false;
+      if (assignment.completed) return false;
+      if (assignment.day !== null) return false; // Only unscheduled
+      
+      // Check if older than previous month
+      if (assignment.year < prevMonthYear) return true;
+      if (assignment.year === prevMonthYear && assignment.month < prevMonth) return true;
       
       return false;
     });
@@ -2639,9 +2683,29 @@ export class DbStorage implements IStorage {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
     
-    // 1. Add all day=null incomplete assignments (existing unscheduled)
+    // Calculate month boundaries (prev, current, next)
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const prevMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+    const nextMonthYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+    
+    // Helper to check if a year/month is within our 3-month window (prev, current, next)
+    const isWithinWindow = (year: number, month: number): boolean => {
+      // Previous month
+      if (year === prevMonthYear && month === prevMonth) return true;
+      // Current month
+      if (year === currentYear && month === currentMonth) return true;
+      // Next month
+      if (year === nextMonthYear && month === nextMonth) return true;
+      return false;
+    };
+    
+    // 1. Add all day=null incomplete assignments that are within our window (existing unscheduled)
     for (const assignment of allAssignments) {
       if (assignment.day === null && !assignment.completed) {
+        // Only include if within our 3-month window
+        if (!isWithinWindow(assignment.year, assignment.month)) continue;
+        
         const client = allClients.find(c => c.id === assignment.clientId);
         if (client && !client.inactive) {
           result.push({
@@ -2659,10 +2723,7 @@ export class DbStorage implements IStorage {
     }
     
     // 2. Find clients missing assignments for their selected months
-    // Include: past months in current year, current month, and next month
-    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
-    const nextMonthYear = currentMonth === 12 ? currentYear + 1 : currentYear;
-    
+    // Only include: previous month, current month, and next month
     for (const client of allClients) {
       if (client.inactive) continue;
       if (!client.selectedMonths || client.selectedMonths.length === 0) continue;
@@ -2670,19 +2731,24 @@ export class DbStorage implements IStorage {
       for (const monthIndex of client.selectedMonths) {
         const month = monthIndex + 1; // Convert 0-indexed to 1-indexed
         
-        // Include past months in current year, current month, and next month
-        const isPastMonthThisYear = month < currentMonth;
+        // Only include previous month, current month, and next month
+        const isPrevMonth = month === prevMonth;
         const isCurrentMonth = month === currentMonth;
         const isNextMonth = month === nextMonth;
         
-        if (!isPastMonthThisYear && !isCurrentMonth && !isNextMonth) {
+        if (!isPrevMonth && !isCurrentMonth && !isNextMonth) {
           continue;
         }
         
-        // Past months are in current year, current month is current year, next month could be next year
-        const targetYear = isNextMonth && nextMonth < currentMonth ? currentYear + 1 : currentYear;
+        // Determine target year based on which month bucket
+        let targetYear = currentYear;
+        if (isPrevMonth) {
+          targetYear = prevMonthYear;
+        } else if (isNextMonth) {
+          targetYear = nextMonthYear;
+        }
         
-        // Check if assignment exists for this client/year/month
+        // Check if assignment exists for this client/year/month (any assignment, including completed)
         const existingAssignment = allAssignments.find(a => 
           a.clientId === client.id && 
           a.year === targetYear && 
@@ -2728,6 +2794,33 @@ export class DbStorage implements IStorage {
           and(
             eq(calendarAssignments.year, currentYear),
             lt(calendarAssignments.month, currentMonth)
+          )
+        )
+      ));
+    
+    return result;
+  }
+  
+  // Get old unscheduled assignments (older than previous month) that need user action
+  async getOldUnscheduledAssignments(companyId: string): Promise<CalendarAssignment[]> {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1; // 1-indexed
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const prevMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    
+    // Get all incomplete unscheduled assignments older than previous month
+    const result = await db.select()
+      .from(calendarAssignments)
+      .where(and(
+        eq(calendarAssignments.companyId, companyId),
+        eq(calendarAssignments.completed, false),
+        sql`${calendarAssignments.day} IS NULL`,
+        or(
+          lt(calendarAssignments.year, prevMonthYear),
+          and(
+            eq(calendarAssignments.year, prevMonthYear),
+            lt(calendarAssignments.month, prevMonth)
           )
         )
       ));

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ChevronsRight, ChevronsLeft, Route, Users, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ChevronsRight, ChevronsLeft, Route, Users, Info, AlertTriangle, Trash2, Archive } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -827,6 +827,64 @@ export default function Calendar() {
     refetchOnMount: 'always',
   });
 
+  // Query for old unscheduled items that need user action (older than previous month)
+  const { data: oldUnscheduledItems = [] } = useQuery<any[]>({
+    queryKey: ["/api/calendar/old-unscheduled"],
+    queryFn: async () => {
+      const res = await fetch(`/api/calendar/old-unscheduled`);
+      if (!res.ok) throw new Error("Failed to fetch old unscheduled items");
+      return res.json();
+    },
+  });
+
+  const [showOldItemsDialog, setShowOldItemsDialog] = useState(false);
+
+  // Delete old unscheduled assignment
+  const deleteOldAssignment = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      return apiRequest("DELETE", `/api/calendar/assign/${assignmentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/old-unscheduled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled"] });
+      toast({
+        title: "Assignment deleted",
+        description: "The old assignment has been removed",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete assignment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mark old assignment as completed (archive it)
+  const archiveOldAssignment = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      return apiRequest("PATCH", `/api/calendar/assign/${assignmentId}`, {
+        completed: true
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/old-unscheduled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled"] });
+      toast({
+        title: "Assignment archived",
+        description: "The old assignment has been marked as complete",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to archive assignment",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Listen for sidebar events
   useEffect(() => {
     const handleAddClient = () => setAddClientDialogOpen(true);
@@ -1205,6 +1263,88 @@ export default function Calendar() {
       autoScroll={{ threshold: { x: 0.2, y: 0.2 } }}
     >
       <div className="h-screen bg-background flex flex-col">
+        {/* Alert banner for old unscheduled items */}
+        {oldUnscheduledItems.length > 0 && (
+          <div className="bg-amber-100 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 px-4 py-2 flex items-center justify-center gap-3">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <span className="text-sm text-amber-800 dark:text-amber-200">
+              {oldUnscheduledItems.length} old unscheduled job{oldUnscheduledItems.length !== 1 ? 's' : ''} need{oldUnscheduledItems.length === 1 ? 's' : ''} attention
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs bg-white dark:bg-amber-900/50 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-amber-900/70"
+              onClick={() => setShowOldItemsDialog(true)}
+              data-testid="button-view-old-items"
+            >
+              Review
+            </Button>
+            <button
+              className="ml-2 text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200"
+              onClick={() => setShowOldItemsDialog(true)}
+              data-testid="button-dismiss-old-items-banner"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Dialog for managing old unscheduled items */}
+        <Dialog open={showOldItemsDialog} onOpenChange={setShowOldItemsDialog}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                Old Unscheduled Jobs
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground mb-4">
+              These jobs are from months older than last month and need your attention. You can either archive them (mark as complete) or delete them.
+            </p>
+            <div className="overflow-y-auto flex-1 space-y-2">
+              {oldUnscheduledItems.map((item: any) => (
+                <div key={item.assignment.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <div className="font-medium">{item.client?.companyName || 'Unknown Client'}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {item.client?.location && <span>{item.client.location} • </span>}
+                      {MONTH_ABBREV[item.assignment.month - 1]} '{String(item.assignment.year).slice(-2)}
+                      {item.assignment.jobNumber && <span> • Job #{item.assignment.jobNumber}</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => archiveOldAssignment.mutate(item.assignment.id)}
+                      disabled={archiveOldAssignment.isPending || deleteOldAssignment.isPending}
+                      data-testid={`button-archive-${item.assignment.id}`}
+                    >
+                      <Archive className="h-4 w-4 mr-1" />
+                      Archive
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => deleteOldAssignment.mutate(item.assignment.id)}
+                      disabled={archiveOldAssignment.isPending || deleteOldAssignment.isPending}
+                      data-testid={`button-delete-${item.assignment.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {oldUnscheduledItems.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">
+                  All old items have been handled
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <main className={`flex flex-col flex-1 min-h-0 mx-auto px-4 sm:px-6 lg:px-8 py-4 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

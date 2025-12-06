@@ -2059,6 +2059,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get old unscheduled assignments (older than previous month) that need user action
+  app.get("/api/calendar/old-unscheduled", isAuthenticated, async (req, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      const oldAssignments = await storage.getOldUnscheduledAssignments(companyId);
+      const clients = await storage.getAllClients(companyId);
+      
+      // Combine assignments with client data
+      const oldWithClients = oldAssignments.map(assignment => {
+        const client = clients.find(c => c.id === assignment.clientId);
+        return { assignment, client };
+      }).filter(item => item.client);
+      
+      res.json(oldWithClients);
+    } catch (error) {
+      console.error('Get old unscheduled assignments error:', error);
+      res.status(500).json({ error: "Failed to fetch old unscheduled assignments" });
+    }
+  });
+
   app.post("/api/calendar/assign", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user!.id;
