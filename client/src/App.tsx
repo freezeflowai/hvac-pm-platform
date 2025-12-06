@@ -118,14 +118,25 @@ function AppContent() {
     queryKey: ["/api/calendar/unscheduled"],
     enabled: Boolean(user?.id),
   });
+  
+  // Fetch overdue assignments (past month incomplete assignments)
+  const { data: overdueAssignments = [] } = useQuery<any[]>({
+    queryKey: ["/api/calendar/overdue"],
+    enabled: Boolean(user?.id),
+  });
 
-  // Filter for past-month items only
+  // Count past-month unscheduled items plus past-month overdue scheduled items
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
+  
+  // Past-month items from unscheduled backlog
   const pastUnscheduledCount = unscheduledBacklog.filter(item => 
     item.year < currentYear || (item.year === currentYear && item.month < currentMonth)
   ).length;
+  
+  // Combine with overdue assignments from past months
+  const totalOverdueCount = pastUnscheduledCount + overdueAssignments.length;
   
   const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
@@ -171,7 +182,7 @@ function AppContent() {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             
             {/* Minimizable overdue jobs alert */}
-            {!isTechnicianPage && pastUnscheduledCount > 0 && (
+            {!isTechnicianPage && totalOverdueCount > 0 && (
               overdueAlertMinimized ? (
                 <Button
                   variant="ghost"
@@ -181,7 +192,7 @@ function AppContent() {
                   data-testid="button-expand-overdue-alert"
                 >
                   <AlertTriangle className="h-4 w-4" />
-                  <span className="font-medium">{pastUnscheduledCount}</span>
+                  <span className="font-medium">{totalOverdueCount}</span>
                   <ChevronRight className="h-3 w-3" />
                 </Button>
               ) : (
@@ -191,7 +202,7 @@ function AppContent() {
                 >
                   <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
                   <span className="text-sm font-medium">
-                    {pastUnscheduledCount} overdue job{pastUnscheduledCount > 1 ? 's' : ''}
+                    {totalOverdueCount} overdue job{totalOverdueCount > 1 ? 's' : ''} from past months
                   </span>
                   <Button
                     variant="ghost"
