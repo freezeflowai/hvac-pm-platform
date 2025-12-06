@@ -68,33 +68,32 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
           </Button>
         </CardHeader>
         <CardContent className="flex-1 min-h-0 p-4 pt-2">
-          <SortableContext items={clients.map((c: any) => c.assignmentId || c.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={clients.map((c: any) => c.id)} strategy={verticalListSortingStrategy}>
             <div 
               ref={setNodeRef}
               className="space-y-2 h-full overflow-y-auto pr-2"
               style={{ scrollbarWidth: 'thin' }}
               data-testid="unscheduled-panel"
             >
-              {clients.map((client: any) => {
-                // Only show off-month badge if there's an existing assignment from a different month
-                const hasAssignment = client.assignmentId !== null;
-                const isOffMonth = hasAssignment && (client.assignmentMonth !== currentMonth || client.assignmentYear !== currentYear);
-                const monthLabel = isOffMonth ? `${MONTH_ABBREV[client.assignmentMonth - 1]}${client.assignmentYear !== currentYear ? ` '${String(client.assignmentYear).slice(-2)}` : ''}` : null;
+              {clients.map((item: any) => {
+                // Show month badge for all items (since they could be for any month)
+                const isCurrentViewMonth = item.month === currentMonth && item.year === currentYear;
+                const monthLabel = !isCurrentViewMonth ? `${MONTH_ABBREV[item.month - 1]}${item.year !== currentYear ? ` '${String(item.year).slice(-2)}` : ''}` : null;
                 
-                // Determine if this is a PAST month (overdue) vs future month
-                const isPastMonth = hasAssignment && (
-                  client.assignmentYear < currentYear || 
-                  (client.assignmentYear === currentYear && client.assignmentMonth < currentMonth)
-                );
+                // Determine if this is a PAST month (overdue) vs future/current month
+                const now = new Date();
+                const todayYear = now.getFullYear();
+                const todayMonth = now.getMonth() + 1;
+                const isPastMonth = item.year < todayYear || (item.year === todayYear && item.month < todayMonth);
                 
                 return (
                   <DraggableClient
-                    key={client.assignmentId || client.id}
-                    id={client.assignmentId || client.id}
-                    client={client}
-                    onClick={() => onClientClick?.(client.id)}
+                    key={item.id}
+                    id={item.id}
+                    client={{ companyName: item.companyName, location: item.location, id: item.clientId }}
+                    onClick={() => onClientClick?.(item.clientId)}
                     monthLabel={monthLabel}
-                    isOffMonth={isOffMonth}
+                    isOffMonth={!isCurrentViewMonth}
                     isPastMonth={isPastMonth}
                   />
                 );
@@ -504,7 +503,7 @@ export default function Calendar() {
     },
     onSuccess: async () => {
       await refetchCalendar();
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Client scheduled",
@@ -534,7 +533,7 @@ export default function Calendar() {
     },
     onSuccess: async () => {
       await refetchCalendar();
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/overdue"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
@@ -557,7 +556,7 @@ export default function Calendar() {
     },
     onSuccess: async () => {
       await refetchCalendar();
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Removed",
@@ -583,7 +582,7 @@ export default function Calendar() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Schedule cleared",
@@ -609,7 +608,7 @@ export default function Calendar() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Day cleared",
@@ -700,69 +699,69 @@ export default function Calendar() {
       return;
     }
 
-    // Check if this is an existing assignment (in current month) or an unscheduled item with an existing assignment
-    const isExistingAssignment = assignments.some((a: any) => a.id === activeId);
-    const unscheduledItem = unscheduledClients.find((c: any) => c.assignmentId === activeId);
-    const isUnscheduledWithAssignment = !!unscheduledItem;
+    // Check if this is an existing assignment in current month's calendar
+    const isExistingCalendarAssignment = assignments.some((a: any) => a.id === activeId);
+    
+    // Check if this is an unscheduled item from the backlog
+    const unscheduledItem = unscheduledClients.find((item: any) => item.id === activeId);
+    const hasExistingAssignment = unscheduledItem?.status === 'existing';
 
     // Check if dropping on a monthly view day
     if (overId.startsWith('day-')) {
       const day = parseInt(overId.replace('day-', ''));
       
-      if (isExistingAssignment) {
+      if (isExistingCalendarAssignment) {
         // Only move if the assignment exists and day changed
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
         if (currentAssignment && currentAssignment.day !== day) {
           updateAssignment.mutate({ id: activeId, day });
         }
-      } else if (isUnscheduledWithAssignment) {
-        // Update existing unscheduled assignment (may be from different month) to current month/day
-        updateAssignment.mutate({ id: activeId, day, targetMonth: month, targetYear: year });
-      } else {
-        // Create new assignment from unscheduled client (no existing assignment)
-        createAssignment.mutate({ clientId: activeId, day });
+      } else if (unscheduledItem && hasExistingAssignment) {
+        // Update existing unscheduled assignment (may be from different month) to current view's month/day
+        updateAssignment.mutate({ id: unscheduledItem.assignmentId, day, targetMonth: month, targetYear: year });
+      } else if (unscheduledItem) {
+        // Create new assignment from unscheduled client (no existing assignment - "missing" status)
+        createAssignment.mutate({ clientId: unscheduledItem.clientId, day });
       }
     } else if (overId.startsWith('allday-')) {
       // Dropped on all-day slot in weekly view (allday-{dayName}-{dayNumber})
       const parts = overId.replace('allday-', '').split('-');
-      const dayName = parts[0];
       const targetDay = parseInt(parts[1]);
       
-      if (isExistingAssignment) {
+      if (isExistingCalendarAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
         // Update if day changed OR if moving from a time slot to all-day (scheduledHour becomes null)
         if (currentAssignment && (currentAssignment.day !== targetDay || currentAssignment.scheduledHour !== null)) {
           updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: null });
         }
-      } else if (isUnscheduledWithAssignment) {
-        // Update existing unscheduled assignment to current month/day
-        updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: null, targetMonth: month, targetYear: year });
-      } else {
+      } else if (unscheduledItem && hasExistingAssignment) {
+        // Update existing unscheduled assignment to current view's month/day
+        updateAssignment.mutate({ id: unscheduledItem.assignmentId, day: targetDay, scheduledHour: null, targetMonth: month, targetYear: year });
+      } else if (unscheduledItem) {
         // Create new assignment from unscheduled client
-        createAssignment.mutate({ clientId: activeId, day: targetDay });
+        createAssignment.mutate({ clientId: unscheduledItem.clientId, day: targetDay });
       }
     } else if (overId.startsWith('weekly-')) {
       // Dropped on hourly slot in weekly view (weekly-{dayName}-{hour}-{dayNumber})
       const parts = overId.replace('weekly-', '').split('-');
-      const dayName = parts[0];
       const hour = parseInt(parts[1]);
       const targetDay = parseInt(parts[2]);
       
-      if (isExistingAssignment) {
+      if (isExistingCalendarAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
         if (currentAssignment && (currentAssignment.day !== targetDay || currentAssignment.scheduledHour !== hour)) {
           updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: hour });
         }
-      } else if (isUnscheduledWithAssignment) {
-        // Update existing unscheduled assignment to current month/day/hour
-        updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: hour, targetMonth: month, targetYear: year });
-      } else {
+      } else if (unscheduledItem && hasExistingAssignment) {
+        // Update existing unscheduled assignment to current view's month/day/hour
+        updateAssignment.mutate({ id: unscheduledItem.assignmentId, day: targetDay, scheduledHour: hour, targetMonth: month, targetYear: year });
+      } else if (unscheduledItem) {
         // Create new assignment from unscheduled client
-        createAssignment.mutate({ clientId: activeId, day: targetDay, scheduledHour: hour });
+        createAssignment.mutate({ clientId: unscheduledItem.clientId, day: targetDay, scheduledHour: hour });
       }
     } else if (overId === 'unscheduled-panel') {
       // Dropped on unscheduled panel - remove from calendar
-      if (isExistingAssignment) {
+      if (isExistingCalendarAssignment) {
         deleteAssignment.mutate(activeId);
       }
     }
@@ -793,7 +792,7 @@ export default function Calendar() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/unscheduled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/overdue"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance/recently-completed"] });
@@ -819,9 +818,9 @@ export default function Calendar() {
   });
 
   const { data: unscheduledClients = [], isLoading: isLoadingUnscheduled } = useQuery<any[]>({
-    queryKey: ["/api/calendar/unscheduled", year, month],
+    queryKey: ["/api/calendar/unscheduled"],
     queryFn: async () => {
-      const res = await fetch(`/api/calendar/unscheduled?year=${year}&month=${month}`);
+      const res = await fetch(`/api/calendar/unscheduled`);
       if (!res.ok) throw new Error("Failed to fetch unscheduled clients");
       return res.json();
     },

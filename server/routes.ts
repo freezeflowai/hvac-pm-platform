@@ -2028,41 +2028,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/calendar/unscheduled", isAuthenticated, async (req, res) => {
     try {
       const companyId = req.user!.companyId;
-      const { year, month } = req.query;
       
-      // Get current month/year for context (used to determine which clients need assignments)
-      const now = new Date();
-      const currentYear = year ? parseInt(year as string) : now.getFullYear();
-      const currentMonth = month ? parseInt(month as string) : now.getMonth() + 1;
+      // Get all unscheduled backlog across all months - this is a fixed list
+      // that doesn't change based on which month is being viewed
+      const backlog = await storage.getAllUnscheduledBacklog(companyId);
       
-      // Get all unscheduled assignments across all months (day=null, completed=false)
-      const allUnscheduledAssignments = await storage.getAllUnscheduledAssignments(companyId);
-      
-      // Get clients that have no calendar assignment at all for current month
-      const clientsWithNoAssignment = await storage.getUnscheduledClients(companyId, currentYear, currentMonth);
-      
-      // Build result: first add assignment-backed items
-      const assignmentClientIds = new Set(allUnscheduledAssignments.map(item => item.client.id));
-      const result: any[] = allUnscheduledAssignments.map(item => ({
-        ...item.client,
-        assignmentId: item.assignment.id,
-        assignmentMonth: item.assignment.month,
-        assignmentYear: item.assignment.year,
-      }));
-      
-      // Then add clients with no assignment (not already in the assignment list)
-      for (const client of clientsWithNoAssignment) {
-        if (!assignmentClientIds.has(client.id)) {
-          result.push({
-            ...client,
-            assignmentId: null,
-            assignmentMonth: null,
-            assignmentYear: null,
-          });
-        }
-      }
-      
-      res.json(result);
+      res.json(backlog);
     } catch (error) {
       console.error('Get unscheduled clients error:', error);
       res.status(500).json({ error: "Failed to fetch unscheduled clients" });

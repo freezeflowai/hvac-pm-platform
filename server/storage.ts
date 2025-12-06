@@ -154,6 +154,16 @@ export interface IStorage {
   getClientCalendarAssignment(companyId: string, clientId: string, year: number, month: number): Promise<CalendarAssignment | undefined>;
   getUnscheduledClients(companyId: string, year: number, month: number): Promise<Client[]>;
   getAllUnscheduledAssignments(companyId: string): Promise<Array<{ client: Client; assignment: CalendarAssignment }>>;
+  getAllUnscheduledBacklog(companyId: string): Promise<Array<{ 
+    id: string;
+    clientId: string;
+    companyName: string;
+    location: string | null;
+    month: number;
+    year: number;
+    assignmentId: string | null;
+    status: 'existing' | 'missing';
+  }>>;
   getPastIncompleteAssignments(companyId: string): Promise<CalendarAssignment[]>;
   
   // Job notes methods
@@ -1243,6 +1253,98 @@ export class MemStorage implements IStorage {
     return result.sort((a, b) => {
       if (a.assignment.year !== b.assignment.year) return a.assignment.year - b.assignment.year;
       return a.assignment.month - b.assignment.month;
+    });
+  }
+
+  async getAllUnscheduledBacklog(companyId: string): Promise<Array<{ 
+    id: string;
+    clientId: string;
+    companyName: string;
+    location: string | null;
+    month: number;
+    year: number;
+    assignmentId: string | null;
+    status: 'existing' | 'missing';
+  }>> {
+    const allClients = await this.getAllClients(companyId);
+    const allAssignments = Array.from(this.calendarAssignments.values())
+      .filter(a => a.companyId === companyId);
+    
+    const result: Array<{ 
+      id: string;
+      clientId: string;
+      companyName: string;
+      location: string | null;
+      month: number;
+      year: number;
+      assignmentId: string | null;
+      status: 'existing' | 'missing';
+    }> = [];
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    
+    // 1. Add all day=null incomplete assignments (existing unscheduled)
+    for (const assignment of allAssignments) {
+      if (assignment.day === null && !assignment.completed) {
+        const client = allClients.find(c => c.id === assignment.clientId);
+        if (client && !client.inactive) {
+          result.push({
+            id: assignment.id,
+            clientId: client.id,
+            companyName: client.companyName,
+            location: client.location,
+            month: assignment.month,
+            year: assignment.year,
+            assignmentId: assignment.id,
+            status: 'existing'
+          });
+        }
+      }
+    }
+    
+    // 2. Find clients missing assignments for their selected months
+    // For current year: check months >= currentMonth
+    // For next year: check months < currentMonth (the next occurrence of those months)
+    for (const client of allClients) {
+      if (client.inactive) continue;
+      if (!client.selectedMonths || client.selectedMonths.length === 0) continue;
+      
+      for (const monthIndex of client.selectedMonths) {
+        const month = monthIndex + 1; // Convert 0-indexed to 1-indexed
+        
+        // Determine which year this month occurrence falls in
+        // If month < currentMonth, it's next year; otherwise it's current year
+        const targetYear = month < currentMonth ? currentYear + 1 : currentYear;
+        
+        // Check if assignment exists for this client/year/month
+        const existingAssignment = allAssignments.find(a => 
+          a.clientId === client.id && 
+          a.year === targetYear && 
+          a.month === month
+        );
+        
+        // If no assignment exists, add as "missing"
+        if (!existingAssignment) {
+          result.push({
+            id: `${client.id}:${targetYear}-${month}`,
+            clientId: client.id,
+            companyName: client.companyName,
+            location: client.location,
+            month: month,
+            year: targetYear,
+            assignmentId: null,
+            status: 'missing'
+          });
+        }
+      }
+    }
+    
+    // Sort by year, then month
+    return result.sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
     });
   }
 
@@ -2495,6 +2597,99 @@ export class DbStorage implements IStorage {
     }
     
     return result;
+  }
+
+  async getAllUnscheduledBacklog(companyId: string): Promise<Array<{ 
+    id: string;
+    clientId: string;
+    companyName: string;
+    location: string | null;
+    month: number;
+    year: number;
+    assignmentId: string | null;
+    status: 'existing' | 'missing';
+  }>> {
+    const allClients = await this.getAllClients(companyId);
+    const allAssignments = await db.select()
+      .from(calendarAssignments)
+      .where(eq(calendarAssignments.companyId, companyId));
+    
+    const result: Array<{ 
+      id: string;
+      clientId: string;
+      companyName: string;
+      location: string | null;
+      month: number;
+      year: number;
+      assignmentId: string | null;
+      status: 'existing' | 'missing';
+    }> = [];
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    
+    // 1. Add all day=null incomplete assignments (existing unscheduled)
+    for (const assignment of allAssignments) {
+      if (assignment.day === null && !assignment.completed) {
+        const client = allClients.find(c => c.id === assignment.clientId);
+        if (client && !client.inactive) {
+          result.push({
+            id: assignment.id,
+            clientId: client.id,
+            companyName: client.companyName,
+            location: client.location,
+            month: assignment.month,
+            year: assignment.year,
+            assignmentId: assignment.id,
+            status: 'existing'
+          });
+        }
+      }
+    }
+    
+    // 2. Find clients missing assignments for their selected months
+    // For current year: check months >= currentMonth
+    // For next year: check months < currentMonth (the next occurrence of those months)
+    for (const client of allClients) {
+      if (client.inactive) continue;
+      if (!client.selectedMonths || client.selectedMonths.length === 0) continue;
+      
+      for (const monthIndex of client.selectedMonths) {
+        const month = monthIndex + 1; // Convert 0-indexed to 1-indexed
+        
+        // Determine which year this month occurrence falls in
+        // If month < currentMonth, it's next year; otherwise it's current year
+        const targetYear = month < currentMonth ? currentYear + 1 : currentYear;
+        
+        // Check if assignment exists for this client/year/month
+        const existingAssignment = allAssignments.find(a => 
+          a.clientId === client.id && 
+          a.year === targetYear && 
+          a.month === month
+        );
+        
+        // If no assignment exists, add as "missing"
+        if (!existingAssignment) {
+          result.push({
+            id: `${client.id}:${targetYear}-${month}`,
+            clientId: client.id,
+            companyName: client.companyName,
+            location: client.location,
+            month: month,
+            year: targetYear,
+            assignmentId: null,
+            status: 'missing'
+          });
+        }
+      }
+    }
+    
+    // Sort by year, then month
+    return result.sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    });
   }
 
   async getPastIncompleteAssignments(companyId: string): Promise<CalendarAssignment[]> {
