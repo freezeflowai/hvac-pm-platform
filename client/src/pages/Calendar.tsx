@@ -76,13 +76,12 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
               data-testid="unscheduled-panel"
             >
               {clients.map((item: any) => {
-                // Show month badge for all items (since they could be for any month)
-                const isCurrentViewMonth = item.month === currentMonth && item.year === currentYear;
-                const monthLabel = !isCurrentViewMonth ? `${MONTH_ABBREV[item.month - 1]}${item.year !== currentYear ? ` '${String(item.year).slice(-2)}` : ''}` : null;
-                
-                // Determine if this is a PAST month (overdue) vs future/current month
+                // Show month badge for ALL items with year suffix
                 const now = new Date();
                 const todayYear = now.getFullYear();
+                const monthLabel = `${MONTH_ABBREV[item.month - 1]} '${String(item.year).slice(-2)}`;
+                
+                // Determine if this is a PAST month (overdue) vs future/current month
                 const todayMonth = now.getMonth() + 1;
                 const isPastMonth = item.year < todayYear || (item.year === todayYear && item.month < todayMonth);
                 
@@ -93,7 +92,7 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
                     client={{ companyName: item.companyName, location: item.location, id: item.clientId }}
                     onClick={() => onClientClick?.(item.clientId)}
                     monthLabel={monthLabel}
-                    isOffMonth={!isCurrentViewMonth}
+                    isOffMonth={true}
                     isPastMonth={isPastMonth}
                   />
                 );
