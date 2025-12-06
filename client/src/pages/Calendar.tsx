@@ -489,13 +489,15 @@ export default function Calendar() {
   });
 
   const createAssignment = useMutation({
-    mutationFn: async ({ clientId, day, scheduledHour }: { clientId: string; day: number; scheduledHour?: number }) => {
+    mutationFn: async ({ clientId, day, scheduledHour, targetYear, targetMonth }: { clientId: string; day: number; scheduledHour?: number; targetYear?: number; targetMonth?: number }) => {
+      const useYear = targetYear ?? year;
+      const useMonth = targetMonth ?? month;
       return apiRequest("POST", `/api/calendar/assign`, {
         clientId,
-        year,
-        month,
+        year: useYear,
+        month: useMonth,
         day,
-        scheduledDate: new Date(year, month - 1, day).toISOString().split('T')[0],
+        scheduledDate: new Date(useYear, useMonth - 1, day).toISOString().split('T')[0],
         scheduledHour: scheduledHour !== undefined ? scheduledHour : undefined,
         autoDueDate: false,
       });
@@ -720,7 +722,13 @@ export default function Calendar() {
         updateAssignment.mutate({ id: unscheduledItem.assignmentId, day, targetMonth: month, targetYear: year });
       } else if (unscheduledItem) {
         // Create new assignment from unscheduled client (no existing assignment - "missing" status)
-        createAssignment.mutate({ clientId: unscheduledItem.clientId, day });
+        // Use the item's original month/year, not the current view
+        createAssignment.mutate({ 
+          clientId: unscheduledItem.clientId, 
+          day, 
+          targetYear: unscheduledItem.year, 
+          targetMonth: unscheduledItem.month 
+        });
       }
     } else if (overId.startsWith('allday-')) {
       // Dropped on all-day slot in weekly view (allday-{dayName}-{dayNumber})
@@ -737,8 +745,13 @@ export default function Calendar() {
         // Update existing unscheduled assignment to current view's month/day
         updateAssignment.mutate({ id: unscheduledItem.assignmentId, day: targetDay, scheduledHour: null, targetMonth: month, targetYear: year });
       } else if (unscheduledItem) {
-        // Create new assignment from unscheduled client
-        createAssignment.mutate({ clientId: unscheduledItem.clientId, day: targetDay });
+        // Create new assignment from unscheduled client - use item's original month/year
+        createAssignment.mutate({ 
+          clientId: unscheduledItem.clientId, 
+          day: targetDay,
+          targetYear: unscheduledItem.year,
+          targetMonth: unscheduledItem.month
+        });
       }
     } else if (overId.startsWith('weekly-')) {
       // Dropped on hourly slot in weekly view (weekly-{dayName}-{hour}-{dayNumber})
@@ -755,8 +768,14 @@ export default function Calendar() {
         // Update existing unscheduled assignment to current view's month/day/hour
         updateAssignment.mutate({ id: unscheduledItem.assignmentId, day: targetDay, scheduledHour: hour, targetMonth: month, targetYear: year });
       } else if (unscheduledItem) {
-        // Create new assignment from unscheduled client
-        createAssignment.mutate({ clientId: unscheduledItem.clientId, day: targetDay, scheduledHour: hour });
+        // Create new assignment from unscheduled client - use item's original month/year
+        createAssignment.mutate({ 
+          clientId: unscheduledItem.clientId, 
+          day: targetDay, 
+          scheduledHour: hour,
+          targetYear: unscheduledItem.year,
+          targetMonth: unscheduledItem.month
+        });
       }
     } else if (overId === 'unscheduled-panel') {
       // Dropped on unscheduled panel - remove from calendar
