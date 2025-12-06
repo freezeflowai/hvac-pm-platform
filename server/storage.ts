@@ -1327,25 +1327,9 @@ export class MemStorage implements IStorage {
     
     // 2. Find clients missing assignments for their selected months
     // Only include: previous month, current month, and next month
-    // BUT: If work was rescheduled to a later month, don't show earlier months as missing
     for (const client of allClients) {
       if (client.inactive) continue;
       if (!client.selectedMonths || client.selectedMonths.length === 0) continue;
-      
-      // Check if this client has any scheduled (day != null) assignment in current or next month
-      // If so, they've been rescheduled and we shouldn't show previous month as missing
-      const hasCurrentMonthScheduled = allAssignments.some(a => 
-        a.clientId === client.id && 
-        a.year === currentYear && 
-        a.month === currentMonth &&
-        a.day !== null
-      );
-      const hasNextMonthScheduled = allAssignments.some(a => 
-        a.clientId === client.id && 
-        a.year === nextMonthYear && 
-        a.month === nextMonth &&
-        a.day !== null
-      );
       
       for (const monthIndex of client.selectedMonths) {
         const month = monthIndex + 1; // Convert 0-indexed to 1-indexed
@@ -1365,16 +1349,6 @@ export class MemStorage implements IStorage {
           targetYear = prevMonthYear;
         } else if (isNextMonth) {
           targetYear = nextMonthYear;
-        }
-        
-        // Skip previous month if work was rescheduled to current or next month
-        if (isPrevMonth && (hasCurrentMonthScheduled || hasNextMonthScheduled)) {
-          continue;
-        }
-        
-        // Skip current month if work was rescheduled to next month
-        if (isCurrentMonth && hasNextMonthScheduled) {
-          continue;
         }
         
         // Check if assignment exists for this client/year/month (any assignment, including completed)
@@ -2750,25 +2724,9 @@ export class DbStorage implements IStorage {
     
     // 2. Find clients missing assignments for their selected months
     // Only include: previous month, current month, and next month
-    // BUT: If work was rescheduled to a later month, don't show earlier months as missing
     for (const client of allClients) {
       if (client.inactive) continue;
       if (!client.selectedMonths || client.selectedMonths.length === 0) continue;
-      
-      // Check if this client has any scheduled (day != null) assignment in current or next month
-      // If so, they've been rescheduled and we shouldn't show previous month as missing
-      const hasCurrentMonthScheduled = allAssignments.some(a => 
-        a.clientId === client.id && 
-        a.year === currentYear && 
-        a.month === currentMonth &&
-        a.day !== null
-      );
-      const hasNextMonthScheduled = allAssignments.some(a => 
-        a.clientId === client.id && 
-        a.year === nextMonthYear && 
-        a.month === nextMonth &&
-        a.day !== null
-      );
       
       for (const monthIndex of client.selectedMonths) {
         const month = monthIndex + 1; // Convert 0-indexed to 1-indexed
@@ -2788,16 +2746,6 @@ export class DbStorage implements IStorage {
           targetYear = prevMonthYear;
         } else if (isNextMonth) {
           targetYear = nextMonthYear;
-        }
-        
-        // Skip previous month if work was rescheduled to current or next month
-        if (isPrevMonth && (hasCurrentMonthScheduled || hasNextMonthScheduled)) {
-          continue;
-        }
-        
-        // Skip current month if work was rescheduled to next month
-        if (isCurrentMonth && hasNextMonthScheduled) {
-          continue;
         }
         
         // Check if assignment exists for this client/year/month (any assignment, including completed)
