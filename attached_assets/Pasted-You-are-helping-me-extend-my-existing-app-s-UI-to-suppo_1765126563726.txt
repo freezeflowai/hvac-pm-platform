@@ -1,0 +1,201 @@
+You are helping me extend my existing app’s UI to support the new parent/child client structure that I use for QuickBooks Online sync.
+
+IMPORTANT:
+- Use the same frontend stack that is already in this repo (React, Vue, plain HTML, etc.).
+- Find the existing “Add Client” / “New Client” UI (for example: AddClientDialog, ClientForm, NewClientModal, or similar).
+- Do NOT rewrite the whole app. Instead, extend and refactor the existing Add Client flow in a minimal, clean, and backward-compatible way.
+
+--------------------------------
+BUSINESS CONTEXT (RECAP)
+--------------------------------
+
+In the backend/data model, I now have:
+
+- Company (parent) – maps to QBO Customer
+  - id
+  - name
+  - legalName
+  - phone
+  - email
+  - billing address (street, city, province/state, postalCode, country)
+  - isActive
+  - qboCustomerId (hidden / system field)
+  - qboSyncToken (hidden / system field)
+
+- Location (child) – maps to QBO Sub-Customer
+  - id
+  - companyId
+  - name (location/site name)
+  - siteCode or storeNumber
+  - service address (street, city, province/state, postalCode, country)
+  - contactPhone
+  - contactEmail
+  - billWithParent (boolean)
+  - isActive
+  - qboCustomerId (hidden / system field)
+  - qboParentCustomerId (hidden / system field)
+  - qboSyncToken (hidden / system field)
+
+Every “client” in the UI should effectively be:
+- A Company (parent) plus at least one Location (child).
+- For the first creation flow, we will collect:
+  - Parent company info
+  - Primary location info
+  - Billing preference (bill with parent or bill location directly)
+
+--------------------------------
+UI/UX REQUIREMENT
+--------------------------------
+
+I want an **“Add Client” dialog box** (or slide-over panel, depending on current design) that lets the user create a new client with both:
+
+1. Parent Company data
+2. Primary Location data
+
+This dialog should **extend** whatever “Add Client” fields are already present.
+
+Structure of the dialog:
+
+- Title: “Add Client”
+- Sections (visually separated with headings):
+
+  1) **Company Information** (parent)
+     - Fields (add, or map cleanly to existing ones):
+       - Company Name (required) → maps to Company.name
+       - Legal Name (optional) → Company.legalName
+       - Phone (optional) → Company.phone
+       - Email (optional) → Company.email
+       - Billing Address (group):
+         - Street
+         - City
+         - Province/State
+         - Postal Code
+         - Country
+     - These should align with any existing “client” fields so we don’t create duplicates; re-use existing fields where possible.
+
+  2) **Primary Location Information** (child)
+     - This represents the first location under this client.
+     - Fields:
+       - Location Name (required) → Location.name
+         - Example placeholder: “Toronto Warehouse”, “Main Store”, etc.
+       - Site Code / Store Number (optional) → Location.siteCode / storeNumber
+       - Service Address (group):
+         - Street
+         - City
+         - Province/State
+         - Postal Code
+         - Country
+       - Contact Phone (optional) → Location.contactPhone
+       - Contact Email (optional) → Location.contactEmail
+
+  3) **Billing Settings**
+     - A toggle or checkbox:
+       - Label: “Bill this location with the parent company”
+       - Control: `billWithParent` (boolean)
+       - Default: checked = true
+       - Helper text:
+         - “If enabled, invoices for this location will be billed to the parent company in QuickBooks. If disabled, this location will be billed directly as its own sub-customer.”
+
+- Footer / Actions:
+  - Primary button: “Save Client”
+  - Secondary button: “Cancel”
+  - Disable the Save button while submitting / when required fields are invalid.
+
+--------------------------------
+BEHAVIOR / FORM LOGIC
+--------------------------------
+
+1. **Validation**
+   - Required:
+     - Company Name
+     - Location Name
+   - Optional:
+     - All other fields (but validate formats for email, phone, postal code if you already have validators in the project).
+   - Show inline validation messages consistent with existing UI patterns.
+
+2. **Data Shape on Submit**
+   - On submit, the dialog should call ONE function / API that accepts a payload like:
+
+   {
+     company: {
+       name: string,
+       legalName?: string,
+       phone?: string,
+       email?: string,
+       billingAddress?: {
+         street?: string,
+         city?: string,
+         stateOrProvince?: string,
+         postalCode?: string,
+         country?: string
+       }
+       // qbo* fields are NOT entered here; they are system fields.
+     },
+     primaryLocation: {
+       name: string,
+       siteCode?: string,
+       serviceAddress?: {
+         street?: string,
+         city?: string,
+         stateOrProvince?: string,
+         postalCode?: string,
+         country?: string
+       },
+       contactPhone?: string,
+       contactEmail?: string,
+       billWithParent: boolean
+       // qbo* fields are NOT entered here; they are system fields.
+     }
+   }
+
+   - If there is already an API helper (e.g. `createClient` or `createCustomer`), either:
+     - adapt it to accept this object, OR
+     - create a new helper like `createClientWithLocation(payload)` and call that instead.
+   - Make sure the dialog closes only on successful save and shows an error state on failure.
+
+3. **QuickBooks fields**
+   - The QBO IDs (`qboCustomerId`, `qboParentCustomerId`, `qboSyncToken`, etc.) **should NOT be visible or editable** in this dialog.
+   - They are system-managed and will be filled later by sync logic.
+   - Do NOT include any QBO-specific IDs in the UI.
+
+4. **Editing vs Adding**
+   - If the project already has an “Edit Client” dialog:
+     - Keep it working.
+     - Optionally, you may reuse the same component for both “Add” and “Edit” modes, but ensure “Add” always includes both Company + Primary Location.
+   - It’s fine if, for now, we only support **one location** in this dialog (the primary one). Additional locations can be handled in a separate “Manage Locations” screen later.
+
+--------------------------------
+WHAT TO CHANGE IN THE CODEBASE
+--------------------------------
+
+1. Locate the existing Add Client UI:
+   - This might be a component like:
+     - `AddClientDialog`, `ClientForm`, `NewClientModal`, `CreateClientForm`, etc.
+   - Extend it to include:
+     - The three sections described above.
+     - New fields for Location and Billing Settings.
+
+2. Wire up the form state:
+   - Use the project’s usual form handling (React state, Formik, Vue reactive form, etc.).
+   - Maintain separate nested objects for `company` and `primaryLocation` in the component state.
+
+3. Implement the submit handler:
+   - Validate.
+   - Call the appropriate API method:
+     - Prefer something like `createClientWithLocation({ company, primaryLocation })`.
+     - If it doesn’t exist, create it in the API layer and route it to the backend endpoint that creates both Company and Location in one transaction.
+
+4. Styling:
+   - Match the styling conventions already used in the project:
+     - Same spacing, typography, button styles.
+     - Use grouped fieldsets or cards for the three sections.
+   - Make sure the dialog works well on smaller screens (responsive layout is a plus).
+
+5. Output:
+   - Show me the updated component code for the Add Client dialog (or the relevant form components).
+   - Show any new helper/API functions you add for `createClientWithLocation`.
+   - If a migration of props or types is needed (e.g., TypeScript interfaces), update those as well.
+
+Comment the code where appropriate to explain:
+- Which fields map to Company vs Location.
+- How `billWithParent` will later be used by the QuickBooks sync logic.

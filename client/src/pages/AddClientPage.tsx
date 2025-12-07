@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import AddClientDialog, { ClientFormData } from "@/components/AddClientDialog";
+import AddClientWithCompanyDialog, { ClientWithCompanyFormData } from "@/components/AddClientWithCompanyDialog";
 import type { Client } from "@shared/schema";
 
 export default function AddClientPage() {
@@ -13,6 +15,7 @@ export default function AddClientPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const isEditing = Boolean(id);
+  const [activeTab, setActiveTab] = useState<"simple" | "with-company">("with-company");
 
   const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
@@ -31,19 +34,15 @@ export default function AddClientPage() {
     const currentYear = today.getFullYear();
     const currentDay = today.getDate();
     
-    // Sort months to ensure consistent behavior
     const sortedMonths = [...selectedMonths].sort((a, b) => a - b);
     
-    // If current month is selected and we haven't passed the 15th, use current month
     if (sortedMonths.includes(currentMonth) && currentDay < 15) {
       return new Date(currentYear, currentMonth, 15);
     }
     
-    // Otherwise find the next scheduled month
     let nextMonth = sortedMonths.find(m => m > currentMonth);
     
     if (nextMonth === undefined) {
-      // Wrap to next year
       nextMonth = sortedMonths[0];
       return new Date(currentYear + 1, nextMonth, 15);
     }
@@ -51,6 +50,35 @@ export default function AddClientPage() {
     return new Date(currentYear, nextMonth, 15);
   };
 
+  // Mutation for creating client with company (new QBO-compatible flow)
+  const createClientWithCompanyMutation = useMutation({
+    mutationFn: async (data: ClientWithCompanyFormData) => {
+      const res = await apiRequest("POST", "/api/clients/with-company", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-companies"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/parts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/schedule"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+      toast({
+        title: "Client added",
+        description: "The client and company have been added successfully.",
+      });
+      setLocation("/");
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.message || "Failed to add client.";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Legacy mutation for simple client creation (backward compatible)
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormData) => {
       const nextDue = calculateNextDueDate(data.selectedMonths, data.inactive);
@@ -142,12 +170,16 @@ export default function AddClientPage() {
     },
   });
 
-  const handleSubmit = (data: ClientFormData) => {
+  const handleSimpleSubmit = (data: ClientFormData) => {
     if (isEditing && id) {
       updateClientMutation.mutate({ id, data });
     } else {
       createClientMutation.mutate(data);
     }
+  };
+
+  const handleWithCompanySubmit = (data: ClientWithCompanyFormData) => {
+    createClientWithCompanyMutation.mutate(data);
   };
 
   const editData = client ? {
@@ -216,13 +248,43 @@ export default function AddClientPage() {
         </div>
       </div>
 
-        {!isEditing || editData ? (
-          <AddClientDialog
-            onCancel={() => setLocation("/")}
-            onSubmit={handleSubmit}
-            editData={editData}
-          />
-        ) : null}
+        {isEditing ? (
+          // Use legacy dialog for editing existing clients
+          editData ? (
+            <AddClientDialog
+              onCancel={() => setLocation("/")}
+              onSubmit={handleSimpleSubmit}
+              editData={editData}
+            />
+          ) : null
+        ) : (
+          // For new clients, show tabbed interface with both options
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "simple" | "with-company")}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="with-company" data-testid="tab-with-company">
+                With Company (QBO Ready)
+              </TabsTrigger>
+              <TabsTrigger value="simple" data-testid="tab-simple">
+                Simple Client
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="with-company">
+              <AddClientWithCompanyDialog
+                onCancel={() => setLocation("/")}
+                onSubmit={handleWithCompanySubmit}
+                isSubmitting={createClientWithCompanyMutation.isPending}
+              />
+            </TabsContent>
+            
+            <TabsContent value="simple">
+              <AddClientDialog
+                onCancel={() => setLocation("/")}
+                onSubmit={handleSimpleSubmit}
+              />
+            </TabsContent>
+          </Tabs>
+        )}
       </main>
     </div>
   );

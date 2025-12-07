@@ -2439,6 +2439,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create client with company (for QBO sync - creates both parent Company and child Location)
+  // This endpoint creates a CustomerCompany (parent) and a Client/Location (child)
+  // The billWithParent flag on the location determines how invoices are routed in QBO:
+  // - If true: QBO CustomerRef points to parent Company
+  // - If false: QBO CustomerRef points to this Location as a Sub-Customer
+  app.post("/api/clients/with-company", isAuthenticated, async (req, res) => {
+    try {
+      // Check subscription limits first
+      const limitCheck = await subscriptionService.canAddLocation(req.user!.id);
+      if (!limitCheck.allowed) {
+        return res.status(403).json({ 
+          error: limitCheck.reason,
+          current: limitCheck.current,
+          limit: limitCheck.limit,
+          subscriptionLimitReached: true
+        });
+      }
+
+      const { company, primaryLocation } = req.body;
+      
+      // Validate company data upfront
+      if (!company?.name?.trim()) {
+        return res.status(400).json({ error: "Company name is required" });
+      }
+      
+      // Validate location data upfront
+      if (!primaryLocation?.name?.trim()) {
+        return res.status(400).json({ error: "Location name is required" });
+      }
+      
+      // Validate maintenance months for active clients
+      const isInactive = primaryLocation.inactive === true;
+      const selectedMonths = primaryLocation.selectedMonths || [];
+      if (!isInactive && (!Array.isArray(selectedMonths) || selectedMonths.length === 0)) {
+        return res.status(400).json({ error: "At least one maintenance month is required for active clients" });
+      }
+      
+      // Validate parts upfront if provided
+      const parts = primaryLocation.parts;
+      let validatedParts: Array<{ partId: string; quantity: number }> | undefined;
+      if (parts && Array.isArray(parts) && parts.length > 0) {
+        const partsSchema = z.array(z.object({
+          partId: z.string().uuid(),
+          quantity: z.number().positive()
+        }));
+        try {
+          validatedParts = partsSchema.parse(parts);
+        } catch (parseError) {
+          return res.status(400).json({ error: "Invalid parts data" });
+        }
+      }
+      
+      // Build customer company data - only include non-empty fields
+      const customerCompanyInput: Record<string, any> = {
+        name: company.name,
+        isActive: true,
+      };
+      if (company.legalName) customerCompanyInput.legalName = company.legalName;
+      if (company.phone) customerCompanyInput.phone = company.phone;
+      if (company.email) customerCompanyInput.email = company.email;
+      if (company.billingAddress?.street) customerCompanyInput.billingStreet = company.billingAddress.street;
+      if (company.billingAddress?.city) customerCompanyInput.billingCity = company.billingAddress.city;
+      if (company.billingAddress?.stateOrProvince) customerCompanyInput.billingProvince = company.billingAddress.stateOrProvince;
+      if (company.billingAddress?.postalCode) customerCompanyInput.billingPostalCode = company.billingAddress.postalCode;
+      if (company.billingAddress?.country) customerCompanyInput.billingCountry = company.billingAddress.country;
+      
+      // Validate with schema
+      const customerCompanyData = insertCustomerCompanySchema.parse(customerCompanyInput);
+      
+      // Calculate next due date based on selected months
+      const calculateNextDueDate = (months: number[], inactive: boolean) => {
+        if (inactive || !months || months.length === 0) return new Date('9999-12-31');
+        
+        const today = new Date();
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+        const currentDay = today.getDate();
+        
+        const sortedMonths = [...months].sort((a, b) => a - b);
+        
+        if (sortedMonths.includes(currentMonth) && currentDay < 15) {
+          return new Date(currentYear, currentMonth, 15);
+        }
+        
+        let nextMonth = sortedMonths.find(m => m > currentMonth);
+        
+        if (nextMonth === undefined) {
+          nextMonth = sortedMonths[0];
+          return new Date(currentYear + 1, nextMonth, 15);
+        }
+        
+        return new Date(currentYear, nextMonth, 15);
+      };
+      
+      const nextDue = calculateNextDueDate(selectedMonths, isInactive);
+      
+      // Build client data - only include non-empty fields
+      const clientInput: Record<string, any> = {
+        companyName: company.name,
+        location: primaryLocation.name,
+        selectedMonths: selectedMonths,
+        inactive: isInactive,
+        nextDue: nextDue.toISOString(),
+        billWithParent: primaryLocation.billWithParent ?? true,
+      };
+      if (primaryLocation.serviceAddress?.street) clientInput.address = primaryLocation.serviceAddress.street;
+      if (primaryLocation.serviceAddress?.city) clientInput.city = primaryLocation.serviceAddress.city;
+      if (primaryLocation.serviceAddress?.stateOrProvince) clientInput.province = primaryLocation.serviceAddress.stateOrProvince;
+      if (primaryLocation.serviceAddress?.postalCode) clientInput.postalCode = primaryLocation.serviceAddress.postalCode;
+      if (primaryLocation.contactName) clientInput.contactName = primaryLocation.contactName;
+      if (primaryLocation.contactEmail) clientInput.email = primaryLocation.contactEmail;
+      if (primaryLocation.contactPhone) clientInput.phone = primaryLocation.contactPhone;
+      if (primaryLocation.roofLadderCode) clientInput.roofLadderCode = primaryLocation.roofLadderCode;
+      if (primaryLocation.notes) clientInput.notes = primaryLocation.notes;
+      
+      // Validate client data with schema before creating anything
+      const validatedClient = insertClientSchema.parse(clientInput);
+      
+      // All validation passed - now create entities
+      // Create customer company (parent) first
+      const customerCompany = await storage.createCustomerCompany(req.user!.companyId, customerCompanyData);
+      
+      let client: Client;
+      try {
+        // Add parentCompanyId after company is created
+        const clientWithParent = {
+          ...validatedClient,
+          parentCompanyId: customerCompany.id,
+        };
+        
+        // Create client with or without parts
+        if (validatedParts && validatedParts.length > 0) {
+          client = await storage.createClientWithParts(
+            req.user!.companyId, 
+            req.user!.id, 
+            clientWithParent, 
+            validatedParts
+          );
+        } else {
+          client = await storage.createClient(req.user!.companyId, req.user!.id, clientWithParent);
+        }
+      } catch (clientError) {
+        // If client creation fails, clean up the customer company to maintain consistency
+        console.error('Client creation failed, rolling back customer company:', clientError);
+        try {
+          await storage.deleteCustomerCompany(req.user!.companyId, customerCompany.id);
+        } catch (rollbackError) {
+          console.error('Failed to rollback customer company:', rollbackError);
+        }
+        throw clientError;
+      }
+      
+      res.status(201).json({
+        customerCompany,
+        client,
+      });
+    } catch (error) {
+      console.error('Create client with company error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create client with company" });
+    }
+  });
+
   // Invoice routes
   app.get("/api/invoices", isAuthenticated, async (req, res) => {
     try {
