@@ -596,3 +596,169 @@ export const updateInvoiceLineSchema = z.object({
 export type InsertInvoiceLine = z.infer<typeof insertInvoiceLineSchema>;
 export type UpdateInvoiceLine = z.infer<typeof updateInvoiceLineSchema>;
 export type InvoiceLine = typeof invoiceLines.$inferSelect;
+
+// ============================================
+// JOBS SYSTEM
+// ============================================
+
+// Job status enum values
+export const jobStatusEnum = [
+  "draft",
+  "scheduled", 
+  "dispatched",
+  "en_route",
+  "on_site",
+  "completed",
+  "invoiced",
+  "cancelled"
+] as const;
+export type JobStatus = typeof jobStatusEnum[number];
+
+// Job priority enum values
+export const jobPriorityEnum = ["low", "normal", "high", "emergency"] as const;
+export type JobPriority = typeof jobPriorityEnum[number];
+
+// Job type enum values
+export const jobTypeEnum = ["service", "install", "maintenance", "inspection"] as const;
+export type JobType = typeof jobTypeEnum[number];
+
+// Recurrence frequency enum values
+export const recurrenceFrequencyEnum = ["daily", "weekly", "monthly", "quarterly", "yearly"] as const;
+export type RecurrenceFrequency = typeof recurrenceFrequencyEnum[number];
+
+// Recurring Job Series - template for recurring jobs
+export const recurringJobSeries = pgTable("recurring_job_series", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  locationId: varchar("location_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  // Template fields
+  baseSummary: text("base_summary").notNull(),
+  baseDescription: text("base_description"),
+  baseJobType: text("base_job_type").notNull().default("service"),
+  basePriority: text("base_priority").notNull().default("normal"),
+  defaultTechnicianId: varchar("default_technician_id").references(() => users.id, { onDelete: "set null" }),
+  // Scheduling context
+  startDate: date("start_date").notNull(),
+  timezone: text("timezone").default("America/Toronto"),
+  notes: text("notes"),
+  // Status
+  isActive: boolean("is_active").notNull().default(true),
+  // Metadata
+  createdByUserId: varchar("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertRecurringJobSeriesSchema = createInsertSchema(recurringJobSeries).omit({
+  id: true,
+  companyId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  baseJobType: z.enum(jobTypeEnum).default("service"),
+  basePriority: z.enum(jobPriorityEnum).default("normal"),
+});
+
+export type InsertRecurringJobSeries = z.infer<typeof insertRecurringJobSeriesSchema>;
+export type RecurringJobSeries = typeof recurringJobSeries.$inferSelect;
+
+// Recurring Job Phases - each phase in a multi-phase recurrence
+export const recurringJobPhases = pgTable("recurring_job_phases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  seriesId: varchar("series_id").notNull().references(() => recurringJobSeries.id, { onDelete: "cascade" }),
+  orderIndex: integer("order_index").notNull().default(0),
+  // Recurrence pattern
+  frequency: text("frequency").notNull(), // daily, weekly, monthly, quarterly, yearly
+  interval: integer("interval").notNull().default(1), // e.g., every 2 weeks
+  // End conditions (mutually exclusive)
+  occurrences: integer("occurrences"), // Run for N occurrences
+  untilDate: date("until_date"), // Run until this date
+});
+
+export const insertRecurringJobPhaseSchema = createInsertSchema(recurringJobPhases).omit({
+  id: true,
+}).extend({
+  frequency: z.enum(recurrenceFrequencyEnum),
+  interval: z.number().int().min(1).default(1),
+  occurrences: z.number().int().min(1).nullable().optional(),
+  untilDate: z.string().nullable().optional(), // Accept string for date input
+});
+
+export type InsertRecurringJobPhase = z.infer<typeof insertRecurringJobPhaseSchema>;
+export type RecurringJobPhase = typeof recurringJobPhases.$inferSelect;
+
+// Jobs table - individual job instances
+export const jobs = pgTable("jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  locationId: varchar("location_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  // Job identification
+  jobNumber: integer("job_number").notNull(),
+  // Assignment
+  primaryTechnicianId: varchar("primary_technician_id").references(() => users.id, { onDelete: "set null" }),
+  assignedTechnicianIds: varchar("assigned_technician_ids").array(),
+  // Status and classification
+  status: text("status").notNull().default("draft"),
+  priority: text("priority").notNull().default("normal"),
+  jobType: text("job_type").notNull().default("service"),
+  // Job details
+  summary: text("summary").notNull(),
+  description: text("description"),
+  accessInstructions: text("access_instructions"),
+  // Scheduling
+  scheduledStart: timestamp("scheduled_start"),
+  scheduledEnd: timestamp("scheduled_end"),
+  actualStart: timestamp("actual_start"),
+  actualEnd: timestamp("actual_end"),
+  // Billing
+  invoiceId: varchar("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+  qboInvoiceId: text("qbo_invoice_id"),
+  billingNotes: text("billing_notes"),
+  // Recurrence linkage
+  recurringSeriesId: varchar("recurring_series_id").references(() => recurringJobSeries.id, { onDelete: "set null" }),
+  // Calendar assignment linkage (for backward compatibility during migration)
+  calendarAssignmentId: varchar("calendar_assignment_id").references(() => calendarAssignments.id, { onDelete: "set null" }),
+  // Soft deletion / state
+  isActive: boolean("is_active").notNull().default(true),
+  // Metadata
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertJobSchema = createInsertSchema(jobs).omit({
+  id: true,
+  companyId: true,
+  jobNumber: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  status: z.enum(jobStatusEnum).default("draft"),
+  priority: z.enum(jobPriorityEnum).default("normal"),
+  jobType: z.enum(jobTypeEnum).default("service"),
+  scheduledStart: z.string().nullable().optional(), // Accept ISO string
+  scheduledEnd: z.string().nullable().optional(),
+});
+
+export const updateJobSchema = z.object({
+  locationId: z.string().optional(),
+  primaryTechnicianId: z.string().nullable().optional(),
+  assignedTechnicianIds: z.array(z.string()).nullable().optional(),
+  status: z.enum(jobStatusEnum).optional(),
+  priority: z.enum(jobPriorityEnum).optional(),
+  jobType: z.enum(jobTypeEnum).optional(),
+  summary: z.string().optional(),
+  description: z.string().nullable().optional(),
+  accessInstructions: z.string().nullable().optional(),
+  scheduledStart: z.string().nullable().optional(),
+  scheduledEnd: z.string().nullable().optional(),
+  actualStart: z.string().nullable().optional(),
+  actualEnd: z.string().nullable().optional(),
+  invoiceId: z.string().nullable().optional(),
+  qboInvoiceId: z.string().nullable().optional(),
+  billingNotes: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type InsertJob = z.infer<typeof insertJobSchema>;
+export type UpdateJob = z.infer<typeof updateJobSchema>;
+export type Job = typeof jobs.$inferSelect;

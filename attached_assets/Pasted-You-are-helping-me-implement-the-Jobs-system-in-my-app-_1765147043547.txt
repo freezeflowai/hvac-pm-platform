@@ -1,0 +1,426 @@
+You are helping me implement the **Jobs** system in my app.
+
+This app is a dispatching / field-service tool (HVAC-focused) that already has:
+- Clients (Company + Location model)
+- Calendar (month/week views, filtered by technician)
+- Basic navigation (Dashboard, Calendar, Jobs, Clients, Products & Services, Reports, Manage Team, Admin)
+- QuickBooks Online integration for clients and invoices (Company = QBO Customer, Location = QBO Sub-Customer)
+
+Use the EXISTING stack (frontend, backend, ORM, router) already in this project.
+Do NOT introduce new frameworks. Extend what’s there.
+
+I want you to build:
+
+1. A **Jobs List page**: `/jobs`
+2. A **Job Detail page**: `/jobs/:id`
+3. A **Quick Add Job dialog** that can be opened from various places (Jobs, Calendar, Client page)
+4. A **recurring jobs model** that can handle:
+   - simple recurrences (e.g., every month)
+   - and more complex sequences like:
+     - “every quarter for 2 quarters, then every month for 4 months”
+
+------------------------------------------------
+1) DATA MODEL – JOBS AND RECURRING SERIES
+------------------------------------------------
+
+First, define/extend the backend data models (or ORM entities) for Jobs.
+
+### Core Job
+
+Create (or extend) a `Job` entity with at least:
+
+- id (PK)
+- companyId (FK → Company.id)
+- locationId (FK → Location.id)
+- primaryTechnicianId (FK → Technician/User) – optional
+- assignedTechnicianIds (array or join table) – optional, for future multi-tech jobs
+
+- status (enum/string), at minimum:
+  - "draft"
+  - "scheduled"
+  - "dispatched"
+  - "en_route"
+  - "on_site"
+  - "completed"
+  - "invoiced"
+  - "cancelled"
+
+- priority (enum/string): "low", "normal", "high", "emergency"
+- jobType (enum/string): e.g. "service", "install", "maintenance", "inspection"
+
+- summary (short string – appears in calendar & lists)
+- description (text – detailed problem description)
+- accessInstructions (text – codes, after hours, etc.)
+
+- scheduledStart (datetime)
+- scheduledEnd (datetime)
+- actualStart (datetime | null)
+- actualEnd (datetime | null)
+
+Billing-related:
+
+- invoiceId (FK to Invoice table, nullable)
+- qboInvoiceId (nullable)
+- billingNotes (text, optional)
+
+Recurrence linkage:
+
+- recurringSeriesId (FK → RecurringJobSeries.id, nullable)
+  - Null = one-off job
+  - Non-null = generated from a recurring series
+
+Soft deletion / state:
+
+- isActive (boolean, default true)
+- createdAt, updatedAt
+
+### Recurring Jobs – Series and Phases
+
+I want recurring jobs that can express:
+
+- Simple patterns:
+  - "Every month, forever"
+  - "Every week, 10 times"
+- More complex, multi-phase patterns:
+  - "Every quarter for 2 occurrences, then every month for 4"
+
+Design this with two entities: `RecurringJobSeries` + `RecurringJobPhase`.
+
+#### RecurringJobSeries
+
+Represents a template for a set of jobs for a given client + location.
+
+Fields:
+
+- id (PK)
+- companyId (FK → Company.id)
+- locationId (FK → Location.id)
+- baseSummary (string)
+- baseDescription (text)
+- baseJobType (string/enum)
+- basePriority (string/enum)
+- defaultTechnicianId (optional)
+- isActive (boolean, default true)
+
+Scheduling context:
+
+- startDate (date) – when the series can begin
+- timezone (string) – if needed, otherwise use app default
+- notes (optional text)
+
+Linkage:
+
+- createdByUserId (optional)
+- createdAt, updatedAt
+
+#### RecurringJobPhase
+
+Represents ONE phase in the series (allows sequences like quarterly → monthly, etc.).
+
+Fields:
+
+- id (PK)
+- seriesId (FK → RecurringJobSeries.id)
+- orderIndex (int) – 0,1,2… to define phase order
+
+Recurrence pattern:
+
+- frequency (enum/string):
+  - "daily"
+  - "weekly"
+  - "monthly"
+  - "quarterly"
+  - "yearly"
+
+- interval (int):
+  - e.g. frequency="monthly", interval=1 → every month
+  - frequency="weekly", interval=2 → every 2 weeks
+  - frequency="quarterly", interval=1 → every quarter
+
+- occurrences (int | nullable):
+  - If set: phase runs for this many occurrences.
+- untilDate (date | nullable):
+  - Alternative to occurrences for end condition.
+
+We only need ONE of `occurrences` or `untilDate` per phase; code should treat them as mutually exclusive.
+
+Example to support:
+- "every quarter for 2 quarters, then every month for 4 months"
+
+Series:
+- startDate = 2025-01-01
+- Phases:
+  - Phase 0:
+    - frequency = "quarterly"
+    - interval = 1
+    - occurrences = 2
+  - Phase 1:
+    - frequency = "monthly"
+    - interval = 1
+    - occurrences = 4
+
+Implementation note:
+- You do NOT need to fully implement a complex recurrence engine.  
+- You DO need to:
+  - Store this data structure.
+  - Provide functions that can:
+    - Generate the next N occurrences (e.g. next 12) from the series + phases.
+    - Create Job records for those occurrences.
+
+------------------------------------------------
+2) API LAYER – JOBS & RECURRING SERIES
+------------------------------------------------
+
+Implement or extend API endpoints / server handlers for:
+
+### Jobs
+
+- `GET /jobs`:
+  - Supports filters: status, technicianId, companyId, locationId, date range.
+  - Returns a list of jobs with their core fields, including location + company info for display.
+
+- `GET /jobs/:id`:
+  - Returns full job details, including:
+    - Company + Location info
+    - Assigned technicians
+    - Recurring series linkage (if any)
+
+- `POST /jobs`:
+  - Creates a one-off job.
+  - Payload includes:
+    - companyId
+    - locationId
+    - summary
+    - description
+    - jobType
+    - priority
+    - scheduledStart / scheduledEnd
+    - primaryTechnicianId (optional)
+
+- `PUT /jobs/:id`:
+  - Updates job fields (status, schedule, tech, summary, etc.).
+
+- `PATCH /jobs/:id/status`:
+  - Optional small endpoint to change status only.
+
+### Recurring Series
+
+- `POST /recurring-series`:
+  - Creates a new RecurringJobSeries and associated phases in a single transaction.
+  - Payload:
+
+    {
+      companyId: number,
+      locationId: number,
+      baseSummary: string,
+      baseDescription?: string,
+      baseJobType?: string,
+      basePriority?: string,
+      defaultTechnicianId?: number,
+      startDate: string (YYYY-MM-DD),
+      phases: [
+        {
+          orderIndex: number,
+          frequency: "daily" | "weekly" | "monthly" | "quarterly" | "yearly",
+          interval: number,
+          occurrences?: number,
+          untilDate?: string
+        },
+        ...
+      ]
+    }
+
+- `GET /recurring-series/:id`:
+  - Returns the series plus phases.
+
+- `POST /recurring-series/:id/generate`:
+  - Given a series, generate one or more upcoming job instances.
+  - Input:
+    - count or dateRange (choose what fits easiest with current API design).
+  - Output:
+    - The generated Job objects (and persist them in DB).
+
+The generate endpoint can be basic; don’t over-engineer. It’s fine if it only handles “generate next N jobs from today onward” for now.
+
+------------------------------------------------
+3) UI – JOBS LIST PAGE (/jobs)
+------------------------------------------------
+
+Create a main Jobs page (e.g. `/jobs`) that shows:
+
+- Page header:
+  - Title: “Jobs”
+  - Primary button: “Create Job” (opens Quick Add Job dialog)
+
+- Filters:
+  - Date range
+  - Status
+  - Technician
+  - Client (Company)
+  - Location (dependent on selected client, if applicable)
+
+- Table/list columns:
+  - Job #
+  - Summary
+  - Client (Company)
+  - Location
+  - Technician
+  - Status
+  - Scheduled Date/Time
+  - Actions (View, Edit, etc.)
+
+Clicking the Job row or a “View” button should navigate to `/jobs/:id` (Job Detail page).
+
+------------------------------------------------
+4) UI – JOB DETAIL PAGE (/jobs/:id)
+------------------------------------------------
+
+Create a Job Detail page for viewing & editing a single job.
+
+Structure:
+
+- Top section:
+  - Job summary (title)
+  - Status (with ability to change status)
+  - Key metadata (priority, jobType, recurrence info if applicable)
+  - Primary actions like “Edit Job”, “Create Invoice” (if not yet invoiced)
+
+- Sections or tabs (keep it simple, can be vertical sections for now):
+  - **Job Info**
+    - Summary, description, access instructions
+    - ScheduledStart / scheduledEnd
+    - ActualStart / actualEnd
+    - Priority, jobType
+  - **Client & Location**
+    - Company name
+    - Location name + address
+    - Clickable links to open the Client or Location page
+  - **Technician Assignment**
+    - Primary tech, additional techs (if multi-tech supported)
+  - **Billing**
+    - Link to associated invoice if present
+    - billingNotes
+
+If `recurringSeriesId` is not null:
+
+- Show a small “Recurring” badge or section:
+  - “This job belongs to recurring series #123 (click to view).”
+
+------------------------------------------------
+5) UI – QUICK ADD JOB DIALOG
+------------------------------------------------
+
+Implement a **Quick Add Job** dialog (modal) that can be launched from:
+
+- Jobs page (“Create Job” button)
+- Calendar (if there is already a “create job” action)
+- Client page (Quick Actions → “Create Job”)
+
+The Quick Add dialog should focus on **speed** and **minimum fields**:
+
+Fields:
+
+- Client (Company) – required
+  - If opened from a specific client page, prefill and lock this.
+- Location – required
+  - Filtered by selected company.
+  - If opened from a specific Location context, prefill and lock this.
+- Summary – required (short job title)
+- Job Type – optional (default “service”)
+- Priority – default “normal”
+- Technician – optional (primaryTech)
+- Scheduled Start – required (datetime)
+- Scheduled End – optional (or auto-calculated by default, e.g., 1 hour)
+
+Recurrence toggle:
+
+- Checkbox/switch: “Make this a recurring job”
+- If not checked:
+  - Create a **one-off Job**.
+
+- If checked:
+  - Show a **Recurrence section** inside the dialog.
+
+### Recurrence Section (supporting multi-phase schedules)
+
+In the Recurrence section:
+
+- Display a list of **phases** with ability to add/remove:
+
+  - Button: “Add Phase”
+
+  Each phase row should allow:
+
+  - Frequency (select): daily, weekly, monthly, quarterly, yearly
+  - Interval (number): e.g. 1 = every, 2 = every 2 weeks, etc.
+  - End condition:
+    - Option A: Number of occurrences (int)
+    - Option B: Until date (date)
+
+  Example user scenario to support:
+  - Phase 1: frequency = quarterly, interval = 1, occurrences = 2
+  - Phase 2: frequency = monthly, interval = 1, occurrences = 4
+
+On submit with recurrence enabled:
+
+- Create a `RecurringJobSeries` with associated `RecurringJobPhase` records (from the form).
+- Optionally:
+  - Also generate the **first job instance(s)** immediately via the `/recurring-series/:id/generate` flow, or
+  - At least return the series id so the UI can inform the user and the backend can schedule generation.
+
+For now, it is acceptable if the Quick Add Job dialog:
+
+- Either:
+  - Creates one job AND a recurring series entry, OR
+  - Only creates the recurring series and the UX makes clear that jobs will be generated later.
+- Document behavior in comments so future developers know what's happening.
+
+UX behavior:
+
+- On success:
+  - Close the dialog.
+  - If the user came from `/jobs`, refresh the jobs list.
+  - If the user came from a Client page, optionally show a toast and leave them there.
+- On error:
+  - Show validation / error messages, do not close the dialog.
+
+------------------------------------------------
+6) WIRES TO OTHER PARTS OF THE APP
+------------------------------------------------
+
+- From the **Client Detail** page’s Jobs tab:
+  - “Create Job” should open the same Quick Add Job dialog with:
+    - companyId prefilled
+    - locationId prefilled if a specific Location filter is selected.
+
+- From the **Calendar** view:
+  - If a “New Job” or “Create Job” action already exists:
+    - Reuse the Quick Add Job dialog.
+    - Prefill scheduledStart / scheduledEnd based on the selected slot.
+
+------------------------------------------------
+7) WHAT TO OUTPUT
+------------------------------------------------
+
+Please implement and show:
+
+1. Backend/ORM models:
+   - Job
+   - RecurringJobSeries
+   - RecurringJobPhase
+
+2. API endpoints / handlers:
+   - /jobs (list, get, create, update basic)
+   - /recurring-series (create, get)
+   - /recurring-series/:id/generate (basic next-N generation)
+
+3. Frontend:
+   - Jobs List page (/jobs)
+   - Job Detail page (/jobs/:id)
+   - Quick Add Job dialog with:
+     - core Job fields
+     - optional recurrence section with multiple phases
+
+4. Any necessary router updates and type/interface definitions.
+
+Use the project’s existing styling components, form handling, and patterns. Keep the UI clean and simple; focus on making the data model and flows solid and easy to extend.

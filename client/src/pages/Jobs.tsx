@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Search, ChevronDown, ChevronUp, ArrowUpDown, Loader2 } from "lucide-react";
+import { useLocation } from "wouter";
+import { Search, ChevronDown, ChevronUp, ArrowUpDown, Loader2, Plus, Calendar, Wrench, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,221 +16,171 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { JobDetailDialog } from "@/components/JobDetailDialog";
+import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
+import type { Job } from "@shared/schema";
 
-interface CalendarAssignment {
-  id: string;
-  clientId: string;
-  year: number;
-  month: number;
-  day: number | null;
-  scheduledDate: string;
-  scheduledHour: number | null;
-  completed: boolean;
-  completionNotes: string | null;
-  assignedTechnicianIds: string[] | null;
-  jobNumber: number;
+interface EnrichedJob extends Job {
+  locationName: string;
+  locationCity: string;
+  locationAddress: string;
 }
 
-interface Client {
-  id: string;
-  companyName: string;
-  location: string | null;
-  address: string | null;
-  city: string | null;
-  province: string | null;
-  postalCode: string | null;
-}
-
-type JobStatusFilter = "late" | "upcoming" | "completed" | "unscheduled";
-type SortField = "client" | "jobNumber" | "schedule" | "status";
+type JobStatusFilter = "all" | "draft" | "scheduled" | "in_progress" | "completed" | "cancelled" | "on_hold" | "overdue";
+type SortField = "location" | "jobNumber" | "schedule" | "status" | "priority";
 type SortDirection = "asc" | "desc";
 
-const ALL_STATUSES: JobStatusFilter[] = ["late", "upcoming", "completed", "unscheduled"];
-
-function parseLocalDate(dateStr: string): Date {
-  if (!dateStr) return new Date();
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
+function getJobStatusDisplay(status: string, scheduledStart: Date | null): { 
+  label: string; 
+  variant: "default" | "destructive" | "secondary" | "outline"; 
+  priority: number;
+  isOverdue?: boolean;
+} {
+  const now = new Date();
+  
+  if (status === "completed") {
+    return { label: "Completed", variant: "secondary", priority: 5 };
+  }
+  if (status === "cancelled") {
+    return { label: "Cancelled", variant: "outline", priority: 6 };
+  }
+  if (status === "on_hold") {
+    return { label: "On Hold", variant: "outline", priority: 4 };
+  }
+  if (status === "in_progress") {
+    return { label: "In Progress", variant: "default", priority: 1 };
+  }
+  if (status === "draft") {
+    return { label: "Draft", variant: "outline", priority: 3 };
+  }
+  
+  if (status === "scheduled" && scheduledStart) {
+    const scheduled = new Date(scheduledStart);
+    if (scheduled < now) {
+      return { label: "Overdue", variant: "destructive", priority: 0, isOverdue: true };
+    }
+    return { label: "Scheduled", variant: "default", priority: 2 };
+  }
+  
+  return { label: status, variant: "outline", priority: 3 };
 }
 
-function getJobStatus(assignment: CalendarAssignment): { label: string; variant: "default" | "destructive" | "secondary" | "outline"; priority: number } {
-  if (assignment.completed) {
-    return { label: "COMPLETED", variant: "secondary", priority: 3 };
+function getPriorityDisplay(priority: string): { label: string; variant: "default" | "destructive" | "secondary" | "outline" } {
+  switch (priority) {
+    case "urgent":
+      return { label: "Urgent", variant: "destructive" };
+    case "high":
+      return { label: "High", variant: "default" };
+    case "medium":
+      return { label: "Medium", variant: "secondary" };
+    case "low":
+      return { label: "Low", variant: "outline" };
+    default:
+      return { label: priority, variant: "outline" };
   }
-  
-  if (assignment.day === null) {
-    return { label: "Unscheduled", variant: "outline", priority: 2 };
-  }
-  
-  const scheduledDate = parseLocalDate(assignment.scheduledDate);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  if (scheduledDate < today) {
-    return { label: "Late", variant: "destructive", priority: 0 };
-  }
-  
-  return { label: "Upcoming", variant: "default", priority: 1 };
 }
 
 function formatJobNumber(jobNumber: number): string {
   return `#${jobNumber}`;
 }
 
-function formatAddress(client: Client | undefined): string {
-  if (!client) return "No address";
-  const parts = [
-    client.address,
-    client.city,
-    client.province,
-    client.postalCode
-  ].filter(Boolean);
-  return parts.join(", ") || "No address";
-}
-
-interface ClientPart {
-  id: string;
-  partId: string;
-  quantity: number;
-  part?: {
-    id: string;
-    type: string;
-    filterType?: string | null;
-    beltType?: string | null;
-    size?: string | null;
-    name?: string | null;
-  };
-}
-
 const ITEMS_PER_PAGE = 50;
 
 export default function Jobs() {
   const { toast } = useToast();
-  const [activeFilter, setActiveFilter] = useState<"all" | JobStatusFilter>("all");
+  const [, setLocation] = useLocation();
+  const [activeFilter, setActiveFilter] = useState<JobStatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("schedule");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [selectedJob, setSelectedJob] = useState<{ assignment: CalendarAssignment; client: Client | undefined } | null>(null);
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const loaderRef = useRef<HTMLDivElement>(null);
 
-  const { data: calendarData, isLoading: isCalendarLoading } = useQuery<{ assignments: CalendarAssignment[]; clients: Client[]; total?: number }>({
-    queryKey: ["/api/calendar/all"],
-    queryFn: async () => {
-      const res = await fetch('/api/calendar/all', {
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error("Failed to fetch jobs");
-      return res.json();
-    },
+  const { data: jobs = [], isLoading } = useQuery<EnrichedJob[]>({
+    queryKey: ["/api/jobs"],
   });
-
-  const { data: bulkParts = {} } = useQuery<Record<string, ClientPart[]>>({
-    queryKey: ["/api/client-parts/bulk"],
-    staleTime: 60 * 1000,
-  });
-
-  const assignTechniciansMutation = useMutation({
-    mutationFn: async ({ assignmentId, technicianIds }: { assignmentId: string; technicianIds: string[] }) => {
-      return apiRequest("PATCH", `/api/calendar/assign/${assignmentId}`, {
-        assignedTechnicianIds: technicianIds
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/all"] });
-      toast({ title: "Updated", description: "Technicians assigned successfully" });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to assign technicians", variant: "destructive" });
-    },
-  });
-
-  const clientMap = useMemo(() => {
-    const map = new Map<string, Client>();
-    if (calendarData?.clients) {
-      calendarData.clients.forEach(client => map.set(client.id, client));
-    }
-    return map;
-  }, [calendarData?.clients]);
 
   const filteredAndSortedJobs = useMemo(() => {
-    if (!calendarData?.assignments) return [];
-
-    let jobs = calendarData.assignments.map(assignment => {
-      const client = clientMap.get(assignment.clientId);
-      const status = getJobStatus(assignment);
+    let result = jobs.map(job => {
+      const statusInfo = getJobStatusDisplay(job.status, job.scheduledStart);
       return {
-        ...assignment,
-        client,
-        statusInfo: status,
+        ...job,
+        statusInfo,
       };
     });
 
-    // Filter by active status filter
     if (activeFilter !== "all") {
-      jobs = jobs.filter(job => {
-        const status = job.statusInfo.label.toLowerCase() as JobStatusFilter;
-        return status === activeFilter;
+      result = result.filter(job => {
+        if (activeFilter === "overdue") {
+          return job.statusInfo.isOverdue;
+        }
+        return job.status === activeFilter;
       });
     }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      jobs = jobs.filter(job => {
-        const clientName = job.client?.companyName?.toLowerCase() || "";
-        const address = formatAddress(job.client).toLowerCase();
+      result = result.filter(job => {
+        const locationName = job.locationName?.toLowerCase() || "";
+        const address = job.locationAddress?.toLowerCase() || "";
+        const city = job.locationCity?.toLowerCase() || "";
         const jobNumber = formatJobNumber(job.jobNumber).toLowerCase();
-        const notes = job.completionNotes?.toLowerCase() || "";
-        return clientName.includes(query) || address.includes(query) || jobNumber.includes(query) || notes.includes(query);
+        const summary = job.summary?.toLowerCase() || "";
+        return locationName.includes(query) || 
+               address.includes(query) || 
+               city.includes(query) || 
+               jobNumber.includes(query) ||
+               summary.includes(query);
       });
     }
 
-    jobs.sort((a, b) => {
+    result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case "client":
-          comparison = (a.client?.companyName || "").localeCompare(b.client?.companyName || "");
+        case "location":
+          comparison = (a.locationName || "").localeCompare(b.locationName || "");
           break;
         case "jobNumber":
           comparison = a.jobNumber - b.jobNumber;
           break;
         case "schedule":
-          if (a.day === null && b.day === null) {
+          if (!a.scheduledStart && !b.scheduledStart) {
             comparison = 0;
-          } else if (a.day === null) {
+          } else if (!a.scheduledStart) {
             comparison = 1;
-          } else if (b.day === null) {
+          } else if (!b.scheduledStart) {
             comparison = -1;
           } else {
-            const dateA = parseLocalDate(a.scheduledDate);
-            const dateB = parseLocalDate(b.scheduledDate);
+            const dateA = new Date(a.scheduledStart);
+            const dateB = new Date(b.scheduledStart);
             comparison = dateA.getTime() - dateB.getTime();
           }
           break;
         case "status":
           comparison = a.statusInfo.priority - b.statusInfo.priority;
           break;
+        case "priority":
+          const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+          comparison = (priorityOrder[a.priority as keyof typeof priorityOrder] ?? 2) - 
+                       (priorityOrder[b.priority as keyof typeof priorityOrder] ?? 2);
+          break;
       }
       return sortDirection === "asc" ? comparison : -comparison;
     });
 
-    return jobs;
-  }, [calendarData?.assignments, clientMap, activeFilter, searchQuery, sortField, sortDirection]);
+    return result;
+  }, [jobs, activeFilter, searchQuery, sortField, sortDirection]);
 
-  // Reset visible count when filters or sort changes
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
   }, [activeFilter, searchQuery, sortField, sortDirection]);
 
-  // Visible jobs (paginated)
   const visibleJobs = useMemo(() => {
     return filteredAndSortedJobs.slice(0, visibleCount);
   }, [filteredAndSortedJobs, visibleCount]);
 
   const hasMore = visibleCount < filteredAndSortedJobs.length;
 
-  // Intersection observer for infinite scroll
   const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
     const target = entries[0];
     if (target.isIntersecting && hasMore) {
@@ -257,23 +208,8 @@ export default function Jobs() {
     }
   };
 
-  const handleRowClick = (job: typeof filteredAndSortedJobs[0]) => {
-    setSelectedJob({
-      assignment: {
-        id: job.id,
-        clientId: job.clientId,
-        year: job.year,
-        month: job.month,
-        day: job.day,
-        scheduledDate: job.scheduledDate,
-        scheduledHour: job.scheduledHour,
-        completed: job.completed,
-        completionNotes: job.completionNotes,
-        assignedTechnicianIds: job.assignedTechnicianIds,
-        jobNumber: job.jobNumber,
-      },
-      client: job.client,
-    });
+  const handleRowClick = (job: EnrichedJob) => {
+    setLocation(`/jobs/${job.id}`);
   };
 
   const SortableHeader = ({ field, children, testId }: { field: SortField; children: React.ReactNode; testId: string }) => (
@@ -293,33 +229,46 @@ export default function Jobs() {
     </TableHead>
   );
 
-  // Calculate status counts
   const statusCounts = useMemo(() => {
-    if (!calendarData?.assignments) return { late: 0, upcoming: 0, completed: 0, unscheduled: 0 };
+    const counts = { 
+      draft: 0, 
+      scheduled: 0, 
+      in_progress: 0, 
+      completed: 0, 
+      cancelled: 0, 
+      on_hold: 0,
+      overdue: 0 
+    };
     
-    const counts = { late: 0, upcoming: 0, completed: 0, unscheduled: 0 };
-    calendarData.assignments.forEach(assignment => {
-      const status = getJobStatus(assignment).label.toLowerCase();
-      if (status in counts) {
-        counts[status as keyof typeof counts]++;
+    jobs.forEach(job => {
+      const statusInfo = getJobStatusDisplay(job.status, job.scheduledStart);
+      if (statusInfo.isOverdue) {
+        counts.overdue++;
+      } else if (job.status in counts) {
+        counts[job.status as keyof typeof counts]++;
       }
     });
+    
     return counts;
-  }, [calendarData?.assignments]);
+  }, [jobs]);
 
-  const totalCount = statusCounts.late + statusCounts.upcoming + statusCounts.completed + statusCounts.unscheduled;
+  const totalCount = jobs.length;
 
-  const statusFilterOptions: { value: JobStatusFilter; label: string; variant: "default" | "destructive" | "secondary" | "outline" }[] = [
-    { value: "late", label: "Late", variant: "destructive" },
-    { value: "upcoming", label: "Upcoming", variant: "default" },
-    { value: "unscheduled", label: "Unscheduled", variant: "outline" },
-    { value: "completed", label: "Completed", variant: "secondary" },
+  const statusFilterOptions: { value: JobStatusFilter; label: string; count: number; variant: "default" | "destructive" | "secondary" | "outline" }[] = [
+    { value: "overdue", label: "Overdue", count: statusCounts.overdue, variant: "destructive" },
+    { value: "in_progress", label: "In Progress", count: statusCounts.in_progress, variant: "default" },
+    { value: "scheduled", label: "Scheduled", count: statusCounts.scheduled, variant: "default" },
+    { value: "draft", label: "Draft", count: statusCounts.draft, variant: "outline" },
+    { value: "completed", label: "Completed", count: statusCounts.completed, variant: "secondary" },
   ];
 
-  if (isCalendarLoading) {
+  if (isLoading) {
     return (
       <div className="p-6" data-testid="jobs-loading">
-        <div className="text-center py-8">Loading jobs...</div>
+        <div className="text-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+          Loading jobs...
+        </div>
       </div>
     );
   }
@@ -327,7 +276,7 @@ export default function Jobs() {
   return (
     <div className="p-6 space-y-6" data-testid="jobs-page">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant={activeFilter === "all" ? "default" : "outline"}
             size="sm"
@@ -339,8 +288,7 @@ export default function Jobs() {
           </Button>
           {statusFilterOptions.map(option => {
             const isActive = activeFilter === option.value;
-            const count = statusCounts[option.value];
-            const activeVariant = option.value === "late" ? "destructive" : "default";
+            const activeVariant = option.value === "overdue" ? "destructive" : "default";
             return (
               <Button
                 key={option.value}
@@ -350,21 +298,30 @@ export default function Jobs() {
                 className={!isActive ? "opacity-60" : ""}
                 data-testid={`button-filter-status-${option.value}`}
               >
-                {option.label} ({count})
+                {option.label} ({option.count})
               </Button>
             );
           })}
         </div>
 
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search jobs..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-            data-testid="input-search-jobs"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search jobs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-jobs"
+            />
+          </div>
+          <Button
+            onClick={() => setShowCreateDialog(true)}
+            data-testid="button-create-job"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Job
+          </Button>
         </div>
       </div>
 
@@ -372,52 +329,86 @@ export default function Jobs() {
         <Table>
           <TableHeader>
             <TableRow>
-              <SortableHeader field="client" testId="header-client">Client</SortableHeader>
-              <SortableHeader field="jobNumber" testId="header-jobnumber">Job number</SortableHeader>
-              <TableHead data-testid="header-property">Property</TableHead>
+              <SortableHeader field="location" testId="header-location">Location</SortableHeader>
+              <SortableHeader field="jobNumber" testId="header-jobnumber">Job</SortableHeader>
+              <TableHead data-testid="header-summary">Summary</TableHead>
               <SortableHeader field="schedule" testId="header-schedule">Schedule</SortableHeader>
+              <SortableHeader field="priority" testId="header-priority">Priority</SortableHeader>
               <SortableHeader field="status" testId="header-status">Status</SortableHeader>
             </TableRow>
           </TableHeader>
           <TableBody>
             {visibleJobs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground" data-testid="text-no-jobs">
-                  No jobs found
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground" data-testid="text-no-jobs">
+                  {jobs.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <Wrench className="h-8 w-8 opacity-50" />
+                      <p>No jobs yet</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowCreateDialog(true)}
+                        data-testid="button-create-first-job"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create your first job
+                      </Button>
+                    </div>
+                  ) : (
+                    "No jobs match your filters"
+                  )}
                 </TableCell>
               </TableRow>
             ) : (
-              visibleJobs.map((job) => (
-                <TableRow 
-                  key={job.id} 
-                  className="cursor-pointer hover-elevate"
-                  onClick={() => handleRowClick(job)}
-                  data-testid={`row-job-${job.id}`}
-                >
-                  <TableCell className="font-medium" data-testid={`text-client-${job.id}`}>
-                    {job.client?.companyName || "Unknown Client"}
-                  </TableCell>
-                  <TableCell data-testid={`text-jobnumber-${job.id}`}>
-                    <div className="font-mono text-sm">{formatJobNumber(job.jobNumber)}</div>
-                    {job.completionNotes && (
-                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">
-                        {job.completionNotes}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground" data-testid={`text-property-${job.id}`}>
-                    {formatAddress(job.client)}
-                  </TableCell>
-                  <TableCell data-testid={`text-schedule-${job.id}`}>
-                    {job.day !== null ? format(parseLocalDate(job.scheduledDate), "MMMM d, yyyy") : "Not scheduled"}
-                  </TableCell>
-                  <TableCell data-testid={`badge-status-${job.id}`}>
-                    <Badge variant={job.statusInfo.variant}>
-                      {job.statusInfo.label}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))
+              visibleJobs.map((job) => {
+                const priorityDisplay = getPriorityDisplay(job.priority);
+                return (
+                  <TableRow 
+                    key={job.id} 
+                    className="cursor-pointer hover-elevate"
+                    onClick={() => handleRowClick(job)}
+                    data-testid={`row-job-${job.id}`}
+                  >
+                    <TableCell className="font-medium" data-testid={`text-location-${job.id}`}>
+                      <div>{job.locationName || "Unknown"}</div>
+                      {job.locationCity && (
+                        <div className="text-xs text-muted-foreground">{job.locationCity}</div>
+                      )}
+                    </TableCell>
+                    <TableCell data-testid={`text-jobnumber-${job.id}`}>
+                      <div className="font-mono text-sm">{formatJobNumber(job.jobNumber)}</div>
+                      <div className="text-xs text-muted-foreground capitalize">{job.jobType}</div>
+                    </TableCell>
+                    <TableCell data-testid={`text-summary-${job.id}`}>
+                      <div className="max-w-[300px] truncate">{job.summary}</div>
+                    </TableCell>
+                    <TableCell data-testid={`text-schedule-${job.id}`}>
+                      {job.scheduledStart ? (
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          {format(new Date(job.scheduledStart), "MMM d, yyyy")}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Not scheduled</span>
+                      )}
+                    </TableCell>
+                    <TableCell data-testid={`badge-priority-${job.id}`}>
+                      <Badge variant={priorityDisplay.variant} className="text-xs">
+                        {priorityDisplay.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell data-testid={`badge-status-${job.id}`}>
+                      <Badge variant={job.statusInfo.variant}>
+                        {job.statusInfo.isOverdue && (
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                        )}
+                        {job.statusInfo.label}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -437,17 +428,9 @@ export default function Jobs() {
         Showing {visibleJobs.length} of {filteredAndSortedJobs.length} job{filteredAndSortedJobs.length !== 1 ? 's' : ''}
       </div>
 
-      <JobDetailDialog
-        assignment={selectedJob?.assignment || null}
-        client={selectedJob?.client}
-        open={!!selectedJob}
-        onOpenChange={(open) => {
-          if (!open) setSelectedJob(null);
-        }}
-        bulkParts={bulkParts}
-        onAssignTechnicians={(assignmentId: string, technicianIds: string[]) => {
-          assignTechniciansMutation.mutate({ assignmentId, technicianIds });
-        }}
+      <QuickAddJobDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
       />
     </div>
   );

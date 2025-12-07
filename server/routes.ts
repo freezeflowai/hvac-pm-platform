@@ -9,7 +9,7 @@ import { sendInvitationEmail } from "./emailService";
 import { impersonationService } from "./impersonationService";
 import { auditService } from "./auditService";
 import { requirePlatformAdmin, blockImpersonation } from "./impersonationMiddleware";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, insertJobNoteSchema, updateJobNoteSchema, insertClientNoteSchema, updateClientNoteSchema, insertCustomerCompanySchema, updateCustomerCompanySchema, insertInvoiceSchema, updateInvoiceSchema, insertInvoiceLineSchema, updateInvoiceLineSchema, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, insertJobNoteSchema, updateJobNoteSchema, insertClientNoteSchema, updateClientNoteSchema, insertCustomerCompanySchema, updateCustomerCompanySchema, insertInvoiceSchema, updateInvoiceSchema, insertInvoiceLineSchema, updateInvoiceLineSchema, insertJobSchema, updateJobSchema, insertRecurringJobSeriesSchema, insertRecurringJobPhaseSchema, jobStatusEnum, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
 import { db } from "./db";
@@ -3540,6 +3540,241 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching equipment:", error);
       res.status(500).json({ error: "Failed to fetch equipment" });
+    }
+  });
+
+  // =====================
+  // JOBS API ENDPOINTS
+  // =====================
+  
+  // Get all jobs with filters
+  app.get("/api/jobs", isAuthenticated, async (req, res) => {
+    try {
+      const { status, technicianId, locationId, startDate, endDate } = req.query;
+      const filters: {
+        status?: string;
+        technicianId?: string;
+        locationId?: string;
+        startDate?: string;
+        endDate?: string;
+      } = {};
+      
+      if (status && typeof status === 'string') filters.status = status;
+      if (technicianId && typeof technicianId === 'string') filters.technicianId = technicianId;
+      if (locationId && typeof locationId === 'string') filters.locationId = locationId;
+      if (startDate && typeof startDate === 'string') filters.startDate = startDate;
+      if (endDate && typeof endDate === 'string') filters.endDate = endDate;
+      
+      const jobs = await storage.getJobs(req.user!.companyId, Object.keys(filters).length > 0 ? filters : undefined);
+      
+      // Enrich jobs with client/location info
+      const enrichedJobs = await Promise.all(jobs.map(async (job) => {
+        const location = await storage.getClient(req.user!.companyId, job.locationId);
+        return {
+          ...job,
+          locationName: location?.companyName || 'Unknown',
+          locationCity: location?.city || '',
+          locationAddress: location?.address || '',
+        };
+      }));
+      
+      res.json(enrichedJobs);
+    } catch (error) {
+      console.error('Get jobs error:', error);
+      res.status(500).json({ error: "Failed to get jobs" });
+    }
+  });
+
+  // Get single job by ID
+  app.get("/api/jobs/:id", isAuthenticated, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.user!.companyId, req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      // Enrich with location info
+      const location = await storage.getClient(req.user!.companyId, job.locationId);
+      let parentCompany = null;
+      if (location?.parentCompanyId) {
+        parentCompany = await storage.getCustomerCompany(req.user!.companyId, location.parentCompanyId);
+      }
+      
+      // Get assigned technicians
+      let technicians: User[] = [];
+      if (job.assignedTechnicianIds && job.assignedTechnicianIds.length > 0) {
+        const allTechs = await storage.getTechniciansByCompanyId(req.user!.companyId);
+        technicians = allTechs.filter(t => job.assignedTechnicianIds?.includes(t.id));
+      }
+      
+      // Get recurring series if linked
+      let recurringSeries = null;
+      if (job.recurringSeriesId) {
+        recurringSeries = await storage.getRecurringSeries(req.user!.companyId, job.recurringSeriesId);
+      }
+      
+      res.json({
+        ...job,
+        location,
+        parentCompany,
+        technicians,
+        recurringSeries,
+      });
+    } catch (error) {
+      console.error('Get job error:', error);
+      res.status(500).json({ error: "Failed to get job" });
+    }
+  });
+
+  // Create new job
+  app.post("/api/jobs", isAuthenticated, async (req, res) => {
+    try {
+      const data = insertJobSchema.parse(req.body);
+      const job = await storage.createJob(req.user!.companyId, data);
+      res.status(201).json(job);
+    } catch (error) {
+      console.error('Create job error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid job data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create job" });
+    }
+  });
+
+  // Update job
+  app.put("/api/jobs/:id", isAuthenticated, async (req, res) => {
+    try {
+      const data = updateJobSchema.parse(req.body);
+      const job = await storage.updateJob(req.user!.companyId, req.params.id, data);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      res.json(job);
+    } catch (error) {
+      console.error('Update job error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid job data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update job" });
+    }
+  });
+
+  // Update job status only
+  app.patch("/api/jobs/:id/status", isAuthenticated, async (req, res) => {
+    try {
+      const { status } = req.body;
+      if (!status || !jobStatusEnum.includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      const job = await storage.updateJobStatus(req.user!.companyId, req.params.id, status);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      res.json(job);
+    } catch (error) {
+      console.error('Update job status error:', error);
+      res.status(500).json({ error: "Failed to update job status" });
+    }
+  });
+
+  // Delete job (soft delete)
+  app.delete("/api/jobs/:id", isAuthenticated, async (req, res) => {
+    try {
+      const deleted = await storage.deleteJob(req.user!.companyId, req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete job error:', error);
+      res.status(500).json({ error: "Failed to delete job" });
+    }
+  });
+
+  // ================================
+  // RECURRING SERIES API ENDPOINTS
+  // ================================
+  
+  // Create recurring series with phases
+  app.post("/api/recurring-series", isAuthenticated, async (req, res) => {
+    try {
+      const { phases, ...seriesData } = req.body;
+      
+      const validatedSeries = insertRecurringJobSeriesSchema.parse({
+        ...seriesData,
+        createdByUserId: req.user!.id,
+      });
+      
+      const phasesSchema = z.array(insertRecurringJobPhaseSchema);
+      const validatedPhases = phasesSchema.parse(phases || []);
+      
+      if (validatedPhases.length === 0) {
+        return res.status(400).json({ error: "At least one recurrence phase is required" });
+      }
+      
+      const series = await storage.createRecurringSeries(req.user!.companyId, validatedSeries, validatedPhases);
+      
+      // Get the phases we just created
+      const createdPhases = await storage.getRecurringPhases(series.id);
+      
+      res.status(201).json({
+        ...series,
+        phases: createdPhases,
+      });
+    } catch (error) {
+      console.error('Create recurring series error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid series data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create recurring series" });
+    }
+  });
+
+  // Get recurring series by ID
+  app.get("/api/recurring-series/:id", isAuthenticated, async (req, res) => {
+    try {
+      const series = await storage.getRecurringSeries(req.user!.companyId, req.params.id);
+      if (!series) {
+        return res.status(404).json({ error: "Recurring series not found" });
+      }
+      
+      const phases = await storage.getRecurringPhases(series.id);
+      const location = await storage.getClient(req.user!.companyId, series.locationId);
+      
+      res.json({
+        ...series,
+        phases,
+        location,
+      });
+    } catch (error) {
+      console.error('Get recurring series error:', error);
+      res.status(500).json({ error: "Failed to get recurring series" });
+    }
+  });
+
+  // Generate jobs from recurring series
+  app.post("/api/recurring-series/:id/generate", isAuthenticated, async (req, res) => {
+    try {
+      const { count = 1 } = req.body;
+      
+      if (count < 1 || count > 24) {
+        return res.status(400).json({ error: "Count must be between 1 and 24" });
+      }
+      
+      const series = await storage.getRecurringSeries(req.user!.companyId, req.params.id);
+      if (!series) {
+        return res.status(404).json({ error: "Recurring series not found" });
+      }
+      
+      const generatedJobs = await storage.generateJobsFromSeries(req.user!.companyId, req.params.id, count);
+      
+      res.status(201).json({
+        generated: generatedJobs.length,
+        jobs: generatedJobs,
+      });
+    } catch (error) {
+      console.error('Generate jobs error:', error);
+      res.status(500).json({ error: "Failed to generate jobs" });
     }
   });
 

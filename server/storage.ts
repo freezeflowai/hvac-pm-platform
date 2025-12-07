@@ -35,9 +35,19 @@ import {
   type InvoiceLine,
   type InsertInvoiceLine,
   type UpdateInvoiceLine,
+  type Job,
+  type InsertJob,
+  type UpdateJob,
+  type RecurringJobSeries,
+  type InsertRecurringJobSeries,
+  type RecurringJobPhase,
+  type InsertRecurringJobPhase,
   customerCompanies,
   invoices,
-  invoiceLines
+  invoiceLines,
+  jobs,
+  recurringJobSeries,
+  recurringJobPhases
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { STANDARD_BELTS, STANDARD_FILTERS } from "./seed-data";
@@ -209,6 +219,28 @@ export interface IStorage {
   getCompanyById(id: string): Promise<any | undefined>;
   getAllCompanies(): Promise<any[]>;
   updateCompany(companyId: string, updates: Partial<any>): Promise<void>;
+  
+  // Jobs methods
+  getJobs(companyId: string, filters?: {
+    status?: string;
+    technicianId?: string;
+    locationId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<Job[]>;
+  getJob(companyId: string, id: string): Promise<Job | undefined>;
+  createJob(companyId: string, data: InsertJob): Promise<Job>;
+  updateJob(companyId: string, id: string, data: UpdateJob): Promise<Job | undefined>;
+  updateJobStatus(companyId: string, id: string, status: string): Promise<Job | undefined>;
+  deleteJob(companyId: string, id: string): Promise<boolean>;
+  getNextJobNumber(companyId: string): Promise<number>;
+  
+  // Recurring Job Series methods
+  getRecurringSeries(companyId: string, id: string): Promise<RecurringJobSeries | undefined>;
+  getRecurringSeriesByLocation(companyId: string, locationId: string): Promise<RecurringJobSeries[]>;
+  createRecurringSeries(companyId: string, data: InsertRecurringJobSeries, phases: InsertRecurringJobPhase[]): Promise<RecurringJobSeries>;
+  getRecurringPhases(seriesId: string): Promise<RecurringJobPhase[]>;
+  generateJobsFromSeries(companyId: string, seriesId: string, count: number): Promise<Job[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -225,6 +257,10 @@ export class MemStorage implements IStorage {
   private invitationTokens: Map<string, any>;
   private companies: Map<string, any>;
   private jobNotes: Map<string, JobNote>;
+  private jobsMap: Map<string, Job>;
+  private recurringSeriesMap: Map<string, RecurringJobSeries>;
+  private recurringPhasesMap: Map<string, RecurringJobPhase>;
+  private jobNumberCounters: Map<string, number>;
 
   constructor() {
     this.users = new Map();
@@ -240,6 +276,10 @@ export class MemStorage implements IStorage {
     this.invitationTokens = new Map();
     this.companies = new Map();
     this.jobNotes = new Map();
+    this.jobsMap = new Map();
+    this.recurringSeriesMap = new Map();
+    this.recurringPhasesMap = new Map();
+    this.jobNumberCounters = new Map();
   }
 
   // User methods
@@ -1619,6 +1659,257 @@ export class MemStorage implements IStorage {
       return true;
     }
     return false;
+  }
+
+  // Jobs methods
+  async getJobs(companyId: string, filters?: {
+    status?: string;
+    technicianId?: string;
+    locationId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<Job[]> {
+    let result = Array.from(this.jobsMap.values())
+      .filter(job => job.companyId === companyId && job.isActive);
+    
+    if (filters?.status) {
+      result = result.filter(job => job.status === filters.status);
+    }
+    if (filters?.technicianId) {
+      result = result.filter(job => 
+        job.primaryTechnicianId === filters.technicianId ||
+        job.assignedTechnicianIds?.includes(filters.technicianId!)
+      );
+    }
+    if (filters?.locationId) {
+      result = result.filter(job => job.locationId === filters.locationId);
+    }
+    if (filters?.startDate) {
+      const start = new Date(filters.startDate);
+      result = result.filter(job => job.scheduledStart && new Date(job.scheduledStart) >= start);
+    }
+    if (filters?.endDate) {
+      const end = new Date(filters.endDate);
+      result = result.filter(job => job.scheduledStart && new Date(job.scheduledStart) <= end);
+    }
+    
+    return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getJob(companyId: string, id: string): Promise<Job | undefined> {
+    const job = this.jobsMap.get(id);
+    if (job && job.companyId === companyId) {
+      return job;
+    }
+    return undefined;
+  }
+
+  async getNextJobNumber(companyId: string): Promise<number> {
+    const current = this.jobNumberCounters.get(companyId) || 10000;
+    const next = current + 1;
+    this.jobNumberCounters.set(companyId, next);
+    return next;
+  }
+
+  async createJob(companyId: string, data: InsertJob): Promise<Job> {
+    const id = randomUUID();
+    const jobNumber = await this.getNextJobNumber(companyId);
+    const now = new Date();
+    const newJob: Job = {
+      id,
+      companyId,
+      jobNumber,
+      locationId: data.locationId,
+      primaryTechnicianId: data.primaryTechnicianId || null,
+      assignedTechnicianIds: data.assignedTechnicianIds || null,
+      status: data.status || 'draft',
+      priority: data.priority || 'medium',
+      jobType: data.jobType || 'maintenance',
+      summary: data.summary,
+      description: data.description || null,
+      accessInstructions: data.accessInstructions || null,
+      scheduledStart: data.scheduledStart ? new Date(data.scheduledStart) : null,
+      scheduledEnd: data.scheduledEnd ? new Date(data.scheduledEnd) : null,
+      actualStart: null,
+      actualEnd: null,
+      invoiceId: data.invoiceId || null,
+      qboInvoiceId: data.qboInvoiceId || null,
+      billingNotes: data.billingNotes || null,
+      recurringSeriesId: data.recurringSeriesId || null,
+      calendarAssignmentId: data.calendarAssignmentId || null,
+      isActive: true,
+      createdAt: now,
+      updatedAt: null,
+    };
+    this.jobsMap.set(id, newJob);
+    return newJob;
+  }
+
+  async updateJob(companyId: string, id: string, data: UpdateJob): Promise<Job | undefined> {
+    const existing = this.jobsMap.get(id);
+    if (!existing || existing.companyId !== companyId) {
+      return undefined;
+    }
+    const updated: Job = {
+      ...existing,
+      ...data,
+      scheduledStart: data.scheduledStart !== undefined ? (data.scheduledStart ? new Date(data.scheduledStart) : null) : existing.scheduledStart,
+      scheduledEnd: data.scheduledEnd !== undefined ? (data.scheduledEnd ? new Date(data.scheduledEnd) : null) : existing.scheduledEnd,
+      actualStart: data.actualStart !== undefined ? (data.actualStart ? new Date(data.actualStart) : null) : existing.actualStart,
+      actualEnd: data.actualEnd !== undefined ? (data.actualEnd ? new Date(data.actualEnd) : null) : existing.actualEnd,
+      updatedAt: new Date(),
+    };
+    this.jobsMap.set(id, updated);
+    return updated;
+  }
+
+  async updateJobStatus(companyId: string, id: string, status: string): Promise<Job | undefined> {
+    return this.updateJob(companyId, id, { status: status as any });
+  }
+
+  async deleteJob(companyId: string, id: string): Promise<boolean> {
+    const job = this.jobsMap.get(id);
+    if (job && job.companyId === companyId) {
+      // Soft delete
+      job.isActive = false;
+      job.updatedAt = new Date();
+      this.jobsMap.set(id, job);
+      return true;
+    }
+    return false;
+  }
+
+  // Recurring Job Series methods
+  async getRecurringSeries(companyId: string, id: string): Promise<RecurringJobSeries | undefined> {
+    const series = this.recurringSeriesMap.get(id);
+    if (series && series.companyId === companyId) {
+      return series;
+    }
+    return undefined;
+  }
+
+  async getRecurringSeriesByLocation(companyId: string, locationId: string): Promise<RecurringJobSeries[]> {
+    return Array.from(this.recurringSeriesMap.values())
+      .filter(s => s.companyId === companyId && s.locationId === locationId && s.isActive);
+  }
+
+  async createRecurringSeries(companyId: string, data: InsertRecurringJobSeries, phases: InsertRecurringJobPhase[]): Promise<RecurringJobSeries> {
+    const id = randomUUID();
+    const now = new Date();
+    const series: RecurringJobSeries = {
+      id,
+      companyId,
+      locationId: data.locationId,
+      baseSummary: data.baseSummary,
+      baseDescription: data.baseDescription || null,
+      baseJobType: data.baseJobType || 'service',
+      basePriority: data.basePriority || 'normal',
+      defaultTechnicianId: data.defaultTechnicianId || null,
+      startDate: data.startDate,
+      timezone: data.timezone || 'America/Toronto',
+      notes: data.notes || null,
+      isActive: true,
+      createdByUserId: data.createdByUserId || null,
+      createdAt: now,
+      updatedAt: null,
+    };
+    this.recurringSeriesMap.set(id, series);
+
+    // Create phases
+    for (const phaseData of phases) {
+      const phaseId = randomUUID();
+      const phase: RecurringJobPhase = {
+        id: phaseId,
+        seriesId: id,
+        orderIndex: phaseData.orderIndex ?? 0,
+        frequency: phaseData.frequency,
+        interval: phaseData.interval || 1,
+        occurrences: phaseData.occurrences || null,
+        untilDate: phaseData.untilDate || null,
+      };
+      this.recurringPhasesMap.set(phaseId, phase);
+    }
+
+    return series;
+  }
+
+  async getRecurringPhases(seriesId: string): Promise<RecurringJobPhase[]> {
+    return Array.from(this.recurringPhasesMap.values())
+      .filter(p => p.seriesId === seriesId)
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+  }
+
+  async generateJobsFromSeries(companyId: string, seriesId: string, count: number): Promise<Job[]> {
+    const series = await this.getRecurringSeries(companyId, seriesId);
+    if (!series) return [];
+
+    const phases = await this.getRecurringPhases(seriesId);
+    if (phases.length === 0) return [];
+
+    const generatedJobs: Job[] = [];
+    let currentDate = new Date(series.startDate);
+    let jobsGenerated = 0;
+    let phaseIndex = 0;
+    let phaseOccurrenceCount = 0;
+
+    while (jobsGenerated < count && phaseIndex < phases.length) {
+      const phase = phases[phaseIndex];
+      
+      // Check if phase is complete
+      if (phase.occurrences && phaseOccurrenceCount >= phase.occurrences) {
+        phaseIndex++;
+        phaseOccurrenceCount = 0;
+        continue;
+      }
+      if (phase.untilDate && currentDate > new Date(phase.untilDate)) {
+        phaseIndex++;
+        phaseOccurrenceCount = 0;
+        continue;
+      }
+
+      // Create job for current date
+      const job = await this.createJob(companyId, {
+        locationId: series.locationId,
+        summary: series.baseSummary,
+        description: series.baseDescription,
+        jobType: series.baseJobType as any,
+        priority: series.basePriority as any,
+        primaryTechnicianId: series.defaultTechnicianId,
+        scheduledStart: currentDate.toISOString(),
+        recurringSeriesId: seriesId,
+        status: 'scheduled',
+      });
+      generatedJobs.push(job);
+      jobsGenerated++;
+      phaseOccurrenceCount++;
+
+      // Advance to next date based on frequency
+      currentDate = this.advanceDate(currentDate, phase.frequency, phase.interval);
+    }
+
+    return generatedJobs;
+  }
+
+  private advanceDate(date: Date, frequency: string, interval: number): Date {
+    const result = new Date(date);
+    switch (frequency) {
+      case 'daily':
+        result.setDate(result.getDate() + interval);
+        break;
+      case 'weekly':
+        result.setDate(result.getDate() + (7 * interval));
+        break;
+      case 'monthly':
+        result.setMonth(result.getMonth() + interval);
+        break;
+      case 'quarterly':
+        result.setMonth(result.getMonth() + (3 * interval));
+        break;
+      case 'yearly':
+        result.setFullYear(result.getFullYear() + interval);
+        break;
+    }
+    return result;
   }
 }
 
@@ -3421,6 +3712,272 @@ export class DbStorage implements IStorage {
     }
 
     return { invoice, lines, location, customerCompany };
+  }
+
+  // Jobs methods
+  async getJobs(companyId: string, filters?: {
+    status?: string;
+    technicianId?: string;
+    locationId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<Job[]> {
+    const conditions = [eq(jobs.companyId, companyId), eq(jobs.isActive, true)];
+    
+    if (filters?.status) {
+      conditions.push(eq(jobs.status, filters.status));
+    }
+    if (filters?.locationId) {
+      conditions.push(eq(jobs.locationId, filters.locationId));
+    }
+    if (filters?.technicianId) {
+      conditions.push(
+        or(
+          eq(jobs.primaryTechnicianId, filters.technicianId),
+          sql`${filters.technicianId} = ANY(${jobs.assignedTechnicianIds})`
+        )!
+      );
+    }
+    if (filters?.startDate) {
+      conditions.push(sql`${jobs.scheduledStart} >= ${filters.startDate}::timestamp`);
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`${jobs.scheduledStart} <= ${filters.endDate}::timestamp`);
+    }
+
+    return db.select()
+      .from(jobs)
+      .where(and(...conditions))
+      .orderBy(desc(jobs.createdAt));
+  }
+
+  async getJob(companyId: string, id: string): Promise<Job | undefined> {
+    const result = await db.select()
+      .from(jobs)
+      .where(and(eq(jobs.id, id), eq(jobs.companyId, companyId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async getNextJobNumber(companyId: string): Promise<number> {
+    // Use company_counters table for atomic job number generation
+    const result = await db.select()
+      .from(companyCounters)
+      .where(eq(companyCounters.companyId, companyId))
+      .limit(1);
+    
+    if (result.length === 0) {
+      // Initialize counter for this company
+      await db.insert(companyCounters).values({
+        companyId,
+        nextJobNumber: 10001,
+      });
+      return 10000;
+    }
+    
+    const current = result[0].nextJobNumber;
+    await db.update(companyCounters)
+      .set({ nextJobNumber: current + 1 })
+      .where(eq(companyCounters.companyId, companyId));
+    
+    return current;
+  }
+
+  async createJob(companyId: string, data: InsertJob): Promise<Job> {
+    const jobNumber = await this.getNextJobNumber(companyId);
+    const result = await db.insert(jobs).values({
+      companyId,
+      jobNumber,
+      locationId: data.locationId,
+      primaryTechnicianId: data.primaryTechnicianId || null,
+      assignedTechnicianIds: data.assignedTechnicianIds || null,
+      status: data.status || 'draft',
+      priority: data.priority || 'medium',
+      jobType: data.jobType || 'maintenance',
+      summary: data.summary,
+      description: data.description || null,
+      accessInstructions: data.accessInstructions || null,
+      scheduledStart: data.scheduledStart ? new Date(data.scheduledStart) : null,
+      scheduledEnd: data.scheduledEnd ? new Date(data.scheduledEnd) : null,
+      invoiceId: data.invoiceId || null,
+      qboInvoiceId: data.qboInvoiceId || null,
+      billingNotes: data.billingNotes || null,
+      recurringSeriesId: data.recurringSeriesId || null,
+      calendarAssignmentId: data.calendarAssignmentId || null,
+    }).returning();
+    return result[0];
+  }
+
+  async updateJob(companyId: string, id: string, data: UpdateJob): Promise<Job | undefined> {
+    const updateData: any = { ...data, updatedAt: new Date() };
+    
+    // Handle date conversions
+    if (data.scheduledStart !== undefined) {
+      updateData.scheduledStart = data.scheduledStart ? new Date(data.scheduledStart) : null;
+    }
+    if (data.scheduledEnd !== undefined) {
+      updateData.scheduledEnd = data.scheduledEnd ? new Date(data.scheduledEnd) : null;
+    }
+    if (data.actualStart !== undefined) {
+      updateData.actualStart = data.actualStart ? new Date(data.actualStart) : null;
+    }
+    if (data.actualEnd !== undefined) {
+      updateData.actualEnd = data.actualEnd ? new Date(data.actualEnd) : null;
+    }
+
+    const result = await db.update(jobs)
+      .set(updateData)
+      .where(and(eq(jobs.id, id), eq(jobs.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async updateJobStatus(companyId: string, id: string, status: string): Promise<Job | undefined> {
+    return this.updateJob(companyId, id, { status: status as any });
+  }
+
+  async deleteJob(companyId: string, id: string): Promise<boolean> {
+    // Soft delete
+    const result = await db.update(jobs)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(eq(jobs.id, id), eq(jobs.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Recurring Job Series methods
+  async getRecurringSeries(companyId: string, id: string): Promise<RecurringJobSeries | undefined> {
+    const result = await db.select()
+      .from(recurringJobSeries)
+      .where(and(eq(recurringJobSeries.id, id), eq(recurringJobSeries.companyId, companyId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async getRecurringSeriesByLocation(companyId: string, locationId: string): Promise<RecurringJobSeries[]> {
+    return db.select()
+      .from(recurringJobSeries)
+      .where(and(
+        eq(recurringJobSeries.companyId, companyId),
+        eq(recurringJobSeries.locationId, locationId),
+        eq(recurringJobSeries.isActive, true)
+      ))
+      .orderBy(desc(recurringJobSeries.createdAt));
+  }
+
+  async createRecurringSeries(companyId: string, data: InsertRecurringJobSeries, phases: InsertRecurringJobPhase[]): Promise<RecurringJobSeries> {
+    return await db.transaction(async (tx) => {
+      const seriesResult = await tx.insert(recurringJobSeries).values({
+        companyId,
+        locationId: data.locationId,
+        baseSummary: data.baseSummary,
+        baseDescription: data.baseDescription || null,
+        baseJobType: data.baseJobType || 'service',
+        basePriority: data.basePriority || 'normal',
+        defaultTechnicianId: data.defaultTechnicianId || null,
+        startDate: data.startDate,
+        timezone: data.timezone || 'America/Toronto',
+        notes: data.notes || null,
+        createdByUserId: data.createdByUserId || null,
+      }).returning();
+      const series = seriesResult[0];
+
+      // Create phases
+      if (phases.length > 0) {
+        await tx.insert(recurringJobPhases).values(
+          phases.map(phase => ({
+            seriesId: series.id,
+            orderIndex: phase.orderIndex,
+            frequency: phase.frequency,
+            interval: phase.interval || 1,
+            occurrences: phase.occurrences || null,
+            untilDate: phase.untilDate || null,
+          }))
+        );
+      }
+
+      return series;
+    });
+  }
+
+  async getRecurringPhases(seriesId: string): Promise<RecurringJobPhase[]> {
+    return db.select()
+      .from(recurringJobPhases)
+      .where(eq(recurringJobPhases.seriesId, seriesId))
+      .orderBy(recurringJobPhases.orderIndex);
+  }
+
+  async generateJobsFromSeries(companyId: string, seriesId: string, count: number): Promise<Job[]> {
+    const series = await this.getRecurringSeries(companyId, seriesId);
+    if (!series) return [];
+
+    const phases = await this.getRecurringPhases(seriesId);
+    if (phases.length === 0) return [];
+
+    const generatedJobs: Job[] = [];
+    let currentDate = new Date(series.startDate);
+    let jobsGenerated = 0;
+    let phaseIndex = 0;
+    let phaseOccurrenceCount = 0;
+
+    while (jobsGenerated < count && phaseIndex < phases.length) {
+      const phase = phases[phaseIndex];
+      
+      // Check if phase is complete
+      if (phase.occurrences && phaseOccurrenceCount >= phase.occurrences) {
+        phaseIndex++;
+        phaseOccurrenceCount = 0;
+        continue;
+      }
+      if (phase.untilDate && currentDate > new Date(phase.untilDate)) {
+        phaseIndex++;
+        phaseOccurrenceCount = 0;
+        continue;
+      }
+
+      // Create job for current date
+      const job = await this.createJob(companyId, {
+        locationId: series.locationId,
+        summary: series.baseSummary,
+        description: series.baseDescription,
+        jobType: series.baseJobType as any,
+        priority: series.basePriority as any,
+        primaryTechnicianId: series.defaultTechnicianId,
+        scheduledStart: currentDate.toISOString(),
+        recurringSeriesId: seriesId,
+        status: 'scheduled',
+      });
+      generatedJobs.push(job);
+      jobsGenerated++;
+      phaseOccurrenceCount++;
+
+      // Advance to next date based on frequency
+      currentDate = this.advanceDate(currentDate, phase.frequency, phase.interval);
+    }
+
+    return generatedJobs;
+  }
+
+  private advanceDate(date: Date, frequency: string, interval: number): Date {
+    const result = new Date(date);
+    switch (frequency) {
+      case 'daily':
+        result.setDate(result.getDate() + interval);
+        break;
+      case 'weekly':
+        result.setDate(result.getDate() + (7 * interval));
+        break;
+      case 'monthly':
+        result.setMonth(result.getMonth() + interval);
+        break;
+      case 'quarterly':
+        result.setMonth(result.getMonth() + (3 * interval));
+        break;
+      case 'yearly':
+        result.setFullYear(result.getFullYear() + interval);
+        break;
+    }
+    return result;
   }
 }
 
