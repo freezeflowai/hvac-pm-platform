@@ -3129,6 +3129,67 @@ export class DbStorage implements IStorage {
     return this.updateCustomerCompany(companyId, id, { isActive: false });
   }
 
+  // Create CustomerCompany and Client atomically in a transaction
+  async createCustomerCompanyWithClient(
+    companyId: string,
+    userId: string,
+    companyData: InsertCustomerCompany,
+    clientData: InsertClient,
+    partsList?: Array<{ partId: string; quantity: number }>
+  ): Promise<{ customerCompany: CustomerCompany; client: Client }> {
+    // Validate user belongs to company
+    const isValid = await this.validateUserInCompany(userId, companyId);
+    if (!isValid) {
+      throw new Error("User does not belong to this company");
+    }
+
+    return await db.transaction(async (tx) => {
+      // Validate all parts exist and belong to company first
+      if (partsList && partsList.length > 0) {
+        for (const partItem of partsList) {
+          const existingPart = await tx.select().from(parts).where(
+            and(eq(parts.id, partItem.partId), eq(parts.companyId, companyId))
+          ).limit(1);
+          
+          if (!existingPart || existingPart.length === 0) {
+            throw new Error(`Part with ID ${partItem.partId} not found or does not belong to company`);
+          }
+        }
+      }
+
+      // Create the customer company
+      const customerCompanyResult = await tx.insert(customerCompanies).values({
+        ...companyData,
+        companyId,
+      }).returning();
+      const customerCompany = customerCompanyResult[0];
+
+      // Create the client linked to the customer company
+      const clientResult = await tx.insert(clients).values({
+        ...clientData,
+        parentCompanyId: customerCompany.id,
+        companyId,
+        userId,
+      }).returning();
+      const client = clientResult[0];
+
+      // Bulk insert all client-part associations if parts were provided
+      if (partsList && partsList.length > 0) {
+        await tx.insert(clientParts).values(
+          partsList.map(partItem => ({
+            clientId: client.id,
+            partId: partItem.partId,
+            quantity: partItem.quantity,
+            companyId,
+            userId,
+          }))
+        );
+      }
+
+      return { customerCompany, client };
+    });
+  }
+
   // Invoice methods
   async getInvoices(companyId: string): Promise<Invoice[]> {
     return db.select()

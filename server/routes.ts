@@ -2557,43 +2557,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate client data with schema before creating anything
       const validatedClient = insertClientSchema.parse(clientInput);
       
-      // All validation passed - now create entities
-      // Create customer company (parent) first
-      const customerCompany = await storage.createCustomerCompany(req.user!.companyId, customerCompanyData);
-      
-      let client: Client;
-      try {
-        // Add parentCompanyId after company is created
-        const clientWithParent = {
-          ...validatedClient,
-          parentCompanyId: customerCompany.id,
-        };
-        
-        // Create client with or without parts
-        if (validatedParts && validatedParts.length > 0) {
-          client = await storage.createClientWithParts(
-            req.user!.companyId, 
-            req.user!.id, 
-            clientWithParent, 
-            validatedParts
-          );
-        } else {
-          client = await storage.createClient(req.user!.companyId, req.user!.id, clientWithParent);
-        }
-      } catch (clientError) {
-        // If client creation fails, clean up the customer company to maintain consistency
-        console.error('Client creation failed, rolling back customer company:', clientError);
-        try {
-          await storage.deleteCustomerCompany(req.user!.companyId, customerCompany.id);
-        } catch (rollbackError) {
-          console.error('Failed to rollback customer company:', rollbackError);
-        }
-        throw clientError;
-      }
+      // All validation passed - create both entities atomically in a transaction
+      const result = await storage.createCustomerCompanyWithClient(
+        req.user!.companyId,
+        req.user!.id,
+        customerCompanyData,
+        validatedClient,
+        validatedParts
+      );
       
       res.status(201).json({
-        customerCompany,
-        client,
+        customerCompany: result.customerCompany,
+        client: result.client,
       });
     } catch (error) {
       console.error('Create client with company error:', error);
