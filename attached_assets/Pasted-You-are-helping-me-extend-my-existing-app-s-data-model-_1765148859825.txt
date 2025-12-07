@@ -1,0 +1,258 @@
+You are helping me extend my existing app’s data model and UI for **Clients, Locations, PM (preventative maintenance), and Jobs**.
+
+Context:
+- The app is a dispatching / field-service system for HVAC.
+- We already have:
+  - Company (client) and Location (site) model:
+    - Company = QBO Customer
+    - Location = QBO Sub-Customer
+  - Jobs (or at least a planned Jobs system) that support recurring tasks.
+  - Products & Services (parts, filters, belts, etc.).
+  - Client detail page with tabs (Overview, Jobs, Locations, Parts, Notes).
+- I want to model **preventative maintenance (PM)** and **parts that are needed for each PM visit per location**, so recurring jobs can be created with parts pre-populated.
+
+Use the existing tech stack, ORM, and UI components. Do NOT introduce new frameworks. Extend what’s there.
+
+------------------------------------------------
+1) DATA MODEL – PM PLAN PER LOCATION
+------------------------------------------------
+
+Create two new entities (or tables) tied to Location:
+
+### A) LocationPMPlan
+
+Represents the PM schedule for a single location.
+
+Fields:
+
+- id (PK)
+- locationId (FK → Location.id, required)
+- hasPm (boolean, default false)
+- pmType (string | nullable) – optional classification, e.g. "filters only", "full HVAC PM", etc.
+- Monthly flags (booleans) to indicate which months have PM:
+  - pmJan
+  - pmFeb
+  - pmMar
+  - pmApr
+  - pmMay
+  - pmJun
+  - pmJul
+  - pmAug
+  - pmSep
+  - pmOct
+  - pmNov
+  - pmDec
+- notes (text | nullable)
+- recurringSeriesId (FK → RecurringJobSeries.id | nullable) – optional link to a recurring job series for this PM plan.
+- isActive (boolean, default true)
+- createdAt, updatedAt
+
+This allows us to say: e.g. PM in Jan, Mar, Jun, Oct for this specific location.
+
+### B) LocationPMPartTemplate
+
+Represents parts/filters/belts that are used at this location during **each PM visit**.
+
+Fields:
+
+- id (PK)
+- locationId (FK → Location.id, required)
+- productId (FK → Product/Service.id, required) – e.g. filter SKU, belt SKU.
+- descriptionOverride (string | nullable) – optional custom description to show on job/invoice.
+- quantityPerVisit (decimal, required) – how many of this part are used every PM visit at this location.
+- equipmentLabel (string | nullable) – e.g. "RTU #1", "Freezer 3", "Unit 1–3".
+- isActive (boolean, default true)
+- createdAt, updatedAt
+
+The idea is: for every PM job generated for a location, we copy these templates into JobPart entries.
+
+------------------------------------------------
+2) JOB PARTS INTEGRATION
+------------------------------------------------
+
+Assuming a JobPart entity does or will exist, verify or create:
+
+JobPart:
+
+- id (PK)
+- jobId (FK → Job.id)
+- productId (FK → Product/Service.id)
+- description (string)
+- quantity (decimal)
+- unitPrice (decimal | nullable)
+- source (string | nullable) – e.g. "pm_template", "added_by_tech"
+- createdAt, updatedAt
+
+We will later use JobPart to:
+- Show planned parts on the job.
+- Convert parts into invoice lines when billing.
+
+------------------------------------------------
+3) API – LOCATION PM PLAN & PARTS
+------------------------------------------------
+
+Implement or extend API endpoints for managing PM per location:
+
+### PM Plan
+
+- `GET /locations/:locationId/pm-plan`
+  - Returns existing LocationPMPlan (or null if none).
+- `POST /locations/:locationId/pm-plan`
+  - Creates or updates the PM plan for that location.
+  - Payload example:
+
+    {
+      hasPm: boolean,
+      pmType?: string,
+      pmJan?: boolean,
+      pmFeb?: boolean,
+      ...
+      pmDec?: boolean,
+      notes?: string
+    }
+
+- `DELETE /locations/:locationId/pm-plan`
+  - Optional: mark PM plan as inactive (isActive = false).
+
+### PM Parts Template
+
+- `GET /locations/:locationId/pm-parts`
+  - Returns a list of LocationPMPartTemplate for that location.
+
+- `POST /locations/:locationId/pm-parts`
+  - Adds a new PM part template row.
+  - Payload:
+
+    {
+      productId: number,
+      descriptionOverride?: string,
+      quantityPerVisit: number,
+      equipmentLabel?: string
+    }
+
+- `PUT /locations/:locationId/pm-parts/:id`
+  - Updates an existing PM part template row.
+
+- `DELETE /locations/:locationId/pm-parts/:id`
+  - Soft delete (set isActive = false) or hard delete, depending on app conventions.
+
+------------------------------------------------
+4) UI – LOCATION PM & PARTS SECTION
+------------------------------------------------
+
+On the **Location detail view** (likely under the Client Detail page → Locations tab → click a location, or a dedicated Location detail screen):
+
+Add a new **"PM & Parts"** section or tab for each location.
+
+### PM Schedule UI
+
+- Toggle: "Has Preventative Maintenance?" (binds to LocationPMPlan.hasPm).
+- If `hasPm` is false:
+  - Show a short note: "This location is serviced on an as-needed basis only."
+- If `hasPm` is true:
+  - Show a 12-month checkbox grid with labels:
+    - Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec.
+  - Bind each checkbox to pmJan..pmDec fields.
+  - Optional text summary below:
+    - "PM scheduled for: Jan, Mar, Jun, Oct" (build this dynamically from checked months).
+  - Optional field: pmType (dropdown or text).
+  - Notes textbox.
+
+### PM Parts Template UI
+
+- Below the schedule, show a table/grid titled "PM Parts / Filters / Belts".
+
+Columns:
+
+- Product (dropdown/search from Products & Services list)
+- Description (display product description, but allow override text if descriptionOverride is present)
+- Quantity per visit
+- Equipment/Unit label (optional text)
+- Active (toggle) or Remove action
+
+Actions:
+
+- "Add Part" button to append a new row.
+- Save/Update buttons that call:
+  - `/locations/:locationId/pm-parts` (POST for new rows)
+  - `/locations/:locationId/pm-parts/:id` (PUT for edited rows)
+  - `/locations/:locationId/pm-parts/:id` (DELETE or deactivate) for removed rows.
+
+Validation:
+
+- Require productId and quantityPerVisit for each row.
+- Show simple inline errors for missing required fields.
+
+------------------------------------------------
+5) INTEGRATION WITH RECURRING PM JOBS
+------------------------------------------------
+
+We already have or are planning a Jobs + RecurringJobSeries system.
+
+Add utility logic on the backend:
+
+**Function: `generatePmJobForLocation(locationId, date)`**
+
+- Steps:
+  1. Look up the LocationPMPlan for this location.
+     - If `hasPm` is false, do nothing or return an error.
+     - Ensure the month of `date` matches one of the checked months (pmJan..pmDec).
+  2. Create a Job for this location:
+     - companyId = Location.companyId
+     - locationId = locationId
+     - jobType = "maintenance" or "pm"
+     - summary = use a pattern like "PM Visit - {Month Year} - {Location Name}"
+     - scheduledStart = date (or a default time for that day)
+     - priority = "normal" by default (or use PM-specific default)
+  3. Fetch all active LocationPMPartTemplate rows for this location.
+  4. For each template row, create a JobPart:
+     - jobId = new job’s id
+     - productId = template.productId
+     - description = template.descriptionOverride or product’s default description
+     - quantity = template.quantityPerVisit
+     - source = "pm_template"
+
+Return the created Job (and its JobParts) to the caller.
+
+You can later hook this into:
+
+- RecurringJobSeries generation (e.g. for each PM month, call `generatePmJobForLocation`).
+- A manual “Generate PM Jobs” button at the Location or Client level.
+
+For now, implement the function and expose it via a basic endpoint, e.g.:
+
+- `POST /locations/:locationId/generate-pm-job`
+  - Payload: `{ date: "YYYY-MM-DD" }`
+  - Response: created job + jobParts.
+
+------------------------------------------------
+6) FUTURE REPORTING (just prep, no need to fully implement now)
+------------------------------------------------
+
+Please add comments in the backend near LocationPMPartTemplate and LocationPMPlan explaining that:
+
+- These tables will later be used to calculate **part demand per month** across all clients/locations.
+- Example: sum `quantityPerVisit` for all PM visits scheduled in a month to get projected filter/belt requirements.
+
+No need to implement full reporting logic yet; just keep the design clean and ready for it.
+
+------------------------------------------------
+WHAT TO OUTPUT
+------------------------------------------------
+
+1. Updated/added ORM models:
+   - LocationPMPlan
+   - LocationPMPartTemplate
+   - (Optionally confirm JobPart model is aligned.)
+
+2. API endpoints for:
+   - /locations/:locationId/pm-plan (GET/POST)
+   - /locations/:locationId/pm-parts (GET/POST/PUT/DELETE)
+   - /locations/:locationId/generate-pm-job (POST) using the logic described.
+
+3. Frontend components:
+   - The "PM & Parts" section/tab in the Location detail view, with:
+     - PM schedule toggle + month checkboxes
+     - PM parts table with add/edit/remove
+
+Make sure everything uses the existing styling, form patterns, and type definitions so it feels native to the app.

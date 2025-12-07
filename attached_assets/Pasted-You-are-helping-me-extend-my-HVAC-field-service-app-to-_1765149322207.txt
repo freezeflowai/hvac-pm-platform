@@ -1,0 +1,210 @@
+You are helping me extend my HVAC field-service app to link **Equipment** to **Jobs**, and to show **equipment service history**.
+
+Context:
+- The app already has:
+  - Company and Location models.
+  - LocationEquipment: equipment per location (model, serial, notes, etc.).
+  - Job: service/PM work orders.
+  - JobPart: parts used on jobs.
+  - LocationPMPartTemplate: PM parts templates, now optionally with equipmentId.
+- We have PM job generation logic (or planned logic) using LocationPMPlan + LocationPMPartTemplate.
+
+Use the existing stack (ORM, API, frontend). Extend what’s there.
+
+------------------------------------------------
+1) DATA MODEL – JOB ↔ EQUIPMENT LINK
+------------------------------------------------
+
+Create a new entity: `JobEquipment`
+
+Fields:
+
+- id (PK)
+- jobId (FK → Job.id, required)
+- equipmentId (FK → LocationEquipment.id, required)
+- notes (text | nullable)  // e.g. “worked on condenser section only”
+- createdAt
+- updatedAt
+
+Constraints:
+
+- A (jobId, equipmentId) pair should be unique (no duplicate associations).
+- Equipment must belong to the same location as the job’s location (enforce in logic or via validation).
+
+### Optional but recommended: equipmentId on JobPart
+
+Update JobPart (if not already) to include:
+
+- equipmentId (FK → LocationEquipment.id | nullable)
+
+Behavior:
+
+- If JobPart comes from a LocationPMPartTemplate with equipmentId:
+  - Set JobPart.equipmentId = template.equipmentId.
+- JobParts can optionally be tied to specific equipment on that job.
+
+------------------------------------------------
+2) API – JOB ↔ EQUIPMENT
+------------------------------------------------
+
+Add API endpoints for managing job-equipment links:
+
+- `GET /jobs/:jobId/equipment`
+  - Returns all JobEquipment for the given job, including:
+    - equipment details (name, type, model, serial).
+
+- `POST /jobs/:jobId/equipment`
+  - Adds equipment to a job.
+  - Payload:
+
+    {
+      equipmentId: number,
+      notes?: string
+    }
+
+  - Validate:
+    - The equipment belongs to the same location as the job.
+    - (jobId, equipmentId) is not already used.
+
+- `PUT /jobs/:jobId/equipment/:jobEquipmentId`
+  - Updates notes for that job-equipment link.
+
+- `DELETE /jobs/:jobId/equipment/:jobEquipmentId`
+  - Removes the link (soft or hard delete according to app conventions).
+
+You may also choose to embed this into the existing Job PUT/PATCH payload, but separate endpoints are fine.
+
+------------------------------------------------
+3) UI – JOB DETAIL PAGE: EQUIPMENT SECTION
+------------------------------------------------
+
+On the Job Detail page (`/jobs/:id`), add an **“Equipment”** section.
+
+Layout:
+
+- Section title: “Equipment on this Job”
+- Table or list with columns:
+  - Equipment Name
+  - Type
+  - Model
+  - Serial
+  - Notes
+  - Actions (Edit Notes, Remove)
+
+- “Add Equipment” button:
+  - Opens a small form or modal:
+    - Dropdown: Equipment (list of equipment for `job.locationId`)
+      - Fetch from: `/locations/:locationId/equipment`
+    - Notes (optional textarea)
+  - On submit:
+    - Call `POST /jobs/:jobId/equipment`.
+    - Refresh the equipment list in the Job detail view.
+
+Behavior:
+
+- Users can:
+  - Assign equipment when creating/configuring a job.
+  - Add/remove equipment later if the tech worked on different units than initially planned.
+
+Optional:
+- On the Job Detail page, if JobParts have `equipmentId`, you can show this association under each part row.
+
+------------------------------------------------
+4) UI – EQUIPMENT DETAIL: SERVICE HISTORY
+------------------------------------------------
+
+On the **Equipment** path (under Location view), add an Equipment Detail view. You may already have a simple equipment view; extend it as follows:
+
+- Show equipment header:
+  - Name
+  - Type
+  - Manufacturer
+  - Model
+  - Serial
+  - Tag
+  - InstallDate
+  - WarrantyExpiry
+  - Notes
+
+- Add a **“Service History”** section listing all jobs linked via JobEquipment.
+
+For the history table:
+
+- Source:
+  - Query: all JobEquipment where equipmentId = this equipment’s id.
+  - Join to Job to display job fields.
+
+- Columns:
+  - Date (job.scheduledStart or actualStart)
+  - Job # / ID
+  - Summary
+  - Job Type
+  - Technician (primaryTechnician, if available)
+  - Status
+
+- Each row:
+  - Clicking the Job ID or Summary should open the Job Detail page (`/jobs/:id`).
+
+If the app doesn’t have a dedicated Equipment Detail route yet, you can implement:
+
+- `/locations/:locationId/equipment/:equipmentId`
+  - Render the equipment header + service history section.
+
+------------------------------------------------
+5) PM JOB GENERATION – AUTO-LINK EQUIPMENT
+------------------------------------------------
+
+Update the PM job generation logic (e.g. `generatePmJobForLocation(locationId, date)`) to automatically link equipment when PM parts are tied to equipment.
+
+Rules:
+
+1. After creating the Job:
+   - Get all `LocationPMPartTemplate` rows for that location (where isActive = true).
+   - For each template row:
+     - Find template.equipmentId (may be null).
+
+2. For each unique equipmentId (non-null) in those templates:
+   - Create a JobEquipment row:
+     - jobId = created job’s id
+     - equipmentId = that equipmentId
+     - notes = null (or a standard note like "PM visit auto-linked").
+
+3. When creating JobParts from templates:
+   - If template.equipmentId is not null:
+     - Set JobPart.equipmentId = template.equipmentId.
+
+This ensures PM jobs automatically:
+
+- Show which equipment is involved.
+- Carry parts tied to specific equipment.
+
+------------------------------------------------
+6) DEV NOTES / COMMENTS
+------------------------------------------------
+
+Add comments in the models and key logic explaining:
+
+- JobEquipment is used to track **which equipment a job touched**, enabling equipment service history.
+- Some jobs may have no equipment linked (general work at the location).
+- Some equipment may never have PM parts but will still appear on jobs for one-off service calls.
+- JobPart.equipmentId is optional and used when parts are clearly tied to a specific equipment.
+
+------------------------------------------------
+WHAT TO OUTPUT
+------------------------------------------------
+
+1. ORM/entity definitions/migrations for:
+   - JobEquipment
+   - Updated JobPart (equipmentId).
+
+2. API endpoints:
+   - /jobs/:jobId/equipment (GET/POST/PUT/DELETE).
+
+3. Frontend changes:
+   - Equipment section on Job Detail page:
+     - List equipment.
+     - Add/remove equipment.
+   - Equipment detail view:
+     - Service History table listing all jobs linked to that equipment.
+
+All code should follow the existing codebase style, naming conventions, and UI components.

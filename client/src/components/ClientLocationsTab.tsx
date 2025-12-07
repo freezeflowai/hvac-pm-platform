@@ -5,10 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Pencil, FileText, ToggleLeft, ToggleRight, Loader2, Briefcase } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus, Pencil, FileText, ToggleLeft, ToggleRight, Loader2, Briefcase, Wrench } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import LocationFormModal from "./LocationFormModal";
+import LocationPMSection from "./LocationPMSection";
 import type { Client } from "@shared/schema";
 import { Link } from "wouter";
 
@@ -23,6 +26,7 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Client | null>(null);
+  const [pmSheetLocation, setPmSheetLocation] = useState<Client | null>(null);
 
   const { data: locations = [], isLoading, error } = useQuery<Client[]>({
     queryKey: ["/api/customer-companies", parentCompanyId, "locations"],
@@ -185,6 +189,15 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => setPmSheetLocation(location)}
+                          data-testid={`button-pm-parts-${location.id}`}
+                          title="PM & Parts"
+                        >
+                          <Wrench className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleEditLocation(location)}
                           data-testid={`button-edit-location-${location.id}`}
                           title="Edit"
@@ -235,6 +248,24 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
         parentCompanyId={parentCompanyId}
         onSuccess={handleFormSuccess}
       />
+
+      <Sheet open={!!pmSheetLocation} onOpenChange={(open) => !open && setPmSheetLocation(null)}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-hidden">
+          <SheetHeader>
+            <SheetTitle>
+              PM & Parts - {pmSheetLocation?.location || pmSheetLocation?.companyName}
+            </SheetTitle>
+            <SheetDescription>
+              Configure preventative maintenance schedule and parts for this location.
+            </SheetDescription>
+          </SheetHeader>
+          <ScrollArea className="h-[calc(100vh-120px)] mt-4 pr-4">
+            {pmSheetLocation && (
+              <LocationPMSection locationId={pmSheetLocation.id} />
+            )}
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

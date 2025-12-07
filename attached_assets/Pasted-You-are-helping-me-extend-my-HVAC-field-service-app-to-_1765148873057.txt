@@ -1,0 +1,206 @@
+You are helping me extend my HVAC field-service app to properly support **Equipment tracking** per Location, separate from PM parts.
+
+Context:
+- The app already has:
+  - Company (client) and Location (site) model.
+  - A Location PM plan (LocationPMPlan) and PM parts template (LocationPMPartTemplate).
+  - Product/Service catalog (filters, belts, etc.).
+- We previously made LocationPMPartTemplate to represent parts used per PM visit for a location.
+- Now I want **Equipment** to be a separate concept:
+  - Some equipment will have recurring PM parts.
+  - Some equipment will have NO recurring parts, but we still want to track model/serial/notes.
+
+Use the existing stack (ORM, API, frontend). Extend what exists, don’t rebuild.
+
+------------------------------------------------
+1) DATA MODEL – EQUIPMENT PER LOCATION
+------------------------------------------------
+
+Create a new entity: `LocationEquipment`
+
+Fields:
+
+- id (PK)
+- locationId (FK → Location.id, required)
+- name (string, required)  // e.g. "RTU #1", "Walk-in Freezer", "Make-up Air #2"
+- equipmentType (string | nullable)  // e.g. "RTU", "Furnace", "Freezer", etc.
+- manufacturer (string | nullable)
+- modelNumber (string | nullable)
+- serialNumber (string | nullable)
+- tagNumber (string | nullable)  // internal asset tag or label
+- installDate (date | nullable)
+- warrantyExpiry (date | nullable)
+- notes (text | nullable)
+- isActive (boolean, default true)
+- createdAt, updatedAt
+
+This table should be independent of PM parts. Equipment may or may not have any PM configuration.
+
+------------------------------------------------
+2) LINKING PM PARTS TO EQUIPMENT (OPTIONAL)
+------------------------------------------------
+
+Update the existing `LocationPMPartTemplate` entity to optionally link to specific equipment at that location:
+
+Add field:
+
+- equipmentId (FK → LocationEquipment.id | nullable)
+
+Behavior:
+
+- If `equipmentId` is null:
+  - The PM part template is **location-level** (applies generally to the site).
+- If `equipmentId` is non-null:
+  - The PM part template is specific to that piece of equipment.
+
+Do NOT make equipmentId required. Some PM parts will belong to the location as a whole.
+
+------------------------------------------------
+3) API – EQUIPMENT ENDPOINTS
+------------------------------------------------
+
+Add REST API endpoints for equipment management:
+
+- `GET /locations/:locationId/equipment`
+  - Returns all LocationEquipment records for that location (active by default).
+
+- `POST /locations/:locationId/equipment`
+  - Creates a new equipment record for that location.
+  - Payload example:
+
+    {
+      name: string,
+      equipmentType?: string,
+      manufacturer?: string,
+      modelNumber?: string,
+      serialNumber?: string,
+      tagNumber?: string,
+      installDate?: string (YYYY-MM-DD),
+      warrantyExpiry?: string (YYYY-MM-DD),
+      notes?: string
+    }
+
+- `PUT /locations/:locationId/equipment/:equipmentId`
+  - Update existing equipment fields.
+
+- `DELETE /locations/:locationId/equipment/:equipmentId`
+  - Soft delete (set isActive = false) or follow existing deletion convention.
+
+Make sure these endpoints enforce that the equipment belongs to the specified location.
+
+------------------------------------------------
+4) API – PM PARTS AWARE OF EQUIPMENT
+------------------------------------------------
+
+Update the PM parts endpoints to allow specifying `equipmentId`:
+
+- `GET /locations/:locationId/pm-parts`
+  - Should include equipment information for each row (if equipmentId set), e.g.:
+    - equipmentId
+    - equipmentName (joined from LocationEquipment, if convenient)
+
+- `POST /locations/:locationId/pm-parts`
+  - Payload now accepts optional `equipmentId`:
+
+    {
+      productId: number,
+      descriptionOverride?: string,
+      quantityPerVisit: number,
+      equipmentLabel?: string,
+      equipmentId?: number  // optional
+    }
+
+- `PUT /locations/:locationId/pm-parts/:id`
+  - Same as above, allow updating equipmentId.
+
+Validation:
+- If an equipmentId is provided, verify that it belongs to the same location.
+
+------------------------------------------------
+5) FRONTEND – EQUIPMENT UI PER LOCATION
+------------------------------------------------
+
+On the Location detail screen (or wherever you show Location info under the Client page), add an **Equipment** section or tab.
+
+### Equipment section/tab:
+
+- Table of equipment for this location, with columns:
+  - Name
+  - Type
+  - Model
+  - Serial
+  - Tag
+  - Notes (shortened preview)
+
+- “Add Equipment” button:
+  - Opens a form/modal with fields:
+    - Name (required)
+    - Equipment Type
+    - Manufacturer
+    - Model Number
+    - Serial Number
+    - Tag Number
+    - Install Date
+    - Warranty Expiry
+    - Notes
+
+- Each row has actions:
+  - Edit
+  - Deactivate/Archive (using isActive)
+
+Use existing table and form components & styling from the project.
+
+### PM & Parts section integration:
+
+In the PM & Parts UI (which already shows the monthly PM checkboxes and PM parts table):
+
+- Update the PM parts table to include an **Equipment** column that allows:
+  - A dropdown of equipment for this location, plus:
+    - A “None (location-level)” or blank option.
+
+- When editing/adding PM parts:
+  - User can choose:
+    - No equipment (location-level PM part)
+    - A specific equipment item (binds equipmentId)
+
+- When showing the PM parts list:
+  - Display the selected equipment name in that column if equipmentId is set.
+
+------------------------------------------------
+6) FUTURE JOB / EQUIPMENT LINK (OPTIONAL COMMENT)
+------------------------------------------------
+
+Add comments in the code near LocationEquipment and LocationPMPartTemplate explaining:
+
+- Equipment is tracked independently for model/serial/notes.
+- Some equipment might have **no PM parts**.
+- When generating PM jobs, if LocationPMPartTemplate has an equipmentId:
+  - The created JobPart is conceptually tied to that piece of equipment (even if we don’t yet implement a JobEquipment table).
+- This is in preparation for future features like:
+  - Job → Equipment associations
+  - Equipment service history
+
+You do not need to implement JobEquipment right now; just keep the design consistent.
+
+------------------------------------------------
+WHAT TO OUTPUT
+------------------------------------------------
+
+1. ORM/entity definitions or migrations for:
+   - LocationEquipment (new)
+   - Updated LocationPMPartTemplate (with equipmentId).
+
+2. New API endpoints for:
+   - /locations/:locationId/equipment (GET/POST/PUT/DELETE).
+
+3. Updates to PM parts API to accept and return equipmentId.
+
+4. Frontend components:
+   - Equipment tab/section in the Location view:
+     - Equipment list
+     - Add/Edit forms
+   - Updated PM & Parts UI to:
+     - Show an Equipment column
+     - Allow assigning PM parts to either the whole location or a specific equipment item.
+
+Make sure all naming, styling, and patterns match the existing codebase.

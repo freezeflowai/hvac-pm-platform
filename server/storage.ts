@@ -42,12 +42,25 @@ import {
   type InsertRecurringJobSeries,
   type RecurringJobPhase,
   type InsertRecurringJobPhase,
+  type LocationPMPlan,
+  type InsertLocationPMPlan,
+  type UpdateLocationPMPlan,
+  type LocationPMPartTemplate,
+  type InsertLocationPMPartTemplate,
+  type UpdateLocationPMPartTemplate,
+  type JobPart,
+  type InsertJobPart,
+  type UpdateJobPart,
   customerCompanies,
   invoices,
   invoiceLines,
   jobs,
   recurringJobSeries,
-  recurringJobPhases
+  recurringJobPhases,
+  locationPMPlans,
+  locationPMPartTemplates,
+  jobParts,
+  parts
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { STANDARD_BELTS, STANDARD_FILTERS } from "./seed-data";
@@ -241,6 +254,26 @@ export interface IStorage {
   createRecurringSeries(companyId: string, data: InsertRecurringJobSeries, phases: InsertRecurringJobPhase[]): Promise<RecurringJobSeries>;
   getRecurringPhases(seriesId: string): Promise<RecurringJobPhase[]>;
   generateJobsFromSeries(companyId: string, seriesId: string, count: number): Promise<Job[]>;
+  
+  // Location PM Plan methods
+  getLocationPMPlan(locationId: string): Promise<LocationPMPlan | undefined>;
+  createOrUpdateLocationPMPlan(locationId: string, data: InsertLocationPMPlan): Promise<LocationPMPlan>;
+  deleteLocationPMPlan(locationId: string): Promise<boolean>;
+  
+  // Location PM Part Template methods
+  getLocationPMParts(locationId: string): Promise<LocationPMPartTemplate[]>;
+  createLocationPMPart(locationId: string, data: InsertLocationPMPartTemplate): Promise<LocationPMPartTemplate>;
+  updateLocationPMPart(id: string, data: UpdateLocationPMPartTemplate): Promise<LocationPMPartTemplate | undefined>;
+  deleteLocationPMPart(id: string): Promise<boolean>;
+  
+  // Job Parts methods
+  getJobParts(jobId: string): Promise<JobPart[]>;
+  createJobPart(jobId: string, data: InsertJobPart): Promise<JobPart>;
+  updateJobPart(id: string, data: UpdateJobPart): Promise<JobPart | undefined>;
+  deleteJobPart(id: string): Promise<boolean>;
+  
+  // PM Job generation
+  generatePMJobForLocation(companyId: string, locationId: string, date: Date): Promise<{ job: Job; parts: JobPart[] } | null>;
 }
 
 export class MemStorage implements IStorage {
@@ -261,6 +294,9 @@ export class MemStorage implements IStorage {
   private recurringSeriesMap: Map<string, RecurringJobSeries>;
   private recurringPhasesMap: Map<string, RecurringJobPhase>;
   private jobNumberCounters: Map<string, number>;
+  private locationPMPlansMap: Map<string, LocationPMPlan>;
+  private locationPMPartTemplatesMap: Map<string, LocationPMPartTemplate>;
+  private jobPartsMap: Map<string, JobPart>;
 
   constructor() {
     this.users = new Map();
@@ -280,6 +316,9 @@ export class MemStorage implements IStorage {
     this.recurringSeriesMap = new Map();
     this.recurringPhasesMap = new Map();
     this.jobNumberCounters = new Map();
+    this.locationPMPlansMap = new Map();
+    this.locationPMPartTemplatesMap = new Map();
+    this.jobPartsMap = new Map();
   }
 
   // User methods
@@ -1911,10 +1950,211 @@ export class MemStorage implements IStorage {
     }
     return result;
   }
+
+  // Location PM Plan methods
+  async getLocationPMPlan(locationId: string): Promise<LocationPMPlan | undefined> {
+    return Array.from(this.locationPMPlansMap.values())
+      .find(p => p.locationId === locationId && p.isActive);
+  }
+
+  async createOrUpdateLocationPMPlan(locationId: string, data: InsertLocationPMPlan): Promise<LocationPMPlan> {
+    const existing = await this.getLocationPMPlan(locationId);
+    if (existing) {
+      const updated: LocationPMPlan = {
+        ...existing,
+        ...data,
+        locationId,
+        updatedAt: new Date(),
+      };
+      this.locationPMPlansMap.set(existing.id, updated);
+      return updated;
+    }
+    const id = randomUUID();
+    const plan: LocationPMPlan = {
+      id,
+      locationId,
+      hasPm: data.hasPm ?? false,
+      pmType: data.pmType ?? null,
+      pmJan: data.pmJan ?? false,
+      pmFeb: data.pmFeb ?? false,
+      pmMar: data.pmMar ?? false,
+      pmApr: data.pmApr ?? false,
+      pmMay: data.pmMay ?? false,
+      pmJun: data.pmJun ?? false,
+      pmJul: data.pmJul ?? false,
+      pmAug: data.pmAug ?? false,
+      pmSep: data.pmSep ?? false,
+      pmOct: data.pmOct ?? false,
+      pmNov: data.pmNov ?? false,
+      pmDec: data.pmDec ?? false,
+      notes: data.notes ?? null,
+      recurringSeriesId: data.recurringSeriesId ?? null,
+      isActive: data.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: null,
+    };
+    this.locationPMPlansMap.set(id, plan);
+    return plan;
+  }
+
+  async deleteLocationPMPlan(locationId: string): Promise<boolean> {
+    const plan = await this.getLocationPMPlan(locationId);
+    if (plan) {
+      const updated = { ...plan, isActive: false, updatedAt: new Date() };
+      this.locationPMPlansMap.set(plan.id, updated);
+      return true;
+    }
+    return false;
+  }
+
+  // Location PM Part Template methods
+  async getLocationPMParts(locationId: string): Promise<LocationPMPartTemplate[]> {
+    return Array.from(this.locationPMPartTemplatesMap.values())
+      .filter(p => p.locationId === locationId && p.isActive);
+  }
+
+  async createLocationPMPart(locationId: string, data: InsertLocationPMPartTemplate): Promise<LocationPMPartTemplate> {
+    const id = randomUUID();
+    const template: LocationPMPartTemplate = {
+      id,
+      locationId,
+      productId: data.productId,
+      descriptionOverride: data.descriptionOverride ?? null,
+      quantityPerVisit: data.quantityPerVisit,
+      equipmentLabel: data.equipmentLabel ?? null,
+      isActive: data.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: null,
+    };
+    this.locationPMPartTemplatesMap.set(id, template);
+    return template;
+  }
+
+  async updateLocationPMPart(id: string, data: UpdateLocationPMPartTemplate): Promise<LocationPMPartTemplate | undefined> {
+    const template = this.locationPMPartTemplatesMap.get(id);
+    if (!template) return undefined;
+    const updated: LocationPMPartTemplate = {
+      ...template,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.locationPMPartTemplatesMap.set(id, updated);
+    return updated;
+  }
+
+  async deleteLocationPMPart(id: string): Promise<boolean> {
+    const template = this.locationPMPartTemplatesMap.get(id);
+    if (template) {
+      const updated = { ...template, isActive: false, updatedAt: new Date() };
+      this.locationPMPartTemplatesMap.set(id, updated);
+      return true;
+    }
+    return false;
+  }
+
+  // Job Parts methods
+  async getJobParts(jobId: string): Promise<JobPart[]> {
+    return Array.from(this.jobPartsMap.values())
+      .filter(p => p.jobId === jobId && p.isActive);
+  }
+
+  async createJobPart(jobId: string, data: InsertJobPart): Promise<JobPart> {
+    const id = randomUUID();
+    const jobPart: JobPart = {
+      id,
+      jobId,
+      productId: data.productId ?? null,
+      description: data.description,
+      quantity: data.quantity,
+      unitPrice: data.unitPrice ?? null,
+      source: data.source ?? 'manual',
+      equipmentLabel: data.equipmentLabel ?? null,
+      isActive: data.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: null,
+    };
+    this.jobPartsMap.set(id, jobPart);
+    return jobPart;
+  }
+
+  async updateJobPart(id: string, data: UpdateJobPart): Promise<JobPart | undefined> {
+    const part = this.jobPartsMap.get(id);
+    if (!part) return undefined;
+    const updated: JobPart = {
+      ...part,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.jobPartsMap.set(id, updated);
+    return updated;
+  }
+
+  async deleteJobPart(id: string): Promise<boolean> {
+    const part = this.jobPartsMap.get(id);
+    if (part) {
+      const updated = { ...part, isActive: false, updatedAt: new Date() };
+      this.jobPartsMap.set(id, updated);
+      return true;
+    }
+    return false;
+  }
+
+  // PM Job generation
+  async generatePMJobForLocation(companyId: string, locationId: string, date: Date): Promise<{ job: Job; parts: JobPart[] } | null> {
+    const pmPlan = await this.getLocationPMPlan(locationId);
+    if (!pmPlan || !pmPlan.hasPm) return null;
+
+    const month = date.getMonth();
+    const monthFlags = [
+      pmPlan.pmJan, pmPlan.pmFeb, pmPlan.pmMar, pmPlan.pmApr,
+      pmPlan.pmMay, pmPlan.pmJun, pmPlan.pmJul, pmPlan.pmAug,
+      pmPlan.pmSep, pmPlan.pmOct, pmPlan.pmNov, pmPlan.pmDec
+    ];
+    if (!monthFlags[month]) return null;
+
+    const location = await this.getClient(companyId, locationId);
+    if (!location) return null;
+
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+    const summary = `PM Visit - ${monthNames[month]} ${date.getFullYear()} - ${location.companyName}`;
+
+    const job = await this.createJob(companyId, {
+      locationId,
+      summary,
+      description: pmPlan.notes || undefined,
+      jobType: 'maintenance',
+      priority: 'medium',
+      status: 'scheduled',
+      scheduledStart: date.toISOString(),
+      recurringSeriesId: pmPlan.recurringSeriesId || undefined,
+    });
+
+    const pmPartTemplates = await this.getLocationPMParts(locationId);
+    const createdParts: JobPart[] = [];
+
+    for (const template of pmPartTemplates) {
+      const part = this.parts.get(template.productId);
+      const description = template.descriptionOverride || part?.name || part?.description || 'Unknown Part';
+      
+      const jobPart = await this.createJobPart(job.id, {
+        jobId: job.id,
+        productId: template.productId,
+        description,
+        quantity: template.quantityPerVisit,
+        unitPrice: part?.unitPrice || null,
+        source: 'pm_template',
+        equipmentLabel: template.equipmentLabel,
+      });
+      createdParts.push(jobPart);
+    }
+
+    return { job, parts: createdParts };
+  }
 }
 
 import { db } from './db';
-import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback, invitationTokens, companies, jobNotes, clientNotes, companyCounters } from '@shared/schema';
+import { users, clients, parts as partsTable, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback, invitationTokens, companies, jobNotes, clientNotes, companyCounters } from '@shared/schema';
 import { eq, and, desc, inArray, sql, or, lt } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
@@ -3978,6 +4218,185 @@ export class DbStorage implements IStorage {
         break;
     }
     return result;
+  }
+
+  // Location PM Plan methods
+  async getLocationPMPlan(locationId: string): Promise<LocationPMPlan | undefined> {
+    const result = await db.select()
+      .from(locationPMPlans)
+      .where(and(
+        eq(locationPMPlans.locationId, locationId),
+        eq(locationPMPlans.isActive, true)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async createOrUpdateLocationPMPlan(locationId: string, data: InsertLocationPMPlan): Promise<LocationPMPlan> {
+    const existing = await this.getLocationPMPlan(locationId);
+    if (existing) {
+      const [updated] = await db.update(locationPMPlans)
+        .set({
+          ...data,
+          updatedAt: new Date(),
+        })
+        .where(eq(locationPMPlans.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(locationPMPlans)
+      .values({
+        ...data,
+        locationId,
+      })
+      .returning();
+    return created;
+  }
+
+  async deleteLocationPMPlan(locationId: string): Promise<boolean> {
+    const result = await db.update(locationPMPlans)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(
+        eq(locationPMPlans.locationId, locationId),
+        eq(locationPMPlans.isActive, true)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Location PM Part Template methods
+  async getLocationPMParts(locationId: string): Promise<LocationPMPartTemplate[]> {
+    return db.select()
+      .from(locationPMPartTemplates)
+      .where(and(
+        eq(locationPMPartTemplates.locationId, locationId),
+        eq(locationPMPartTemplates.isActive, true)
+      ));
+  }
+
+  async createLocationPMPart(locationId: string, data: InsertLocationPMPartTemplate): Promise<LocationPMPartTemplate> {
+    const [created] = await db.insert(locationPMPartTemplates)
+      .values({
+        ...data,
+        locationId,
+      })
+      .returning();
+    return created;
+  }
+
+  async updateLocationPMPart(id: string, data: UpdateLocationPMPartTemplate): Promise<LocationPMPartTemplate | undefined> {
+    const [updated] = await db.update(locationPMPartTemplates)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(locationPMPartTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteLocationPMPart(id: string): Promise<boolean> {
+    const result = await db.update(locationPMPartTemplates)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(locationPMPartTemplates.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Job Parts methods
+  async getJobParts(jobId: string): Promise<JobPart[]> {
+    return db.select()
+      .from(jobParts)
+      .where(and(
+        eq(jobParts.jobId, jobId),
+        eq(jobParts.isActive, true)
+      ));
+  }
+
+  async createJobPart(jobId: string, data: InsertJobPart): Promise<JobPart> {
+    const [created] = await db.insert(jobParts)
+      .values({
+        ...data,
+        jobId,
+      })
+      .returning();
+    return created;
+  }
+
+  async updateJobPart(id: string, data: UpdateJobPart): Promise<JobPart | undefined> {
+    const [updated] = await db.update(jobParts)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(jobParts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteJobPart(id: string): Promise<boolean> {
+    const result = await db.update(jobParts)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(jobParts.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // PM Job generation
+  async generatePMJobForLocation(companyId: string, locationId: string, date: Date): Promise<{ job: Job; parts: JobPart[] } | null> {
+    const pmPlan = await this.getLocationPMPlan(locationId);
+    if (!pmPlan || !pmPlan.hasPm) return null;
+
+    const month = date.getMonth();
+    const monthFlags = [
+      pmPlan.pmJan, pmPlan.pmFeb, pmPlan.pmMar, pmPlan.pmApr,
+      pmPlan.pmMay, pmPlan.pmJun, pmPlan.pmJul, pmPlan.pmAug,
+      pmPlan.pmSep, pmPlan.pmOct, pmPlan.pmNov, pmPlan.pmDec
+    ];
+    if (!monthFlags[month]) return null;
+
+    const location = await this.getClient(companyId, locationId);
+    if (!location) return null;
+
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+    const summary = `PM Visit - ${monthNames[month]} ${date.getFullYear()} - ${location.companyName}`;
+
+    const job = await this.createJob(companyId, {
+      locationId,
+      summary,
+      description: pmPlan.notes || undefined,
+      jobType: 'maintenance',
+      priority: 'medium',
+      status: 'scheduled',
+      scheduledStart: date.toISOString(),
+      recurringSeriesId: pmPlan.recurringSeriesId || undefined,
+    });
+
+    const pmPartTemplates = await this.getLocationPMParts(locationId);
+    const createdParts: JobPart[] = [];
+
+    for (const template of pmPartTemplates) {
+      const [part] = await db.select()
+        .from(partsTable)
+        .where(eq(partsTable.id, template.productId))
+        .limit(1);
+      
+      const description = template.descriptionOverride || part?.name || part?.description || 'Unknown Part';
+      
+      const jobPart = await this.createJobPart(job.id, {
+        jobId: job.id,
+        productId: template.productId,
+        description,
+        quantity: template.quantityPerVisit,
+        unitPrice: part?.unitPrice || null,
+        source: 'pm_template',
+        equipmentLabel: template.equipmentLabel,
+      });
+      createdParts.push(jobPart);
+    }
+
+    return { job, parts: createdParts };
   }
 }
 

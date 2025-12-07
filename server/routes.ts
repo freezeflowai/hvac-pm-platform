@@ -3778,6 +3778,264 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ================================
+  // LOCATION PM PLAN API ENDPOINTS
+  // ================================
+  
+  // Get PM plan for a location
+  app.get("/api/locations/:locationId/pm-plan", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      const pmPlan = await storage.getLocationPMPlan(req.params.locationId);
+      res.json(pmPlan || null);
+    } catch (error) {
+      console.error('Get PM plan error:', error);
+      res.status(500).json({ error: "Failed to get PM plan" });
+    }
+  });
+
+  // Create or update PM plan for a location
+  app.post("/api/locations/:locationId/pm-plan", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      const pmPlan = await storage.createOrUpdateLocationPMPlan(req.params.locationId, {
+        ...req.body,
+        locationId: req.params.locationId,
+      });
+      res.json(pmPlan);
+    } catch (error) {
+      console.error('Create/update PM plan error:', error);
+      res.status(500).json({ error: "Failed to save PM plan" });
+    }
+  });
+
+  // Delete PM plan for a location (soft delete)
+  app.delete("/api/locations/:locationId/pm-plan", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      await storage.deleteLocationPMPlan(req.params.locationId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete PM plan error:', error);
+      res.status(500).json({ error: "Failed to delete PM plan" });
+    }
+  });
+
+  // ================================
+  // LOCATION PM PARTS API ENDPOINTS
+  // ================================
+  
+  // Get PM parts for a location
+  app.get("/api/locations/:locationId/pm-parts", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      const pmParts = await storage.getLocationPMParts(req.params.locationId);
+      res.json(pmParts);
+    } catch (error) {
+      console.error('Get PM parts error:', error);
+      res.status(500).json({ error: "Failed to get PM parts" });
+    }
+  });
+
+  // Add PM part for a location
+  app.post("/api/locations/:locationId/pm-parts", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      if (!req.body.productId || !req.body.quantityPerVisit) {
+        return res.status(400).json({ error: "productId and quantityPerVisit are required" });
+      }
+      
+      const pmPart = await storage.createLocationPMPart(req.params.locationId, {
+        ...req.body,
+        locationId: req.params.locationId,
+      });
+      res.status(201).json(pmPart);
+    } catch (error) {
+      console.error('Create PM part error:', error);
+      res.status(500).json({ error: "Failed to create PM part" });
+    }
+  });
+
+  // Update PM part
+  app.put("/api/locations/:locationId/pm-parts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      const pmPart = await storage.updateLocationPMPart(req.params.id, req.body);
+      if (!pmPart) {
+        return res.status(404).json({ error: "PM part not found" });
+      }
+      res.json(pmPart);
+    } catch (error) {
+      console.error('Update PM part error:', error);
+      res.status(500).json({ error: "Failed to update PM part" });
+    }
+  });
+
+  // Delete PM part (soft delete)
+  app.delete("/api/locations/:locationId/pm-parts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      const deleted = await storage.deleteLocationPMPart(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "PM part not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete PM part error:', error);
+      res.status(500).json({ error: "Failed to delete PM part" });
+    }
+  });
+
+  // ================================
+  // PM JOB GENERATION ENDPOINT
+  // ================================
+  
+  // Generate PM job for a location
+  app.post("/api/locations/:locationId/generate-pm-job", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      const { date } = req.body;
+      if (!date) {
+        return res.status(400).json({ error: "date is required (YYYY-MM-DD format)" });
+      }
+      
+      const jobDate = new Date(date);
+      if (isNaN(jobDate.getTime())) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+      
+      const result = await storage.generatePMJobForLocation(
+        req.user!.companyId,
+        req.params.locationId,
+        jobDate
+      );
+      
+      if (!result) {
+        return res.status(400).json({ 
+          error: "Cannot generate PM job. Either PM is not enabled for this location or the specified month is not scheduled for PM." 
+        });
+      }
+      
+      res.status(201).json(result);
+    } catch (error) {
+      console.error('Generate PM job error:', error);
+      res.status(500).json({ error: "Failed to generate PM job" });
+    }
+  });
+
+  // ================================
+  // JOB PARTS API ENDPOINTS
+  // ================================
+  
+  // Get job parts
+  app.get("/api/jobs/:jobId/parts", isAuthenticated, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.user!.companyId, req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      const parts = await storage.getJobParts(req.params.jobId);
+      res.json(parts);
+    } catch (error) {
+      console.error('Get job parts error:', error);
+      res.status(500).json({ error: "Failed to get job parts" });
+    }
+  });
+
+  // Add job part
+  app.post("/api/jobs/:jobId/parts", isAuthenticated, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.user!.companyId, req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      if (!req.body.description || !req.body.quantity) {
+        return res.status(400).json({ error: "description and quantity are required" });
+      }
+      
+      const jobPart = await storage.createJobPart(req.params.jobId, {
+        ...req.body,
+        jobId: req.params.jobId,
+      });
+      res.status(201).json(jobPart);
+    } catch (error) {
+      console.error('Create job part error:', error);
+      res.status(500).json({ error: "Failed to create job part" });
+    }
+  });
+
+  // Update job part
+  app.put("/api/jobs/:jobId/parts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.user!.companyId, req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      const jobPart = await storage.updateJobPart(req.params.id, req.body);
+      if (!jobPart) {
+        return res.status(404).json({ error: "Job part not found" });
+      }
+      res.json(jobPart);
+    } catch (error) {
+      console.error('Update job part error:', error);
+      res.status(500).json({ error: "Failed to update job part" });
+    }
+  });
+
+  // Delete job part
+  app.delete("/api/jobs/:jobId/parts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.user!.companyId, req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      const deleted = await storage.deleteJobPart(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Job part not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete job part error:', error);
+      res.status(500).json({ error: "Failed to delete job part" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

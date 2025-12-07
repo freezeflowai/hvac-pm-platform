@@ -615,11 +615,11 @@ export const jobStatusEnum = [
 export type JobStatus = typeof jobStatusEnum[number];
 
 // Job priority enum values
-export const jobPriorityEnum = ["low", "normal", "high", "emergency"] as const;
+export const jobPriorityEnum = ["low", "medium", "high", "urgent"] as const;
 export type JobPriority = typeof jobPriorityEnum[number];
 
 // Job type enum values
-export const jobTypeEnum = ["service", "install", "maintenance", "inspection"] as const;
+export const jobTypeEnum = ["maintenance", "repair", "inspection", "installation", "emergency"] as const;
 export type JobType = typeof jobTypeEnum[number];
 
 // Recurrence frequency enum values
@@ -655,8 +655,8 @@ export const insertRecurringJobSeriesSchema = createInsertSchema(recurringJobSer
   createdAt: true,
   updatedAt: true,
 }).extend({
-  baseJobType: z.enum(jobTypeEnum).default("service"),
-  basePriority: z.enum(jobPriorityEnum).default("normal"),
+  baseJobType: z.enum(jobTypeEnum).default("maintenance"),
+  basePriority: z.enum(jobPriorityEnum).default("medium"),
 });
 
 export type InsertRecurringJobSeries = z.infer<typeof insertRecurringJobSeriesSchema>;
@@ -699,8 +699,8 @@ export const jobs = pgTable("jobs", {
   assignedTechnicianIds: varchar("assigned_technician_ids").array(),
   // Status and classification
   status: text("status").notNull().default("draft"),
-  priority: text("priority").notNull().default("normal"),
-  jobType: text("job_type").notNull().default("service"),
+  priority: text("priority").notNull().default("medium"),
+  jobType: text("job_type").notNull().default("maintenance"),
   // Job details
   summary: text("summary").notNull(),
   description: text("description"),
@@ -733,8 +733,8 @@ export const insertJobSchema = createInsertSchema(jobs).omit({
   updatedAt: true,
 }).extend({
   status: z.enum(jobStatusEnum).default("draft"),
-  priority: z.enum(jobPriorityEnum).default("normal"),
-  jobType: z.enum(jobTypeEnum).default("service"),
+  priority: z.enum(jobPriorityEnum).default("medium"),
+  jobType: z.enum(jobTypeEnum).default("maintenance"),
   scheduledStart: z.string().nullable().optional(), // Accept ISO string
   scheduledEnd: z.string().nullable().optional(),
 });
@@ -762,3 +762,143 @@ export const updateJobSchema = z.object({
 export type InsertJob = z.infer<typeof insertJobSchema>;
 export type UpdateJob = z.infer<typeof updateJobSchema>;
 export type Job = typeof jobs.$inferSelect;
+
+// ============================================================================
+// LOCATION PM PLAN - Preventative Maintenance schedule per location
+// ============================================================================
+// This table will be used to calculate part demand per month across all locations.
+// Example: sum quantityPerVisit for all PM visits scheduled in a month to get 
+// projected filter/belt requirements for inventory planning.
+export const locationPMPlans = pgTable("location_pm_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  locationId: varchar("location_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  hasPm: boolean("has_pm").notNull().default(false),
+  pmType: text("pm_type"), // e.g. "filters only", "full HVAC PM"
+  // Monthly PM flags
+  pmJan: boolean("pm_jan").notNull().default(false),
+  pmFeb: boolean("pm_feb").notNull().default(false),
+  pmMar: boolean("pm_mar").notNull().default(false),
+  pmApr: boolean("pm_apr").notNull().default(false),
+  pmMay: boolean("pm_may").notNull().default(false),
+  pmJun: boolean("pm_jun").notNull().default(false),
+  pmJul: boolean("pm_jul").notNull().default(false),
+  pmAug: boolean("pm_aug").notNull().default(false),
+  pmSep: boolean("pm_sep").notNull().default(false),
+  pmOct: boolean("pm_oct").notNull().default(false),
+  pmNov: boolean("pm_nov").notNull().default(false),
+  pmDec: boolean("pm_dec").notNull().default(false),
+  notes: text("notes"),
+  recurringSeriesId: varchar("recurring_series_id").references(() => recurringJobSeries.id, { onDelete: "set null" }),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertLocationPMPlanSchema = createInsertSchema(locationPMPlans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateLocationPMPlanSchema = z.object({
+  hasPm: z.boolean().optional(),
+  pmType: z.string().nullable().optional(),
+  pmJan: z.boolean().optional(),
+  pmFeb: z.boolean().optional(),
+  pmMar: z.boolean().optional(),
+  pmApr: z.boolean().optional(),
+  pmMay: z.boolean().optional(),
+  pmJun: z.boolean().optional(),
+  pmJul: z.boolean().optional(),
+  pmAug: z.boolean().optional(),
+  pmSep: z.boolean().optional(),
+  pmOct: z.boolean().optional(),
+  pmNov: z.boolean().optional(),
+  pmDec: z.boolean().optional(),
+  notes: z.string().nullable().optional(),
+  recurringSeriesId: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type InsertLocationPMPlan = z.infer<typeof insertLocationPMPlanSchema>;
+export type UpdateLocationPMPlan = z.infer<typeof updateLocationPMPlanSchema>;
+export type LocationPMPlan = typeof locationPMPlans.$inferSelect;
+
+// ============================================================================
+// LOCATION PM PART TEMPLATE - Parts/filters/belts used at each PM visit
+// ============================================================================
+// These templates are copied into JobPart entries when generating PM jobs.
+// Used for inventory planning: sum quantityPerVisit across all locations for 
+// a given month to project parts demand.
+export const locationPMPartTemplates = pgTable("location_pm_part_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  locationId: varchar("location_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  productId: varchar("product_id").notNull().references(() => parts.id, { onDelete: "cascade" }),
+  descriptionOverride: text("description_override"), // Custom description for job/invoice
+  quantityPerVisit: text("quantity_per_visit").notNull(), // Stored as text for decimal precision
+  equipmentLabel: text("equipment_label"), // e.g. "RTU #1", "Freezer 3"
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertLocationPMPartTemplateSchema = createInsertSchema(locationPMPartTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateLocationPMPartTemplateSchema = z.object({
+  productId: z.string().optional(),
+  descriptionOverride: z.string().nullable().optional(),
+  quantityPerVisit: z.string().optional(),
+  equipmentLabel: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type InsertLocationPMPartTemplate = z.infer<typeof insertLocationPMPartTemplateSchema>;
+export type UpdateLocationPMPartTemplate = z.infer<typeof updateLocationPMPartTemplateSchema>;
+export type LocationPMPartTemplate = typeof locationPMPartTemplates.$inferSelect;
+
+// ============================================================================
+// JOB PARTS - Parts attached to individual jobs
+// ============================================================================
+// When a PM job is generated, LocationPMPartTemplate entries are copied here.
+// Later converted to invoice lines when billing.
+export const jobPartSourceEnum = ["pm_template", "added_by_tech", "quoted", "manual"] as const;
+
+export const jobParts = pgTable("job_parts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  productId: varchar("product_id").references(() => parts.id, { onDelete: "set null" }),
+  description: text("description").notNull(),
+  quantity: text("quantity").notNull(), // Stored as text for decimal precision
+  unitPrice: text("unit_price"), // Stored as text for decimal precision
+  source: text("source").notNull().default("manual"), // pm_template, added_by_tech, quoted, manual
+  equipmentLabel: text("equipment_label"), // Copied from PM template or added by tech
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertJobPartSchema = createInsertSchema(jobParts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  source: z.enum(jobPartSourceEnum).default("manual"),
+});
+
+export const updateJobPartSchema = z.object({
+  productId: z.string().nullable().optional(),
+  description: z.string().optional(),
+  quantity: z.string().optional(),
+  unitPrice: z.string().nullable().optional(),
+  source: z.enum(jobPartSourceEnum).optional(),
+  equipmentLabel: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type InsertJobPart = z.infer<typeof insertJobPartSchema>;
+export type UpdateJobPart = z.infer<typeof updateJobPartSchema>;
+export type JobPart = typeof jobParts.$inferSelect;
