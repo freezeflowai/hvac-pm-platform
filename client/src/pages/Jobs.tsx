@@ -340,10 +340,11 @@ export default function Jobs() {
           {statusFilterOptions.map(option => {
             const isActive = activeFilter === option.value;
             const count = statusCounts[option.value];
+            const activeVariant = option.value === "late" ? "destructive" : "default";
             return (
               <Button
                 key={option.value}
-                variant={isActive ? option.variant : "ghost"}
+                variant={isActive ? activeVariant : "ghost"}
                 size="sm"
                 onClick={() => setActiveFilter(option.value)}
                 className={!isActive ? "opacity-50" : ""}
