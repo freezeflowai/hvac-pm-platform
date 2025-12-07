@@ -82,9 +82,9 @@ export default function ClientDetailPage() {
         <div className="text-center py-12">
           <h2 className="text-lg font-semibold text-destructive">Client not found</h2>
           <p className="text-muted-foreground mt-2">The client you're looking for doesn't exist or you don't have access.</p>
-          <Button variant="outline" className="mt-4" onClick={() => setLocation("/")}>
+          <Button variant="outline" className="mt-4" onClick={() => setLocation("/reports")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Dashboard
+            Back to Client List
           </Button>
         </div>
       </div>
@@ -99,7 +99,7 @@ export default function ClientDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/reports")} data-testid="button-back-to-clients">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
