@@ -8,12 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Table,
   TableBody,
   TableCell,
@@ -47,9 +41,11 @@ interface Client {
   postalCode: string | null;
 }
 
-type JobStatus = "all" | "late" | "upcoming" | "completed" | "unscheduled";
+type JobStatusFilter = "late" | "upcoming" | "completed" | "unscheduled";
 type SortField = "client" | "jobNumber" | "schedule" | "status";
 type SortDirection = "asc" | "desc";
+
+const ALL_STATUSES: JobStatusFilter[] = ["late", "upcoming", "completed", "unscheduled"];
 
 function parseLocalDate(dateStr: string): Date {
   if (!dateStr) return new Date();
@@ -110,7 +106,7 @@ const ITEMS_PER_PAGE = 50;
 
 export default function Jobs() {
   const { toast } = useToast();
-  const [statusFilter, setStatusFilter] = useState<JobStatus>("all");
+  const [activeFilters, setActiveFilters] = useState<Set<JobStatusFilter>>(new Set(ALL_STATUSES));
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("schedule");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -170,21 +166,11 @@ export default function Jobs() {
       };
     });
 
-    if (statusFilter !== "all") {
+    // Filter by active status filters
+    if (activeFilters.size < ALL_STATUSES.length) {
       jobs = jobs.filter(job => {
-        const status = job.statusInfo.label.toLowerCase();
-        switch (statusFilter) {
-          case "late":
-            return status === "late";
-          case "upcoming":
-            return status === "upcoming";
-          case "completed":
-            return status === "completed";
-          case "unscheduled":
-            return status === "unscheduled";
-          default:
-            return true;
-        }
+        const status = job.statusInfo.label.toLowerCase() as JobStatusFilter;
+        return activeFilters.has(status);
       });
     }
 
@@ -229,12 +215,12 @@ export default function Jobs() {
     });
 
     return jobs;
-  }, [calendarData?.assignments, clientMap, statusFilter, searchQuery, sortField, sortDirection]);
+  }, [calendarData?.assignments, clientMap, activeFilters, searchQuery, sortField, sortDirection]);
 
   // Reset visible count when filters or sort changes
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
-  }, [statusFilter, searchQuery, sortField, sortDirection]);
+  }, [activeFilters, searchQuery, sortField, sortDirection]);
 
   // Visible jobs (paginated)
   const visibleJobs = useMemo(() => {
@@ -307,12 +293,37 @@ export default function Jobs() {
     </TableHead>
   );
 
-  const statusOptions = [
-    { value: "all", label: "All" },
-    { value: "late", label: "Late" },
-    { value: "upcoming", label: "Upcoming" },
-    { value: "completed", label: "Completed" },
-    { value: "unscheduled", label: "Unscheduled" },
+  // Calculate status counts
+  const statusCounts = useMemo(() => {
+    if (!calendarData?.assignments) return { late: 0, upcoming: 0, completed: 0, unscheduled: 0 };
+    
+    const counts = { late: 0, upcoming: 0, completed: 0, unscheduled: 0 };
+    calendarData.assignments.forEach(assignment => {
+      const status = getJobStatus(assignment).label.toLowerCase();
+      if (status in counts) {
+        counts[status as keyof typeof counts]++;
+      }
+    });
+    return counts;
+  }, [calendarData?.assignments]);
+
+  const toggleFilter = (status: JobStatusFilter) => {
+    setActiveFilters(prev => {
+      const newFilters = new Set(prev);
+      if (newFilters.has(status)) {
+        newFilters.delete(status);
+      } else {
+        newFilters.add(status);
+      }
+      return newFilters;
+    });
+  };
+
+  const statusFilterOptions: { value: JobStatusFilter; label: string; variant: "default" | "destructive" | "secondary" | "outline" }[] = [
+    { value: "late", label: "Late", variant: "destructive" },
+    { value: "upcoming", label: "Upcoming", variant: "default" },
+    { value: "completed", label: "Completed", variant: "secondary" },
+    { value: "unscheduled", label: "Unscheduled", variant: "outline" },
   ];
 
   if (isCalendarLoading) {
@@ -327,25 +338,22 @@ export default function Jobs() {
     <div className="p-6 space-y-6" data-testid="jobs-page">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" data-testid="button-filter-status">
-                Status | {statusOptions.find(o => o.value === statusFilter)?.label}
-                <ChevronDown className="ml-2 h-4 w-4" />
+          {statusFilterOptions.map(option => {
+            const isActive = activeFilters.has(option.value);
+            const count = statusCounts[option.value];
+            return (
+              <Button
+                key={option.value}
+                variant={isActive ? option.variant : "ghost"}
+                size="sm"
+                onClick={() => toggleFilter(option.value)}
+                className={!isActive ? "opacity-50" : ""}
+                data-testid={`button-filter-status-${option.value}`}
+              >
+                {option.label} ({count})
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              {statusOptions.map(option => (
-                <DropdownMenuItem 
-                  key={option.value}
-                  onClick={() => setStatusFilter(option.value as JobStatus)}
-                  data-testid={`button-filter-status-${option.value}`}
-                >
-                  {option.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            );
+          })}
         </div>
 
         <div className="relative w-64">
