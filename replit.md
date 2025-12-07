@@ -61,6 +61,17 @@ The application uses a Material Design-inspired typography with the Inter font f
   - QBO Mapper functions: mapInvoiceToQBO (build QBO Invoice payload), parseQBOInvoiceResponse (extract sync fields from QBO responses).
   - QBO Sync Service: createInvoiceInQBO, updateInvoiceInQBO, voidInvoiceInQBO, deleteInvoiceInQBO stub methods ready for OAuth integration.
   - API routes: Full CRUD for invoices with multi-tenant companyId scoping, includes invoice lines management.
+- **Jobs System**: Complete dispatching system with recurring series support:
+  - `jobs` table: Full job data model with status workflow (draft, scheduled, in_progress, on_hold, completed, cancelled, invoiced), priority levels (low, medium, high, urgent), job types (maintenance, repair, inspection, installation, emergency), technician assignment, and scheduling.
+  - `recurring_job_series` table: Recurring job templates with frequency (weekly, biweekly, monthly, quarterly, annually), start/end dates, and generation tracking.
+  - `recurring_job_phases` table: Multi-phase work templates within recurring series.
+  - `company_counters` table: Atomic company-scoped job number sequences (JOB-0001 format).
+  - Job status transitions: Draft → Scheduled → In Progress → On Hold/Completed → Cancelled/Invoiced with validation guards.
+  - Date range filtering: GET /api/jobs supports startDate and endDate query params for calendar views.
+  - Location-based filtering: Jobs linked to Locations (clients) via locationId FK.
+  - API endpoints: GET/POST /api/jobs, GET/PATCH/DELETE /api/jobs/:id, POST/GET /api/recurring-series.
+  - Frontend: QuickAddJobDialog for job creation, Jobs.tsx list page with status filters and sorting, JobDetailPage.tsx for detailed view and status management.
+  - Coexistence: Jobs system works alongside calendarAssignments during migration via optional calendarAssignmentId reference.
 
 ## External Dependencies
 
