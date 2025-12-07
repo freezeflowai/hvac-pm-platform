@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, date, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -482,3 +482,117 @@ export const updateClientNoteSchema = z.object({
 export type InsertClientNote = z.infer<typeof insertClientNoteSchema>;
 export type UpdateClientNote = z.infer<typeof updateClientNoteSchema>;
 export type ClientNote = typeof clientNotes.$inferSelect;
+
+// Invoice statuses
+export const invoiceStatusEnum = ["draft", "sent", "paid", "void", "cancelled"] as const;
+export type InvoiceStatus = typeof invoiceStatusEnum[number];
+
+// Invoices table - syncs with QBO Invoices
+// Always belongs to a Location; billing target (Company vs Location) determined by billWithParent flag
+export const invoices = pgTable("invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  // Always links to a Location (client) where work is performed
+  locationId: varchar("location_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  // Parent company reference (for easier querying when billing parent)
+  customerCompanyId: varchar("customer_company_id").references(() => customerCompanies.id, { onDelete: "set null" }),
+  // Invoice details
+  invoiceNumber: text("invoice_number"), // App-side invoice number, may mirror QBO DocNumber
+  status: text("status").notNull().default("draft"), // draft, sent, paid, void, cancelled
+  issueDate: date("issue_date").notNull(),
+  dueDate: date("due_date"),
+  currency: text("currency").notNull().default("CAD"), // e.g., "CAD", "USD"
+  // Totals (stored as text to preserve decimal precision)
+  subtotal: text("subtotal").notNull().default("0"),
+  taxTotal: text("tax_total").notNull().default("0"),
+  total: text("total").notNull().default("0"),
+  // Notes
+  notesInternal: text("notes_internal"), // Not sent to QBO
+  notesCustomer: text("notes_customer"), // Maps to QBO CustomerMemo
+  // QBO sync fields
+  qboInvoiceId: text("qbo_invoice_id"), // QBO Invoice.Id
+  qboSyncToken: text("qbo_sync_token"), // QBO Invoice.SyncToken (required for updates)
+  qboLastSyncedAt: timestamp("qbo_last_synced_at"),
+  qboDocNumber: text("qbo_doc_number"), // QBO DocNumber
+  // Status
+  isActive: boolean("is_active").notNull().default(true), // Soft delete / void
+  // Metadata
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({
+  id: true,
+  companyId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  status: z.enum(invoiceStatusEnum).default("draft"),
+  issueDate: z.string(), // Accept string for date input
+});
+
+export const updateInvoiceSchema = z.object({
+  locationId: z.string().optional(),
+  customerCompanyId: z.string().nullable().optional(),
+  invoiceNumber: z.string().nullable().optional(),
+  status: z.enum(invoiceStatusEnum).optional(),
+  issueDate: z.string().optional(),
+  dueDate: z.string().nullable().optional(),
+  currency: z.string().optional(),
+  subtotal: z.string().optional(),
+  taxTotal: z.string().optional(),
+  total: z.string().optional(),
+  notesInternal: z.string().nullable().optional(),
+  notesCustomer: z.string().nullable().optional(),
+  qboInvoiceId: z.string().nullable().optional(),
+  qboSyncToken: z.string().nullable().optional(),
+  qboLastSyncedAt: z.date().nullable().optional(),
+  qboDocNumber: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type UpdateInvoice = z.infer<typeof updateInvoiceSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+
+// Invoice line items table
+export const invoiceLines = pgTable("invoice_lines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  lineNumber: integer("line_number").notNull(), // Ordering
+  description: text("description").notNull(),
+  quantity: text("quantity").notNull().default("1"), // Stored as text for decimal precision
+  unitPrice: text("unit_price").notNull().default("0"), // Stored as text for decimal precision
+  lineSubtotal: text("line_subtotal").notNull().default("0"), // quantity * unitPrice
+  taxCode: text("tax_code"), // Tax code name/identifier
+  // QBO mapping fields
+  qboItemRefId: text("qbo_item_ref_id"), // Maps to QBO ItemRef (product/service)
+  qboTaxCodeRefId: text("qbo_tax_code_ref_id"), // Maps to QBO TaxCodeRef
+  // Metadata for extensibility
+  metadata: text("metadata"), // JSON string for future use
+  // Timestamps
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertInvoiceLineSchema = createInsertSchema(invoiceLines).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateInvoiceLineSchema = z.object({
+  lineNumber: z.number().int().optional(),
+  description: z.string().optional(),
+  quantity: z.string().optional(),
+  unitPrice: z.string().optional(),
+  lineSubtotal: z.string().optional(),
+  taxCode: z.string().nullable().optional(),
+  qboItemRefId: z.string().nullable().optional(),
+  qboTaxCodeRefId: z.string().nullable().optional(),
+  metadata: z.string().nullable().optional(),
+});
+
+export type InsertInvoiceLine = z.infer<typeof insertInvoiceLineSchema>;
+export type UpdateInvoiceLine = z.infer<typeof updateInvoiceLineSchema>;
+export type InvoiceLine = typeof invoiceLines.$inferSelect;

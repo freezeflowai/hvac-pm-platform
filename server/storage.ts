@@ -29,7 +29,15 @@ import {
   type CustomerCompany,
   type InsertCustomerCompany,
   type UpdateCustomerCompany,
-  customerCompanies
+  type Invoice,
+  type InsertInvoice,
+  type UpdateInvoice,
+  type InvoiceLine,
+  type InsertInvoiceLine,
+  type UpdateInvoiceLine,
+  customerCompanies,
+  invoices,
+  invoiceLines
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { STANDARD_BELTS, STANDARD_FILTERS } from "./seed-data";
@@ -3119,6 +3127,156 @@ export class DbStorage implements IStorage {
 
   async deactivateCustomerCompany(companyId: string, id: string): Promise<CustomerCompany | undefined> {
     return this.updateCustomerCompany(companyId, id, { isActive: false });
+  }
+
+  // Invoice methods
+  async getInvoices(companyId: string): Promise<Invoice[]> {
+    return db.select()
+      .from(invoices)
+      .where(eq(invoices.companyId, companyId))
+      .orderBy(desc(invoices.createdAt));
+  }
+
+  async getInvoicesByLocation(companyId: string, locationId: string): Promise<Invoice[]> {
+    return db.select()
+      .from(invoices)
+      .where(and(eq(invoices.companyId, companyId), eq(invoices.locationId, locationId)))
+      .orderBy(desc(invoices.createdAt));
+  }
+
+  async getInvoicesByCustomerCompany(companyId: string, customerCompanyId: string): Promise<Invoice[]> {
+    return db.select()
+      .from(invoices)
+      .where(and(eq(invoices.companyId, companyId), eq(invoices.customerCompanyId, customerCompanyId)))
+      .orderBy(desc(invoices.createdAt));
+  }
+
+  async getInvoice(companyId: string, id: string): Promise<Invoice | undefined> {
+    const result = await db.select()
+      .from(invoices)
+      .where(and(eq(invoices.id, id), eq(invoices.companyId, companyId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async getInvoiceByQboId(companyId: string, qboInvoiceId: string): Promise<Invoice | undefined> {
+    const result = await db.select()
+      .from(invoices)
+      .where(and(eq(invoices.companyId, companyId), eq(invoices.qboInvoiceId, qboInvoiceId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createInvoice(companyId: string, data: InsertInvoice): Promise<Invoice> {
+    const result = await db.insert(invoices).values({
+      ...data,
+      companyId,
+    }).returning();
+    return result[0];
+  }
+
+  async updateInvoice(companyId: string, id: string, data: UpdateInvoice): Promise<Invoice | undefined> {
+    const result = await db.update(invoices)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(invoices.id, id), eq(invoices.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteInvoice(companyId: string, id: string): Promise<boolean> {
+    const result = await db.delete(invoices)
+      .where(and(eq(invoices.id, id), eq(invoices.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async voidInvoice(companyId: string, id: string): Promise<Invoice | undefined> {
+    return this.updateInvoice(companyId, id, { status: "void", isActive: false });
+  }
+
+  // Invoice Line methods
+  async getInvoiceLines(invoiceId: string): Promise<InvoiceLine[]> {
+    return db.select()
+      .from(invoiceLines)
+      .where(eq(invoiceLines.invoiceId, invoiceId))
+      .orderBy(invoiceLines.lineNumber);
+  }
+
+  async getInvoiceLine(invoiceId: string, id: string): Promise<InvoiceLine | undefined> {
+    const result = await db.select()
+      .from(invoiceLines)
+      .where(and(eq(invoiceLines.id, id), eq(invoiceLines.invoiceId, invoiceId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createInvoiceLine(data: InsertInvoiceLine): Promise<InvoiceLine> {
+    const result = await db.insert(invoiceLines).values(data).returning();
+    return result[0];
+  }
+
+  async createInvoiceLines(lines: InsertInvoiceLine[]): Promise<InvoiceLine[]> {
+    if (lines.length === 0) return [];
+    const result = await db.insert(invoiceLines).values(lines).returning();
+    return result;
+  }
+
+  async updateInvoiceLine(invoiceId: string, id: string, data: UpdateInvoiceLine): Promise<InvoiceLine | undefined> {
+    const result = await db.update(invoiceLines)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(invoiceLines.id, id), eq(invoiceLines.invoiceId, invoiceId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteInvoiceLine(invoiceId: string, id: string): Promise<boolean> {
+    const result = await db.delete(invoiceLines)
+      .where(and(eq(invoiceLines.id, id), eq(invoiceLines.invoiceId, invoiceId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async deleteInvoiceLines(invoiceId: string): Promise<number> {
+    const result = await db.delete(invoiceLines)
+      .where(eq(invoiceLines.invoiceId, invoiceId))
+      .returning();
+    return result.length;
+  }
+
+  async replaceInvoiceLines(invoiceId: string, lines: InsertInvoiceLine[]): Promise<InvoiceLine[]> {
+    await this.deleteInvoiceLines(invoiceId);
+    if (lines.length === 0) return [];
+    return this.createInvoiceLines(lines.map(line => ({ ...line, invoiceId })));
+  }
+
+  // Get invoice with all related data for QBO sync
+  async getInvoiceWithDetails(companyId: string, id: string): Promise<{
+    invoice: Invoice;
+    lines: InvoiceLine[];
+    location: Client;
+    customerCompany?: CustomerCompany;
+  } | undefined> {
+    const invoice = await this.getInvoice(companyId, id);
+    if (!invoice) return undefined;
+
+    const lines = await this.getInvoiceLines(id);
+    const location = await this.getClient(companyId, invoice.locationId);
+    if (!location) return undefined;
+
+    let customerCompany: CustomerCompany | undefined;
+    if (invoice.customerCompanyId) {
+      customerCompany = await this.getCustomerCompany(companyId, invoice.customerCompanyId);
+    } else if (location.parentCompanyId) {
+      customerCompany = await this.getCustomerCompany(companyId, location.parentCompanyId);
+    }
+
+    return { invoice, lines, location, customerCompany };
   }
 }
 

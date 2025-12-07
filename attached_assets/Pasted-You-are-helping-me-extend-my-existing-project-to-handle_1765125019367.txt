@@ -1,0 +1,249 @@
+You are helping me extend my existing project to handle invoices that sync cleanly with QuickBooks Online (QBO), using the parent/child customer structure described below.
+
+Use the EXISTING tech stack already in this repo (same language, framework, ORM, etc.). Do NOT introduce a new framework unless absolutely necessary. If invoice models already exist, extend them instead of rewriting from scratch.
+
+This prompt builds on a prior requirement where:
+
+- Company = QBO Customer (parent)
+- Location = QBO Sub-Customer (child)
+
+Quick recap of the CUSTOMER data model:
+
+- Company (parent)
+  - id
+  - name
+  - ...
+  - qboCustomerId
+  - qboSyncToken
+  - isActive
+
+- Location (child)
+  - id
+  - companyId
+  - name
+  - billWithParent (boolean)
+  - ...
+  - qboCustomerId      // ID of QBO sub-customer
+  - qboParentCustomerId // ID of QBO parent Customer
+  - qboSyncToken
+  - isActive
+
+In QBO:
+- Customer = parent
+- Sub-Customer = child/location
+- Sub-customers have ParentRef and a “Bill with parent” flag.
+
+--------------------------------
+NEW REQUIREMENT: INVOICE MODEL
+--------------------------------
+
+I want an Invoice system in my app that:
+
+- Always belongs to a specific **Location** (the place where work is done).
+- Can be **billed to either the parent Company or to the Location itself**, depending on Location.billWithParent.
+- Syncs to QBO Invoice objects with correct CustomerRef, lines, and totals.
+- Stores QBO IDs / SyncTokens so updates are safe and idempotent.
+
+Please design or adjust the following entities (or equivalent, depending on the current project structure):
+
+1) Invoice (header)
+
+Required minimum fields:
+
+- id (internal PK)
+- companyId (FK → Company.id)
+- locationId (FK → Location.id)
+- invoiceNumber (string | nullable)  // app-side invoice number, may mirror QBO DocNumber
+- status (enum/string):
+  - "draft"
+  - "sent"
+  - "paid"
+  - "void"
+  - "cancelled"
+- issueDate (date)
+- dueDate (date | nullable)
+- currency (string, e.g. "CAD" or "USD")
+- subtotal (decimal)
+- taxTotal (decimal)
+- total (decimal)
+- notesInternal (text | nullable)     // not sent to QBO
+- notesCustomer (text | nullable)     // maps to QBO CustomerMemo
+- qboInvoiceId (string | nullable)    // QBO Invoice.Id
+- qboSyncToken (string | nullable)    // QBO Invoice.SyncToken
+- qboLastSyncedAt (datetime | nullable)
+- isActive (boolean, default true)    // soft delete / void
+
+2) InvoiceLine (line items)
+
+Required minimum fields:
+
+- id (internal PK)
+- invoiceId (FK → Invoice.id)
+- lineNumber (int)           // ordering
+- description (string)
+- quantity (decimal)
+- unitPrice (decimal)
+- lineSubtotal (decimal)
+- taxCode (string | nullable)   // maps to QBO TaxCodeRef if applicable
+- qboItemRefId (string | nullable)  // maps to QBO ItemRef (product/service)
+- qboTaxCodeRefId (string | nullable)
+- metadata/json (optional)   // free-form for future
+
+--------------------------------
+BILLING LOGIC: PARENT VS CHILD
+--------------------------------
+
+The core rule:
+
+- An Invoice is **always tied to a Location** where work is done.
+- BUT: the **CustomerRef on the QBO invoice** depends on the Location’s `billWithParent` flag.
+
+Rules:
+
+1) If Location.billWithParent = TRUE:
+   - In QBO:
+     - Invoice.CustomerRef should point to the **parent Company’s qboCustomerId**.
+     - The invoice should still indicate which Location the work was for.
+       Do this by:
+       - Setting QBO ShipAddr to the Location’s service address.
+       - Adding a line in CustomerMemo or a custom field like:
+         "Location: <CompanyName> - <LocationName> (Location ID: XXX)"
+   - In the app:
+     - invoice.companyId = Company.id
+     - invoice.locationId = Location.id
+
+2) If Location.billWithParent = FALSE:
+   - In QBO:
+     - Invoice.CustomerRef should point to the **Location’s qboCustomerId** (the sub-customer).
+   - In the app:
+     - Still maintain both:
+       - invoice.companyId = Company.id
+       - invoice.locationId = Location.id
+
+IMPORTANT: In every case, the invoice belongs to a Location in the app. The “bill with parent” flag only affects which QBO CustomerId we use on CustomerRef.
+
+--------------------------------
+MAPPING APP → QBO INVOICE
+--------------------------------
+
+Please implement mapping functions that convert an Invoice + its lines into a QBO Invoice payload and vice versa.
+
+Implement functions like (names can be adjusted to project style):
+
+- toQboInvoicePayload(invoice: Invoice, company: Company, location: Location, lines: InvoiceLine[]): QboInvoicePayload
+- fromQboInvoicePayload(qbo: QboInvoicePayload): { invoice, lines, company, location }
+
+For the App → QBO mapping, ensure:
+
+1) CustomerRef:
+   - If Location.billWithParent == true:
+     - CustomerRef.value = Company.qboCustomerId
+   - Else:
+     - CustomerRef.value = Location.qboCustomerId
+
+2) BillTo / ShipTo:
+   - BillTo (BillAddr):
+     - For both cases, by default, use the **billing address** from the bill-to entity:
+       - If billing parent: Company billing address.
+       - If billing location: Location address or Company billing address, depending on business preference. (Document logic in comments.)
+   - ShipTo (ShipAddr):
+     - Use the **Location’s service address**.
+   - Add a CustomerMemo (or custom field) like:
+     - "Service location: <CompanyName> - <LocationName> (Location ID: X)"
+
+3) Line items:
+   - Map our InvoiceLine fields to QBO Invoice Line objects.
+   - Each line should include:
+     - Amount = quantity * unitPrice
+     - DetailType = "SalesItemLineDetail"
+     - SalesItemLineDetail:
+       - ItemRef.value = qboItemRefId (if set) OR some default service item we configure.
+       - Qty = quantity
+       - UnitPrice = unitPrice
+       - TaxCodeRef (if taxCode or qboTaxCodeRefId is set)
+
+4) Totals:
+   - QBO will recompute totals based on line items.
+   - In our app, keep subtotal/tax/total fields in sync.
+   - If QBO rejects mismatches, decide whether to:
+     - trust QBO as source of truth and overwrite local totals, or
+     - treat as error. Document the chosen behavior in comments.
+
+5) Currency:
+   - Map Invoice.currency → QBO TxnCurrencyRef if multicurrency is used.
+   - If multicurrency is off in QBO, assume home currency and handle accordingly.
+
+6) Status mapping (optional / best effort):
+   - QBO Invoices have status fields (e.g., "Open", "Paid", "Voided").
+   - When reading QBO Invoice:
+     - Map "Open" → app status "sent"
+     - Map "Paid" → app status "paid"
+     - Map "Voided" → app status "void"
+   - We don’t need to handle payments in this step, just read enough to know if invoice is paid or not.
+
+--------------------------------
+SYNC LOGIC
+--------------------------------
+
+Add helper functions for syncing:
+
+- syncInvoiceToQbo(invoiceId: ID): Promise<void>
+  - Loads invoice, company, location, and lines.
+  - If no qboInvoiceId:
+    - Create a new QBO invoice via the API.
+    - Store returned Id and SyncToken in qboInvoiceId and qboSyncToken.
+  - If qboInvoiceId exists:
+    - Update existing QBO invoice using Id and SyncToken.
+    - Store new SyncToken on success.
+  - Update qboLastSyncedAt.
+
+- syncInvoicesFromQbo(since: datetime): Promise<void>
+  - Calls QBO API to fetch invoices modified since `since`.
+  - For each returned invoice:
+    - Determine if the CustomerRef is a parent or a sub-customer:
+      - If CustomerRef.Id matches an existing Company.qboCustomerId:
+        - Find or create corresponding Location using ShipAddr and/or memo text if necessary.
+      - If CustomerRef.Id matches an existing Location.qboCustomerId:
+        - Link to that Location.
+    - Upsert local Invoice + lines, updating qboInvoiceId, qboSyncToken, qboLastSyncedAt.
+
+Also:
+
+- Handle optimistic concurrency:
+  - Always send existing SyncToken when updating.
+  - If QBO responds with “Object has been modified”, surface an error or implement conflict resolution strategy (e.g., re-fetch and show conflict to user).
+
+--------------------------------
+DELETION / VOIDING RULES
+--------------------------------
+
+- In my app:
+  - “Deleting” an invoice should usually mean:
+    - set Invoice.isActive = false
+    - set status = "void" or "cancelled"
+- In QBO:
+  - You cannot hard-delete; you must **void** the invoice.
+- Implement logic so that:
+  - If an invoice is set to void in app and synced:
+    - send a QBO void operation (or update invoice with status=Voided as supported by the SDK / API).
+  - If QBO invoice is voided:
+    - update local invoice status accordingly.
+
+--------------------------------
+WHAT TO OUTPUT
+--------------------------------
+
+1. Data model changes or new models for Invoice and InvoiceLine (using the project’s ORM).
+2. Any DB migrations needed.
+3. Helper/mapping functions for:
+   - Invoice/InvoiceLines → QBO Invoice payload
+   - QBO Invoice → local Invoice/InvoiceLines
+4. Sync functions:
+   - syncInvoiceToQbo
+   - syncInvoicesFromQbo (sketch basic version if full implementation is too big)
+5. Example usage code:
+   - Creating an invoice for a Location with billWithParent=true vs billWithParent=false.
+   - Syncing that invoice to QBO.
+   - Handling the response and updating local IDs/SyncTokens.
+
+Keep the code clean, strongly typed (if applicable), and well-commented so it is easy to see where the QuickBooks-specific logic lives.

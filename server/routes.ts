@@ -9,7 +9,7 @@ import { sendInvitationEmail } from "./emailService";
 import { impersonationService } from "./impersonationService";
 import { auditService } from "./auditService";
 import { requirePlatformAdmin, blockImpersonation } from "./impersonationMiddleware";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, insertJobNoteSchema, updateJobNoteSchema, insertClientNoteSchema, updateClientNoteSchema, insertCustomerCompanySchema, updateCustomerCompanySchema, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, insertJobNoteSchema, updateJobNoteSchema, insertClientNoteSchema, updateClientNoteSchema, insertCustomerCompanySchema, updateCustomerCompanySchema, insertInvoiceSchema, updateInvoiceSchema, insertInvoiceLineSchema, updateInvoiceLineSchema, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
 import { db } from "./db";
@@ -2436,6 +2436,197 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Deactivate customer company error:', error);
       res.status(500).json({ error: "Failed to deactivate customer company" });
+    }
+  });
+
+  // Invoice routes
+  app.get("/api/invoices", isAuthenticated, async (req, res) => {
+    try {
+      const { locationId, customerCompanyId } = req.query;
+      let invoices;
+      if (locationId && typeof locationId === 'string') {
+        invoices = await storage.getInvoicesByLocation(req.user!.companyId, locationId);
+      } else if (customerCompanyId && typeof customerCompanyId === 'string') {
+        invoices = await storage.getInvoicesByCustomerCompany(req.user!.companyId, customerCompanyId);
+      } else {
+        invoices = await storage.getInvoices(req.user!.companyId);
+      }
+      res.json(invoices);
+    } catch (error) {
+      console.error('Get invoices error:', error);
+      res.status(500).json({ error: "Failed to get invoices" });
+    }
+  });
+
+  app.get("/api/invoices/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const invoice = await storage.getInvoice(req.user!.companyId, id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error('Get invoice error:', error);
+      res.status(500).json({ error: "Failed to get invoice" });
+    }
+  });
+
+  app.get("/api/invoices/:id/details", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const details = await storage.getInvoiceWithDetails(req.user!.companyId, id);
+      if (!details) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      res.json(details);
+    } catch (error) {
+      console.error('Get invoice details error:', error);
+      res.status(500).json({ error: "Failed to get invoice details" });
+    }
+  });
+
+  app.post("/api/invoices", isAuthenticated, async (req, res) => {
+    try {
+      const data = insertInvoiceSchema.parse(req.body);
+      const invoice = await storage.createInvoice(req.user!.companyId, data);
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error('Create invoice error:', error);
+      res.status(500).json({ error: "Failed to create invoice" });
+    }
+  });
+
+  app.patch("/api/invoices/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const data = updateInvoiceSchema.parse(req.body);
+      const invoice = await storage.updateInvoice(req.user!.companyId, id, data);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error('Update invoice error:', error);
+      res.status(500).json({ error: "Failed to update invoice" });
+    }
+  });
+
+  app.delete("/api/invoices/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteInvoice(req.user!.companyId, id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete invoice error:', error);
+      res.status(500).json({ error: "Failed to delete invoice" });
+    }
+  });
+
+  app.post("/api/invoices/:id/void", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const invoice = await storage.voidInvoice(req.user!.companyId, id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error('Void invoice error:', error);
+      res.status(500).json({ error: "Failed to void invoice" });
+    }
+  });
+
+  // Invoice lines routes
+  app.get("/api/invoices/:invoiceId/lines", isAuthenticated, async (req, res) => {
+    try {
+      const { invoiceId } = req.params;
+      // Verify the invoice belongs to this company
+      const invoice = await storage.getInvoice(req.user!.companyId, invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const lines = await storage.getInvoiceLines(invoiceId);
+      res.json(lines);
+    } catch (error) {
+      console.error('Get invoice lines error:', error);
+      res.status(500).json({ error: "Failed to get invoice lines" });
+    }
+  });
+
+  app.post("/api/invoices/:invoiceId/lines", isAuthenticated, async (req, res) => {
+    try {
+      const { invoiceId } = req.params;
+      // Verify the invoice belongs to this company
+      const invoice = await storage.getInvoice(req.user!.companyId, invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const data = insertInvoiceLineSchema.parse({ ...req.body, invoiceId });
+      const line = await storage.createInvoiceLine(data);
+      res.status(201).json(line);
+    } catch (error) {
+      console.error('Create invoice line error:', error);
+      res.status(500).json({ error: "Failed to create invoice line" });
+    }
+  });
+
+  app.patch("/api/invoices/:invoiceId/lines/:lineId", isAuthenticated, async (req, res) => {
+    try {
+      const { invoiceId, lineId } = req.params;
+      // Verify the invoice belongs to this company
+      const invoice = await storage.getInvoice(req.user!.companyId, invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const data = updateInvoiceLineSchema.parse(req.body);
+      const line = await storage.updateInvoiceLine(invoiceId, lineId, data);
+      if (!line) {
+        return res.status(404).json({ error: "Invoice line not found" });
+      }
+      res.json(line);
+    } catch (error) {
+      console.error('Update invoice line error:', error);
+      res.status(500).json({ error: "Failed to update invoice line" });
+    }
+  });
+
+  app.delete("/api/invoices/:invoiceId/lines/:lineId", isAuthenticated, async (req, res) => {
+    try {
+      const { invoiceId, lineId } = req.params;
+      // Verify the invoice belongs to this company
+      const invoice = await storage.getInvoice(req.user!.companyId, invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const deleted = await storage.deleteInvoiceLine(invoiceId, lineId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Invoice line not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete invoice line error:', error);
+      res.status(500).json({ error: "Failed to delete invoice line" });
+    }
+  });
+
+  app.put("/api/invoices/:invoiceId/lines", isAuthenticated, async (req, res) => {
+    try {
+      const { invoiceId } = req.params;
+      // Verify the invoice belongs to this company
+      const invoice = await storage.getInvoice(req.user!.companyId, invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const linesData = z.array(insertInvoiceLineSchema.omit({ invoiceId: true })).parse(req.body);
+      const lines = await storage.replaceInvoiceLines(invoiceId, linesData.map(line => ({ ...line, invoiceId })));
+      res.json(lines);
+    } catch (error) {
+      console.error('Replace invoice lines error:', error);
+      res.status(500).json({ error: "Failed to replace invoice lines" });
     }
   });
 
