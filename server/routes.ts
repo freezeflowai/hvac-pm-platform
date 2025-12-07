@@ -2469,12 +2469,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Location name is required" });
       }
       
-      // Validate maintenance months for active clients
+      // Maintenance months are optional during quick creation
+      // They can be added later on the client detail page
       const isInactive = primaryLocation.inactive === true;
       const selectedMonths = primaryLocation.selectedMonths || [];
-      if (!isInactive && (!Array.isArray(selectedMonths) || selectedMonths.length === 0)) {
-        return res.status(400).json({ error: "At least one maintenance month is required for active clients" });
-      }
       
       // Validate parts upfront if provided
       const parts = primaryLocation.parts;
