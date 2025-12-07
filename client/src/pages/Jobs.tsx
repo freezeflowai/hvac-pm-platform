@@ -106,7 +106,7 @@ const ITEMS_PER_PAGE = 50;
 
 export default function Jobs() {
   const { toast } = useToast();
-  const [activeFilters, setActiveFilters] = useState<Set<JobStatusFilter>>(new Set(ALL_STATUSES));
+  const [activeFilter, setActiveFilter] = useState<"all" | JobStatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("schedule");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -166,11 +166,11 @@ export default function Jobs() {
       };
     });
 
-    // Filter by active status filters
-    if (activeFilters.size < ALL_STATUSES.length) {
+    // Filter by active status filter
+    if (activeFilter !== "all") {
       jobs = jobs.filter(job => {
         const status = job.statusInfo.label.toLowerCase() as JobStatusFilter;
-        return activeFilters.has(status);
+        return status === activeFilter;
       });
     }
 
@@ -215,12 +215,12 @@ export default function Jobs() {
     });
 
     return jobs;
-  }, [calendarData?.assignments, clientMap, activeFilters, searchQuery, sortField, sortDirection]);
+  }, [calendarData?.assignments, clientMap, activeFilter, searchQuery, sortField, sortDirection]);
 
   // Reset visible count when filters or sort changes
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
-  }, [activeFilters, searchQuery, sortField, sortDirection]);
+  }, [activeFilter, searchQuery, sortField, sortDirection]);
 
   // Visible jobs (paginated)
   const visibleJobs = useMemo(() => {
@@ -307,27 +307,6 @@ export default function Jobs() {
     return counts;
   }, [calendarData?.assignments]);
 
-  const toggleFilter = (status: JobStatusFilter) => {
-    setActiveFilters(prev => {
-      const newFilters = new Set(prev);
-      if (newFilters.has(status)) {
-        newFilters.delete(status);
-      } else {
-        newFilters.add(status);
-      }
-      return newFilters;
-    });
-  };
-
-  const toggleAll = () => {
-    if (activeFilters.size === ALL_STATUSES.length) {
-      setActiveFilters(new Set());
-    } else {
-      setActiveFilters(new Set(ALL_STATUSES));
-    }
-  };
-
-  const allSelected = activeFilters.size === ALL_STATUSES.length;
   const totalCount = statusCounts.late + statusCounts.upcoming + statusCounts.completed + statusCounts.unscheduled;
 
   const statusFilterOptions: { value: JobStatusFilter; label: string; variant: "default" | "destructive" | "secondary" | "outline" }[] = [
@@ -350,23 +329,23 @@ export default function Jobs() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <Button
-            variant={allSelected ? "default" : "ghost"}
+            variant={activeFilter === "all" ? "default" : "ghost"}
             size="sm"
-            onClick={toggleAll}
-            className={!allSelected ? "opacity-50" : ""}
+            onClick={() => setActiveFilter("all")}
+            className={activeFilter !== "all" ? "opacity-50" : ""}
             data-testid="button-filter-status-all"
           >
             All ({totalCount})
           </Button>
           {statusFilterOptions.map(option => {
-            const isActive = activeFilters.has(option.value);
+            const isActive = activeFilter === option.value;
             const count = statusCounts[option.value];
             return (
               <Button
                 key={option.value}
                 variant={isActive ? option.variant : "ghost"}
                 size="sm"
-                onClick={() => toggleFilter(option.value)}
+                onClick={() => setActiveFilter(option.value)}
                 className={!isActive ? "opacity-50" : ""}
                 data-testid={`button-filter-status-${option.value}`}
               >
