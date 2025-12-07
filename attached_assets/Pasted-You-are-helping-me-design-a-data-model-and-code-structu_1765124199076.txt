@@ -1,0 +1,157 @@
+You are helping me design a data model and code structure that will sync cleanly with QuickBooks Online (QBO) for customers and sub-customers.
+
+Important: I need to support a parent → child company structure in my app that matches how QBO handles Customers and Sub-Customers, so synchronization is as close to flawless as possible.
+
+Use the *existing* stack of this project (same language, framework, and ORM that is already in the repo). Do NOT introduce a new framework unless you absolutely have to. If a database schema / models already exist, extend them safely instead of rewriting everything.
+
+--------------------------------
+BUSINESS REQUIREMENT OVERVIEW
+--------------------------------
+
+In my app:
+
+- I have **clients** who are companies.
+- One company can have **multiple locations** (branches, stores, plants, etc.).
+- Conceptually:
+  - A **Parent Company** = the corporate entity (e.g. "ABC Holdings Inc")
+  - A **Child Company / Location** = a specific site (e.g. "Toronto Warehouse", "Mississauga Store")
+
+I want this to map directly to:
+
+- QBO **Customer**  = Parent Company
+- QBO **Sub-Customer** = Child Company / Location
+
+QBO rules we must mirror:
+
+1. Only **2 levels of hierarchy**:
+   - Customer → Sub-Customer
+   - NO third level (no grand-child).
+2. Every Customer/Sub-Customer has a unique **DisplayName** across the whole account.
+3. A Sub-Customer has a **ParentRef** that links it to the parent Customer.
+4. A Sub-Customer has a **“Bill with parent”** flag:
+   - If true: invoices bill through the parent.
+   - If false: invoices bill directly to the sub-customer.
+5. QBO never hard-deletes customers, it sets them inactive (Active = false).
+
+--------------------------------
+APP DATA MODEL REQUIREMENTS
+--------------------------------
+
+Please design/adjust the data model so that:
+
+We have a **Company** entity (parent) and a **Location** entity (child):
+
+1) Company (parent) – maps to QBO Customer
+   - Fields (at minimum):
+     - id (internal PK)
+     - name (string) – main company name
+     - legalName (string | optional)
+     - phone (string | optional)
+     - email (string | optional)
+     - billingAddress fields (street, city, province/state, postal code, country)
+     - isActive (boolean, default true)
+     - qboCustomerId (string | nullable) – QBO `Customer.Id`
+     - qboSyncToken (string | nullable) – QBO `Customer.SyncToken`
+     - qboLastSyncedAt (datetime | nullable)
+   - Constraints:
+     - name should be unique per account if it will become a QBO Customer DisplayName.
+
+2) Location (child) – maps to QBO Sub-Customer
+   - Fields (at minimum):
+     - id (internal PK)
+     - companyId (FK to Company.id)
+     - name (string) – location/site name only (e.g. "Toronto Warehouse")
+     - siteCode or storeNumber (string | optional)
+     - serviceAddress fields (street, city, province/state, postal code, country)
+     - contactPhone (string | optional)
+     - contactEmail (string | optional)
+     - billWithParent (boolean, default true) – maps to QBO's "Bill with parent" option
+     - isActive (boolean, default true)
+     - qboCustomerId (string | nullable) – this is the QBO ID of the sub-customer
+     - qboParentCustomerId (string | nullable) – QBO parent Customer.Id (mirrors QBO ParentRef)
+     - qboSyncToken (string | nullable)
+     - qboLastSyncedAt (datetime | nullable)
+   - Constraints:
+     - (companyId, name) should be unique.
+     - Locations never become parents; depth is always exactly 2 levels max.
+
+3) IMPORTANT NAMING RULES:
+   - In my application:
+     - Company.name = "ABC Holdings Inc"
+     - Location.name = "Toronto Warehouse"
+   - In QBO UI, the sub-customer will show as:
+     - "ABC Holdings Inc: Toronto Warehouse"
+   - YOU SHOULD NOT store the colon-formatted name in my database.
+   - Instead, implement helper logic that:
+     - When creating/updating a QBO sub-customer, builds `DisplayName` as:
+       `ParentCompanyName + ":" + " " + LocationName`
+     - When reading a QBO sub-customer back, it should map that `DisplayName` back into:
+       Parent name → Company, child name → Location.
+
+--------------------------------
+MAPPING APP <-> QBO STRUCTURE
+--------------------------------
+
+Please create helper functions or methods that:
+
+1) Map a **Company** record to a QBO Customer JSON payload. For example:
+
+   Input: Company entity
+   Output: QBO Customer object with fields like:
+   - DisplayName
+   - CompanyName
+   - Phone
+   - BillAddr
+   - Active
+   - (plus Id and SyncToken if updating)
+
+2) Map a **Location** record to a QBO Sub-Customer JSON payload. For example:
+
+   - ParentRef.value should equal the parent Company.qboCustomerId
+   - DisplayName built as `"ParentName: ChildLocationName"`
+   - BillWithParent set from Location.billWithParent
+   - Active set from Location.isActive
+
+3) Map QBO responses back into app models:
+   - If a Customer has no ParentRef → store as Company.
+   - If a Customer has a ParentRef → store as Location AND create or link the parent Company accordingly.
+   - Keep qboCustomerId and qboSyncToken updated on each sync.
+
+4) Enforce a **max depth of 2** in the app:
+   - We never create a Location whose parent is another Location.
+   - If QBO returns a sub-customer-of-a-sub-customer (unlikely, but defensive coding), treat it as invalid or flatten it according to a small comment in code.
+
+--------------------------------
+SYNC BEHAVIOR & LIFECYCLE
+--------------------------------
+
+Please also implement or stub out:
+
+- A clean way to **soft delete**:
+  - When a Company or Location is "deleted" in my app, mark `isActive = false` and propagate to QBO by setting `Active = false` on the corresponding Customer/Sub-Customer.
+- Functions to:
+  - createCompanyAndSyncToQbo(...)
+  - createLocationAndSyncToQbo(...)
+  - updateCompanyAndSyncToQbo(...)
+  - updateLocationAndSyncToQbo(...)
+- These should:
+  - Use `qboCustomerId` and `qboSyncToken` when updating.
+  - If there is no `qboCustomerId`, they should create a new QBO Customer/Sub-Customer.
+  - If there is one, they should update.
+- Handle name collisions politely (e.g. if QBO rejects a DisplayName as not unique, surface an error I can catch / display in the UI).
+
+--------------------------------
+WHAT TO OUTPUT
+--------------------------------
+
+1. Updated / new database models or ORM entities for Company and Location with the fields above.
+2. Any necessary migrations.
+3. Mapping/utility functions for:
+   - App → QBO Customer/Sub-Customer
+   - QBO Customer/Sub-Customer → App
+4. Example usage code showing:
+   - Creating a parent company + child locations.
+   - Syncing them to QBO.
+   - Reading them back from QBO and updating the local DB.
+
+Make the code clean, well-structured, and well-commented so another developer can understand the QBO mapping rules quickly.

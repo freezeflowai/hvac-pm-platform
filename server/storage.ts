@@ -25,7 +25,11 @@ import {
   type UpdateJobNote,
   type ClientNote,
   type InsertClientNote,
-  type UpdateClientNote
+  type UpdateClientNote,
+  type CustomerCompany,
+  type InsertCustomerCompany,
+  type UpdateCustomerCompany,
+  customerCompanies
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { STANDARD_BELTS, STANDARD_FILTERS } from "./seed-data";
@@ -414,6 +418,12 @@ export class MemStorage implements IStorage {
       phone: insertClient.phone ?? null,
       roofLadderCode: insertClient.roofLadderCode ?? null,
       notes: insertClient.notes ?? null,
+      parentCompanyId: insertClient.parentCompanyId ?? null,
+      billWithParent: insertClient.billWithParent ?? true,
+      qboCustomerId: insertClient.qboCustomerId ?? null,
+      qboParentCustomerId: insertClient.qboParentCustomerId ?? null,
+      qboSyncToken: insertClient.qboSyncToken ?? null,
+      qboLastSyncedAt: insertClient.qboLastSyncedAt ?? null,
       companyId,
       userId,
       inactive,
@@ -3063,6 +3073,52 @@ export class DbStorage implements IStorage {
       .where(and(eq(clientNotes.id, id), eq(clientNotes.companyId, companyId)))
       .returning();
     return result.length > 0;
+  }
+
+  // Customer Companies (QBO Parent Company) methods
+  async getCustomerCompanies(companyId: string): Promise<CustomerCompany[]> {
+    return db.select()
+      .from(customerCompanies)
+      .where(eq(customerCompanies.companyId, companyId))
+      .orderBy(customerCompanies.name);
+  }
+
+  async getCustomerCompany(companyId: string, id: string): Promise<CustomerCompany | undefined> {
+    const result = await db.select()
+      .from(customerCompanies)
+      .where(and(eq(customerCompanies.id, id), eq(customerCompanies.companyId, companyId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createCustomerCompany(companyId: string, data: InsertCustomerCompany): Promise<CustomerCompany> {
+    const result = await db.insert(customerCompanies).values({
+      ...data,
+      companyId,
+    }).returning();
+    return result[0];
+  }
+
+  async updateCustomerCompany(companyId: string, id: string, data: UpdateCustomerCompany): Promise<CustomerCompany | undefined> {
+    const result = await db.update(customerCompanies)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(customerCompanies.id, id), eq(customerCompanies.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCustomerCompany(companyId: string, id: string): Promise<boolean> {
+    const result = await db.delete(customerCompanies)
+      .where(and(eq(customerCompanies.id, id), eq(customerCompanies.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async deactivateCustomerCompany(companyId: string, id: string): Promise<CustomerCompany | undefined> {
+    return this.updateCustomerCompany(companyId, id, { isActive: false });
   }
 }
 

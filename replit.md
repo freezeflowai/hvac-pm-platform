@@ -36,6 +36,13 @@ The application uses a Material Design-inspired typography with the Inter font f
 - **Route Optimization**: Integrates OpenRouteService API for efficient technician routing. Converts addresses to GPS, calculates optimal visiting order, and visualizes routes on an interactive Leaflet map. Includes starting location input and smart reordering. Requires `OPENROUTESERVICE_API_KEY`.
 - **Calendar Cleanup**: Automatic removal of invalid calendar assignments when client PM months are updated, preserving completed jobs.
 - **Platform Admin Impersonation**: Secure system for platform administrators to impersonate company admins for support. Features server-side session storage, time limits, mandatory reason logging, and comprehensive audit trails. Includes an impersonation banner in the UI.
+- **Client Notes System**: Multiple timestamped notes per client with full CRUD operations. Notes display in client report dialog with add/edit/delete capability.
+- **QuickBooks Online (QBO) Sync Infrastructure**: Data model supporting QBO Customer/Sub-Customer hierarchy:
+  - `customer_companies` table: Parent entities mapping to QBO Customers with billing address, QBO sync fields (qboCustomerId, qboSyncToken, qboLastSyncedAt).
+  - `clients` table extended: Added parentCompanyId (FK to customer_companies), billWithParent flag, and QBO sync fields.
+  - QBO Mapper utilities (`server/qbo/mappers.ts`): Bidirectional mapping between app entities and QBO payloads.
+  - QBO Sync Service (`server/qbo/syncService.ts`): Stub implementation for create/update/deactivate sync operations.
+  - API routes for customer companies CRUD with soft delete (deactivate) support.
 
 ## External Dependencies
 

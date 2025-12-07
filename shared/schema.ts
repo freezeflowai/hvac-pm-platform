@@ -108,24 +108,78 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 
+// Customer Companies - Parent entities that map to QBO Customers
+// These represent the corporate entity (e.g. "ABC Holdings Inc")
+export const customerCompanies = pgTable("customer_companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  // Company information
+  name: text("name").notNull(), // Main company name (maps to QBO DisplayName for parent)
+  legalName: text("legal_name"), // Official legal name if different
+  phone: text("phone"),
+  email: text("email"),
+  // Billing address (used for QBO BillAddr)
+  billingStreet: text("billing_street"),
+  billingCity: text("billing_city"),
+  billingProvince: text("billing_province"),
+  billingPostalCode: text("billing_postal_code"),
+  billingCountry: text("billing_country"),
+  // Status
+  isActive: boolean("is_active").notNull().default(true),
+  // QBO sync fields
+  qboCustomerId: text("qbo_customer_id"), // QBO Customer.Id
+  qboSyncToken: text("qbo_sync_token"), // QBO Customer.SyncToken (required for updates)
+  qboLastSyncedAt: timestamp("qbo_last_synced_at"),
+  // Metadata
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertCustomerCompanySchema = createInsertSchema(customerCompanies).omit({
+  id: true,
+  companyId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateCustomerCompanySchema = insertCustomerCompanySchema.partial();
+
+export type InsertCustomerCompany = z.infer<typeof insertCustomerCompanySchema>;
+export type UpdateCustomerCompany = z.infer<typeof updateCustomerCompanySchema>;
+export type CustomerCompany = typeof customerCompanies.$inferSelect;
+
+// Clients (Locations) - Child entities that map to QBO Sub-Customers
+// These represent specific sites/locations (e.g. "Toronto Warehouse")
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // Parent company reference (optional - if null, this is a standalone client)
+  parentCompanyId: varchar("parent_company_id").references(() => customerCompanies.id, { onDelete: "set null" }),
   companyName: text("company_name").notNull(),
-  location: text("location"),
+  location: text("location"), // Location/site name (e.g. "Toronto Warehouse")
+  // Service address
   address: text("address"),
   city: text("city"),
   province: text("province"),
   postalCode: text("postal_code"),
+  // Contact info
   contactName: text("contact_name"),
   email: text("email"),
   phone: text("phone"),
   roofLadderCode: text("roof_ladder_code"),
   notes: text("notes"),
+  // PM scheduling
   selectedMonths: integer("selected_months").array().notNull(),
   inactive: boolean("inactive").notNull().default(false),
   nextDue: text("next_due").notNull(),
+  // QBO sync fields
+  billWithParent: boolean("bill_with_parent").notNull().default(true), // Maps to QBO "Bill with parent"
+  qboCustomerId: text("qbo_customer_id"), // QBO Sub-Customer.Id
+  qboParentCustomerId: text("qbo_parent_customer_id"), // QBO parent Customer.Id (mirrors QBO ParentRef)
+  qboSyncToken: text("qbo_sync_token"), // QBO Sub-Customer.SyncToken
+  qboLastSyncedAt: timestamp("qbo_last_synced_at"),
+  // Metadata
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 

@@ -9,7 +9,7 @@ import { sendInvitationEmail } from "./emailService";
 import { impersonationService } from "./impersonationService";
 import { auditService } from "./auditService";
 import { requirePlatformAdmin, blockImpersonation } from "./impersonationMiddleware";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, insertJobNoteSchema, updateJobNoteSchema, insertClientNoteSchema, updateClientNoteSchema, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, insertJobNoteSchema, updateJobNoteSchema, insertClientNoteSchema, updateClientNoteSchema, insertCustomerCompanySchema, updateCustomerCompanySchema, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
 import { db } from "./db";
@@ -2356,6 +2356,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Upload image error:', error);
       res.status(500).json({ error: "Failed to upload image" });
+    }
+  });
+
+  // Customer Companies routes (QBO Parent Companies)
+  app.get("/api/customer-companies", isAuthenticated, async (req, res) => {
+    try {
+      const companies = await storage.getCustomerCompanies(req.user!.companyId);
+      res.json(companies);
+    } catch (error) {
+      console.error('Get customer companies error:', error);
+      res.status(500).json({ error: "Failed to get customer companies" });
+    }
+  });
+
+  app.get("/api/customer-companies/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const company = await storage.getCustomerCompany(req.user!.companyId, id);
+      if (!company) {
+        return res.status(404).json({ error: "Customer company not found" });
+      }
+      res.json(company);
+    } catch (error) {
+      console.error('Get customer company error:', error);
+      res.status(500).json({ error: "Failed to get customer company" });
+    }
+  });
+
+  app.post("/api/customer-companies", isAuthenticated, async (req, res) => {
+    try {
+      const data = insertCustomerCompanySchema.parse(req.body);
+      const company = await storage.createCustomerCompany(req.user!.companyId, data);
+      res.status(201).json(company);
+    } catch (error) {
+      console.error('Create customer company error:', error);
+      res.status(500).json({ error: "Failed to create customer company" });
+    }
+  });
+
+  app.patch("/api/customer-companies/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const data = updateCustomerCompanySchema.parse(req.body);
+      const company = await storage.updateCustomerCompany(req.user!.companyId, id, data);
+      if (!company) {
+        return res.status(404).json({ error: "Customer company not found" });
+      }
+      res.json(company);
+    } catch (error) {
+      console.error('Update customer company error:', error);
+      res.status(500).json({ error: "Failed to update customer company" });
+    }
+  });
+
+  app.delete("/api/customer-companies/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteCustomerCompany(req.user!.companyId, id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Customer company not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete customer company error:', error);
+      res.status(500).json({ error: "Failed to delete customer company" });
+    }
+  });
+
+  // Deactivate (soft delete) for QBO sync
+  app.post("/api/customer-companies/:id/deactivate", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const company = await storage.deactivateCustomerCompany(req.user!.companyId, id);
+      if (!company) {
+        return res.status(404).json({ error: "Customer company not found" });
+      }
+      res.json(company);
+    } catch (error) {
+      console.error('Deactivate customer company error:', error);
+      res.status(500).json({ error: "Failed to deactivate customer company" });
     }
   });
 
