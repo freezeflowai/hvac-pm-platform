@@ -329,10 +329,10 @@ export default function Jobs() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <Button
-            variant={activeFilter === "all" ? "default" : "ghost"}
+            variant={activeFilter === "all" ? "default" : "outline"}
             size="sm"
             onClick={() => setActiveFilter("all")}
-            className={activeFilter !== "all" ? "opacity-50" : ""}
+            className={activeFilter !== "all" ? "opacity-60" : ""}
             data-testid="button-filter-status-all"
           >
             All ({totalCount})
@@ -344,10 +344,10 @@ export default function Jobs() {
             return (
               <Button
                 key={option.value}
-                variant={isActive ? activeVariant : "ghost"}
+                variant={isActive ? activeVariant : "outline"}
                 size="sm"
                 onClick={() => setActiveFilter(option.value)}
-                className={!isActive ? "opacity-50" : ""}
+                className={!isActive ? "opacity-60" : ""}
                 data-testid={`button-filter-status-${option.value}`}
               >
                 {option.label} ({count})
