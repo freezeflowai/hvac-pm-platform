@@ -118,25 +118,16 @@ function AppContent() {
     queryKey: ["/api/calendar/unscheduled"],
     enabled: Boolean(user?.id),
   });
-  
-  // Fetch overdue assignments (past month incomplete assignments)
-  const { data: overdueAssignments = [] } = useQuery<any[]>({
-    queryKey: ["/api/calendar/overdue"],
-    enabled: Boolean(user?.id),
-  });
 
-  // Count past-month unscheduled items plus past-month overdue scheduled items
+  // Count past-month unscheduled items from the backlog (within the 3-month window)
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
   
-  // Past-month items from unscheduled backlog
-  const pastUnscheduledCount = unscheduledBacklog.filter(item => 
+  // Past-month items from unscheduled backlog (previous month only, since that's in the window)
+  const totalOverdueCount = unscheduledBacklog.filter(item => 
     item.year < currentYear || (item.year === currentYear && item.month < currentMonth)
   ).length;
-  
-  // Combine with overdue assignments from past months
-  const totalOverdueCount = pastUnscheduledCount + overdueAssignments.length;
   
   const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
