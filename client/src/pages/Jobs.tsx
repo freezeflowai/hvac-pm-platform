@@ -319,11 +319,22 @@ export default function Jobs() {
     });
   };
 
+  const toggleAll = () => {
+    if (activeFilters.size === ALL_STATUSES.length) {
+      setActiveFilters(new Set());
+    } else {
+      setActiveFilters(new Set(ALL_STATUSES));
+    }
+  };
+
+  const allSelected = activeFilters.size === ALL_STATUSES.length;
+  const totalCount = statusCounts.late + statusCounts.upcoming + statusCounts.completed + statusCounts.unscheduled;
+
   const statusFilterOptions: { value: JobStatusFilter; label: string; variant: "default" | "destructive" | "secondary" | "outline" }[] = [
     { value: "late", label: "Late", variant: "destructive" },
     { value: "upcoming", label: "Upcoming", variant: "default" },
-    { value: "completed", label: "Completed", variant: "secondary" },
     { value: "unscheduled", label: "Unscheduled", variant: "outline" },
+    { value: "completed", label: "Completed", variant: "secondary" },
   ];
 
   if (isCalendarLoading) {
@@ -338,6 +349,15 @@ export default function Jobs() {
     <div className="p-6 space-y-6" data-testid="jobs-page">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">
+          <Button
+            variant={allSelected ? "default" : "ghost"}
+            size="sm"
+            onClick={toggleAll}
+            className={!allSelected ? "opacity-50" : ""}
+            data-testid="button-filter-status-all"
+          >
+            All ({totalCount})
+          </Button>
           {statusFilterOptions.map(option => {
             const isActive = activeFilters.has(option.value);
             const count = statusCounts[option.value];
