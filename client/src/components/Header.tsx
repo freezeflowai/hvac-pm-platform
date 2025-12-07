@@ -199,16 +199,17 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
                 </Command>
               </PopoverContent>
             </Popover>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={onAddClient}
-              data-testid="button-add-client"
-              className="h-8 gap-1.5"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Add Client</span>
-            </Button>
+            <Link href="/add-client">
+              <Button
+                variant="default"
+                size="sm"
+                data-testid="button-add-client"
+                className="h-8 gap-1.5"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Client</span>
+              </Button>
+            </Link>
             <Button
               variant="ghost"
               size="icon"
