@@ -401,3 +401,30 @@ export const updateJobNoteSchema = z.object({
 export type InsertJobNote = z.infer<typeof insertJobNoteSchema>;
 export type UpdateJobNote = z.infer<typeof updateJobNoteSchema>;
 export type JobNote = typeof jobNotes.$inferSelect;
+
+// Client notes table - stores multiple timestamped notes per client
+export const clientNotes = pgTable("client_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  noteText: text("note_text").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertClientNoteSchema = createInsertSchema(clientNotes).omit({
+  id: true,
+  companyId: true,
+  userId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateClientNoteSchema = z.object({
+  noteText: z.string().optional(),
+});
+
+export type InsertClientNote = z.infer<typeof insertClientNoteSchema>;
+export type UpdateClientNote = z.infer<typeof updateClientNoteSchema>;
+export type ClientNote = typeof clientNotes.$inferSelect;

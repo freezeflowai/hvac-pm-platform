@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Printer, Pencil } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Printer, Pencil, Plus, Trash2, Check, X } from "lucide-react";
 import { format } from "date-fns";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import EditClientDialog from "./EditClientDialog";
 
 interface Part {
@@ -59,6 +61,16 @@ interface ClientReportData {
   equipment: Equipment[];
 }
 
+interface ClientNote {
+  id: string;
+  clientId: string;
+  companyId: string;
+  userId: string;
+  noteText: string;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
 interface ClientReportDialogProps {
   clientId: string | null;
   open: boolean;
@@ -83,6 +95,10 @@ const getPartDisplayName = (part: Part): string => {
 
 export default function ClientReportDialog({ clientId, open, onOpenChange }: ClientReportDialogProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [newNoteText, setNewNoteText] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editNoteText, setEditNoteText] = useState("");
 
   const { data: reportData, isLoading } = useQuery<ClientReportData>({
     queryKey: ['/api/clients', clientId, 'report'],
@@ -98,6 +114,61 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
     },
     enabled: !!clientId && open,
     retry: false,
+  });
+
+  const { data: clientNotes = [], isLoading: isLoadingNotes } = useQuery<ClientNote[]>({
+    queryKey: ['/api/client-notes', clientId],
+    queryFn: async () => {
+      const res = await fetch(`/api/client-notes/${clientId}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to fetch client notes: ${res.status}`);
+      }
+      return res.json();
+    },
+    enabled: !!clientId && open,
+  });
+
+  const createNoteMutation = useMutation({
+    mutationFn: async (noteText: string) => {
+      return apiRequest('/api/client-notes', {
+        method: 'POST',
+        body: JSON.stringify({ clientId, noteText }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/client-notes', clientId] });
+      setNewNoteText("");
+      setIsAddingNote(false);
+    },
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ id, noteText }: { id: string; noteText: string }) => {
+      return apiRequest(`/api/client-notes/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ noteText }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/client-notes', clientId] });
+      setEditingNoteId(null);
+      setEditNoteText("");
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/client-notes/${id}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/client-notes', clientId] });
+    },
   });
 
   const handlePrint = () => {
@@ -311,6 +382,148 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No equipment tracked for this client.</p>
+              )}
+            </div>
+
+            {/* Client Notes Section */}
+            <div className="space-y-3 border-t pt-6">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-xl font-bold">Notes</h2>
+                {!isAddingNote && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsAddingNote(true)}
+                    data-testid="button-add-note"
+                    className="gap-1"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Note
+                  </Button>
+                )}
+              </div>
+
+              {isAddingNote && (
+                <div className="space-y-2 p-3 border rounded-md bg-muted/50">
+                  <Textarea
+                    placeholder="Enter note..."
+                    value={newNoteText}
+                    onChange={(e) => setNewNoteText(e.target.value)}
+                    data-testid="input-new-note"
+                    rows={3}
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setIsAddingNote(false);
+                        setNewNoteText("");
+                      }}
+                      data-testid="button-cancel-note"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => createNoteMutation.mutate(newNoteText)}
+                      disabled={!newNoteText.trim() || createNoteMutation.isPending}
+                      data-testid="button-save-note"
+                    >
+                      <Check className="h-4 w-4 mr-1" />
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {isLoadingNotes ? (
+                <p className="text-sm text-muted-foreground">Loading notes...</p>
+              ) : clientNotes.length > 0 ? (
+                <div className="space-y-3">
+                  {clientNotes.map((note) => (
+                    <div
+                      key={note.id}
+                      className="p-3 border rounded-md"
+                      data-testid={`note-item-${note.id}`}
+                    >
+                      {editingNoteId === note.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={editNoteText}
+                            onChange={(e) => setEditNoteText(e.target.value)}
+                            data-testid="input-edit-note"
+                            rows={3}
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingNoteId(null);
+                                setEditNoteText("");
+                              }}
+                              data-testid="button-cancel-edit"
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => updateNoteMutation.mutate({ id: note.id, noteText: editNoteText })}
+                              disabled={!editNoteText.trim() || updateNoteMutation.isPending}
+                              data-testid="button-save-edit"
+                            >
+                              <Check className="h-4 w-4 mr-1" />
+                              Save
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-base whitespace-pre-wrap" data-testid={`text-note-${note.id}`}>
+                              {note.noteText}
+                            </p>
+                            <div className="flex gap-1 shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  setEditingNoteId(note.id);
+                                  setEditNoteText(note.noteText);
+                                }}
+                                data-testid={`button-edit-note-${note.id}`}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive hover:text-destructive"
+                                onClick={() => deleteNoteMutation.mutate(note.id)}
+                                disabled={deleteNoteMutation.isPending}
+                                data-testid={`button-delete-note-${note.id}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {format(new Date(note.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                            {note.updatedAt && note.updatedAt !== note.createdAt && (
+                              <span> (edited {format(new Date(note.updatedAt), "MMM d, yyyy")})</span>
+                            )}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No notes for this client.</p>
               )}
             </div>
           </div>

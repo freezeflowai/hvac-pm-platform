@@ -9,7 +9,7 @@ import { sendInvitationEmail } from "./emailService";
 import { impersonationService } from "./impersonationService";
 import { auditService } from "./auditService";
 import { requirePlatformAdmin, blockImpersonation } from "./impersonationMiddleware";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, insertJobNoteSchema, updateJobNoteSchema, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, insertJobNoteSchema, updateJobNoteSchema, insertClientNoteSchema, updateClientNoteSchema, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
 import { db } from "./db";
@@ -2356,6 +2356,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Upload image error:', error);
       res.status(500).json({ error: "Failed to upload image" });
+    }
+  });
+
+  // Client notes routes
+  app.get("/api/client-notes/:clientId", isAuthenticated, async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      const notes = await storage.getClientNotes(req.user!.companyId, clientId);
+      res.json(notes);
+    } catch (error) {
+      console.error('Get client notes error:', error);
+      res.status(500).json({ error: "Failed to get client notes" });
+    }
+  });
+
+  app.post("/api/client-notes", isAuthenticated, async (req, res) => {
+    try {
+      const noteData = insertClientNoteSchema.parse(req.body);
+      const note = await storage.createClientNote(req.user!.companyId, req.user!.id, noteData);
+      res.status(201).json(note);
+    } catch (error) {
+      console.error('Create client note error:', error);
+      res.status(500).json({ error: "Failed to create client note" });
+    }
+  });
+
+  app.patch("/api/client-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const noteData = updateClientNoteSchema.parse(req.body);
+      const note = await storage.updateClientNote(req.user!.companyId, id, noteData);
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error('Update client note error:', error);
+      res.status(500).json({ error: "Failed to update client note" });
+    }
+  });
+
+  app.delete("/api/client-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteClientNote(req.user!.companyId, id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete client note error:', error);
+      res.status(500).json({ error: "Failed to delete client note" });
     }
   });
 

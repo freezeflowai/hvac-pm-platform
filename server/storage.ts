@@ -22,7 +22,10 @@ import {
   type InsertFeedback,
   type JobNote,
   type InsertJobNote,
-  type UpdateJobNote
+  type UpdateJobNote,
+  type ClientNote,
+  type InsertClientNote,
+  type UpdateClientNote
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { STANDARD_BELTS, STANDARD_FILTERS } from "./seed-data";
@@ -1568,7 +1571,7 @@ export class MemStorage implements IStorage {
 }
 
 import { db } from './db';
-import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback, invitationTokens, companies, jobNotes, companyCounters } from '@shared/schema';
+import { users, clients, parts, clientParts, maintenanceRecords, passwordResetTokens, equipment, companySettings, calendarAssignments, feedback, invitationTokens, companies, jobNotes, clientNotes, companyCounters } from '@shared/schema';
 import { eq, and, desc, inArray, sql, or, lt } from 'drizzle-orm';
 
 export class DbStorage implements IStorage {
@@ -3014,6 +3017,50 @@ export class DbStorage implements IStorage {
   async deleteJobNote(companyId: string, id: string): Promise<boolean> {
     const result = await db.delete(jobNotes)
       .where(and(eq(jobNotes.id, id), eq(jobNotes.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Client notes methods
+  async getClientNotes(companyId: string, clientId: string): Promise<ClientNote[]> {
+    return db.select()
+      .from(clientNotes)
+      .where(and(eq(clientNotes.companyId, companyId), eq(clientNotes.clientId, clientId)))
+      .orderBy(desc(clientNotes.createdAt));
+  }
+
+  async getClientNote(companyId: string, id: string): Promise<ClientNote | undefined> {
+    const result = await db.select()
+      .from(clientNotes)
+      .where(and(eq(clientNotes.id, id), eq(clientNotes.companyId, companyId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createClientNote(companyId: string, userId: string, note: InsertClientNote): Promise<ClientNote> {
+    const result = await db.insert(clientNotes).values({
+      companyId,
+      userId,
+      clientId: note.clientId,
+      noteText: note.noteText,
+    }).returning();
+    return result[0];
+  }
+
+  async updateClientNote(companyId: string, id: string, note: UpdateClientNote): Promise<ClientNote | undefined> {
+    const result = await db.update(clientNotes)
+      .set({
+        ...note,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(clientNotes.id, id), eq(clientNotes.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteClientNote(companyId: string, id: string): Promise<boolean> {
+    const result = await db.delete(clientNotes)
+      .where(and(eq(clientNotes.id, id), eq(clientNotes.companyId, companyId)))
       .returning();
     return result.length > 0;
   }
