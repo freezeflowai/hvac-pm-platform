@@ -569,7 +569,8 @@ export default function Dashboard() {
   const handleEditClient = async (id: string) => {
     // Extract clientId from composite ID if needed (for recently completed items)
     const clientId = id.includes('|') ? id.split('|')[0] : id;
-    setLocation(`/edit-client/${clientId}`);
+    // Navigate to new client detail page
+    setLocation(`/clients/${clientId}`);
   };
 
   const handleDeleteClient = async (id: string) => {

@@ -192,8 +192,8 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
   };
 
   const handleEditClick = (client: Client) => {
-    setClientToEdit(client);
-    setEditDialogOpen(true);
+    // Navigate to the new client detail page
+    setLocation(`/clients/${client.id}`);
   };
 
   const handleEditSaved = (clientId: string) => {

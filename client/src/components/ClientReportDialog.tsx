@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Printer, Pencil, Plus, Trash2, Check, X } from "lucide-react";
 import { format } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import EditClientDialog from "./EditClientDialog";
 
 interface Part {
   id: string;
@@ -94,7 +94,6 @@ const getPartDisplayName = (part: Part): string => {
 };
 
 export default function ClientReportDialog({ clientId, open, onOpenChange }: ClientReportDialogProps) {
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [newNoteText, setNewNoteText] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -171,19 +170,18 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
     },
   });
 
+  const [, setLocation] = useLocation();
+
   const handlePrint = () => {
     window.print();
   };
 
   const handleEdit = () => {
     if (reportData?.client) {
-      setEditDialogOpen(true);
+      // Navigate to new client detail page
+      onOpenChange(false);
+      setLocation(`/clients/${reportData.client.id}`);
     }
-  };
-
-  const handleEditSaved = (clientId: string) => {
-    setEditDialogOpen(false);
-    onOpenChange(false);
   };
 
   if (!clientId) return null;
@@ -534,14 +532,6 @@ export default function ClientReportDialog({ clientId, open, onOpenChange }: Cli
         )}
       </DialogContent>
 
-      {reportData?.client && (
-        <EditClientDialog
-          client={reportData.client}
-          open={editDialogOpen}
-          onOpenChange={setEditDialogOpen}
-          onSaved={handleEditSaved}
-        />
-      )}
     </Dialog>
   );
 }
