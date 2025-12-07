@@ -29,19 +29,11 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Client | null>(null);
 
-  // Fetch all locations (clients) for this company
-  // If we have a parentCompanyId, fetch locations under that parent
-  // Otherwise, fetch all clients for this company
+  // Fetch locations (clients) under this parent company
+  // Uses dedicated endpoint that filters server-side by parentCompanyId
   const { data: locations = [], isLoading, error } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
-    select: (clients) => {
-      if (parentCompanyId) {
-        // Filter to locations under this parent company
-        return clients.filter(c => c.parentCompanyId === parentCompanyId);
-      }
-      // Fallback: filter by companyId
-      return clients.filter(c => c.companyId === companyId);
-    },
+    queryKey: ["/api/customer-companies", parentCompanyId, "locations"],
+    enabled: Boolean(parentCompanyId),
   });
 
   // Toggle active status mutation
@@ -51,6 +43,7 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
       return await res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-companies", parentCompanyId, "locations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Location updated",
@@ -86,6 +79,7 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
   const handleFormSuccess = () => {
     setIsFormOpen(false);
     setEditingLocation(null);
+    queryClient.invalidateQueries({ queryKey: ["/api/customer-companies", parentCompanyId, "locations"] });
     queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
   };
 
@@ -109,6 +103,20 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
         <CardContent className="py-12">
           <div className="text-center text-destructive">
             <p>Failed to load locations. Please try again.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // If no parentCompanyId is set, show informational message
+  if (!parentCompanyId) {
+    return (
+      <Card>
+        <CardContent className="py-12">
+          <div className="text-center text-muted-foreground">
+            <p>This client is not linked to a parent company.</p>
+            <p className="text-sm mt-2">Locations are organized under parent companies for QuickBooks synchronization.</p>
           </div>
         </CardContent>
       </Card>

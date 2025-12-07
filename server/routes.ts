@@ -2384,6 +2384,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get locations (clients) under a specific parent company
+  app.get("/api/customer-companies/:parentId/locations", isAuthenticated, async (req, res) => {
+    try {
+      const { parentId } = req.params;
+      const locations = await storage.getClientsByParentCompany(req.user!.companyId, parentId);
+      res.json(locations);
+    } catch (error) {
+      console.error('Get locations by parent company error:', error);
+      res.status(500).json({ error: "Failed to get locations" });
+    }
+  });
+
   app.post("/api/customer-companies", isAuthenticated, async (req, res) => {
     try {
       const data = insertCustomerCompanySchema.parse(req.body);

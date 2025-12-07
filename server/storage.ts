@@ -403,6 +403,12 @@ export class MemStorage implements IStorage {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
+  async getClientsByParentCompany(companyId: string, parentCompanyId: string): Promise<Client[]> {
+    return Array.from(this.clients.values())
+      .filter(client => client.companyId === companyId && client.parentCompanyId === parentCompanyId)
+      .sort((a, b) => a.companyName.localeCompare(b.companyName));
+  }
+
   async createClient(companyId: string, userId: string, insertClient: InsertClient): Promise<Client> {
     // Validate user belongs to company
     const isValid = await this.validateUserInCompany(userId, companyId);
