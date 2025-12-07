@@ -43,6 +43,8 @@ The application uses a Material Design-inspired typography with the Inter font f
   - QBO Mapper utilities (`server/qbo/mappers.ts`): Bidirectional mapping between app entities and QBO payloads.
   - QBO Sync Service (`server/qbo/syncService.ts`): Stub implementation for create/update/deactivate sync operations.
   - API routes for customer companies CRUD with soft delete (deactivate) support.
+  - Transactional storage method `createCustomerCompanyWithClient`: Atomic creation of CustomerCompany + Client + ClientParts using db.transaction() for rollback safety.
+  - API endpoint `POST /api/clients/with-company`: Creates parent Company and child Location together with upfront validation and proper QBO field mapping.
 - **Invoice System with QBO Integration**: Complete invoicing system supporting QuickBooks Online synchronization:
   - `invoices` table: Full invoice data model with status workflow (draft, sent, paid, void, deleted), QBO sync fields (qboInvoiceId, qboSyncToken, qboLastSyncedAt, qboDocNumber), billing references to CustomerCompany or Location.
   - `invoice_lines` table: Detailed line items with description, quantity, unitPrice, lineSubtotal, tax codes, and QBO item references.
