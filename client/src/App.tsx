@@ -146,7 +146,8 @@ function AppContent() {
   const isTechnicianPage = location === '/technician' || location === '/daily-parts';
 
   const handleClientSelect = (clientId: string) => {
-    window.dispatchEvent(new CustomEvent('openClientDialog', { detail: { clientId } }));
+    // Navigate directly to client detail page
+    setLocation(`/clients/${clientId}`);
   };
 
   const handleDashboardClick = () => {

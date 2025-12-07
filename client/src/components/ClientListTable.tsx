@@ -187,8 +187,8 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
   };
 
   const handleRowClick = (clientId: string) => {
-    setReportClientId(clientId);
-    setReportDialogOpen(true);
+    // Navigate to client detail page
+    setLocation(`/clients/${clientId}`);
   };
 
   const handleEditClick = (client: Client) => {

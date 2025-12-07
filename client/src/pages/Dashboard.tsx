@@ -275,7 +275,8 @@ export default function Dashboard() {
   const handleSelectClient = (clientId: string) => {
     setSearchQuery("");
     setSearchOpen(false);
-    setReportDialogClientId(clientId);
+    // Navigate to client detail page
+    setLocation(`/clients/${clientId}`);
   };
 
   // Handle clicking on a PM to open job dialog

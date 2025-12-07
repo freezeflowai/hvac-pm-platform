@@ -4,7 +4,6 @@ import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, u
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
-import ClientReportDialog from "@/components/ClientReportDialog";
 import { JobDetailDialog } from "@/components/JobDetailDialog";
 import { RouteOptimizationDialog } from "@/components/RouteOptimizationDialog";
 import { PartsDialog } from "@/components/PartsDialog";
@@ -352,7 +351,7 @@ export default function Calendar() {
   const [partsDialogTitle, setPartsDialogTitle] = useState("");
   const [partsDialogParts, setPartsDialogParts] = useState<Array<{ description: string; quantity: number }>>([]);
   const { toast } = useToast();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
   const weeklyScrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollDoneRef = useRef(false);
@@ -893,7 +892,8 @@ export default function Calendar() {
     const handleAddClient = () => setAddClientDialogOpen(true);
     const handleOpenClient = (e: Event) => {
       const customEvent = e as CustomEvent;
-      setReportDialogClientId(customEvent.detail.clientId);
+      // Navigate to client detail page instead of opening dialog
+      setLocation(`/clients/${customEvent.detail.clientId}`);
     };
 
     window.addEventListener('openAddClientDialog', handleAddClient);
@@ -903,7 +903,7 @@ export default function Calendar() {
       window.removeEventListener('openAddClientDialog', handleAddClient);
       window.removeEventListener('openClientDialog', handleOpenClient);
     };
-  }, []);
+  }, [setLocation]);
 
   // Reset scroll flag when switching away from weekly view
   useEffect(() => {
@@ -1603,11 +1603,6 @@ export default function Calendar() {
         }}
       />
 
-      <ClientReportDialog 
-        clientId={reportDialogClientId}
-        open={!!reportDialogClientId}
-        onOpenChange={(open) => !open && setReportDialogClientId(null)}
-      />
 
       <RouteOptimizationDialog
         open={routeOptimizationOpen}
