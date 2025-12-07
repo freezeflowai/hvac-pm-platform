@@ -28,6 +28,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
+import QuickAddClientModal from "@/components/QuickAddClientModal";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Search, Plus, Settings, AlertTriangle, X, ChevronRight } from "lucide-react";
@@ -118,6 +119,7 @@ function AppContent() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [overdueAlertMinimized, setOverdueAlertMinimized] = useState(false);
+  const [addClientModalOpen, setAddClientModalOpen] = useState(false);
 
   // Fetch unscheduled backlog to check for past-month items
   const { data: unscheduledBacklog = [] } = useQuery<any[]>({
@@ -153,7 +155,12 @@ function AppContent() {
   };
 
   const handleAddClient = () => {
-    window.dispatchEvent(new CustomEvent('openAddClientDialog'));
+    setAddClientModalOpen(true);
+  };
+
+  const handleClientCreated = (clientId: string) => {
+    setAddClientModalOpen(false);
+    setLocation(`/clients/${clientId}`);
   };
 
   const filteredClients = allClients.filter(client =>
@@ -284,6 +291,11 @@ function AppContent() {
           </main>
         </div>
       </div>
+      <QuickAddClientModal
+        open={addClientModalOpen}
+        onOpenChange={setAddClientModalOpen}
+        onSuccess={handleClientCreated}
+      />
     </SidebarProvider>
   );
 }
