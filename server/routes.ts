@@ -4036,6 +4036,231 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ================================
+  // LOCATION EQUIPMENT API ENDPOINTS
+  // ================================
+  
+  // Get location equipment
+  app.get("/api/locations/:locationId/equipment", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      const equipment = await storage.getLocationEquipment(req.params.locationId);
+      res.json(equipment);
+    } catch (error) {
+      console.error('Get location equipment error:', error);
+      res.status(500).json({ error: "Failed to get location equipment" });
+    }
+  });
+
+  // Create location equipment
+  app.post("/api/locations/:locationId/equipment", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      if (!req.body.name) {
+        return res.status(400).json({ error: "name is required" });
+      }
+      
+      // Sanitize input - only allow specific fields to prevent tenant boundary violations
+      const sanitizedData = {
+        name: req.body.name,
+        equipmentType: req.body.equipmentType || null,
+        manufacturer: req.body.manufacturer || null,
+        modelNumber: req.body.modelNumber || null,
+        serialNumber: req.body.serialNumber || null,
+        tagNumber: req.body.tagNumber || null,
+        installDate: req.body.installDate || null,
+        warrantyExpiry: req.body.warrantyExpiry || null,
+        notes: req.body.notes || null,
+      };
+      
+      const equipment = await storage.createLocationEquipment(req.params.locationId, sanitizedData);
+      res.status(201).json(equipment);
+    } catch (error) {
+      console.error('Create location equipment error:', error);
+      res.status(500).json({ error: "Failed to create location equipment" });
+    }
+  });
+
+  // Update location equipment
+  app.put("/api/locations/:locationId/equipment/:equipmentId", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      const existingEquipment = await storage.getLocationEquipmentItem(req.params.equipmentId);
+      if (!existingEquipment || existingEquipment.locationId !== req.params.locationId) {
+        return res.status(404).json({ error: "Equipment not found" });
+      }
+      
+      // Sanitize input - only allow specific fields to prevent tenant boundary violations
+      const sanitizedData: Record<string, unknown> = {};
+      if (req.body.name !== undefined) sanitizedData.name = req.body.name;
+      if (req.body.equipmentType !== undefined) sanitizedData.equipmentType = req.body.equipmentType;
+      if (req.body.manufacturer !== undefined) sanitizedData.manufacturer = req.body.manufacturer;
+      if (req.body.modelNumber !== undefined) sanitizedData.modelNumber = req.body.modelNumber;
+      if (req.body.serialNumber !== undefined) sanitizedData.serialNumber = req.body.serialNumber;
+      if (req.body.tagNumber !== undefined) sanitizedData.tagNumber = req.body.tagNumber;
+      if (req.body.installDate !== undefined) sanitizedData.installDate = req.body.installDate;
+      if (req.body.warrantyExpiry !== undefined) sanitizedData.warrantyExpiry = req.body.warrantyExpiry;
+      if (req.body.notes !== undefined) sanitizedData.notes = req.body.notes;
+      
+      const updated = await storage.updateLocationEquipment(req.params.equipmentId, sanitizedData);
+      res.json(updated);
+    } catch (error) {
+      console.error('Update location equipment error:', error);
+      res.status(500).json({ error: "Failed to update location equipment" });
+    }
+  });
+
+  // Delete location equipment (soft delete)
+  app.delete("/api/locations/:locationId/equipment/:equipmentId", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      const existingEquipment = await storage.getLocationEquipmentItem(req.params.equipmentId);
+      if (!existingEquipment || existingEquipment.locationId !== req.params.locationId) {
+        return res.status(404).json({ error: "Equipment not found" });
+      }
+      
+      const deleted = await storage.deleteLocationEquipment(req.params.equipmentId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Equipment not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete location equipment error:', error);
+      res.status(500).json({ error: "Failed to delete location equipment" });
+    }
+  });
+
+  // Get single equipment item with service history
+  app.get("/api/locations/:locationId/equipment/:equipmentId", isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getClient(req.user!.companyId, req.params.locationId);
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+      
+      const equipment = await storage.getLocationEquipmentItem(req.params.equipmentId);
+      if (!equipment || equipment.locationId !== req.params.locationId) {
+        return res.status(404).json({ error: "Equipment not found" });
+      }
+      
+      const serviceHistory = await storage.getEquipmentServiceHistory(req.params.equipmentId);
+      res.json({ equipment, serviceHistory });
+    } catch (error) {
+      console.error('Get equipment details error:', error);
+      res.status(500).json({ error: "Failed to get equipment details" });
+    }
+  });
+
+  // ================================
+  // JOB EQUIPMENT API ENDPOINTS
+  // ================================
+  
+  // Get job equipment
+  app.get("/api/jobs/:jobId/equipment", isAuthenticated, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.user!.companyId, req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      const equipment = await storage.getJobEquipment(req.params.jobId);
+      res.json(equipment);
+    } catch (error) {
+      console.error('Get job equipment error:', error);
+      res.status(500).json({ error: "Failed to get job equipment" });
+    }
+  });
+
+  // Add equipment to job
+  app.post("/api/jobs/:jobId/equipment", isAuthenticated, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.user!.companyId, req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      if (!req.body.equipmentId) {
+        return res.status(400).json({ error: "equipmentId is required" });
+      }
+      
+      // Verify equipment belongs to the same location as the job
+      const equipment = await storage.getLocationEquipmentItem(req.body.equipmentId);
+      if (!equipment || equipment.locationId !== job.locationId) {
+        return res.status(400).json({ error: "Equipment must belong to the same location as the job" });
+      }
+      
+      // Sanitize input - only allow specific fields to prevent tenant boundary violations
+      const sanitizedData = {
+        equipmentId: req.body.equipmentId,
+        notes: req.body.notes || null,
+      };
+      
+      const jobEquipment = await storage.createJobEquipment(req.params.jobId, sanitizedData);
+      res.status(201).json(jobEquipment);
+    } catch (error) {
+      console.error('Add job equipment error:', error);
+      res.status(500).json({ error: "Failed to add equipment to job" });
+    }
+  });
+
+  // Update job equipment notes
+  app.put("/api/jobs/:jobId/equipment/:jobEquipmentId", isAuthenticated, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.user!.companyId, req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      // Sanitize input - only allow notes field to be updated
+      const sanitizedData: Record<string, unknown> = {};
+      if (req.body.notes !== undefined) sanitizedData.notes = req.body.notes;
+      
+      const updated = await storage.updateJobEquipment(req.params.jobEquipmentId, sanitizedData);
+      if (!updated) {
+        return res.status(404).json({ error: "Job equipment not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error('Update job equipment error:', error);
+      res.status(500).json({ error: "Failed to update job equipment" });
+    }
+  });
+
+  // Remove equipment from job
+  app.delete("/api/jobs/:jobId/equipment/:jobEquipmentId", isAuthenticated, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.user!.companyId, req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      const deleted = await storage.deleteJobEquipment(req.params.jobEquipmentId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Job equipment not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete job equipment error:', error);
+      res.status(500).json({ error: "Failed to remove equipment from job" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -15,6 +15,7 @@ import { Plus, Pencil, Trash2, Loader2, Calendar, Package, Wrench, Save } from "
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { LocationPMPlan, LocationPMPartTemplate, Part } from "@shared/schema";
+import LocationEquipmentSection from "./LocationEquipmentSection";
 
 interface LocationPMSectionProps {
   locationId: string;
@@ -526,6 +527,9 @@ export default function LocationPMSection({ locationId }: LocationPMSectionProps
           </CardContent>
         </Card>
       )}
+
+      {/* Equipment Section */}
+      <LocationEquipmentSection locationId={locationId} />
     </div>
   );
 }

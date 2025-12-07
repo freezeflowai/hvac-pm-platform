@@ -25,6 +25,7 @@ import {
   DollarSign,
   Repeat
 } from "lucide-react";
+import JobEquipmentSection from "@/components/JobEquipmentSection";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -399,6 +400,8 @@ export default function JobDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          <JobEquipmentSection jobId={job.id} locationId={job.locationId} />
         </div>
 
         <div className="space-y-6">

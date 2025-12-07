@@ -825,18 +825,70 @@ export type UpdateLocationPMPlan = z.infer<typeof updateLocationPMPlanSchema>;
 export type LocationPMPlan = typeof locationPMPlans.$inferSelect;
 
 // ============================================================================
+// LOCATION EQUIPMENT - Equipment tracked per location
+// ============================================================================
+// Equipment is tracked independently for model/serial/notes.
+// Some equipment might have no PM parts (tracked for service history only).
+// Equipment can be linked to PM parts templates and job parts.
+// When generating PM jobs, if LocationPMPartTemplate has an equipmentId,
+// the created JobPart is tied to that equipment (via JobEquipment).
+// Prepares for future features: Job → Equipment associations, equipment service history.
+export const locationEquipment = pgTable("location_equipment", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  locationId: varchar("location_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // e.g. "RTU #1", "Walk-in Freezer", "Make-up Air #2"
+  equipmentType: text("equipment_type"), // e.g. "RTU", "Furnace", "Freezer"
+  manufacturer: text("manufacturer"),
+  modelNumber: text("model_number"),
+  serialNumber: text("serial_number"),
+  tagNumber: text("tag_number"), // internal asset tag or label
+  installDate: date("install_date"),
+  warrantyExpiry: date("warranty_expiry"),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertLocationEquipmentSchema = createInsertSchema(locationEquipment).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateLocationEquipmentSchema = z.object({
+  name: z.string().optional(),
+  equipmentType: z.string().nullable().optional(),
+  manufacturer: z.string().nullable().optional(),
+  modelNumber: z.string().nullable().optional(),
+  serialNumber: z.string().nullable().optional(),
+  tagNumber: z.string().nullable().optional(),
+  installDate: z.string().nullable().optional(),
+  warrantyExpiry: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type InsertLocationEquipment = z.infer<typeof insertLocationEquipmentSchema>;
+export type UpdateLocationEquipment = z.infer<typeof updateLocationEquipmentSchema>;
+export type LocationEquipment = typeof locationEquipment.$inferSelect;
+
+// ============================================================================
 // LOCATION PM PART TEMPLATE - Parts/filters/belts used at each PM visit
 // ============================================================================
 // These templates are copied into JobPart entries when generating PM jobs.
 // Used for inventory planning: sum quantityPerVisit across all locations for 
 // a given month to project parts demand.
+// If equipmentId is null, the PM part is location-level (applies to site generally).
+// If equipmentId is non-null, the PM part is specific to that equipment.
 export const locationPMPartTemplates = pgTable("location_pm_part_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   locationId: varchar("location_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   productId: varchar("product_id").notNull().references(() => parts.id, { onDelete: "cascade" }),
+  equipmentId: varchar("equipment_id").references(() => locationEquipment.id, { onDelete: "set null" }), // Optional link to specific equipment
   descriptionOverride: text("description_override"), // Custom description for job/invoice
   quantityPerVisit: text("quantity_per_visit").notNull(), // Stored as text for decimal precision
-  equipmentLabel: text("equipment_label"), // e.g. "RTU #1", "Freezer 3"
+  equipmentLabel: text("equipment_label"), // Legacy: e.g. "RTU #1", "Freezer 3" - use equipmentId when possible
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at"),
@@ -850,6 +902,7 @@ export const insertLocationPMPartTemplateSchema = createInsertSchema(locationPMP
 
 export const updateLocationPMPartTemplateSchema = z.object({
   productId: z.string().optional(),
+  equipmentId: z.string().nullable().optional(),
   descriptionOverride: z.string().nullable().optional(),
   quantityPerVisit: z.string().optional(),
   equipmentLabel: z.string().nullable().optional(),
@@ -865,17 +918,19 @@ export type LocationPMPartTemplate = typeof locationPMPartTemplates.$inferSelect
 // ============================================================================
 // When a PM job is generated, LocationPMPartTemplate entries are copied here.
 // Later converted to invoice lines when billing.
+// JobPart.equipmentId is optional and used when parts are clearly tied to a specific equipment.
 export const jobPartSourceEnum = ["pm_template", "added_by_tech", "quoted", "manual"] as const;
 
 export const jobParts = pgTable("job_parts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   jobId: varchar("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
   productId: varchar("product_id").references(() => parts.id, { onDelete: "set null" }),
+  equipmentId: varchar("equipment_id").references(() => locationEquipment.id, { onDelete: "set null" }), // Optional link to equipment
   description: text("description").notNull(),
   quantity: text("quantity").notNull(), // Stored as text for decimal precision
   unitPrice: text("unit_price"), // Stored as text for decimal precision
   source: text("source").notNull().default("manual"), // pm_template, added_by_tech, quoted, manual
-  equipmentLabel: text("equipment_label"), // Copied from PM template or added by tech
+  equipmentLabel: text("equipment_label"), // Legacy: Copied from PM template or added by tech
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at"),
@@ -891,6 +946,7 @@ export const insertJobPartSchema = createInsertSchema(jobParts).omit({
 
 export const updateJobPartSchema = z.object({
   productId: z.string().nullable().optional(),
+  equipmentId: z.string().nullable().optional(),
   description: z.string().optional(),
   quantity: z.string().optional(),
   unitPrice: z.string().nullable().optional(),
@@ -902,3 +958,32 @@ export const updateJobPartSchema = z.object({
 export type InsertJobPart = z.infer<typeof insertJobPartSchema>;
 export type UpdateJobPart = z.infer<typeof updateJobPartSchema>;
 export type JobPart = typeof jobParts.$inferSelect;
+
+// ============================================================================
+// JOB EQUIPMENT - Links jobs to equipment worked on
+// ============================================================================
+// JobEquipment tracks which equipment a job touched, enabling equipment service history.
+// Some jobs may have no equipment linked (general work at the location).
+// Some equipment may never have PM parts but will still appear on jobs for one-off service calls.
+export const jobEquipment = pgTable("job_equipment", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  equipmentId: varchar("equipment_id").notNull().references(() => locationEquipment.id, { onDelete: "cascade" }),
+  notes: text("notes"), // e.g. "worked on condenser section only"
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertJobEquipmentSchema = createInsertSchema(jobEquipment).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateJobEquipmentSchema = z.object({
+  notes: z.string().nullable().optional(),
+});
+
+export type InsertJobEquipment = z.infer<typeof insertJobEquipmentSchema>;
+export type UpdateJobEquipment = z.infer<typeof updateJobEquipmentSchema>;
+export type JobEquipment = typeof jobEquipment.$inferSelect;

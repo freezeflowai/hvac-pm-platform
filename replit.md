@@ -72,6 +72,15 @@ The application uses a Material Design-inspired typography with the Inter font f
   - API endpoints: GET/POST /api/jobs, GET/PATCH/DELETE /api/jobs/:id, POST/GET /api/recurring-series.
   - Frontend: QuickAddJobDialog for job creation, Jobs.tsx list page with status filters and sorting, JobDetailPage.tsx for detailed view and status management.
   - Coexistence: Jobs system works alongside calendarAssignments during migration via optional calendarAssignmentId reference.
+- **Equipment Tracking System**: Location-level equipment registry with job linking for service history:
+  - `location_equipment` table: Equipment assets per location with name, equipmentType, manufacturer, modelNumber, serialNumber, tagNumber, installDate, warrantyExpiry, notes, and isActive soft delete flag.
+  - `job_equipment` table: Many-to-many relationship linking jobs to equipment serviced, with optional notes field.
+  - Equipment types: RTU, Split System, Chiller, Boiler, Furnace, Heat Pump, AHU, VRF, Walk-in Cooler/Freezer, Reach-in Cooler/Freezer, Ice Machine, Exhaust Fan, Makeup Air, Other.
+  - PM template integration: `location_pm_part_templates` and `job_parts` tables have optional equipmentId FK to link parts to specific equipment.
+  - Automatic PM job generation: When generating PM jobs from templates, automatically creates JobEquipment entries and sets JobPart.equipmentId based on template configuration.
+  - Service history tracking: API endpoint `/api/locations/:locationId/equipment/:equipmentId` returns equipment details with linked job history.
+  - Frontend components: `LocationEquipmentSection` (expandable equipment rows with service history), `JobEquipmentSection` (job detail page equipment management).
+  - API endpoints: Full CRUD for `/api/locations/:locationId/equipment`, CRUD for `/api/jobs/:jobId/equipment`.
 
 ## External Dependencies
 

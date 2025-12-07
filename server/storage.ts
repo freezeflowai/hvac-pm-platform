@@ -51,6 +51,12 @@ import {
   type JobPart,
   type InsertJobPart,
   type UpdateJobPart,
+  type LocationEquipment,
+  type InsertLocationEquipment,
+  type UpdateLocationEquipment,
+  type JobEquipment,
+  type InsertJobEquipment,
+  type UpdateJobEquipment,
   customerCompanies,
   invoices,
   invoiceLines,
@@ -60,6 +66,8 @@ import {
   locationPMPlans,
   locationPMPartTemplates,
   jobParts,
+  locationEquipment,
+  jobEquipment,
   parts
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -274,6 +282,22 @@ export interface IStorage {
   
   // PM Job generation
   generatePMJobForLocation(companyId: string, locationId: string, date: Date): Promise<{ job: Job; parts: JobPart[] } | null>;
+  
+  // Location Equipment methods (separate from legacy Equipment)
+  getLocationEquipment(locationId: string): Promise<LocationEquipment[]>;
+  getLocationEquipmentItem(id: string): Promise<LocationEquipment | undefined>;
+  createLocationEquipment(locationId: string, data: InsertLocationEquipment): Promise<LocationEquipment>;
+  updateLocationEquipment(id: string, data: UpdateLocationEquipment): Promise<LocationEquipment | undefined>;
+  deleteLocationEquipment(id: string): Promise<boolean>;
+  
+  // Job Equipment methods (job-equipment associations)
+  getJobEquipment(jobId: string): Promise<(JobEquipment & { equipment: LocationEquipment })[]>;
+  createJobEquipment(jobId: string, data: InsertJobEquipment): Promise<JobEquipment>;
+  updateJobEquipment(id: string, data: UpdateJobEquipment): Promise<JobEquipment | undefined>;
+  deleteJobEquipment(id: string): Promise<boolean>;
+  
+  // Equipment service history
+  getEquipmentServiceHistory(equipmentId: string): Promise<Job[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -297,6 +321,8 @@ export class MemStorage implements IStorage {
   private locationPMPlansMap: Map<string, LocationPMPlan>;
   private locationPMPartTemplatesMap: Map<string, LocationPMPartTemplate>;
   private jobPartsMap: Map<string, JobPart>;
+  private locationEquipmentMap: Map<string, LocationEquipment>;
+  private jobEquipmentMap: Map<string, JobEquipment>;
 
   constructor() {
     this.users = new Map();
@@ -319,6 +345,8 @@ export class MemStorage implements IStorage {
     this.locationPMPlansMap = new Map();
     this.locationPMPartTemplatesMap = new Map();
     this.jobPartsMap = new Map();
+    this.locationEquipmentMap = new Map();
+    this.jobEquipmentMap = new Map();
   }
 
   // User methods
@@ -2133,6 +2161,23 @@ export class MemStorage implements IStorage {
     const pmPartTemplates = await this.getLocationPMParts(locationId);
     const createdParts: JobPart[] = [];
 
+    // Collect unique equipment IDs from templates and auto-link to job
+    const uniqueEquipmentIds = new Set<string>();
+    for (const template of pmPartTemplates) {
+      if (template.equipmentId) {
+        uniqueEquipmentIds.add(template.equipmentId);
+      }
+    }
+    
+    // Create JobEquipment entries for each unique equipment
+    for (const equipmentId of uniqueEquipmentIds) {
+      await this.createJobEquipment(job.id, {
+        jobId: job.id,
+        equipmentId,
+        notes: 'PM visit auto-linked',
+      });
+    }
+
     for (const template of pmPartTemplates) {
       const part = this.parts.get(template.productId);
       const description = template.descriptionOverride || part?.name || part?.description || 'Unknown Part';
@@ -2140,6 +2185,7 @@ export class MemStorage implements IStorage {
       const jobPart = await this.createJobPart(job.id, {
         jobId: job.id,
         productId: template.productId,
+        equipmentId: template.equipmentId || undefined,
         description,
         quantity: template.quantityPerVisit,
         unitPrice: part?.unitPrice || null,
@@ -2150,6 +2196,121 @@ export class MemStorage implements IStorage {
     }
 
     return { job, parts: createdParts };
+  }
+
+  // Location Equipment methods
+  async getLocationEquipment(locationId: string): Promise<LocationEquipment[]> {
+    return Array.from(this.locationEquipmentMap.values())
+      .filter(e => e.locationId === locationId && e.isActive);
+  }
+
+  async getLocationEquipmentItem(id: string): Promise<LocationEquipment | undefined> {
+    return this.locationEquipmentMap.get(id);
+  }
+
+  async createLocationEquipment(locationId: string, data: InsertLocationEquipment): Promise<LocationEquipment> {
+    const id = randomUUID();
+    const equipment: LocationEquipment = {
+      id,
+      locationId,
+      name: data.name,
+      equipmentType: data.equipmentType ?? null,
+      manufacturer: data.manufacturer ?? null,
+      modelNumber: data.modelNumber ?? null,
+      serialNumber: data.serialNumber ?? null,
+      tagNumber: data.tagNumber ?? null,
+      installDate: data.installDate ?? null,
+      warrantyExpiry: data.warrantyExpiry ?? null,
+      notes: data.notes ?? null,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: null,
+    };
+    this.locationEquipmentMap.set(id, equipment);
+    return equipment;
+  }
+
+  async updateLocationEquipment(id: string, data: UpdateLocationEquipment): Promise<LocationEquipment | undefined> {
+    const equipment = this.locationEquipmentMap.get(id);
+    if (!equipment) return undefined;
+    const updated: LocationEquipment = {
+      ...equipment,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.locationEquipmentMap.set(id, updated);
+    return updated;
+  }
+
+  async deleteLocationEquipment(id: string): Promise<boolean> {
+    const equipment = this.locationEquipmentMap.get(id);
+    if (equipment) {
+      const updated = { ...equipment, isActive: false, updatedAt: new Date() };
+      this.locationEquipmentMap.set(id, updated);
+      return true;
+    }
+    return false;
+  }
+
+  // Job Equipment methods
+  async getJobEquipment(jobId: string): Promise<(JobEquipment & { equipment: LocationEquipment })[]> {
+    const results: (JobEquipment & { equipment: LocationEquipment })[] = [];
+    for (const je of this.jobEquipmentMap.values()) {
+      if (je.jobId === jobId) {
+        const equipment = this.locationEquipmentMap.get(je.equipmentId);
+        if (equipment) {
+          results.push({ ...je, equipment });
+        }
+      }
+    }
+    return results;
+  }
+
+  async createJobEquipment(jobId: string, data: InsertJobEquipment): Promise<JobEquipment> {
+    const id = randomUUID();
+    const jobEquipment: JobEquipment = {
+      id,
+      jobId,
+      equipmentId: data.equipmentId,
+      notes: data.notes ?? null,
+      createdAt: new Date(),
+      updatedAt: null,
+    };
+    this.jobEquipmentMap.set(id, jobEquipment);
+    return jobEquipment;
+  }
+
+  async updateJobEquipment(id: string, data: UpdateJobEquipment): Promise<JobEquipment | undefined> {
+    const je = this.jobEquipmentMap.get(id);
+    if (!je) return undefined;
+    const updated: JobEquipment = {
+      ...je,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.jobEquipmentMap.set(id, updated);
+    return updated;
+  }
+
+  async deleteJobEquipment(id: string): Promise<boolean> {
+    return this.jobEquipmentMap.delete(id);
+  }
+
+  // Equipment service history
+  async getEquipmentServiceHistory(equipmentId: string): Promise<Job[]> {
+    const jobIds = new Set<string>();
+    for (const je of this.jobEquipmentMap.values()) {
+      if (je.equipmentId === equipmentId) {
+        jobIds.add(je.jobId);
+      }
+    }
+    return Array.from(this.jobsMap.values())
+      .filter(job => jobIds.has(job.id))
+      .sort((a, b) => {
+        const dateA = a.scheduledStart ? new Date(a.scheduledStart).getTime() : 0;
+        const dateB = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
+        return dateB - dateA;
+      });
   }
 }
 
@@ -4376,6 +4537,23 @@ export class DbStorage implements IStorage {
     const pmPartTemplates = await this.getLocationPMParts(locationId);
     const createdParts: JobPart[] = [];
 
+    // Collect unique equipment IDs from templates and auto-link to job
+    const uniqueEquipmentIds = new Set<string>();
+    for (const template of pmPartTemplates) {
+      if (template.equipmentId) {
+        uniqueEquipmentIds.add(template.equipmentId);
+      }
+    }
+    
+    // Create JobEquipment entries for each unique equipment
+    for (const equipmentId of uniqueEquipmentIds) {
+      await this.createJobEquipment(job.id, {
+        jobId: job.id,
+        equipmentId,
+        notes: 'PM visit auto-linked',
+      });
+    }
+
     for (const template of pmPartTemplates) {
       const [part] = await db.select()
         .from(partsTable)
@@ -4387,6 +4565,7 @@ export class DbStorage implements IStorage {
       const jobPart = await this.createJobPart(job.id, {
         jobId: job.id,
         productId: template.productId,
+        equipmentId: template.equipmentId || undefined,
         description,
         quantity: template.quantityPerVisit,
         unitPrice: part?.unitPrice || null,
@@ -4397,6 +4576,121 @@ export class DbStorage implements IStorage {
     }
 
     return { job, parts: createdParts };
+  }
+
+  // Location Equipment methods
+  async getLocationEquipment(locationId: string): Promise<LocationEquipment[]> {
+    return db.select()
+      .from(locationEquipment)
+      .where(and(
+        eq(locationEquipment.locationId, locationId),
+        eq(locationEquipment.isActive, true)
+      ));
+  }
+
+  async getLocationEquipmentItem(id: string): Promise<LocationEquipment | undefined> {
+    const [item] = await db.select()
+      .from(locationEquipment)
+      .where(eq(locationEquipment.id, id))
+      .limit(1);
+    return item;
+  }
+
+  async createLocationEquipment(locationId: string, data: InsertLocationEquipment): Promise<LocationEquipment> {
+    const [created] = await db.insert(locationEquipment)
+      .values({
+        ...data,
+        locationId,
+      })
+      .returning();
+    return created;
+  }
+
+  async updateLocationEquipment(id: string, data: UpdateLocationEquipment): Promise<LocationEquipment | undefined> {
+    const [updated] = await db.update(locationEquipment)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(locationEquipment.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteLocationEquipment(id: string): Promise<boolean> {
+    const result = await db.update(locationEquipment)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(locationEquipment.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Job Equipment methods
+  async getJobEquipment(jobId: string): Promise<(JobEquipment & { equipment: LocationEquipment })[]> {
+    const results = await db.select({
+      id: jobEquipment.id,
+      jobId: jobEquipment.jobId,
+      equipmentId: jobEquipment.equipmentId,
+      notes: jobEquipment.notes,
+      createdAt: jobEquipment.createdAt,
+      updatedAt: jobEquipment.updatedAt,
+      equipment: locationEquipment,
+    })
+      .from(jobEquipment)
+      .innerJoin(locationEquipment, eq(jobEquipment.equipmentId, locationEquipment.id))
+      .where(eq(jobEquipment.jobId, jobId));
+    
+    return results.map(r => ({
+      id: r.id,
+      jobId: r.jobId,
+      equipmentId: r.equipmentId,
+      notes: r.notes,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      equipment: r.equipment,
+    }));
+  }
+
+  async createJobEquipment(jobId: string, data: InsertJobEquipment): Promise<JobEquipment> {
+    const [created] = await db.insert(jobEquipment)
+      .values({
+        ...data,
+        jobId,
+      })
+      .returning();
+    return created;
+  }
+
+  async updateJobEquipment(id: string, data: UpdateJobEquipment): Promise<JobEquipment | undefined> {
+    const [updated] = await db.update(jobEquipment)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(jobEquipment.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteJobEquipment(id: string): Promise<boolean> {
+    const result = await db.delete(jobEquipment)
+      .where(eq(jobEquipment.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Equipment service history
+  async getEquipmentServiceHistory(equipmentId: string): Promise<Job[]> {
+    const jobIds = await db.select({ jobId: jobEquipment.jobId })
+      .from(jobEquipment)
+      .where(eq(jobEquipment.equipmentId, equipmentId));
+    
+    if (jobIds.length === 0) return [];
+    
+    return db.select()
+      .from(jobs)
+      .where(inArray(jobs.id, jobIds.map(j => j.jobId)))
+      .orderBy(desc(jobs.scheduledStart));
   }
 }
 
