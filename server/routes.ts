@@ -2396,6 +2396,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get jobs (calendar assignments) under a parent company with optional location filter
+  // Returns jobs with location metadata for proper display in the UI
+  app.get("/api/customer-companies/:parentId/jobs", isAuthenticated, async (req, res) => {
+    try {
+      const { parentId } = req.params;
+      const { locationId } = req.query;
+      const jobs = await storage.getAssignmentsByParentCompany(
+        req.user!.companyId, 
+        parentId, 
+        typeof locationId === 'string' ? locationId : undefined
+      );
+      
+      // Enrich jobs with location metadata
+      const locations = await storage.getClientsByParentCompany(req.user!.companyId, parentId);
+      const locationMap = new Map(locations.map(loc => [loc.id, loc]));
+      
+      const enrichedJobs = jobs.map(job => {
+        const location = locationMap.get(job.clientId);
+        return {
+          ...job,
+          locationName: location?.location || location?.companyName || undefined,
+          locationCity: location?.city || undefined,
+          billWithParent: location?.billWithParent ?? true
+        };
+      });
+      
+      res.json(enrichedJobs);
+    } catch (error) {
+      console.error('Get jobs by parent company error:', error);
+      res.status(500).json({ error: "Failed to get jobs" });
+    }
+  });
+
   app.post("/api/customer-companies", isAuthenticated, async (req, res) => {
     try {
       const data = insertCustomerCompanySchema.parse(req.body);

@@ -37,6 +37,14 @@ The application uses a Material Design-inspired typography with the Inter font f
 - **Calendar Cleanup**: Automatic removal of invalid calendar assignments when client PM months are updated, preserving completed jobs.
 - **Platform Admin Impersonation**: Secure system for platform administrators to impersonate company admins for support. Features server-side session storage, time limits, mandatory reason logging, and comprehensive audit trails. Includes an impersonation banner in the UI.
 - **Client Notes System**: Multiple timestamped notes per client with full CRUD operations. Notes display in client report dialog with add/edit/delete capability.
+- **Workflow-First Client Detail Page**: Redesigned client detail page (`/clients/:id`) with workflow-focused layout:
+  - Tabs: Overview | Jobs | Locations | Parts | Notes
+  - Quick Actions in header: Create Job, Create Invoice, Add Location buttons
+  - Jobs tab (`ClientJobsTab`): Displays all jobs for the client with location filter dropdown, job status badges (Completed, Scheduled, Overdue), and location metadata
+  - Location filter persisted via URL query params (`?tab=jobs&locationId=xxx`) enabling deep linking
+  - Locations tab: "View Jobs" action navigates to Jobs tab with pre-selected location filter
+  - Activity Summary placeholder on Overview tab for future metrics
+  - API endpoint: `GET /api/customer-companies/:parentId/jobs?locationId=xxx` returns enriched jobs with location names and billing flags
 - **QuickBooks Online (QBO) Sync Infrastructure**: Data model supporting QBO Customer/Sub-Customer hierarchy:
   - `customer_companies` table: Parent entities mapping to QBO Customers with billing address, QBO sync fields (qboCustomerId, qboSyncToken, qboLastSyncedAt).
   - `clients` table extended: Added parentCompanyId (FK to customer_companies), billWithParent flag, and QBO sync fields.

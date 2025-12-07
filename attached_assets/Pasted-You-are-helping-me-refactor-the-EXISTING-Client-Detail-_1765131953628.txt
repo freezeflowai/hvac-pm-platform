@@ -1,0 +1,201 @@
+You are helping me refactor the EXISTING Client Detail page in my app.
+
+Right now this page (for example “Basil Box ▸ Ryerson”) has:
+- Left sidebar nav (Dashboard, Calendar, Jobs, Clients, Products & Services, Reports, Manage Team, Admin)
+- Top area with client name and a location
+- Tabs: Overview | Locations | Parts | Notes
+- Two main cards on the Overview tab: “Company Information” and “Primary Location”
+- A “Quick Actions” section with buttons like “Manage Locations”, “View Parts”, “Create Invoice”
+
+Use the existing frontend stack, routing, and UI components. Do NOT introduce new frameworks. Refactor the current page/component instead of rewriting it from scratch.
+
+The main goal: make this page **workflow-first** (create jobs, manage work, bill) while still showing essential client info. It also needs to handle **multiple locations per client** gracefully.
+
+------------------------------------------------
+HIGH-LEVEL GOALS
+------------------------------------------------
+
+1. Add a **Jobs** tab to the client page so users can see and filter all jobs for that client.
+2. Support **multiple locations per client** by allowing the Jobs tab to filter by location.
+3. Move **Quick Actions** (Create Job, Create Invoice, Add Location) to the top so they are immediately visible.
+4. Keep the existing clean style and the QuickBooks-compatible model (Company ↔ QBO Customer, Location ↔ QBO Sub-Customer).
+
+------------------------------------------------
+1) TABS: ADD A “JOBS” TAB
+------------------------------------------------
+
+Currently the tabs are: Overview | Locations | Parts | Notes.
+
+Change them to:
+
+- Overview
+- Jobs
+- Locations
+- Parts
+- Notes
+
+Use the existing tab component / pattern used on this page.
+
+When the user clicks **Jobs**:
+
+- Show a jobs area for this specific client (see details below).
+- Keep using the same route (e.g. /clients/:id) but with tab state handled as it is today (or with a query param like ?tab=jobs if that is supported).
+
+------------------------------------------------
+2) JOBS TAB – SUPPORT MULTIPLE LOCATIONS
+------------------------------------------------
+
+Create a new Jobs tab component (e.g. `ClientJobsTab`) with the following behavior:
+
+### Layout
+
+At the top of the Jobs tab:
+
+1. A **header row** with:
+   - Title: “Jobs”
+   - A primary button: “Create Job”
+
+2. A **Location filter**:
+
+   - A dropdown or pill selector that allows:
+     - “All Locations”
+     - One option per Location belonging to this Company
+
+   Example:
+     - Location: [ All Locations ▼ ]
+       - All Locations
+       - Ryerson
+       - Yonge & Finch
+       - Scarborough
+
+Below that, show a table or list of jobs for this client.
+
+### Data
+
+- Fetch jobs for this specific client (companyId) via the existing jobs API layer or create a new endpoint if needed.
+- Each job row should display at least:
+  - Job number or ID
+  - Summary/Title
+  - Assigned Technician (or team)
+  - **Location Name** (important)
+  - Status
+  - Scheduled Date/Time
+
+### Filtering
+
+- When `Location = All Locations`:
+  - Show all jobs for this client (all locations).
+- When a specific location is selected:
+  - Show only jobs for that `locationId`.
+
+Ensure the UI visually indicates the location for each job (e.g. a badge or a column called “Location”).
+
+### Create Job button (for now)
+
+- For now, wire “Create Job” to open whatever existing job-creation flow is present (page or modal).
+- It should pre-fill the `companyId` = this client’s ID.
+- If the Location filter is set to a specific location when “Create Job” is clicked:
+  - Also prefill `locationId` to that selected location (if the job creation flow supports it).
+- If the job system is not fully implemented yet, you can still stub this button to just call a placeholder function or route.
+
+------------------------------------------------
+3) LINKING LOCATIONS → JOBS
+------------------------------------------------
+
+On the **Locations** tab:
+
+- For each location row/card, add an action: **“View Jobs”**.
+- When the user clicks “View Jobs” for a given location:
+  - Navigate to the **same client detail route** but with:
+    - The **Jobs** tab active.
+    - The **Location filter pre-selected** to that location.
+
+Implementation detail:
+
+- Use the existing router (e.g., /clients/:id?tab=jobs&locationId=<locationId>).
+- The Jobs tab should read `locationId` from the route/query (or from props) and initialize the Location filter accordingly.
+
+This makes the flow:
+
+- Client → Locations tab → click “View Jobs” on Ryerson → Client → Jobs tab opens with Location = Ryerson and only Ryerson jobs visible.
+
+------------------------------------------------
+4) MOVE QUICK ACTIONS TO THE TOP (WORKFLOW-FIRST)
+------------------------------------------------
+
+Currently “Quick Actions” is a card lower down on the Overview tab.
+
+Refactor so that:
+
+- Near the top of the client detail page (close to the title “Basil Box ▸ Ryerson”), add a **primary actions group** of buttons.
+
+These should include, in roughly this order:
+
+1. **Create Job**
+2. **Create Invoice**
+3. **Add Location**
+
+Use the existing button styles (same look as the “+ Add Client” button in the header).
+
+Behavior:
+
+- These buttons should be available regardless of which tab is active (the actions belong to the client as a whole).
+- You can either:
+  - Place them in the top-right area of the main content header, OR
+  - Place them just under the client name in a horizontal row.
+
+“Quick Actions” as a separate card can be removed or reduced, since its main purpose is now handled by the top actions.
+
+------------------------------------------------
+5) OVERVIEW TAB – KEEP INFO, PREPARE FOR ACTIVITY
+------------------------------------------------
+
+Keep the two main cards on the Overview tab:
+
+1. **Company Information** card:
+   - Company Name
+   - Small subtitle indicating that it maps to QuickBooks Customer.
+   - “View All Locations” button linking to the Locations tab.
+
+2. **Primary Location** card:
+   - Primary location name
+   - Small subtitle indicating that it maps to QuickBooks Sub-Customer.
+   - A badge or label for billing behavior:
+     - “Bills to Parent” or “Bills to This Location”
+   - A short line like:
+     - “Invoices for this location will be billed to the parent company.”
+     - or “Invoices for this location will be billed directly to this location.”
+
+Below or alongside these, add a placeholder card such as “Activity Summary” for future use:
+
+- For now, this can simply say:
+  - “Jobs: coming soon”
+  - “Unpaid invoices: coming soon”
+- The point is to reserve space for operational metrics later, not to fully implement them now.
+
+------------------------------------------------
+6) TECH NOTES & CONSTRAINTS
+------------------------------------------------
+
+- Do not expose or allow editing of QuickBooks IDs (qboCustomerId, qboParentCustomerId, etc.) on this page.
+- Do not break the existing parent/child mapping:
+  - Company = QBO Customer
+  - Location = QBO Sub-Customer
+- Keep the layout responsive and consistent with existing spacing/typography.
+
+------------------------------------------------
+WHAT TO DELIVER
+------------------------------------------------
+
+Please update the existing Client Detail page implementation to:
+
+1. Change tabs to: Overview | Jobs | Locations | Parts | Notes.
+2. Implement the Jobs tab with:
+   - Create Job button
+   - Location filter (All Locations + individual locations)
+   - Job list with Location column/badge.
+3. Add “View Jobs” actions on Locations tab that open the Jobs tab with the appropriate location filter selected.
+4. Move Quick Actions (Create Job, Create Invoice, Add Location) to the top of the page near the client title as a primary action group.
+5. Keep the Company and Primary Location cards on the Overview tab, and add a simple Activity Summary placeholder card.
+
+Use the same code style, components, and routing patterns that already exist in the project.

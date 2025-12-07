@@ -6,44 +6,42 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Building2, MapPin, Package, StickyNote, Phone, Mail, MapPinned, FileText } from "lucide-react";
+import { ArrowLeft, Building2, MapPin, Package, StickyNote, Phone, Mail, MapPinned, FileText, Plus, Briefcase, Activity } from "lucide-react";
 import ClientLocationsTab from "@/components/ClientLocationsTab";
 import ClientNotesTab from "@/components/ClientNotesTab";
+import ClientJobsTab from "@/components/ClientJobsTab";
 import type { Client, CustomerCompany } from "@shared/schema";
 
-// Client Detail Page with Tabs
-// - Company = QBO Customer (parent)
-// - Location = QBO Sub-Customer (child)
-// - billWithParent controls invoice routing in QuickBooks
-
-type TabValue = "overview" | "locations" | "parts" | "notes";
+type TabValue = "overview" | "jobs" | "locations" | "parts" | "notes";
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   
-  // Parse tab from URL query params
-  const getTabFromSearch = (): TabValue => {
+  const getInitialState = () => {
     const params = new URLSearchParams(searchString);
-    const tab = params.get("tab");
-    if (tab === "locations" || tab === "parts" || tab === "notes") {
-      return tab;
-    }
-    return "overview";
+    const tab = params.get("tab") as TabValue | null;
+    const locationId = params.get("locationId");
+    return {
+      tab: (tab && ["overview", "jobs", "locations", "parts", "notes"].includes(tab)) ? tab as TabValue : "overview",
+      locationId: locationId || undefined
+    };
   };
 
-  const [activeTab, setActiveTab] = useState<TabValue>(getTabFromSearch());
+  const [activeTab, setActiveTab] = useState<TabValue>(getInitialState().tab);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | undefined>(getInitialState().locationId);
 
-  // Sync tab state with URL
   useEffect(() => {
-    setActiveTab(getTabFromSearch());
+    const state = getInitialState();
+    setActiveTab(state.tab);
+    setSelectedLocationId(state.locationId);
   }, [searchString]);
 
   const handleTabChange = (value: string) => {
     const tab = value as TabValue;
     setActiveTab(tab);
-    // Update URL with tab query param
+    setSelectedLocationId(undefined);
     if (tab === "overview") {
       setLocation(`/clients/${id}`);
     } else {
@@ -51,17 +49,29 @@ export default function ClientDetailPage() {
     }
   };
 
-  // Fetch client (location) data
+  const handleViewJobsForLocation = (locationId: string) => {
+    setActiveTab("jobs");
+    setSelectedLocationId(locationId);
+    setLocation(`/clients/${id}?tab=jobs&locationId=${locationId}`);
+  };
+
   const { data: client, isLoading: clientLoading, error: clientError } = useQuery<Client>({
     queryKey: ["/api/clients", id],
     enabled: Boolean(id),
   });
 
-  // Fetch parent company if client has one
   const { data: parentCompany, isLoading: companyLoading } = useQuery<CustomerCompany>({
     queryKey: [`/api/customer-companies/${client?.parentCompanyId}`],
     enabled: Boolean(client?.parentCompanyId),
   });
+
+  const handleCreateJob = (locationId?: string) => {
+    if (locationId) {
+      setLocation(`/calendar?action=createJob&locationId=${locationId}`);
+    } else {
+      setLocation(`/calendar?action=createJob&parentCompanyId=${client?.parentCompanyId}`);
+    }
+  };
 
   if (clientLoading) {
     return (
@@ -96,8 +106,7 @@ export default function ClientDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => setLocation("/?tab=clients")} data-testid="button-back-to-clients">
             <ArrowLeft className="h-4 w-4" />
@@ -115,14 +124,34 @@ export default function ClientDetailPage() {
             </p>
           </div>
         </div>
+        
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button onClick={() => handleCreateJob()} data-testid="button-header-create-job">
+            <Briefcase className="h-4 w-4 mr-2" />
+            Create Job
+          </Button>
+          <Link href={`/invoices/new?clientId=${id}`}>
+            <Button variant="outline" data-testid="button-header-create-invoice">
+              <FileText className="h-4 w-4 mr-2" />
+              Create Invoice
+            </Button>
+          </Link>
+          <Button variant="outline" onClick={() => handleTabChange("locations")} data-testid="button-header-add-location">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Location
+          </Button>
+        </div>
       </div>
 
-      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview" data-testid="tab-overview">
             <Building2 className="h-4 w-4 mr-2" />
             Overview
+          </TabsTrigger>
+          <TabsTrigger value="jobs" data-testid="tab-jobs">
+            <Briefcase className="h-4 w-4 mr-2" />
+            Jobs
           </TabsTrigger>
           <TabsTrigger value="locations" data-testid="tab-locations">
             <MapPin className="h-4 w-4 mr-2" />
@@ -138,10 +167,8 @@ export default function ClientDetailPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Company Info Card */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -195,7 +222,6 @@ export default function ClientDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Primary Location Card */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -255,40 +281,57 @@ export default function ClientDetailPage() {
             </Card>
           </div>
 
-          {/* Quick Actions */}
           <Card>
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Activity Summary
+              </CardTitle>
+              <CardDescription>
+                Overview of recent activity and metrics
+              </CardDescription>
             </CardHeader>
-            <CardContent className="flex gap-3 flex-wrap">
-              <Button variant="outline" onClick={() => handleTabChange("locations")}>
-                <MapPin className="h-4 w-4 mr-2" />
-                Manage Locations
-              </Button>
-              <Button variant="outline" onClick={() => handleTabChange("parts")}>
-                <Package className="h-4 w-4 mr-2" />
-                View Parts
-              </Button>
-              <Link href={`/invoices/new?clientId=${id}`}>
-                <Button>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Create Invoice
-                </Button>
-              </Link>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="text-center py-4 border rounded-lg">
+                  <Briefcase className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Jobs</p>
+                  <p className="text-xs text-muted-foreground mt-1">Coming soon</p>
+                </div>
+                <div className="text-center py-4 border rounded-lg">
+                  <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Unpaid Invoices</p>
+                  <p className="text-xs text-muted-foreground mt-1">Coming soon</p>
+                </div>
+                <div className="text-center py-4 border rounded-lg">
+                  <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Locations</p>
+                  <p className="text-xs text-muted-foreground mt-1">Coming soon</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Locations Tab */}
+        <TabsContent value="jobs">
+          <ClientJobsTab 
+            clientId={id!}
+            companyId={client.companyId}
+            parentCompanyId={client.parentCompanyId || undefined}
+            initialLocationId={selectedLocationId}
+            onCreateJob={handleCreateJob}
+          />
+        </TabsContent>
+
         <TabsContent value="locations">
           <ClientLocationsTab 
             clientId={id!} 
             companyId={client.companyId}
             parentCompanyId={client.parentCompanyId || undefined}
+            onViewJobs={handleViewJobsForLocation}
           />
         </TabsContent>
 
-        {/* Parts Tab (stub) */}
         <TabsContent value="parts">
           <Card>
             <CardHeader>
@@ -307,7 +350,6 @@ export default function ClientDetailPage() {
           </Card>
         </TabsContent>
 
-        {/* Notes Tab */}
         <TabsContent value="notes">
           <ClientNotesTab clientId={id!} />
         </TabsContent>

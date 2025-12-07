@@ -104,6 +104,7 @@ export interface IStorage {
   // Client methods
   getClient(companyId: string, id: string): Promise<Client | undefined>;
   getAllClients(companyId: string): Promise<Client[]>;
+  getClientsByParentCompany(companyId: string, parentCompanyId: string): Promise<Client[]>;
   createClient(companyId: string, userId: string, client: InsertClient): Promise<Client>;
   createClientWithParts(companyId: string, userId: string, client: InsertClient, partsList: Array<{ partId: string; quantity: number }>): Promise<Client>;
   updateClient(companyId: string, id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
@@ -181,6 +182,8 @@ export interface IStorage {
   }>>;
   getPastIncompleteAssignments(companyId: string): Promise<CalendarAssignment[]>;
   getOldUnscheduledAssignments(companyId: string): Promise<CalendarAssignment[]>;
+  getAssignmentsByClient(companyId: string, clientId: string): Promise<CalendarAssignment[]>;
+  getAssignmentsByParentCompany(companyId: string, parentCompanyId: string, locationId?: string): Promise<CalendarAssignment[]>;
   
   // Job notes methods
   getJobNotes(companyId: string, assignmentId: string): Promise<JobNote[]>;
@@ -1130,6 +1133,31 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getAssignmentsByClient(companyId: string, clientId: string): Promise<CalendarAssignment[]> {
+    return Array.from(this.calendarAssignments.values())
+      .filter((assignment) => assignment.companyId === companyId && assignment.clientId === clientId)
+      .sort((a, b) => {
+        const dateA = new Date(b.year, b.month - 1, b.day || 1);
+        const dateB = new Date(a.year, a.month - 1, a.day || 1);
+        return dateA.getTime() - dateB.getTime();
+      });
+  }
+
+  async getAssignmentsByParentCompany(companyId: string, parentCompanyId: string, locationId?: string): Promise<CalendarAssignment[]> {
+    const locations = Array.from(this.clients.values()).filter(
+      (client) => client.companyId === companyId && client.parentCompanyId === parentCompanyId
+    );
+    const locationIds = locationId ? [locationId] : locations.map(l => l.id);
+    
+    return Array.from(this.calendarAssignments.values())
+      .filter((assignment) => assignment.companyId === companyId && locationIds.includes(assignment.clientId))
+      .sort((a, b) => {
+        const dateA = new Date(b.year, b.month - 1, b.day || 1);
+        const dateB = new Date(a.year, a.month - 1, a.day || 1);
+        return dateA.getTime() - dateB.getTime();
+      });
+  }
+
   async getAllCalendarAssignmentsPaginated(companyId: string, options: { limit?: number; offset?: number; status?: string; search?: string }): Promise<{ assignments: CalendarAssignment[]; total: number; hasMore: boolean }> {
     const { limit, offset = 0, status, search } = options;
     let assignments = Array.from(this.calendarAssignments.values()).filter(
@@ -1199,7 +1227,7 @@ export class MemStorage implements IStorage {
     const updated: CalendarAssignment = {
       ...existing,
       day: assignmentUpdate.day !== undefined ? assignmentUpdate.day : existing.day,
-      scheduledDate: assignmentUpdate.scheduledDate !== undefined ? assignmentUpdate.scheduledDate : existing.scheduledDate,
+      scheduledDate: assignmentUpdate.scheduledDate !== undefined && assignmentUpdate.scheduledDate !== null ? assignmentUpdate.scheduledDate : existing.scheduledDate,
       scheduledHour: assignmentUpdate.scheduledHour !== undefined ? assignmentUpdate.scheduledHour : existing.scheduledHour,
       autoDueDate: assignmentUpdate.autoDueDate !== undefined ? assignmentUpdate.autoDueDate : existing.autoDueDate
     };
@@ -1740,6 +1768,18 @@ export class DbStorage implements IStorage {
 
   async getAllClients(companyId: string): Promise<Client[]> {
     return db.select().from(clients).where(eq(clients.companyId, companyId)).orderBy(desc(clients.createdAt));
+  }
+
+  async getClientsByParentCompany(companyId: string, parentCompanyId: string): Promise<Client[]> {
+    return db.select()
+      .from(clients)
+      .where(
+        and(
+          eq(clients.companyId, companyId),
+          eq(clients.parentCompanyId, parentCompanyId)
+        )
+      )
+      .orderBy(clients.companyName);
   }
 
   async createClient(companyId: string, userId: string, insertClient: InsertClient): Promise<Client> {
@@ -2389,6 +2429,43 @@ export class DbStorage implements IStorage {
       .where(eq(calendarAssignments.companyId, companyId));
   }
 
+  async getAssignmentsByClient(companyId: string, clientId: string): Promise<CalendarAssignment[]> {
+    return await db.select()
+      .from(calendarAssignments)
+      .where(
+        and(
+          eq(calendarAssignments.companyId, companyId),
+          eq(calendarAssignments.clientId, clientId)
+        )
+      )
+      .orderBy(desc(calendarAssignments.year), desc(calendarAssignments.month), desc(calendarAssignments.day));
+  }
+
+  async getAssignmentsByParentCompany(companyId: string, parentCompanyId: string, locationId?: string): Promise<CalendarAssignment[]> {
+    const locationIds = locationId 
+      ? [locationId]
+      : (await db.select({ id: clients.id })
+          .from(clients)
+          .where(
+            and(
+              eq(clients.companyId, companyId),
+              eq(clients.parentCompanyId, parentCompanyId)
+            )
+          )).map(l => l.id);
+    
+    if (locationIds.length === 0) return [];
+
+    return await db.select()
+      .from(calendarAssignments)
+      .where(
+        and(
+          eq(calendarAssignments.companyId, companyId),
+          inArray(calendarAssignments.clientId, locationIds)
+        )
+      )
+      .orderBy(desc(calendarAssignments.year), desc(calendarAssignments.month), desc(calendarAssignments.day));
+  }
+
   async getAllCalendarAssignmentsPaginated(companyId: string, options: { limit?: number; offset?: number; status?: string; search?: string }): Promise<{ assignments: CalendarAssignment[]; total: number; hasMore: boolean }> {
     const { limit, offset = 0 } = options;
     
@@ -2480,7 +2557,7 @@ export class DbStorage implements IStorage {
     if (assignmentUpdate.year !== undefined) updateFields.year = assignmentUpdate.year;
     if (assignmentUpdate.month !== undefined) updateFields.month = assignmentUpdate.month;
     if (assignmentUpdate.day !== undefined) updateFields.day = assignmentUpdate.day;
-    if (assignmentUpdate.scheduledDate !== undefined) updateFields.scheduledDate = assignmentUpdate.scheduledDate;
+    if (assignmentUpdate.scheduledDate !== undefined && assignmentUpdate.scheduledDate !== null) updateFields.scheduledDate = assignmentUpdate.scheduledDate;
     if (assignmentUpdate.scheduledHour !== undefined) updateFields.scheduledHour = assignmentUpdate.scheduledHour;
     if (assignmentUpdate.autoDueDate !== undefined) updateFields.autoDueDate = assignmentUpdate.autoDueDate;
     if (assignmentUpdate.completed !== undefined) updateFields.completed = assignmentUpdate.completed;

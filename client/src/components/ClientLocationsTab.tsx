@@ -5,38 +5,30 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Pencil, FileText, ToggleLeft, ToggleRight, Loader2 } from "lucide-react";
+import { Plus, Pencil, FileText, ToggleLeft, ToggleRight, Loader2, Briefcase } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import LocationFormModal from "./LocationFormModal";
 import type { Client } from "@shared/schema";
 import { Link } from "wouter";
 
-// Each Location here maps to a QuickBooks Sub-Customer.
-// billWithParent controls whether the invoice's CustomerRef will use the parent Company 
-// or this Location in future QuickBooks sync logic.
-// The app only supports one level of hierarchy: Company → Location. 
-// We never attach a Location under another Location.
-
 interface ClientLocationsTabProps {
   clientId: string;
   companyId: string;
   parentCompanyId?: string;
+  onViewJobs?: (locationId: string) => void;
 }
 
-export default function ClientLocationsTab({ clientId, companyId, parentCompanyId }: ClientLocationsTabProps) {
+export default function ClientLocationsTab({ clientId, companyId, parentCompanyId, onViewJobs }: ClientLocationsTabProps) {
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Client | null>(null);
 
-  // Fetch locations (clients) under this parent company
-  // Uses dedicated endpoint that filters server-side by parentCompanyId
   const { data: locations = [], isLoading, error } = useQuery<Client[]>({
     queryKey: ["/api/customer-companies", parentCompanyId, "locations"],
     enabled: Boolean(parentCompanyId),
   });
 
-  // Toggle active status mutation
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ locationId, isActive }: { locationId: string; isActive: boolean }) => {
       const res = await apiRequest("PATCH", `/api/clients/${locationId}`, { inactive: !isActive });
@@ -72,7 +64,7 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
   const handleToggleActive = (location: Client) => {
     toggleActiveMutation.mutate({
       locationId: location.id,
-      isActive: location.inactive, // If inactive, we're activating it
+      isActive: location.inactive,
     });
   };
 
@@ -109,7 +101,6 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
     );
   }
 
-  // If no parentCompanyId is set, show informational message
   if (!parentCompanyId) {
     return (
       <Card>
@@ -126,7 +117,7 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
           <div>
             <CardTitle>Locations</CardTitle>
             <CardDescription>
@@ -179,12 +170,24 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1">
+                        {onViewJobs && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onViewJobs(location.id)}
+                            data-testid={`button-view-jobs-${location.id}`}
+                            title="View Jobs"
+                          >
+                            <Briefcase className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleEditLocation(location)}
                           data-testid={`button-edit-location-${location.id}`}
+                          title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -194,6 +197,7 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
                           onClick={() => handleToggleActive(location)}
                           disabled={toggleActiveMutation.isPending}
                           data-testid={`button-toggle-location-${location.id}`}
+                          title={location.inactive ? "Activate" : "Deactivate"}
                         >
                           {toggleActiveMutation.isPending ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -208,6 +212,7 @@ export default function ClientLocationsTab({ clientId, companyId, parentCompanyI
                             variant="ghost"
                             size="sm"
                             data-testid={`button-create-invoice-${location.id}`}
+                            title="Create Invoice"
                           >
                             <FileText className="h-4 w-4" />
                           </Button>
