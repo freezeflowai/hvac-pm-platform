@@ -1,0 +1,244 @@
+You are helping me implement a hybrid UX for managing clients in my app:
+
+- A **Quick Add Client modal** (dialog) for fast data entry.
+- A **full Client Detail page with tabs** for deeper management of that client.
+
+Use the existing stack, routing, UI library, and form patterns already in this project. Do NOT introduce new frameworks. Extend what’s there.
+
+------------------------------------------------
+BUSINESS / DATA MODEL (RECAP – DO NOT CHANGE)
+------------------------------------------------
+
+Back-end concepts:
+
+- Company (parent) – maps to QBO Customer
+  - id
+  - name
+  - legalName
+  - phone
+  - email
+  - billingAddress: { street, city, stateOrProvince, postalCode, country }
+  - isActive
+  - qboCustomerId, qboSyncToken, qboLastSyncedAt (system fields, not user-editable)
+
+- Location (child) – maps to QBO Sub-Customer
+  - id
+  - companyId
+  - name (location/site name)
+  - siteCode or storeNumber
+  - serviceAddress: { street, city, stateOrProvince, postalCode, country }
+  - contactPhone
+  - contactEmail
+  - billWithParent (boolean)
+  - isActive
+  - qboCustomerId, qboParentCustomerId, qboSyncToken, qboLastSyncedAt (system fields, not user-editable)
+
+Every “client” in the UI is effectively:
+- A Company + one or more Locations.
+- Primary creation flow: Company + Primary Location + billing flag.
+
+------------------------------------------------
+PART 1 – QUICK ADD CLIENT MODAL (DIALOG)
+------------------------------------------------
+
+Goal: A large modal that allows **fast creation** of a client with:
+
+- Company information
+- Primary Location information
+- Billing preference: bill with parent or not
+
+Requirements:
+
+1) Locate the existing “Add Client” or “New Client” trigger in the UI:
+   - e.g. a button on the client list / dashboard (like “Add Client”).
+
+2) Implement or refactor an **AddClientModal** (or equivalent) that:
+   - Opens as a dialog over the current page.
+   - Has the following structure:
+
+   - Title: “Add Client”
+   - Section 1: Company Information
+     - Company Name (required) → Company.name
+     - Legal Name (optional) → Company.legalName
+     - Phone (optional)
+     - Email (optional)
+     - Billing Address group:
+       - Street
+       - City
+       - State/Province
+       - Postal Code
+       - Country
+   - Section 2: Primary Location Information
+     - Location Name (required) → Location.name
+     - Site Code / Store Number (optional)
+     - Service Address group:
+       - Street
+       - City
+       - State/Province
+       - Postal Code
+       - Country
+     - Contact Phone (optional)
+     - Contact Email (optional)
+   - Section 3: Billing Settings
+     - Toggle or checkbox:
+       - Label: “Bill this location with the parent company”
+       - Field: billWithParent (boolean, default true)
+       - Helper text: “If enabled, invoices for this location will be billed to the parent company in QuickBooks. If disabled, this location will be billed directly as its own sub-customer.”
+
+   - Footer:
+     - Primary button: “Save Client”
+     - Secondary button: “Cancel”
+     - Disable Save while submitting or if required fields are invalid.
+
+3) Form behavior:
+   - Required: Company Name, Location Name.
+   - Optional: everything else (but use existing validators for email, phone, etc. if available).
+   - On submit, POST a payload shaped like:
+
+   {
+     company: {
+       name: string,
+       legalName?: string,
+       phone?: string,
+       email?: string,
+       billingAddress?: {
+         street?: string,
+         city?: string,
+         stateOrProvince?: string,
+         postalCode?: string,
+         country?: string
+       }
+     },
+     primaryLocation: {
+       name: string,
+       siteCode?: string,
+       serviceAddress?: {
+         street?: string,
+         city?: string,
+         stateOrProvince?: string,
+         postalCode?: string,
+         country?: string
+       },
+       contactPhone?: string,
+       contactEmail?: string,
+       billWithParent: boolean
+     }
+   }
+
+   - Reuse existing API helpers if possible; otherwise create something like:
+     - `createClientWithLocation(payload)` in the API layer.
+
+4) On successful save:
+   - Close the modal.
+   - Navigate to the **Client Detail page** for this newly created client:
+     - e.g. route to `/clients/:id` (or whatever the existing client detail route pattern is).
+   - On failure:
+     - Show error message inline in the modal, do NOT close it.
+
+5) QBO fields (qboCustomerId, qboParentCustomerId, qboSyncToken, etc.) are NOT editable in the modal and should not be exposed in the UI.
+
+------------------------------------------------
+PART 2 – CLIENT DETAIL PAGE WITH TABS
+------------------------------------------------
+
+Goal: A full client page with **tabs**, so the UI scales without endless scrolling as features grow.
+
+We want a **ClientDetailPage** (or equivalent route) that:
+
+- Is reachable at something like: `/clients/:id` (adjust to match current router).
+- Shows the client name at the top.
+- Uses tabs to separate concerns into compartments.
+
+Minimum tabs to implement now:
+
+1) **Overview**
+   - Displays high-level info:
+     - Company name, legal name, contact info.
+     - Primary location summary (name, city, billWithParent flag).
+   - A compact summary layout is fine.
+   - Include buttons/links to:
+     - Edit Company info
+     - Go to Locations tab
+   - This tab should load quickly and be lightweight, since it’s the default.
+
+2) **Locations / Properties**
+   - Shows a list/table of Locations for this Company.
+   - Columns (minimum):
+     - Location Name
+     - Site Code / Store Number
+     - City
+     - Bill With Parent (yes/no)
+     - Active (yes/no)
+   - Include actions:
+     - Add Location
+     - Edit Location
+     - (Optional) Deactivate/Activate location
+   - For now, you can implement simple inline edit forms or separate modals for add/edit.
+
+3) **Parts / Equipment** (stub for now)
+   - Create the tab and basic layout (empty state and placeholder).
+   - For now, it can just show a message like “Parts/Equipment management coming soon” or a basic table structure ready to be wired.
+   - The important part is the **tab structure**, not full functionality yet.
+
+4) **Notes** (simple but real)
+   - Textarea or note list where internal notes for this client can be viewed/added.
+   - This can be implemented with basic CRUD or just a stub, but structure it so it can grow.
+
+Tab behavior:
+
+- Use the app’s existing tab component or build a simple tab system.
+- Tabs should be:
+  - Overview
+  - Locations
+  - Parts
+  - Notes
+- Keep state in sync with the router if possible:
+  - Example: `/clients/:id?tab=locations`
+  - When the route changes, activate the corresponding tab.
+  - When the user clicks a tab, update the route query param.
+
+Data loading:
+
+- **Important for performance**: Only load heavy data when the tab is active.
+  - Overview: load basic Company + primary Location.
+  - Locations tab: load full locations list.
+  - Parts tab: (later) load parts/equipment only when active.
+  - Notes tab: load notes only when active.
+- Use existing API layer for fetch calls; add new endpoints if necessary.
+
+------------------------------------------------
+PART 3 – WIRING IT ALL TOGETHER
+------------------------------------------------
+
+1) Update the “Add Client” button on the client list:
+   - It should open the **Quick Add Client modal**, not navigate immediately.
+
+2) After the client is created in the modal:
+   - Navigate to the **Client Detail page** (Overview tab).
+
+3) Ensure that:
+   - Client Detail page is responsive and not a huge scroll:
+     - Tabs break content into compartments.
+   - Each tab uses a self-contained component if possible, like:
+     - ClientOverviewTab
+     - ClientLocationsTab
+     - ClientPartsTab
+     - ClientNotesTab
+
+4) Code quality:
+   - Use the same coding patterns (functional components, hooks, composition API, etc.) already used in this project.
+   - Add comments near key areas explaining:
+     - That Company = QBO Customer (parent)
+     - That Location = QBO Sub-Customer (child)
+     - That `billWithParent` will affect future QuickBooks invoice behavior.
+
+------------------------------------------------
+WHAT TO SHOW ME
+------------------------------------------------
+
+- The updated Add Client modal component (JS/TS/HTML/templating code).
+- The new or updated ClientDetailPage component with tab logic.
+- Any routing changes (new route for `/clients/:id`, tab query handling, etc.).
+- Any new API/helper calls used (e.g. `createClientWithLocation`, `fetchClientDetail`, `fetchClientLocations`).
+
+Make everything consistent with the existing project structure and styling.

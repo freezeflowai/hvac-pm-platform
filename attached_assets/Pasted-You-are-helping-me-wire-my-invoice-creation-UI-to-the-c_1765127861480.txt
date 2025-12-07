@@ -1,0 +1,220 @@
+You are helping me wire my invoice creation UI to the client/location model so that:
+
+- Invoices are always associated with a **Location** (where work is done).
+- The **actual bill-to customer** depends on the Location’s `billWithParent` flag.
+- The UI clearly shows who will be billed (parent company vs location) before the invoice is created.
+
+Use the existing stack, components, and API patterns. Extend what exists; do not introduce new frameworks.
+
+--------------------------------
+DATA MODEL (REFERENCE – DO NOT CHANGE)
+--------------------------------
+
+We already have:
+
+- Company (parent) – maps to QuickBooks Online Customer
+  - id
+  - name
+  - ...contact + billingAddress...
+  - qboCustomerId (system)
+  - isActive
+
+- Location (child) – maps to QuickBooks Online Sub-Customer
+  - id
+  - companyId
+  - name (location/site name)
+  - siteCode / storeNumber
+  - serviceAddress { street, city, stateOrProvince, postalCode, country }
+  - contactPhone
+  - contactEmail
+  - billWithParent (boolean)
+  - isActive
+  - qboCustomerId (system, sub-customer)
+  - qboParentCustomerId (system)
+
+- Invoice
+  - id
+  - companyId         // always the parent company
+  - locationId        // where work is done (required)
+  - invoiceNumber
+  - status
+  - issueDate
+  - dueDate
+  - currency
+  - subtotal
+  - taxTotal
+  - total
+  - notesCustomer
+  - qboInvoiceId (system)
+  - qboSyncToken (system)
+
+Key rule:
+
+- **The invoice always hangs off a Location in the app**, but:
+  - If `billWithParent = true` → invoice’s **bill-to** is the parent Company.
+  - If `billWithParent = false` → invoice’s **bill-to** is the Location (sub-customer).
+
+--------------------------------
+GOAL – INVOICE CREATION UX
+--------------------------------
+
+I want the invoice creation flow to:
+
+1) Always pick a **Location** as the context of the invoice.
+2) Automatically decide **who is billed** based on `billWithParent`.
+3) Clearly display this to the user (so there are no surprises when syncing to QBO).
+
+There are two main entry patterns you should support:
+
+- Creating an invoice **from a specific Location** (e.g., “Create Invoice” button on the Locations tab or Location row).
+- Creating an invoice from a more general “Invoices” or “Clients” area, where the user first selects:
+  - Client (Company)
+  - Then Location
+
+--------------------------------
+PART 1 – INVOICE CREATION ENTRY POINT(S)
+--------------------------------
+
+1) From a Location:
+
+- In the **Locations** tab (or wherever a Location is listed), add an action:
+  - Button: “Create Invoice”
+- When clicked:
+  - Open the **Invoice Creation** view (page or modal, depending on project).
+  - Pre-fill:
+    - `companyId` = Location.companyId
+    - `locationId` = this Location.id
+
+2) From a general Invoices area (if it exists):
+
+- If there is an “Add Invoice” button on an invoices list:
+  - Show a first step in the invoice creation form where the user selects:
+    - Client (Company)
+    - Location (filtered by selected Company)
+  - Once both are selected, apply the same logic below.
+
+--------------------------------
+PART 2 – WHO IS BEING BILLED? (billWithParent LOGIC)
+--------------------------------
+
+Once a Location is chosen (either from a direct Location entry point or a selector), the UI should:
+
+1) Fetch/know:
+   - The Location record (including `billWithParent`).
+   - The associated Company record.
+
+2) Compute the **bill-to entity**:
+
+   - If `location.billWithParent === true`:
+     - billTo = Company
+   - Else:
+     - billTo = Location
+
+3) Display a clear “Bill To” panel near the top of the invoice form:
+
+   - Example layout:
+
+     Bill To:
+       - If billing parent:
+         - “Parent Company: ABC Holdings Inc”
+         - Small subtitle: “Invoices for this location are billed to the parent company.”
+       - If billing location:
+         - “Location: ABC Holdings Inc — Toronto Warehouse”
+         - Small subtitle: “Invoices for this location are billed directly to this location.”
+
+   - Also show an address summary:
+     - Billing Address → from the billTo entity (Company or Location, whichever we chose).
+     - Service/Job Location → always from Location.serviceAddress.
+
+4) DO NOT allow users to override `billWithParent` inside the invoice form.
+   - If they want to change who is billed, they should edit the Location’s settings (`billWithParent`) in the Locations tab.
+   - (You can add a small “Change billing setting in Locations” inline link that navigates to that location’s edit form if needed.)
+
+--------------------------------
+PART 3 – INVOICE FORM FIELDS (HIGH LEVEL)
+--------------------------------
+
+Use the existing invoice form structure in the app. At a minimum, show:
+
+- The “Bill To” section (computed from `billWithParent`).
+- The service location (Location).
+- Core header fields:
+  - Issue Date (default to today)
+  - Due Date (optional or computed)
+  - Currency
+- Line items:
+  - Description
+  - Quantity
+  - Unit price
+  - Tax code or tax setting (if implemented)
+- Notes to customer (maps to QBO CustomerMemo eventually).
+
+We don’t need to redesign the whole invoice form; focus on:
+
+- Correct association with `companyId` and `locationId`.
+- Correct “Bill To” display based on `billWithParent`.
+
+--------------------------------
+PART 4 – DATA SHAPING ON SUBMIT
+--------------------------------
+
+When the user saves/creates the invoice:
+
+1) The local **Invoice** should be created with:
+
+   - `companyId` = Location.companyId
+   - `locationId` = Location.id
+   - Other fields filled from the form (issueDate, dueDate, totals, etc.)
+
+2) Do NOT store any QBO-related IDs at this stage; those are system-managed by sync logic elsewhere.
+
+3) Ensure that the UI clearly indicates that:
+
+   - “Bill To” information is derived from `billWithParent` and Location.
+   - The user cannot directly pick a random bill-to entity; it always flows from that logic.
+
+--------------------------------
+PART 5 – INTERNAL DOCUMENTATION / COMMENTS
+--------------------------------
+
+In the code for the invoice create component:
+
+- Add brief comments explaining:
+
+  - `companyId` always refers to the **parent Company**, even if billing is direct to the Location.
+  - `locationId` represents the **service location** (child).
+  - Billing behavior with QuickBooks:
+
+    - If `billWithParent === true`, the future QBO Invoice will use:
+      - CustomerRef = parent Company (QBO Customer)
+      - ShipAddr = Location (service address)
+
+    - If `billWithParent === false`, the future QBO Invoice will use:
+      - CustomerRef = Location (QBO Sub-Customer)
+      - ShipAddr = Location (service address)
+
+- This is just documentation; you do NOT need to implement QBO API calls here.
+
+--------------------------------
+WHAT TO OUTPUT
+--------------------------------
+
+Please show me:
+
+1) The updated invoice creation component(s) that:
+   - Accept or determine `companyId` and `locationId`.
+   - Fetch the relevant Company and Location.
+   - Compute and display the “Bill To” panel based on `billWithParent`.
+
+2) Any modifications to:
+   - Locations tab (adding “Create Invoice” action).
+   - Global navigation or Invoices list, if you add a company/location selector there.
+
+3) The code that builds the final payload for creating the Invoice in the backend, ensuring it includes:
+   - `companyId`
+   - `locationId`
+   - Header fields (dates, currency, etc.)
+   - Line items
+   - Totals
+
+Use existing patterns and styling so the new behavior feels native to the app.

@@ -1,0 +1,225 @@
+You are helping me implement the **Locations** tab on the Client Detail page.
+
+Context:
+- We already have:
+  - A **Client Detail page** with tabs (Overview, Locations, Parts, Notes).
+  - A **Quick Add Client** modal that creates:
+    - Company (parent)
+    - Primary Location (child)
+    - billWithParent flag
+
+Use the existing frontend stack, patterns, and API layer in this project. Extend what’s there; do not introduce new frameworks.
+
+--------------------------------
+DATA MODEL (REFERENCE – DO NOT CHANGE)
+--------------------------------
+
+Back-end concepts (already implemented):
+
+- Company (parent – QBO Customer)
+  - id
+  - name
+  - ...
+  - isActive
+  - qboCustomerId, qboSyncToken, qboLastSyncedAt (system fields)
+
+- Location (child – QBO Sub-Customer)
+  - id
+  - companyId
+  - name                // location/site name, e.g. "Toronto Warehouse"
+  - siteCode / storeNumber
+  - serviceAddress: { street, city, stateOrProvince, postalCode, country }
+  - contactPhone
+  - contactEmail
+  - billWithParent (boolean)
+  - isActive
+  - qboCustomerId, qboParentCustomerId, qboSyncToken, qboLastSyncedAt (system fields)
+
+Constraints to respect:
+- A Location is always a child of a single Company:
+  - Location.companyId → Company.id
+- We only allow **2 levels**: Company → Location (no child-of-location).
+- (companyId, name) should be unique (no duplicate location names under same company).
+- QBO fields (qboCustomerId, qboParentCustomerId, qboSyncToken, etc.) are NOT user-editable.
+
+--------------------------------
+GOAL – LOCATIONS TAB UX
+--------------------------------
+
+On the Client Detail page, when user clicks the **Locations** tab, they should see:
+
+1) A **table/list of existing locations** for this Company.
+2) Ability to **add a new location**.
+3) Ability to **edit an existing location**.
+4) Ability to **activate/deactivate** locations (soft delete via isActive).
+5) All changes should be QBO-safe but we do NOT implement QBO API calls here – just the app-side UI and API to our backend.
+
+--------------------------------
+PART 1 – LOCATIONS LIST UI
+--------------------------------
+
+Within the **Locations** tab, implement a component (e.g. `ClientLocationsTab`) that:
+
+1) On mount, fetches locations for the current company:
+   - Use existing API patterns.
+   - e.g. `GET /companies/:companyId/locations` or similar.
+   - The companyId comes from the route (`/clients/:id`) or parent component props.
+
+2) Displays a table or list with at least these columns:
+   - Location Name
+   - Site Code / Store Number
+   - City (from serviceAddress.city)
+   - Bill With Parent (Yes/No)
+   - Active (Yes/No)
+   - Actions (Edit, Activate/Deactivate)
+
+3) Show an “Add Location” button at the top/right of this tab.
+
+4) Handle loading and error states:
+   - Show a loading indicator while fetching.
+   - Show an error message if the fetch fails.
+   - Show an empty state message if there are no locations yet.
+
+--------------------------------
+PART 2 – ADD/EDIT LOCATION UI
+--------------------------------
+
+Implement a **Location form** that can be used for both:
+- Adding a new location
+- Editing an existing location
+
+You can implement this as either:
+- A modal dialog (preferred), OR
+- A slide-over panel
+
+Follow the existing design style used in the project (for forms/modals).
+
+Fields in the Location form:
+
+- Location Name (required)           → Location.name
+- Site Code / Store Number (optional)→ Location.siteCode or storeNumber
+- Service Address group:
+  - Street
+  - City
+  - State/Province
+  - Postal Code
+  - Country
+- Contact Phone (optional)
+- Contact Email (optional)
+- Bill With Parent (boolean toggle, default true for new locations)
+  - Label: “Bill this location with the parent company”
+  - Helper text: 
+    - “If enabled, invoices for this location will be billed to the parent company in QuickBooks. If disabled, this location will be billed directly to this location (sub-customer).”
+- Active (boolean):
+  - For **new** locations: default true.
+  - For **edit**: show current value.
+
+Validation:
+- Required:
+  - Location Name.
+- Optional:
+  - Other fields (validate email format and other fields if project has validators).
+- On duplicate name under same company (if API returns a 4xx with that info), show a human-friendly message:
+  - “A location with this name already exists for this client.”
+
+No QBO IDs in the form:
+- Do NOT display or allow editing of qboCustomerId, qboParentCustomerId, qboSyncToken, etc.
+
+--------------------------------
+PART 3 – API INTEGRATION
+--------------------------------
+
+Hook the form up to the backend via the existing API patterns.
+
+For adding a location:
+- On “Add Location” button click:
+  - Open Location form in “create” mode.
+- On submit:
+  - Call something like:
+    - `POST /companies/:companyId/locations`
+    - Payload example:
+
+      {
+        name: string,
+        siteCode?: string,
+        serviceAddress?: {
+          street?: string,
+          city?: string,
+          stateOrProvince?: string,
+          postalCode?: string,
+          country?: string
+        },
+        contactPhone?: string,
+        contactEmail?: string,
+        billWithParent: boolean,
+        isActive: boolean
+      }
+
+  - On success:
+    - Close the form.
+    - Refresh/reload the locations list in the tab.
+  - On error:
+    - Show inline error message and do not close the form.
+
+For editing a location:
+- On “Edit” action in the row:
+  - Open the same form in “edit” mode, pre-filled with that location’s data.
+- On submit:
+  - Call something like:
+    - `PUT /companies/:companyId/locations/:locationId`
+    - Use the same shape as above (with updates).
+  - On success:
+    - Close the form.
+    - Refresh the locations list.
+  - On error:
+    - Show inline error(s).
+
+For activate/deactivate:
+- In the table, have an action like:
+  - “Deactivate” if isActive is true.
+  - “Activate” if isActive is false.
+- When clicked:
+  - Call something like:
+    - `PATCH /companies/:companyId/locations/:locationId` with `{ isActive: false }` or `{ isActive: true }`.
+  - Update the row or refetch the list.
+
+--------------------------------
+PART 4 – QBO-SAFE CONSTRAINTS (DOCS + COMMENTS)
+--------------------------------
+
+Even though this component isn’t calling QBO directly, please:
+
+1) Add clear comments in the Locations tab code explaining:
+
+   - “Each Location here maps to a QuickBooks **Sub-Customer**.”
+   - “billWithParent controls whether the invoice’s CustomerRef will use the parent Company or this Location in future QuickBooks sync logic.”
+   - “The app only supports one level of hierarchy: Company → Location. We never attach a Location under another Location.”
+
+2) Make sure the UI **never suggests** that Locations can have their own children.
+
+3) If you enforce (companyId, name) uniqueness at the API level, surface that error gracefully in the UI:
+   - “This client already has a location with that name. Please choose a different name.”
+
+--------------------------------
+WHAT TO OUTPUT
+--------------------------------
+
+Please show me:
+
+1) The **ClientLocationsTab** (or equivalent) component code:
+   - List/table
+   - “Add Location” button
+   - Integration with the Location form
+   - API calls for fetch/refresh
+
+2) The **Location form** component:
+   - Fields, validation, and submit handlers
+   - Ability to work in “create” and “edit” modes
+   - Props/inputs agreed with the tab component
+
+3) Any small updates needed in:
+   - Routes (if relevant)
+   - Types/interfaces (TypeScript types or similar)
+   - API helper functions (e.g., `fetchLocations(companyId)`, `createLocation(companyId, data)`, `updateLocation(companyId, locationId, data)`, `patchLocationActive(companyId, locationId, isActive)`)
+
+Use the project’s existing coding style, form library, and UI components so everything feels consistent with the rest of the app.

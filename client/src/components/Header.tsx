@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useState, useEffect, useMemo } from "react";
 import FeedbackDialog from "./FeedbackDialog";
+import QuickAddClientModal from "./QuickAddClientModal";
 
 interface HeaderProps {
   onAddClient?: () => void;
@@ -25,6 +26,12 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [addClientModalOpen, setAddClientModalOpen] = useState(false);
+
+  const handleClientCreated = (clientId: string, _companyId?: string) => {
+    // Navigate to the client detail page after creation
+    setLocation(`/clients/${clientId}`);
+  };
 
   const { data: companySettings } = useQuery<CompanySettings | null>({
     queryKey: ["/api/company-settings"],
@@ -199,17 +206,16 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
                 </Command>
               </PopoverContent>
             </Popover>
-            <Link href="/add-client">
-              <Button
-                variant="default"
-                size="sm"
-                data-testid="button-add-client"
-                className="h-8 gap-1.5"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Add Client</span>
-              </Button>
-            </Link>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setAddClientModalOpen(true)}
+              data-testid="button-add-client"
+              className="h-8 gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Client</span>
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -242,6 +248,11 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
         </div>
       </div>
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      <QuickAddClientModal 
+        open={addClientModalOpen} 
+        onOpenChange={setAddClientModalOpen}
+        onSuccess={handleClientCreated}
+      />
     </header>
   );
 }

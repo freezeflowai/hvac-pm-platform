@@ -12,6 +12,7 @@ import Reports from "@/pages/Reports";
 import Admin from "@/pages/Admin";
 import SupportConsole from "@/pages/SupportConsole";
 import AddClientPage from "@/pages/AddClientPage";
+import ClientDetailPage from "@/pages/ClientDetailPage";
 import PartsManagementPage from "@/pages/PartsManagementPage";
 import CompanySettingsPage from "@/pages/CompanySettingsPage";
 import TechnicianDashboard from "@/pages/TechnicianDashboard";
@@ -99,6 +100,11 @@ function Router() {
       <Route path="/daily-parts">
         <ProtectedRoute>
           <DailyParts />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/clients/:id">
+        <ProtectedRoute requireAdmin>
+          <ClientDetailPage />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />
