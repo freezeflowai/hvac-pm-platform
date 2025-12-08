@@ -711,6 +711,7 @@ export default function ProductsServicesManager() {
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <h3 className="font-semibold">Products & Services</h3>
+          <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">v2.0</span>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
