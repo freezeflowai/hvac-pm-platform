@@ -10,6 +10,7 @@ import { ArrowLeft, Building2, MapPin, Package, StickyNote, Phone, Mail, MapPinn
 import ClientLocationsTab from "@/components/ClientLocationsTab";
 import ClientNotesTab from "@/components/ClientNotesTab";
 import ClientJobsTab from "@/components/ClientJobsTab";
+import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
 import type { Client, CustomerCompany } from "@shared/schema";
 
 type TabValue = "overview" | "jobs" | "locations" | "parts" | "notes";
@@ -31,6 +32,8 @@ export default function ClientDetailPage() {
 
   const [activeTab, setActiveTab] = useState<TabValue>(getInitialState().tab);
   const [selectedLocationId, setSelectedLocationId] = useState<string | undefined>(getInitialState().locationId);
+  const [jobDialogOpen, setJobDialogOpen] = useState(false);
+  const [preselectedLocationId, setPreselectedLocationId] = useState<string | undefined>();
 
   useEffect(() => {
     const state = getInitialState();
@@ -66,11 +69,8 @@ export default function ClientDetailPage() {
   });
 
   const handleCreateJob = (locationId?: string) => {
-    if (locationId) {
-      setLocation(`/calendar?action=createJob&locationId=${locationId}`);
-    } else {
-      setLocation(`/calendar?action=createJob&parentCompanyId=${client?.parentCompanyId}`);
-    }
+    setPreselectedLocationId(locationId || id);
+    setJobDialogOpen(true);
   };
 
   if (clientLoading) {
@@ -354,6 +354,12 @@ export default function ClientDetailPage() {
           <ClientNotesTab clientId={id!} />
         </TabsContent>
       </Tabs>
+
+      <QuickAddJobDialog
+        open={jobDialogOpen}
+        onOpenChange={setJobDialogOpen}
+        preselectedLocationId={preselectedLocationId}
+      />
     </div>
   );
 }
