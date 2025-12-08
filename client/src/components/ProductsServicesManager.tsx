@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, Pencil, Search, Loader2, Package, Wrench, Download, Upload, FileText } from "lucide-react";
+import { Trash2, Plus, Search, Loader2, Package, Wrench, Download, Upload, FileText } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -583,20 +583,28 @@ export default function ProductsServicesManager() {
         const margin = calculateMargin(part);
         const partType = part.type === 'filter' ? 'Filter' : part.type === 'belt' ? 'Belt' : part.category || '';
         return (
-          <Card key={part.id} data-testid={`card-item-${part.id}`} className={part.isActive === false ? "opacity-50" : ""}>
+          <Card 
+            key={part.id} 
+            data-testid={`card-item-${part.id}`} 
+            className={`cursor-pointer hover-elevate ${part.isActive === false ? "opacity-50" : ""}`}
+            onClick={() => handleOpenEditDialog(part)}
+          >
             <CardContent className="p-2.5 flex items-start justify-between gap-2">
               <Checkbox
                 checked={selectedIds.has(part.id)}
                 onCheckedChange={(checked) => handleSelectOne(part.id, checked as boolean)}
+                onClick={(e) => e.stopPropagation()}
                 className="mt-0.5"
                 data-testid={`checkbox-select-${part.id}`}
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <p className="font-medium text-sm truncate" data-testid={`text-name-${part.id}`}>{display.primary}</p>
-                  <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium shrink-0" data-testid={`badge-category-${part.id}`}>
-                    {part.type || 'no-type'}
-                  </span>
+                  {partType && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium shrink-0" data-testid={`badge-category-${part.id}`}>
+                      {partType}
+                    </span>
+                  )}
                 </div>
                 {display.secondary && (
                   <p className="text-xs text-muted-foreground truncate" data-testid={`text-sku-${part.id}`}>{display.secondary}</p>
@@ -613,27 +621,19 @@ export default function ProductsServicesManager() {
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-0.5 shrink-0">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                  onClick={() => handleOpenEditDialog(part)}
-                  data-testid={`button-edit-${part.id}`}
-                >
-                  <Pencil className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                  onClick={() => handleDeleteClick(part)}
-                  data-testid={`button-delete-${part.id}`}
-                  disabled={deletePartMutation.isPending}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteClick(part);
+                }}
+                data-testid={`button-delete-${part.id}`}
+                disabled={deletePartMutation.isPending}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
             </CardContent>
           </Card>
         );
@@ -654,7 +654,7 @@ export default function ProductsServicesManager() {
     emptyLabel 
   }: { 
     items: Part[]; 
-    loaderRef: React.RefObject<HTMLDivElement | null>; 
+    loaderRef: React.RefObject<HTMLDivElement>; 
     query: typeof productsQuery;
     tabTotal: number;
     emptyLabel: string;
@@ -709,7 +709,6 @@ export default function ProductsServicesManager() {
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <h3 className="font-semibold">Products & Services</h3>
-          <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">v2.0</span>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
