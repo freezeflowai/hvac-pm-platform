@@ -162,21 +162,25 @@ export default function ClientDetailPage() {
     },
   });
 
-  // Fetch location-specific parts and equipment when on Jobs tab with selected location
+  // Fetch location-specific parts and equipment when on Jobs tab with a selected location filter (not the primary client)
   const { data: locationParts = [] } = useQuery<any[]>({
-    queryKey: ["/api/locations", focusedLocationId, "pm-parts"],
-    enabled: Boolean(focusedLocationId) && activeTab === "jobs",
+    queryKey: ["/api/locations", selectedLocationId, "pm-parts"],
+    enabled: Boolean(selectedLocationId) && activeTab === "jobs",
   });
 
   const { data: locationEquipment = [] } = useQuery<any[]>({
-    queryKey: ["/api/locations", focusedLocationId, "equipment"],
-    enabled: Boolean(focusedLocationId) && activeTab === "jobs",
+    queryKey: ["/api/locations", selectedLocationId, "equipment"],
+    enabled: Boolean(selectedLocationId) && activeTab === "jobs",
   });
 
-  // Toggle location active status
+  // Get the selected location (only when an actual location is selected, not fallback to primary client)
+  const selectedLocation = selectedLocationId ? locations.find(loc => loc.id === selectedLocationId) : undefined;
+
+  // Toggle location active status - only for selected locations, not the primary client
   const toggleActiveMutation = useMutation({
     mutationFn: async (inactive: boolean) => {
-      const res = await apiRequest("PATCH", `/api/clients/${focusedLocationId}`, { inactive });
+      if (!selectedLocationId) throw new Error("No location selected");
+      const res = await apiRequest("PATCH", `/api/clients/${selectedLocationId}`, { inactive });
       return await res.json();
     },
     onSuccess: () => {
@@ -184,17 +188,18 @@ export default function ClientDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/clients", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/customer-companies", client?.parentCompanyId, "locations"] });
       setDeactivateDialogOpen(false);
-      toast({ title: "Status updated", description: `Location ${focusedLocation?.inactive ? "activated" : "deactivated"} successfully.` });
+      toast({ title: "Status updated", description: `Location ${selectedLocation?.inactive ? "activated" : "deactivated"} successfully.` });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update status.", variant: "destructive" });
     },
   });
 
-  // Toggle bill with parent
+  // Toggle bill with parent - only for selected locations, not the primary client
   const toggleBillWithParentMutation = useMutation({
     mutationFn: async (billWithParent: boolean) => {
-      const res = await apiRequest("PATCH", `/api/clients/${focusedLocationId}`, { billWithParent });
+      if (!selectedLocationId) throw new Error("No location selected");
+      const res = await apiRequest("PATCH", `/api/clients/${selectedLocationId}`, { billWithParent });
       return await res.json();
     },
     onSuccess: () => {
@@ -555,43 +560,43 @@ export default function ClientDetailPage() {
 
         {/* Right Column - 30% */}
         <aside className="w-[30%] min-w-[280px] space-y-4 flex-shrink-0">
-          {/* Dynamic content based on tab */}
-          {activeTab === "jobs" && selectedLocationId ? (
+          {/* Dynamic content based on tab - show location panel only when a location is selected */}
+          {activeTab === "jobs" && selectedLocationId && selectedLocation ? (
             <>
               {/* Location Header with Status */}
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-base">{focusedLocation?.location || focusedLocation?.companyName || "Location"}</CardTitle>
-                    <Badge variant={focusedLocation?.inactive ? "secondary" : "default"}>
-                      {focusedLocation?.inactive ? "Inactive" : "Active"}
+                    <CardTitle className="text-base">{selectedLocation.location || selectedLocation.companyName || "Location"}</CardTitle>
+                    <Badge variant={selectedLocation.inactive ? "secondary" : "default"}>
+                      {selectedLocation.inactive ? "Inactive" : "Active"}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Address */}
-                  {focusedLocation?.address && (
+                  {selectedLocation.address && (
                     <div className="text-sm text-muted-foreground">
-                      <p>{focusedLocation.address}</p>
-                      <p>{focusedLocation.city}, {focusedLocation.province} {focusedLocation.postalCode}</p>
+                      <p>{selectedLocation.address}</p>
+                      <p>{selectedLocation.city}, {selectedLocation.province} {selectedLocation.postalCode}</p>
                     </div>
                   )}
 
                   {/* Contact Info */}
                   <div className="space-y-2">
-                    {focusedLocation?.contactName && (
-                      <p className="text-sm font-medium">{focusedLocation.contactName}</p>
+                    {selectedLocation.contactName && (
+                      <p className="text-sm font-medium">{selectedLocation.contactName}</p>
                     )}
-                    {focusedLocation?.email && (
-                      <a href={`mailto:${focusedLocation.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                    {selectedLocation.email && (
+                      <a href={`mailto:${selectedLocation.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
                         <Mail className="h-4 w-4" />
-                        {focusedLocation.email}
+                        {selectedLocation.email}
                       </a>
                     )}
-                    {focusedLocation?.phone && (
-                      <a href={`tel:${focusedLocation.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                    {selectedLocation.phone && (
+                      <a href={`tel:${selectedLocation.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
                         <Phone className="h-4 w-4" />
-                        {focusedLocation.phone}
+                        {selectedLocation.phone}
                       </a>
                     )}
                   </div>
@@ -601,11 +606,11 @@ export default function ClientDetailPage() {
                     <div className="space-y-0.5">
                       <p className="text-sm font-medium">Bill with Parent</p>
                       <p className="text-xs text-muted-foreground">
-                        {focusedLocation?.billWithParent ? "Billed to parent company" : "Billed directly"}
+                        {selectedLocation.billWithParent ? "Billed to parent company" : "Billed directly"}
                       </p>
                     </div>
                     <Switch
-                      checked={focusedLocation?.billWithParent ?? true}
+                      checked={selectedLocation.billWithParent ?? true}
                       onCheckedChange={(checked) => toggleBillWithParentMutation.mutate(checked)}
                       disabled={toggleBillWithParentMutation.isPending}
                       data-testid="switch-bill-with-parent"
@@ -625,14 +630,14 @@ export default function ClientDetailPage() {
                       Edit
                     </Button>
                     <Button 
-                      variant={focusedLocation?.inactive ? "default" : "outline"}
+                      variant={selectedLocation.inactive ? "default" : "outline"}
                       size="sm" 
                       className="flex-1"
-                      onClick={() => focusedLocation?.inactive ? toggleActiveMutation.mutate(false) : setDeactivateDialogOpen(true)}
+                      onClick={() => selectedLocation.inactive ? toggleActiveMutation.mutate(false) : setDeactivateDialogOpen(true)}
                       disabled={toggleActiveMutation.isPending}
                       data-testid="button-toggle-active"
                     >
-                      {focusedLocation?.inactive ? "Activate" : "Deactivate"}
+                      {selectedLocation.inactive ? "Activate" : "Deactivate"}
                     </Button>
                   </div>
                 </CardContent>
@@ -883,19 +888,21 @@ export default function ClientDetailPage() {
         </aside>
       </div>
 
-      {/* Edit Location Modal */}
-      <LocationFormModal
-        open={editLocationModalOpen}
-        onOpenChange={setEditLocationModalOpen}
-        location={focusedLocation as Client}
-        companyId={client.companyId}
-        parentCompanyId={client.parentCompanyId || undefined}
-        onSuccess={() => {
-          setEditLocationModalOpen(false);
-          queryClient.invalidateQueries({ queryKey: ["/api/clients", id] });
-          queryClient.invalidateQueries({ queryKey: ["/api/customer-companies", client.parentCompanyId, "locations"] });
-        }}
-      />
+      {/* Edit Location Modal - only shown when a location is selected */}
+      {selectedLocation && (
+        <LocationFormModal
+          open={editLocationModalOpen}
+          onOpenChange={setEditLocationModalOpen}
+          location={selectedLocation}
+          companyId={client.companyId}
+          parentCompanyId={client.parentCompanyId || undefined}
+          onSuccess={() => {
+            setEditLocationModalOpen(false);
+            queryClient.invalidateQueries({ queryKey: ["/api/clients", id] });
+            queryClient.invalidateQueries({ queryKey: ["/api/customer-companies", client.parentCompanyId, "locations"] });
+          }}
+        />
+      )}
     </div>
   );
 }
