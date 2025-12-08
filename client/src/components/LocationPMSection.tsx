@@ -65,9 +65,10 @@ export default function LocationPMSection({ locationId }: LocationPMSectionProps
     queryKey: ["/api/locations", locationId, "pm-parts"],
   });
 
-  const { data: products = [] } = useQuery<Part[]>({
+  const { data: productsResponse } = useQuery<{ items: Part[]; total: number }>({
     queryKey: ["/api/parts"],
   });
+  const products = productsResponse?.items ?? [];
 
   const [localPlan, setLocalPlan] = useState<Partial<LocationPMPlan>>({});
   
