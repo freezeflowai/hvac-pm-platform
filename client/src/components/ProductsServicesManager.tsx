@@ -580,8 +580,8 @@ export default function ProductsServicesManager() {
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
       {items.map((part) => {
         const display = getPartDisplay(part);
-        const isProductOrService = part.type === "service" || part.type === "product";
         const margin = calculateMargin(part);
+        const partType = part.type === 'filter' ? 'Filter' : part.type === 'belt' ? 'Belt' : part.category || '';
         return (
           <Card key={part.id} data-testid={`card-item-${part.id}`} className={part.isActive === false ? "opacity-50" : ""}>
             <CardContent className="p-2.5 flex items-start justify-between gap-2">
@@ -594,9 +594,9 @@ export default function ProductsServicesManager() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <p className="font-medium text-sm truncate" data-testid={`text-name-${part.id}`}>{display.primary}</p>
-                  {display.category && (
+                  {partType && (
                     <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground shrink-0" data-testid={`badge-category-${part.id}`}>
-                      {display.category}
+                      {partType}
                     </span>
                   )}
                 </div>
@@ -605,10 +605,10 @@ export default function ProductsServicesManager() {
                 )}
               </div>
               <div className="flex flex-col items-end gap-0.5 shrink-0">
-                {isProductOrService && part.unitPrice && (
+                {part.unitPrice && (
                   <span className="text-sm font-medium" data-testid={`text-price-${part.id}`}>${part.unitPrice}</span>
                 )}
-                {isProductOrService && part.cost && (
+                {part.cost && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <span data-testid={`text-cost-${part.id}`}>${part.cost}</span>
                     {margin && <span className="text-green-600" data-testid={`text-margin-${part.id}`}>{margin}</span>}
@@ -616,17 +616,15 @@ export default function ProductsServicesManager() {
                 )}
               </div>
               <div className="flex items-center gap-0.5 shrink-0">
-                {isProductOrService && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7"
-                    onClick={() => handleOpenEditDialog(part)}
-                    data-testid={`button-edit-${part.id}`}
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                )}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => handleOpenEditDialog(part)}
+                  data-testid={`button-edit-${part.id}`}
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
                 <Button
                   size="icon"
                   variant="ghost"
