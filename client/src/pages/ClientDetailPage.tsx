@@ -1,17 +1,23 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation, useSearch, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Building2, MapPin, Package, StickyNote, Phone, Mail, MapPinned, FileText, Plus, Briefcase, Activity } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowLeft, Building2, MapPin, Package, StickyNote, Phone, Mail, MapPinned, FileText, Plus, Briefcase, Star, Pencil, Trash2, CheckCircle, Clock, AlertCircle, Calendar, DollarSign } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import ClientLocationsTab from "@/components/ClientLocationsTab";
 import ClientNotesTab from "@/components/ClientNotesTab";
 import ClientJobsTab from "@/components/ClientJobsTab";
 import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
-import type { Client, CustomerCompany } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { format } from "date-fns";
+import type { Client, CustomerCompany, ClientNote, Job } from "@shared/schema";
 
 type TabValue = "overview" | "jobs" | "locations" | "parts" | "notes";
 
@@ -30,10 +36,17 @@ export default function ClientDetailPage() {
     };
   };
 
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabValue>(getInitialState().tab);
   const [selectedLocationId, setSelectedLocationId] = useState<string | undefined>(getInitialState().locationId);
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
   const [preselectedLocationId, setPreselectedLocationId] = useState<string | undefined>();
+  const [overviewSubTab, setOverviewSubTab] = useState<"active" | "jobs" | "invoices">("active");
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [newNoteContent, setNewNoteContent] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editNoteContent, setEditNoteContent] = useState("");
+  const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
 
   useEffect(() => {
     const state = getInitialState();
@@ -66,6 +79,77 @@ export default function ClientDetailPage() {
   const { data: parentCompany, isLoading: companyLoading } = useQuery<CustomerCompany>({
     queryKey: [`/api/customer-companies/${client?.parentCompanyId}`],
     enabled: Boolean(client?.parentCompanyId),
+  });
+
+  // Fetch locations for this parent company
+  const { data: locations = [] } = useQuery<Client[]>({
+    queryKey: ["/api/customer-companies", client?.parentCompanyId, "locations"],
+    enabled: Boolean(client?.parentCompanyId),
+  });
+
+  // Fetch jobs for overview - enable when we have a client ID
+  const { data: jobs = [] } = useQuery<Job[]>({
+    queryKey: ["/api/jobs"],
+    enabled: Boolean(client),
+  });
+
+  // Filter jobs to this company's locations
+  const companyJobs = jobs.filter(job => {
+    if (!locations.length) return job.locationId === id;
+    return locations.some(loc => loc.id === job.locationId);
+  });
+
+  // Fetch notes for overview
+  const { data: notes = [] } = useQuery<ClientNote[]>({
+    queryKey: ["/api/clients", id, "notes"],
+    enabled: Boolean(id),
+  });
+
+  // Note mutations
+  const createNoteMutation = useMutation({
+    mutationFn: async (noteText: string) => {
+      const res = await apiRequest("POST", `/api/clients/${id}/notes`, { noteText });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", id, "notes"] });
+      setNewNoteContent("");
+      setIsAddingNote(false);
+      toast({ title: "Note added", description: "The note has been added successfully." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add note.", variant: "destructive" });
+    },
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ noteId, noteText }: { noteId: string; noteText: string }) => {
+      const res = await apiRequest("PATCH", `/api/clients/${id}/notes/${noteId}`, { noteText });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", id, "notes"] });
+      setEditingNoteId(null);
+      setEditNoteContent("");
+      toast({ title: "Note updated", description: "The note has been updated successfully." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update note.", variant: "destructive" });
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (noteId: string) => {
+      await apiRequest("DELETE", `/api/clients/${id}/notes/${noteId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", id, "notes"] });
+      setDeleteNoteId(null);
+      toast({ title: "Note deleted", description: "The note has been deleted." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete note.", variant: "destructive" });
+    },
   });
 
   const handleCreateJob = (locationId?: string) => {
@@ -168,149 +252,348 @@ export default function ClientDetailPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Company Information
-                </CardTitle>
-                <CardDescription>
-                  Parent company details (maps to QuickBooks Customer)
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Company Name</Label>
-                  <p className="font-medium">{companyName}</p>
-                </div>
-                {parentCompany?.legalName && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Legal Name</Label>
-                    <p>{parentCompany.legalName}</p>
-                  </div>
-                )}
-                {(parentCompany?.phone || client.phone) && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{parentCompany?.phone || client.phone}</span>
-                  </div>
-                )}
-                {(parentCompany?.email || client.email) && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{parentCompany?.email || client.email}</span>
-                  </div>
-                )}
-                {parentCompany?.billingStreet && (
-                  <div className="flex items-start gap-2">
-                    <MapPinned className="h-4 w-4 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p>{parentCompany.billingStreet}</p>
-                      <p>{parentCompany.billingCity}, {parentCompany.billingProvince} {parentCompany.billingPostalCode}</p>
-                    </div>
-                  </div>
-                )}
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleTabChange("locations")}
-                  data-testid="button-view-locations"
+          {/* Properties Section */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+              <CardTitle>Properties</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => handleTabChange("locations")} data-testid="button-new-property">
+                <Plus className="h-4 w-4 mr-2" />
+                New Property
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {locations.length === 0 ? (
+                <div 
+                  className="flex items-center gap-4 p-3 rounded-lg cursor-pointer hover-elevate"
+                  onClick={() => handleViewJobsForLocation(id!)}
+                  data-testid={`row-location-${id}`}
                 >
-                  View All Locations
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5" />
-                  Primary Location
-                </CardTitle>
-                <CardDescription>
-                  Service location details (maps to QuickBooks Sub-Customer)
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Location Name</Label>
-                  <p className="font-medium">{locationName}</p>
-                </div>
-                {client.address && (
-                  <div className="flex items-start gap-2">
-                    <MapPinned className="h-4 w-4 text-muted-foreground mt-0.5" />
+                  <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                  <div className="flex-1 grid grid-cols-4 gap-4">
                     <div>
-                      <p>{client.address}</p>
-                      <p>{client.city}, {client.province} {client.postalCode}</p>
+                      <p className="font-medium">{locationName}</p>
+                      <p className="text-sm text-muted-foreground">{client.address}</p>
                     </div>
+                    <p className="text-muted-foreground">{client.city}</p>
+                    <p className="text-muted-foreground">{client.province}</p>
+                    <p className="text-muted-foreground">{client.postalCode}</p>
                   </div>
-                )}
-                {client.contactName && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Contact</Label>
-                    <p>{client.contactName}</p>
-                  </div>
-                )}
-                {client.phone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{client.phone}</span>
-                  </div>
-                )}
-                {client.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{client.email}</span>
-                  </div>
-                )}
-                <div className="pt-2 border-t">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs text-muted-foreground">Billing</Label>
-                    <Badge variant={client.billWithParent ? "default" : "secondary"}>
-                      {client.billWithParent ? "Bills to Parent" : "Bills Directly"}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {client.billWithParent 
-                      ? "Invoices will be billed to the parent company."
-                      : "Invoices will be billed directly to this location."}
-                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              ) : (
+                <div className="divide-y">
+                  {locations.map((loc) => (
+                    <div 
+                      key={loc.id}
+                      className="flex items-center gap-4 p-3 cursor-pointer hover-elevate"
+                      onClick={() => handleViewJobsForLocation(loc.id)}
+                      data-testid={`row-location-${loc.id}`}
+                    >
+                      {loc.id === id ? (
+                        <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                      ) : (
+                        <div className="w-4" />
+                      )}
+                      <div className="flex-1 grid grid-cols-4 gap-4">
+                        <div>
+                          <p className="font-medium">{loc.location || loc.companyName}</p>
+                          <p className="text-sm text-muted-foreground">{loc.address}</p>
+                        </div>
+                        <p className="text-muted-foreground">{loc.city}</p>
+                        <p className="text-muted-foreground">{loc.province}</p>
+                        <p className="text-muted-foreground">{loc.postalCode}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
+          {/* Internal Notes Section */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Activity Summary
+                <StickyNote className="h-5 w-5" />
+                Internal Notes
               </CardTitle>
               <CardDescription>
-                Overview of recent activity and metrics
+                Internal notes will only be seen by your team
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="text-center py-4 border rounded-lg">
-                  <Briefcase className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Jobs</p>
-                  <p className="text-xs text-muted-foreground mt-1">Coming soon</p>
+            <CardContent className="space-y-4">
+              {isAddingNote ? (
+                <div className="space-y-3">
+                  <Textarea
+                    placeholder="Note details"
+                    value={newNoteContent}
+                    onChange={(e) => setNewNoteContent(e.target.value)}
+                    className="min-h-[100px]"
+                    data-testid="textarea-new-note"
+                  />
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      onClick={() => createNoteMutation.mutate(newNoteContent.trim())}
+                      disabled={!newNoteContent.trim() || createNoteMutation.isPending}
+                      data-testid="button-save-note"
+                    >
+                      Save Note
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => { setIsAddingNote(false); setNewNoteContent(""); }}
+                      data-testid="button-cancel-note"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
-                <div className="text-center py-4 border rounded-lg">
-                  <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Unpaid Invoices</p>
-                  <p className="text-xs text-muted-foreground mt-1">Coming soon</p>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsAddingNote(true)}
+                  data-testid="button-add-note"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Note
+                </Button>
+              )}
+
+              {notes.length > 0 && (
+                <div className="space-y-3 mt-4">
+                  {notes.slice(0, 3).map((note) => (
+                    <div 
+                      key={note.id}
+                      className="p-4 border rounded-lg cursor-pointer hover-elevate"
+                      onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.noteText); }}
+                      data-testid={`card-note-${note.id}`}
+                    >
+                      {editingNoteId === note.id ? (
+                        <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                          <Textarea
+                            value={editNoteContent}
+                            onChange={(e) => setEditNoteContent(e.target.value)}
+                            className="min-h-[80px]"
+                            data-testid="textarea-edit-note"
+                          />
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              onClick={() => updateNoteMutation.mutate({ noteId: note.id, noteText: editNoteContent.trim() })}
+                              disabled={!editNoteContent.trim() || updateNoteMutation.isPending}
+                            >
+                              Save
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => { setEditingNoteId(null); setEditNoteContent(""); }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-destructive ml-auto"
+                              onClick={() => setDeleteNoteId(note.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
+                              {note.userId?.slice(0, 1).toUpperCase() || "U"}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">Team Member</p>
+                              <p className="text-xs text-muted-foreground">
+                                Created: {format(new Date(note.createdAt), "MM/dd/yyyy h:mma")}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap">{note.noteText}</p>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  {notes.length > 3 && (
+                    <Button variant="ghost" onClick={() => handleTabChange("notes")} className="text-primary hover:underline p-0 h-auto">
+                      View all {notes.length} notes
+                    </Button>
+                  )}
                 </div>
-                <div className="text-center py-4 border rounded-lg">
-                  <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Locations</p>
-                  <p className="text-xs text-muted-foreground mt-1">Coming soon</p>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* Overview / Active Work Section */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap pb-2">
+              <CardTitle>Overview</CardTitle>
+              <Button size="sm" onClick={() => handleCreateJob()} data-testid="button-overview-new">
+                New
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="border-b mb-4">
+                <div className="flex gap-4">
+                  <button
+                    className={`pb-2 text-sm font-medium border-b-2 transition-colors ${overviewSubTab === "active" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                    onClick={() => setOverviewSubTab("active")}
+                    data-testid="tab-active-work"
+                  >
+                    Active Work
+                  </button>
+                  <button
+                    className={`pb-2 text-sm font-medium border-b-2 transition-colors ${overviewSubTab === "jobs" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                    onClick={() => setOverviewSubTab("jobs")}
+                    data-testid="tab-all-jobs"
+                  >
+                    Jobs
+                  </button>
+                  <button
+                    className={`pb-2 text-sm font-medium border-b-2 transition-colors ${overviewSubTab === "invoices" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                    onClick={() => setOverviewSubTab("invoices")}
+                    data-testid="tab-invoices"
+                  >
+                    Invoices
+                  </button>
+                </div>
+              </div>
+
+              {overviewSubTab === "active" && (
+                <div className="divide-y">
+                  {companyJobs
+                    .filter(job => ["scheduled", "in_progress", "draft"].includes(job.status))
+                    .slice(0, 5)
+                    .map((job) => {
+                      const loc = locations.find(l => l.id === job.locationId) || client;
+                      const isToday = job.scheduledStart && format(new Date(job.scheduledStart), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                      const isOverdue = job.scheduledStart && new Date(job.scheduledStart) < new Date() && job.status !== "completed";
+                      
+                      return (
+                        <div 
+                          key={job.id}
+                          className="flex items-center gap-4 py-3 cursor-pointer hover-elevate"
+                          onClick={() => setLocation(`/jobs/${job.id}`)}
+                          data-testid={`row-active-job-${job.id}`}
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium">
+                              Job #{job.jobNumber} - {job.summary || "Maintenance"}
+                            </p>
+                            {isToday && (
+                              <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20 mt-1">
+                                Today
+                              </Badge>
+                            )}
+                            {isOverdue && !isToday && (
+                              <Badge variant="destructive" className="mt-1">
+                                Action required
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            <p>SCHEDULED FOR</p>
+                            <p className="font-medium text-foreground">
+                              {job.scheduledStart ? format(new Date(job.scheduledStart), "MM/dd/yyyy") : "Not scheduled"}
+                            </p>
+                          </div>
+                          <div className="text-sm text-right min-w-[150px]">
+                            <p className="font-medium">{loc.location || loc.companyName}</p>
+                            <p className="text-muted-foreground">{loc.address}</p>
+                            <p className="text-muted-foreground">{loc.city}, {loc.province} {loc.postalCode}</p>
+                          </div>
+                          <div className="text-right min-w-[80px]">
+                            <p className="font-medium">$0.00</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {companyJobs.filter(job => ["scheduled", "in_progress", "draft"].includes(job.status)).length === 0 && (
+                    <div className="py-8 text-center text-muted-foreground">
+                      <Briefcase className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No active work</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {overviewSubTab === "jobs" && (
+                <div className="divide-y">
+                  {companyJobs.slice(0, 10).map((job) => {
+                    const loc = locations.find(l => l.id === job.locationId) || client;
+                    return (
+                      <div 
+                        key={job.id}
+                        className="flex items-center gap-4 py-3 cursor-pointer hover-elevate"
+                        onClick={() => setLocation(`/jobs/${job.id}`)}
+                        data-testid={`row-job-${job.id}`}
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium">Job #{job.jobNumber} - {job.summary || "Maintenance"}</p>
+                          <Badge variant={job.status === "completed" ? "default" : "secondary"} className="mt-1">
+                            {job.status}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {job.scheduledStart ? format(new Date(job.scheduledStart), "MM/dd/yyyy") : "Not scheduled"}
+                        </div>
+                        <div className="text-sm text-right">
+                          <p>{loc.location || loc.companyName}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {companyJobs.length === 0 && (
+                    <div className="py-8 text-center text-muted-foreground">
+                      <Briefcase className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No jobs found</p>
+                    </div>
+                  )}
+                  {companyJobs.length > 10 && (
+                    <div className="pt-4">
+                      <Button variant="ghost" onClick={() => handleTabChange("jobs")} className="text-primary hover:underline p-0 h-auto">
+                        View all {companyJobs.length} jobs
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {overviewSubTab === "invoices" && (
+                <div className="py-8 text-center text-muted-foreground">
+                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No invoices yet</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Delete Note Confirmation */}
+          <AlertDialog open={!!deleteNoteId} onOpenChange={(open) => !open && setDeleteNoteId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Note</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete this note? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteNoteId && deleteNoteMutation.mutate(deleteNoteId)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
 
         <TabsContent value="jobs">
