@@ -41,6 +41,8 @@ interface QuickAddJobDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   preselectedLocationId?: string;
+  editJob?: Job | null;
+  onSuccess?: () => void;
 }
 
 const JOB_TYPES = [
@@ -64,11 +66,12 @@ const STATUSES = [
   { value: "in_progress", label: "In Progress" },
 ];
 
-export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId }: QuickAddJobDialogProps) {
+export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId, editJob, onSuccess }: QuickAddJobDialogProps) {
   const { toast } = useToast();
   const [locationOpen, setLocationOpen] = useState(false);
+  const isEditMode = !!editJob;
   
-  const [formData, setFormData] = useState({
+  const getDefaultFormData = () => ({
     locationId: preselectedLocationId || "",
     summary: "",
     description: "",
@@ -81,30 +84,41 @@ export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId }:
     accessInstructions: "",
     billingNotes: "",
   });
+  
+  const [formData, setFormData] = useState(getDefaultFormData());
 
   useEffect(() => {
-    if (preselectedLocationId) {
+    if (open && editJob) {
+      const formatDateForInput = (date: Date | string | null | undefined): string => {
+        if (!date) return "";
+        const d = typeof date === 'string' ? new Date(date) : date;
+        if (isNaN(d.getTime())) return "";
+        return d.toISOString().slice(0, 16);
+      };
+      
+      setFormData({
+        locationId: editJob.locationId || "",
+        summary: editJob.summary || "",
+        description: editJob.description || "",
+        jobType: editJob.jobType || "maintenance",
+        priority: editJob.priority || "medium",
+        status: editJob.status || "scheduled",
+        scheduledStart: formatDateForInput(editJob.scheduledStart),
+        scheduledEnd: formatDateForInput(editJob.scheduledEnd),
+        primaryTechnicianId: editJob.primaryTechnicianId || "",
+        accessInstructions: editJob.accessInstructions || "",
+        billingNotes: editJob.billingNotes || "",
+      });
+    } else if (open && preselectedLocationId) {
       setFormData(prev => ({ ...prev, locationId: preselectedLocationId }));
     }
-  }, [preselectedLocationId]);
+  }, [open, editJob, preselectedLocationId]);
 
   useEffect(() => {
     if (!open) {
-      setFormData({
-        locationId: preselectedLocationId || "",
-        summary: "",
-        description: "",
-        jobType: "maintenance",
-        priority: "medium",
-        status: "scheduled",
-        scheduledStart: "",
-        scheduledEnd: "",
-        primaryTechnicianId: "",
-        accessInstructions: "",
-        billingNotes: "",
-      });
+      setFormData(getDefaultFormData());
     }
-  }, [open, preselectedLocationId]);
+  }, [open]);
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -130,7 +144,7 @@ export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId }:
     mutationFn: async (data: Partial<InsertJob>) => {
       return apiRequest("POST", "/api/jobs", data);
     },
-    onSuccess: (response) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
       toast({
@@ -138,11 +152,36 @@ export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId }:
         description: `Job has been created successfully.`,
       });
       onOpenChange(false);
+      onSuccess?.();
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to create job",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateJobMutation = useMutation({
+    mutationFn: async (data: Partial<InsertJob>) => {
+      return apiRequest("PUT", `/api/jobs/${editJob?.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", editJob?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+      toast({
+        title: "Job Updated",
+        description: `Job has been updated successfully.`,
+      });
+      onOpenChange(false);
+      onSuccess?.();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update job",
         variant: "destructive",
       });
     },
@@ -183,14 +222,18 @@ export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId }:
       billingNotes: formData.billingNotes.trim() || null,
     };
 
-    createJobMutation.mutate(jobData);
+    if (isEditMode) {
+      updateJobMutation.mutate(jobData);
+    } else {
+      createJobMutation.mutate(jobData);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-quick-add-job">
         <DialogHeader>
-          <DialogTitle data-testid="text-dialog-title">Create New Job</DialogTitle>
+          <DialogTitle data-testid="text-dialog-title">{isEditMode ? "Edit Job" : "Create New Job"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -411,23 +454,23 @@ export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId }:
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={createJobMutation.isPending}
+              disabled={createJobMutation.isPending || updateJobMutation.isPending}
               data-testid="button-cancel"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={createJobMutation.isPending || !formData.locationId || !formData.summary.trim()}
+              disabled={createJobMutation.isPending || updateJobMutation.isPending || !formData.locationId || !formData.summary.trim()}
               data-testid="button-create-job"
             >
-              {createJobMutation.isPending ? (
+              {(createJobMutation.isPending || updateJobMutation.isPending) ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
+                  {isEditMode ? "Saving..." : "Creating..."}
                 </>
               ) : (
-                "Create Job"
+                isEditMode ? "Save Changes" : "Create Job"
               )}
             </Button>
           </DialogFooter>

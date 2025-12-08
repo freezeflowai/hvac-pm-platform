@@ -34,6 +34,7 @@ import {
   Check
 } from "lucide-react";
 import JobEquipmentSection from "@/components/JobEquipmentSection";
+import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -412,6 +413,7 @@ export default function JobDetailPage() {
   const { toast } = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssignTech, setShowAssignTech] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const jobId = params?.id;
 
   const { data: job, isLoading, error } = useQuery<JobDetailResponse>({
@@ -543,7 +545,7 @@ export default function JobDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => toast({ title: "Coming Soon", description: "Edit functionality coming soon." })}
+              onClick={() => setShowEditDialog(true)}
               data-testid="button-edit"
             >
               <Pencil className="h-4 w-4 mr-2" />
@@ -1003,6 +1005,15 @@ export default function JobDetailPage() {
         jobId={job.id}
         currentTechnicianIds={job.assignedTechnicianIds || []}
         primaryTechnicianId={job.primaryTechnicianId}
+      />
+
+      <QuickAddJobDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        editJob={job}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId] });
+        }}
       />
     </div>
   );
