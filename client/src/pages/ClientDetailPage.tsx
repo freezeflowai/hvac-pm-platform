@@ -220,10 +220,6 @@ export default function ClientDetailPage() {
               Create Invoice
             </Button>
           </Link>
-          <Button variant="outline" onClick={() => handleTabChange("locations")} data-testid="button-header-add-location">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Location
-          </Button>
         </div>
       </div>
 
@@ -260,9 +256,9 @@ export default function ClientDetailPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
               <CardTitle>Properties</CardTitle>
-              <Button variant="outline" size="sm" onClick={() => handleTabChange("locations")} data-testid="button-new-property">
-                <Plus className="h-4 w-4 mr-2" />
-                New Property
+              <Button variant="outline" size="sm" onClick={() => handleTabChange("locations")} data-testid="button-manage-property">
+                <MapPin className="h-4 w-4 mr-2" />
+                Manage Property
               </Button>
             </CardHeader>
             <CardContent>

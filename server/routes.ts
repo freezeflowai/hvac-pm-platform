@@ -949,6 +949,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH route for partial client updates (used by LocationFormModal)
+  app.patch("/api/clients/:id", isAuthenticated, async (req, res) => {
+    try {
+      const validated = insertClientSchema.partial().parse(req.body);
+      const companyId = req.user!.companyId;
+      const clientId = req.params.id;
+      
+      const client = await storage.updateClient(companyId, clientId, validated);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      res.json(client);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid client data" });
+    }
+  });
+
   app.delete("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
       await storage.deleteAllClientParts(req.user!.companyId, req.params.id);
