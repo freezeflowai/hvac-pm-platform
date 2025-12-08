@@ -1,0 +1,148 @@
+You are helping me refactor the EXISTING Job Detail page in my HVAC dispatch app.
+
+I’ve already implemented a job page with:
+
+- Header: Job ID, job title (e.g. “Job #10134 – Maintenance Job”), priority pill.
+- A status strip with stages like Draft, Scheduled, In Progress, Completed, Invoiced, Hold, Cancel.
+- A blue “Start Job” button in the header (I want to remove this).
+- Main sections:
+  - Job Details card
+  - Location card
+  - Assigned Technicians card
+  - Equipment card
+  - Parts & Billing card
+  - Activity card
+  - Metadata card
+
+Use the existing tech stack, components, and styling. Do NOT add new frameworks. Refactor the current Job Detail component/layout rather than building a brand new page.
+
+The goal is to:
+- Remove “start/stop job” from this admin/office view.
+- Keep only **status changes** as the way to control job state.
+- Simplify the layout to a **two-column structure** that reduces scrolling and groups related information.
+
+------------------------------------------------
+1) REMOVE START/STOP CONTROLS FROM HEADER
+------------------------------------------------
+
+Currently there is a “Start Job” button in the header area.
+
+Change this so that:
+
+- The header only shows:
+  - Job ID and title (e.g., “Job #10134 – Maintenance Job”)
+  - Priority pill (Low / Medium / High)
+  - Status control (either the existing status strip or a cleaned up status dropdown/strip)
+  - Secondary actions like:
+    - Edit Job
+    - Delete/Cancel job (if allowed)
+- The **“Start Job”** button and any similar “Stop Job” or timer buttons must be removed from this page. Techs will manage live job state in a separate mobile/tech UI, not here.
+
+Status behavior:
+
+- Keep the ability to update status (Draft, Scheduled, In Progress, Completed, Invoiced, Hold, Cancel) from this page.
+- This can remain as the existing status strip or a simplified status dropdown, but there should be **no “start/stop” workflow buttons**.
+
+------------------------------------------------
+2) CHANGE LAYOUT TO TWO COLUMNS
+------------------------------------------------
+
+Convert the main content into a consistent **two-column layout**:
+
+- **Left column**: primary job information and billing
+- **Right column**: context (location, technicians, equipment, activity, metadata)
+
+Maintain responsiveness according to current breakpoints, but on desktop the intent is:
+
+LEFT (wider, main):
+
+1. **Job Details card**
+   - Job Type
+   - Summary
+   - Description
+   - Access Instructions
+   - Scheduled Start
+   - Scheduled End
+   - (Optional) Actual Start/End if present
+
+2. **Parts & Billing card**
+   - Parts Added (count)
+   - Invoice Status (e.g., Not Created / Created / Synced)
+   - Billing Notes
+   - Buttons:
+     - “Add Parts”
+     - If invoice not created: “Create Invoice”
+     - If invoice exists: “View Invoice”
+   - This card should sit directly under Job Details in the left column.
+
+RIGHT (narrower, supporting):
+
+1. **Location card**
+   - Location name
+   - Client/company if available
+   - Address (if available)
+   - “View Location Details” button
+
+2. **Assigned Technicians card**
+   - If none assigned:
+     - Show a clear message: “No technicians assigned yet.”
+     - “Assign Technician” button.
+   - If some assigned:
+     - List technician names.
+     - Keep the “Assign” action in the corner as currently designed.
+
+3. **Equipment card**
+   - Title: Equipment
+   - If none linked:
+     - Message: “No equipment linked to this job.”
+     - If the location has equipment, text can say: “You can link equipment registered at this location.”
+   - “Add Equipment” button in the top-right of the card.
+   - If equipment is linked:
+     - Show a simple list (name, type/model).
+
+4. **Activity card**
+   - Activity log list (e.g. “Job created on [date]”).
+   - Use the existing activity implementation.
+
+5. **Metadata card**
+   - Created date
+   - Job ID
+   - Optionally last updated date if available.
+
+Place these right-column cards stacked in this order: Location → Assigned Technicians → Equipment → Activity → Metadata.
+
+------------------------------------------------
+3) CLEAN UP VISUAL CLUTTER
+------------------------------------------------
+
+- Ensure card spacing and margins are consistent; avoid too much vertical whitespace between cards.
+- Make sure headings (“Job Details”, “Assigned Technicians”, “Equipment”, “Parts & Billing”, “Activity”, “Metadata”) use the same typography as the rest of the app.
+- The overall feeling should be:
+  - Top header (full width).
+  - Two-column body:
+    - Left = work you do on the job.
+    - Right = supporting info.
+
+------------------------------------------------
+4) INTERACTION BEHAVIOR (UNCHANGED OR LIGHTLY TWEAKED)
+------------------------------------------------
+
+- Changing status still calls the same backend update used before.
+- Assign Technician button behavior stays the same (uses existing API to assign techs).
+- Add Equipment button should trigger the same equipment-linking flow that already existed (or stub if it’s not fully implemented yet).
+- Parts & Billing card should remain wired to the existing parts/invoice state (even if some pieces are placeholders).
+
+------------------------------------------------
+WHAT TO DELIVER
+------------------------------------------------
+
+Update the Job Detail page implementation to:
+
+1. Remove any “Start Job” / “Stop Job” style controls from this page; status changes remain as the only control of job state.
+2. Implement a two-column layout:
+   - Left: Job Details, Parts & Billing cards.
+   - Right: Location, Assigned Technicians, Equipment, Activity, Metadata cards in that order.
+3. Ensure visual cleanup and spacing so the page feels less overwhelming and requires less vertical scrolling on desktop.
+4. Preserve all existing functionality (status updates, technician assignment, equipment adding, billing notes, etc.), just reorganized into the new layout.
+
+Use the project’s existing layout/grid system and UI components so the refactor feels native and consistent.

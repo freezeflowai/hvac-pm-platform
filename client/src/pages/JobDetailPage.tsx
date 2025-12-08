@@ -145,24 +145,6 @@ function getPriorityDisplay(priority: string): { label: string; variant: "defaul
   }
 }
 
-function getNextAction(status: string, hasInvoice: boolean): { label: string; action: string; icon: any } | null {
-  switch (status) {
-    case "draft":
-      return { label: "Schedule Job", action: "schedule", icon: Calendar };
-    case "scheduled":
-      return { label: "Start Job", action: "start", icon: Play };
-    case "in_progress":
-      return { label: "Mark Completed", action: "complete", icon: CheckCircle };
-    case "completed":
-      return hasInvoice 
-        ? { label: "View Invoice", action: "view_invoice", icon: Receipt }
-        : { label: "Create Invoice", action: "create_invoice", icon: Receipt };
-    case "invoiced":
-      return { label: "View Invoice", action: "view_invoice", icon: Receipt };
-    default:
-      return null;
-  }
-}
 
 function StatusProgressBar({ currentStatus, onStatusChange, isUpdating }: {
   currentStatus: string;
@@ -488,38 +470,6 @@ export default function JobDetailPage() {
     setShowDeleteConfirm(false);
   };
 
-  const handleNextAction = () => {
-    if (!job) return;
-    // TODO: Check if job has an associated invoice for proper hasInvoice logic
-    const nextAction = getNextAction(job.status, job.status === "invoiced");
-    if (!nextAction) return;
-
-    switch (nextAction.action) {
-      case "schedule":
-        handleStatusChange("scheduled");
-        break;
-      case "start":
-        handleStatusChange("in_progress");
-        break;
-      case "complete":
-        handleStatusChange("completed");
-        break;
-      case "create_invoice":
-        if (!job.locationId) {
-          toast({ 
-            title: "Cannot Create Invoice", 
-            description: "This job is not linked to a location.", 
-            variant: "destructive" 
-          });
-          return;
-        }
-        setLocation(`/invoices/new?jobId=${job.id}&locationId=${job.locationId}`);
-        break;
-      case "view_invoice":
-        toast({ title: "Coming Soon", description: "Invoice viewing will be available soon." });
-        break;
-    }
-  };
 
   if (isLoading) {
     return (
@@ -553,10 +503,7 @@ export default function JobDetailPage() {
   }
 
   const statusInfo = getJobStatusDisplay(job.status, job.scheduledStart);
-  const StatusIcon = statusInfo.icon;
   const priorityInfo = getPriorityDisplay(job.priority);
-  const nextAction = getNextAction(job.status, false);
-  const NextActionIcon = nextAction?.icon;
 
   return (
     <div className="p-6 space-y-6" data-testid="job-detail-page">
@@ -592,37 +539,26 @@ export default function JobDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {nextAction && job.status !== "cancelled" && (
-              <Button 
-                onClick={handleNextAction}
-                disabled={updateStatusMutation.isPending}
-                data-testid="button-next-action"
-              >
-                {updateStatusMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : NextActionIcon && (
-                  <NextActionIcon className="h-4 w-4 mr-2" />
-                )}
-                {nextAction.label}
-              </Button>
-            )}
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              size="icon"
+              size="sm"
               onClick={() => toast({ title: "Coming Soon", description: "Edit functionality coming soon." })}
               data-testid="button-edit"
             >
-              <Pencil className="h-4 w-4" />
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit
             </Button>
             <Button
-              variant="destructive"
-              size="icon"
+              variant="ghost"
+              size="sm"
               onClick={() => setShowDeleteConfirm(true)}
               disabled={deleteJobMutation.isPending}
+              className="text-destructive hover:text-destructive"
               data-testid="button-delete"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
             </Button>
           </div>
         </div>
@@ -634,20 +570,23 @@ export default function JobDetailPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      {/* Two-column layout: Left = Job work, Right = Supporting context */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        {/* LEFT COLUMN: Primary job information and billing */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Job Details Card */}
           <Card data-testid="card-job-details">
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardTitle>Job Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h3 className="text-sm text-muted-foreground mb-1">Job Type</h3>
+                  <p className="text-sm text-muted-foreground">Job Type</p>
                   <p className="font-medium capitalize" data-testid="text-job-type-value">{job.jobType}</p>
                 </div>
                 <div>
-                  <h3 className="text-sm text-muted-foreground mb-1">Priority</h3>
+                  <p className="text-sm text-muted-foreground">Priority</p>
                   <Badge variant={priorityInfo.variant}>{priorityInfo.label}</Badge>
                 </div>
               </div>
@@ -655,14 +594,14 @@ export default function JobDetailPage() {
               <Separator />
 
               <div>
-                <h3 className="font-medium mb-1">Summary</h3>
-                <p data-testid="text-summary">{job.summary}</p>
+                <p className="text-sm text-muted-foreground mb-1">Summary</p>
+                <p className="font-medium" data-testid="text-summary">{job.summary}</p>
               </div>
               
               {job.description && (
                 <div>
-                  <h3 className="font-medium mb-1">Description</h3>
-                  <p className="text-muted-foreground whitespace-pre-wrap" data-testid="text-description">
+                  <p className="text-sm text-muted-foreground mb-1">Description</p>
+                  <p className="whitespace-pre-wrap" data-testid="text-description">
                     {job.description}
                   </p>
                 </div>
@@ -670,8 +609,8 @@ export default function JobDetailPage() {
 
               {job.accessInstructions && (
                 <div>
-                  <h3 className="font-medium mb-1">Access Instructions</h3>
-                  <p className="text-muted-foreground whitespace-pre-wrap" data-testid="text-access">
+                  <p className="text-sm text-muted-foreground mb-1">Access Instructions</p>
+                  <p className="whitespace-pre-wrap" data-testid="text-access">
                     {job.accessInstructions}
                   </p>
                 </div>
@@ -681,22 +620,22 @@ export default function JobDetailPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h3 className="font-medium mb-1 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
+                  <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
                     Scheduled Start
-                  </h3>
-                  <p className="text-muted-foreground" data-testid="text-scheduled-start">
+                  </p>
+                  <p data-testid="text-scheduled-start">
                     {job.scheduledStart 
                       ? format(new Date(job.scheduledStart), "PPP p")
                       : "Not scheduled"}
                   </p>
                 </div>
                 <div>
-                  <h3 className="font-medium mb-1 flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
+                  <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
                     Scheduled End
-                  </h3>
-                  <p className="text-muted-foreground" data-testid="text-scheduled-end">
+                  </p>
+                  <p data-testid="text-scheduled-end">
                     {job.scheduledEnd 
                       ? format(new Date(job.scheduledEnd), "PPP p")
                       : "Not set"}
@@ -705,18 +644,18 @@ export default function JobDetailPage() {
               </div>
 
               {(job.actualStart || job.actualEnd) && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t">
                   <div>
-                    <h3 className="font-medium mb-1">Actual Start</h3>
-                    <p className="text-muted-foreground" data-testid="text-actual-start">
+                    <p className="text-sm text-muted-foreground mb-1">Actual Start</p>
+                    <p data-testid="text-actual-start">
                       {job.actualStart 
                         ? format(new Date(job.actualStart), "PPP p")
                         : "-"}
                     </p>
                   </div>
                   <div>
-                    <h3 className="font-medium mb-1">Actual End</h3>
-                    <p className="text-muted-foreground" data-testid="text-actual-end">
+                    <p className="text-sm text-muted-foreground mb-1">Actual End</p>
+                    <p data-testid="text-actual-end">
                       {job.actualEnd 
                         ? format(new Date(job.actualEnd), "PPP p")
                         : "-"}
@@ -727,96 +666,23 @@ export default function JobDetailPage() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-technicians">
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Assigned Technicians
-                </CardTitle>
-                <CardDescription>
-                  {job.technicians && job.technicians.length > 0 
-                    ? `${job.technicians.length} technician${job.technicians.length > 1 ? 's' : ''} assigned`
-                    : "No technicians assigned yet"}
-                </CardDescription>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setShowAssignTech(true)}
-                data-testid="button-assign-technician"
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                {job.technicians && job.technicians.length > 0 ? "Manage" : "Assign"}
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {job.technicians && job.technicians.length > 0 ? (
-                <div className="space-y-3">
-                  {job.technicians.map(tech => (
-                    <div 
-                      key={tech.id} 
-                      className="flex items-center gap-3 p-2 rounded-lg bg-muted/50"
-                      data-testid={`text-technician-${tech.id}`}
-                    >
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <User className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium">
-                          {tech.firstName && tech.lastName 
-                            ? `${tech.firstName} ${tech.lastName}`
-                            : tech.email}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{tech.email}</p>
-                      </div>
-                      {tech.id === job.primaryTechnicianId && (
-                        <Badge variant="secondary">Primary</Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No technicians assigned to this job yet.</p>
-                  <Button 
-                    variant="outline" 
-                    className="mt-3"
-                    onClick={() => setShowAssignTech(true)}
-                    data-testid="button-assign-technician-empty"
-                  >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Assign Technician
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <JobEquipmentSection jobId={job.id} locationId={job.locationId} />
-
+          {/* Parts & Billing Card */}
           <Card data-testid="card-parts-billing">
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Parts & Billing
-                </CardTitle>
-                <CardDescription>
-                  Manage parts used and billing for this job
-                </CardDescription>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Parts & Billing
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4 mb-4">
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">Parts Added</p>
-                  <p className="text-2xl font-bold">0</p>
+                  <p className="text-xl font-semibold">0</p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">Invoice Status</p>
-                  <p className="text-lg font-medium">
+                  <p className="font-medium">
                     {job.status === "invoiced" ? (
                       <span className="text-green-600 flex items-center gap-1">
                         <Check className="h-4 w-4" />
@@ -828,48 +694,67 @@ export default function JobDetailPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2">
+
+              {job.billingNotes && (
+                <div className="pt-2 border-t">
+                  <p className="text-sm text-muted-foreground mb-1">Billing Notes</p>
+                  <p className="whitespace-pre-wrap text-sm" data-testid="text-billing-notes">
+                    {job.billingNotes}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={() => toast({ title: "Coming Soon", description: "Parts management coming soon." })}
                   data-testid="button-add-parts"
                 >
-                  <Wrench className="h-4 w-4 mr-2" />
+                  <Package className="h-4 w-4 mr-2" />
                   Add Parts
                 </Button>
-                {job.status === "completed" && (
+                {job.status === "completed" ? (
                   <Button 
                     size="sm"
-                    onClick={() => setLocation(`/invoices/new?jobId=${job.id}&locationId=${job.locationId}`)}
+                    onClick={() => {
+                      if (!job.locationId) {
+                        toast({ 
+                          title: "Cannot Create Invoice", 
+                          description: "This job is not linked to a location.", 
+                          variant: "destructive" 
+                        });
+                        return;
+                      }
+                      setLocation(`/invoices/new?jobId=${job.id}&locationId=${job.locationId}`);
+                    }}
                     data-testid="button-create-invoice"
                   >
                     <Receipt className="h-4 w-4 mr-2" />
                     Create Invoice
                   </Button>
-                )}
+                ) : job.status === "invoiced" ? (
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toast({ title: "Coming Soon", description: "Invoice viewing will be available soon." })}
+                    data-testid="button-view-invoice"
+                  >
+                    <Receipt className="h-4 w-4 mr-2" />
+                    View Invoice
+                  </Button>
+                ) : null}
               </div>
-              {job.billingNotes && (
-                <div className="mt-4 pt-4 border-t">
-                  <h3 className="font-medium mb-1">Billing Notes</h3>
-                  <p className="text-muted-foreground whitespace-pre-wrap text-sm" data-testid="text-billing-notes">
-                    {job.billingNotes}
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
 
           {job.recurringSeries && (
             <Card data-testid="card-recurring">
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2">
                   <Repeat className="h-5 w-5" />
                   Recurring Series
                 </CardTitle>
-                <CardDescription>
-                  This job is part of a recurring maintenance series
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <p data-testid="text-series-summary">{job.recurringSeries.baseSummary}</p>
@@ -878,26 +763,28 @@ export default function JobDetailPage() {
           )}
         </div>
 
-        <div className="space-y-6">
+        {/* RIGHT COLUMN: Supporting context */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Location Card */}
           <Card data-testid="card-location">
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
                 Location
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2">
               {job.location ? (
                 <>
                   <div>
-                    <h3 className="font-medium" data-testid="text-location-name">
+                    <p className="font-medium" data-testid="text-location-name">
                       {job.location.companyName}
-                    </h3>
+                    </p>
                     {job.parentCompany && (
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <p className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Building2 className="h-3 w-3" />
                         {job.parentCompany.name}
-                      </div>
+                      </p>
                     )}
                   </div>
 
@@ -912,100 +799,144 @@ export default function JobDetailPage() {
                     </div>
                   )}
 
-                  {job.location.contactName && (
-                    <div className="flex items-center gap-2 text-sm" data-testid="text-contact-name">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      {job.location.contactName}
-                    </div>
-                  )}
-
-                  {job.location.phone && (
-                    <div className="flex items-center gap-2 text-sm" data-testid="text-contact-phone">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <a 
-                        href={`tel:${job.location.phone}`}
-                        className="text-primary hover:underline"
-                      >
-                        {job.location.phone}
-                      </a>
-                    </div>
-                  )}
-
-                  {job.location.email && (
-                    <div className="flex items-center gap-2 text-sm" data-testid="text-contact-email">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <a 
-                        href={`mailto:${job.location.email}`}
-                        className="text-primary hover:underline"
-                      >
-                        {job.location.email}
-                      </a>
-                    </div>
-                  )}
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {job.location.phone && (
+                      <Button variant="outline" size="sm" asChild data-testid="button-call">
+                        <a href={`tel:${job.location.phone}`}>
+                          <Phone className="h-3 w-3 mr-1" />
+                          Call
+                        </a>
+                      </Button>
+                    )}
+                    {job.location.email && (
+                      <Button variant="outline" size="sm" asChild data-testid="button-email">
+                        <a href={`mailto:${job.location.email}`}>
+                          <Mail className="h-3 w-3 mr-1" />
+                          Email
+                        </a>
+                      </Button>
+                    )}
+                  </div>
 
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     className="w-full mt-2"
                     onClick={() => setLocation(`/clients/${job.locationId}`)}
                     data-testid="button-view-location"
                   >
                     View Location Details
+                    <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 </>
               ) : (
-                <p className="text-muted-foreground">Location not found</p>
+                <p className="text-muted-foreground text-sm">Location not found</p>
               )}
             </CardContent>
           </Card>
 
+          {/* Assigned Technicians Card */}
+          <Card data-testid="card-technicians">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Assigned Technicians
+              </CardTitle>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowAssignTech(true)}
+                data-testid="button-assign-technician"
+              >
+                <UserPlus className="h-4 w-4 mr-1" />
+                {job.technicians && job.technicians.length > 0 ? "Manage" : "Assign"}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {job.technicians && job.technicians.length > 0 ? (
+                <div className="space-y-2">
+                  {job.technicians.map(tech => (
+                    <div 
+                      key={tech.id} 
+                      className="flex items-center gap-2 p-2 rounded-lg bg-muted/50"
+                      data-testid={`text-technician-${tech.id}`}
+                    >
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <User className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">
+                          {tech.firstName && tech.lastName 
+                            ? `${tech.firstName} ${tech.lastName}`
+                            : tech.email}
+                        </p>
+                      </div>
+                      {tech.id === job.primaryTechnicianId && (
+                        <Badge variant="secondary" className="shrink-0">Primary</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  <User className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No technicians assigned yet.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Equipment Card */}
+          <JobEquipmentSection jobId={job.id} locationId={job.locationId} />
+
+          {/* Activity Card */}
           <Card data-testid="card-activity">
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2">
                 <History className="h-5 w-5" />
                 Activity
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="flex gap-3 text-sm">
+              <div className="space-y-2">
+                <div className="flex gap-2 text-sm">
                   <div className="h-2 w-2 rounded-full bg-primary mt-1.5 shrink-0" />
                   <div>
                     <p>Job created</p>
-                    <p className="text-muted-foreground">
-                      {format(new Date(job.createdAt), "PPP 'at' p")}
+                    <p className="text-muted-foreground text-xs">
+                      {format(new Date(job.createdAt), "PPP")}
                     </p>
                   </div>
                 </div>
                 {job.scheduledStart && (
-                  <div className="flex gap-3 text-sm">
+                  <div className="flex gap-2 text-sm">
                     <div className="h-2 w-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
                     <div>
-                      <p>Scheduled for</p>
-                      <p className="text-muted-foreground">
-                        {format(new Date(job.scheduledStart), "PPP 'at' p")}
+                      <p>Scheduled</p>
+                      <p className="text-muted-foreground text-xs">
+                        {format(new Date(job.scheduledStart), "PPP")}
                       </p>
                     </div>
                   </div>
                 )}
                 {job.actualStart && (
-                  <div className="flex gap-3 text-sm">
+                  <div className="flex gap-2 text-sm">
                     <div className="h-2 w-2 rounded-full bg-green-500 mt-1.5 shrink-0" />
                     <div>
                       <p>Work started</p>
-                      <p className="text-muted-foreground">
-                        {format(new Date(job.actualStart), "PPP 'at' p")}
+                      <p className="text-muted-foreground text-xs">
+                        {format(new Date(job.actualStart), "PPP")}
                       </p>
                     </div>
                   </div>
                 )}
                 {job.actualEnd && (
-                  <div className="flex gap-3 text-sm">
+                  <div className="flex gap-2 text-sm">
                     <div className="h-2 w-2 rounded-full bg-green-600 mt-1.5 shrink-0" />
                     <div>
                       <p>Work completed</p>
-                      <p className="text-muted-foreground">
-                        {format(new Date(job.actualEnd), "PPP 'at' p")}
+                      <p className="text-muted-foreground text-xs">
+                        {format(new Date(job.actualEnd), "PPP")}
                       </p>
                     </div>
                   </div>
@@ -1014,22 +945,23 @@ export default function JobDetailPage() {
             </CardContent>
           </Card>
 
+          {/* Metadata Card */}
           <Card data-testid="card-metadata">
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardTitle>Metadata</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
+            <CardContent className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
                 <span data-testid="text-created-at">
-                  {format(new Date(job.createdAt), "PPP")}
+                  {format(new Date(job.createdAt), "PP")}
                 </span>
               </div>
               {job.updatedAt && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Updated</span>
                   <span data-testid="text-updated-at">
-                    {format(new Date(job.updatedAt), "PPP")}
+                    {format(new Date(job.updatedAt), "PP")}
                   </span>
                 </div>
               )}
