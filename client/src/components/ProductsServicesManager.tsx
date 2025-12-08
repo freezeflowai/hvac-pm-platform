@@ -37,28 +37,46 @@ interface Part {
   beltType?: string | null;
   size?: string | null;
   name?: string | null;
+  sku?: string | null;
   description?: string | null;
   cost?: string | null;
+  markupPercent?: string | null;
   unitPrice?: string | null;
-  taxExempt?: boolean | null;
+  isTaxable?: boolean | null;
+  taxCode?: string | null;
+  category?: string | null;
+  isActive?: boolean | null;
+  qboItemId?: string | null;
+  qboSyncToken?: string | null;
+  updatedAt?: string | null;
 }
 
 interface ProductFormData {
   type: "service" | "product";
   name: string;
+  sku: string;
   description: string;
   cost: string;
+  markupPercent: string;
   unitPrice: string;
-  taxExempt: boolean;
+  isTaxable: boolean;
+  taxCode: string;
+  category: string;
+  isActive: boolean;
 }
 
 const defaultFormData: ProductFormData = {
-  type: "service",
+  type: "product",
   name: "",
+  sku: "",
   description: "",
   cost: "0.00",
+  markupPercent: "",
   unitPrice: "0.00",
-  taxExempt: false,
+  isTaxable: true,
+  taxCode: "",
+  category: "",
+  isActive: true,
 };
 
 interface PartsResponse {
@@ -88,6 +106,7 @@ export default function ProductsServicesManager() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importFileContent, setImportFileContent] = useState("");
   const [importFileName, setImportFileName] = useState("");
+  const [importUpdateExisting, setImportUpdateExisting] = useState(false);
   const productsLoaderRef = useRef<HTMLDivElement>(null);
   const servicesLoaderRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -254,15 +273,22 @@ export default function ProductsServicesManager() {
   });
 
   const importMutation = useMutation({
-    mutationFn: async (csvData: string) => {
-      const res = await apiRequest("POST", "/api/parts/import", { csvData, skipDuplicates: true });
+    mutationFn: async ({ csvData, updateExisting }: { csvData: string; updateExisting: boolean }) => {
+      const res = await apiRequest("POST", "/api/parts/import", { 
+        csvData, 
+        skipDuplicates: !updateExisting,
+        updateExisting 
+      });
       return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
-      const { imported, skipped, errors } = data;
+      const { imported, skipped, updated, errors } = data;
       
       let description = `Imported ${imported} item${imported !== 1 ? 's' : ''}.`;
+      if (updated > 0) {
+        description += ` Updated ${updated} existing.`;
+      }
       if (skipped > 0) {
         description += ` Skipped ${skipped} duplicate${skipped !== 1 ? 's' : ''}.`;
       }
@@ -271,14 +297,15 @@ export default function ProductsServicesManager() {
       }
       
       toast({
-        title: imported > 0 ? "Import Complete" : "Import Finished",
+        title: (imported > 0 || updated > 0) ? "Import Complete" : "Import Finished",
         description,
-        variant: imported > 0 ? "default" : "destructive",
+        variant: (imported > 0 || updated > 0) ? "default" : "destructive",
       });
       
       setImportDialogOpen(false);
       setImportFileContent("");
       setImportFileName("");
+      setImportUpdateExisting(false);
     },
     onError: () => {
       toast({
@@ -348,7 +375,7 @@ export default function ProductsServicesManager() {
 
   const handleImport = () => {
     if (!importFileContent) return;
-    importMutation.mutate(importFileContent);
+    importMutation.mutate({ csvData: importFileContent, updateExisting: importUpdateExisting });
   };
 
   const handleSelectAll = (partsToSelect: Part[]) => {
@@ -386,12 +413,17 @@ export default function ProductsServicesManager() {
   const handleOpenEditDialog = (product: Part) => {
     setEditingProduct(product);
     setFormData({
-      type: (product.type as "service" | "product") || "service",
+      type: (product.type as "service" | "product") || "product",
       name: product.name || "",
+      sku: product.sku || "",
       description: product.description || "",
       cost: product.cost || "0.00",
+      markupPercent: product.markupPercent || "",
       unitPrice: product.unitPrice || "0.00",
-      taxExempt: product.taxExempt || false,
+      isTaxable: product.isTaxable ?? true,
+      taxCode: product.taxCode || "",
+      category: product.category || "",
+      isActive: product.isActive ?? true,
     });
     setProductDialogOpen(true);
   };
@@ -415,10 +447,15 @@ export default function ProductsServicesManager() {
     const data = {
       type: formData.type,
       name: formData.name,
+      sku: formData.sku || null,
       description: formData.description || null,
       cost: formData.cost || null,
+      markupPercent: formData.markupPercent || null,
       unitPrice: formData.unitPrice || null,
-      taxExempt: formData.taxExempt,
+      isTaxable: formData.isTaxable,
+      taxCode: formData.taxCode || null,
+      category: formData.category || null,
+      isActive: formData.isActive,
     };
 
     if (editingProduct) {
@@ -474,8 +511,20 @@ export default function ProductsServicesManager() {
   const getPartDisplay = (part: Part) => {
     return {
       primary: part.name || "",
-      secondary: part.description || "",
+      secondary: part.sku || "",
+      description: part.description || "",
+      category: part.category || "",
     };
+  };
+
+  const calculateMargin = (part: Part): string => {
+    const cost = parseFloat(part.cost || "0");
+    const unitPrice = parseFloat(part.unitPrice || "0");
+    if (cost > 0 && unitPrice > 0) {
+      const margin = ((unitPrice - cost) / cost) * 100;
+      return `${margin.toFixed(0)}%`;
+    }
+    return "";
   };
 
   const SelectionControls = ({ items, label }: { items: Part[]; label: string }) => (
@@ -528,30 +577,50 @@ export default function ProductsServicesManager() {
   );
 
   const ItemGrid = ({ items }: { items: Part[] }) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
       {items.map((part) => {
         const display = getPartDisplay(part);
         const isProductOrService = part.type === "service" || part.type === "product";
+        const margin = calculateMargin(part);
         return (
-          <Card key={part.id} data-testid={`card-item-${part.id}`}>
-            <CardContent className="p-3 flex items-center justify-between gap-3">
+          <Card key={part.id} data-testid={`card-item-${part.id}`} className={part.isActive === false ? "opacity-50" : ""}>
+            <CardContent className="p-2.5 flex items-start justify-between gap-2">
               <Checkbox
                 checked={selectedIds.has(part.id)}
                 onCheckedChange={(checked) => handleSelectOne(part.id, checked as boolean)}
+                className="mt-0.5"
                 data-testid={`checkbox-select-${part.id}`}
               />
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{display.primary}</p>
-                <p className="text-xs text-muted-foreground truncate">{display.secondary}</p>
-                {isProductOrService && part.unitPrice && (
-                  <p className="text-xs text-muted-foreground">${part.unitPrice}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="font-medium text-sm truncate" data-testid={`text-name-${part.id}`}>{display.primary}</p>
+                  {display.category && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground shrink-0" data-testid={`badge-category-${part.id}`}>
+                      {display.category}
+                    </span>
+                  )}
+                </div>
+                {display.secondary && (
+                  <p className="text-xs text-muted-foreground truncate" data-testid={`text-sku-${part.id}`}>{display.secondary}</p>
                 )}
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex flex-col items-end gap-0.5 shrink-0">
+                {isProductOrService && part.unitPrice && (
+                  <span className="text-sm font-medium" data-testid={`text-price-${part.id}`}>${part.unitPrice}</span>
+                )}
+                {isProductOrService && part.cost && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span data-testid={`text-cost-${part.id}`}>${part.cost}</span>
+                    {margin && <span className="text-green-600" data-testid={`text-margin-${part.id}`}>{margin}</span>}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-0.5 shrink-0">
                 {isProductOrService && (
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-7 w-7"
                     onClick={() => handleOpenEditDialog(part)}
                     data-testid={`button-edit-${part.id}`}
                   >
@@ -561,6 +630,7 @@ export default function ProductsServicesManager() {
                 <Button
                   size="icon"
                   variant="ghost"
+                  className="h-7 w-7"
                   onClick={() => handleDeleteClick(part)}
                   data-testid={`button-delete-${part.id}`}
                   disabled={deletePartMutation.isPending}
@@ -729,40 +799,53 @@ export default function ProductsServicesManager() {
       </div>
 
       <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-product">
+        <DialogContent className="sm:max-w-[550px]" data-testid="dialog-product">
           <DialogHeader>
-            <DialogTitle>{editingProduct ? "Edit Product/Service" : "Add New Product/Service"}</DialogTitle>
+            <DialogTitle>{editingProduct ? "Edit Item" : "Add New Item"}</DialogTitle>
             <DialogDescription>
-              {editingProduct ? "Update the details below." : "Fill in the details to create a new product or service."}
+              {editingProduct ? "Update the item details below." : "Fill in the details to create a new product or service."}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="item-type">Item type</Label>
-              <Select
-                value={formData.type}
-                onValueChange={(value: "service" | "product") => 
-                  setFormData(prev => ({ ...prev, type: value }))
-                }
-              >
-                <SelectTrigger id="item-type" data-testid="select-item-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="service">Service</SelectItem>
-                  <SelectItem value="product">Product</SelectItem>
-                </SelectContent>
-              </Select>
+          <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="item-type">Type</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value: "service" | "product") => 
+                    setFormData(prev => ({ ...prev, type: value }))
+                  }
+                >
+                  <SelectTrigger id="item-type" data-testid="select-item-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="product">Product</SelectItem>
+                    <SelectItem value="service">Service</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="sku">SKU</Label>
+                <Input
+                  id="sku"
+                  value={formData.sku}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))}
+                  placeholder="e.g. HVAC-001"
+                  data-testid="input-sku"
+                />
+              </div>
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">Name *</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter name"
+                placeholder="Enter item name"
                 data-testid="input-name"
               />
             </div>
@@ -774,53 +857,115 @@ export default function ProductsServicesManager() {
                 value={formData.description}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="Enter description"
-                rows={3}
+                rows={2}
                 data-testid="input-description"
               />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="cost">Cost ($)</Label>
-                <Input
-                  id="cost"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.cost}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cost: e.target.value }))}
-                  placeholder="0.00"
-                  data-testid="input-cost"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="unit-price">Unit Price ($)</Label>
-                <Input
-                  id="unit-price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.unitPrice}
-                  onChange={(e) => setFormData(prev => ({ ...prev, unitPrice: e.target.value }))}
-                  placeholder="0.00"
-                  data-testid="input-unit-price"
-                />
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Input
+                id="category"
+                value={formData.category}
+                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                placeholder="e.g. HVAC Parts, Labor"
+                data-testid="input-category"
+              />
+            </div>
+            
+            <div className="border-t pt-3 mt-3">
+              <p className="text-sm font-medium mb-3">Pricing</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="cost">Cost ($)</Label>
+                  <Input
+                    id="cost"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.cost}
+                    onChange={(e) => setFormData(prev => ({ ...prev, cost: e.target.value }))}
+                    placeholder="0.00"
+                    data-testid="input-cost"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="markup-percent">Markup (%)</Label>
+                  <Input
+                    id="markup-percent"
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formData.markupPercent}
+                    onChange={(e) => setFormData(prev => ({ ...prev, markupPercent: e.target.value }))}
+                    placeholder="e.g. 50"
+                    data-testid="input-markup-percent"
+                  />
+                  <p className="text-[10px] text-muted-foreground">If set, calculates unit price</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="unit-price">Unit Price ($)</Label>
+                  <Input
+                    id="unit-price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.unitPrice}
+                    onChange={(e) => setFormData(prev => ({ ...prev, unitPrice: e.target.value }))}
+                    placeholder="0.00"
+                    data-testid="input-unit-price"
+                  />
+                </div>
               </div>
             </div>
             
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="tax-exempt"
-                checked={formData.taxExempt}
-                onCheckedChange={(checked) => 
-                  setFormData(prev => ({ ...prev, taxExempt: checked as boolean }))
-                }
-                data-testid="checkbox-tax-exempt"
-              />
-              <Label htmlFor="tax-exempt" className="text-sm font-normal cursor-pointer">
-                Exempt from Tax
-              </Label>
+            <div className="border-t pt-3 mt-3">
+              <p className="text-sm font-medium mb-3">Tax Settings</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is-taxable"
+                    checked={formData.isTaxable}
+                    onCheckedChange={(checked) => 
+                      setFormData(prev => ({ ...prev, isTaxable: checked as boolean }))
+                    }
+                    data-testid="checkbox-is-taxable"
+                  />
+                  <Label htmlFor="is-taxable" className="text-sm font-normal cursor-pointer">
+                    Taxable
+                  </Label>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="tax-code">Tax Code</Label>
+                  <Input
+                    id="tax-code"
+                    value={formData.taxCode}
+                    onChange={(e) => setFormData(prev => ({ ...prev, taxCode: e.target.value }))}
+                    placeholder="e.g. TAX"
+                    data-testid="input-tax-code"
+                    disabled={!formData.isTaxable}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="border-t pt-3 mt-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is-active"
+                  checked={formData.isActive}
+                  onCheckedChange={(checked) => 
+                    setFormData(prev => ({ ...prev, isActive: checked as boolean }))
+                  }
+                  data-testid="checkbox-is-active"
+                />
+                <Label htmlFor="is-active" className="text-sm font-normal cursor-pointer">
+                  Active (visible in item lists)
+                </Label>
+              </div>
             </div>
           </div>
           
@@ -884,7 +1029,7 @@ export default function ProductsServicesManager() {
       </AlertDialog>
 
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-import">
+        <DialogContent className="sm:max-w-[550px]" data-testid="dialog-import">
           <DialogHeader>
             <DialogTitle>Import Products & Services</DialogTitle>
             <DialogDescription>
@@ -903,15 +1048,32 @@ export default function ProductsServicesManager() {
               </div>
             </div>
             
+            <div className="flex items-center space-x-2 p-2 border rounded-md">
+              <Checkbox
+                id="update-existing"
+                checked={importUpdateExisting}
+                onCheckedChange={(checked) => setImportUpdateExisting(checked as boolean)}
+                data-testid="checkbox-update-existing"
+              />
+              <Label htmlFor="update-existing" className="text-sm font-normal cursor-pointer">
+                Update existing items (match by name)
+              </Label>
+            </div>
+            
             <div className="text-sm text-muted-foreground space-y-1">
               <p className="font-medium">Expected CSV columns:</p>
               <ul className="list-disc list-inside text-xs space-y-0.5">
                 <li><span className="font-medium">name</span> (required) - Product or service name</li>
                 <li><span className="font-medium">type</span> (required) - "product" or "service"</li>
-                <li><span className="font-medium">description</span> - Optional description</li>
-                <li><span className="font-medium">unit_price</span> - Selling price</li>
+                <li><span className="font-medium">sku</span> - SKU / item code</li>
+                <li><span className="font-medium">description</span> - Item description</li>
                 <li><span className="font-medium">cost</span> - Your cost</li>
-                <li><span className="font-medium">tax_exempt</span> - "true" or "false"</li>
+                <li><span className="font-medium">markup_percent</span> - Markup percentage</li>
+                <li><span className="font-medium">unit_price</span> - Selling price</li>
+                <li><span className="font-medium">is_taxable</span> - "true" or "false"</li>
+                <li><span className="font-medium">tax_code</span> - Tax code for QBO</li>
+                <li><span className="font-medium">category</span> - Category name</li>
+                <li><span className="font-medium">is_active</span> - "true" or "false"</li>
               </ul>
             </div>
           </div>
@@ -923,6 +1085,7 @@ export default function ProductsServicesManager() {
                 setImportDialogOpen(false);
                 setImportFileContent("");
                 setImportFileName("");
+                setImportUpdateExisting(false);
               }}
               data-testid="button-cancel-import"
             >

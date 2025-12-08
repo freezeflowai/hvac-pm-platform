@@ -1,0 +1,354 @@
+You are helping me implement and refine the **Products & Services** module in my HVAC dispatch app.
+
+Context (current state):
+
+- There is already a “Products & Services” page with:
+  - Left sidebar nav (Dashboard, Calendar, Jobs, Clients, Products & Services, Reports, etc.).
+  - Header: “Products & Services”.
+  - Tabs: “Products (XXX)” and “Services (0)”.
+  - Search bar and buttons: Import, Export, Add New.
+  - A grid/list of product cards (e.g., belts) with edit/delete icons.
+- The app integrates with **QuickBooks Online** (QBO), so items here need to map cleanly to QBO Items.
+
+Use the existing backend stack (ORM, API conventions) and frontend stack (React or similar) already in this project. Do NOT add new frameworks. Extend and refactor what’s present.
+
+The goals:
+
+1. Define a clean **Item** data model for products and services, aligned with QBO.
+2. Improve the **Products & Services** list UI.
+3. Implement **Add/Edit Item** UI.
+4. Implement **CSV Import** and **CSV Export** for items.
+5. Leave space for categorization (category/group), but do NOT add UoM.
+
+------------------------------------------------
+1) DATA MODEL – ITEMS (PRODUCTS & SERVICES)
+------------------------------------------------
+
+Create or update a single `Item` entity to represent both products and services. Use a `type` field to distinguish.
+
+Fields:
+
+- id (PK)
+- type (enum/string):
+  - "product"
+  - "service"
+
+- name (string, required)
+- sku (string | nullable)  // belt/filter code or internal item code
+- description (string | nullable)
+
+- cost (decimal, default 0)           // internal cost
+- markupPercent (decimal | nullable)  // optional, used to auto-calc price
+- unitPrice (decimal, default 0)      // sell price that appears on jobs/invoices
+
+- isTaxable (boolean, default true)
+- taxCode (string | nullable)         // reserved for future tax integration, can be null for now
+
+- category (string | nullable)        // simple category/group label; leave space, no complex hierarchy yet
+
+- isActive (boolean, default true)
+
+- qboItemId (string | nullable)       // QBO Item id if/when synced
+- qboSyncToken (string | nullable)    // QBO sync token if needed
+
+- createdAt, updatedAt
+
+Pricing logic (in code, not necessarily enforced at DB level):
+
+- If `markupPercent` is set and `cost` changes, `unitPrice` should be recalculated as:
+  - `unitPrice = cost * (1 + markupPercent / 100)`
+- Allow overriding `unitPrice` manually and optionally nulling out `markupPercent` if the user wants full manual control.
+
+------------------------------------------------
+2) API – ITEMS CRUD
+------------------------------------------------
+
+Implement or confirm REST endpoints for Items:
+
+- `GET /items`
+  - Query params:
+    - type (optional: "product" or "service")
+    - search (optional; matches name, sku, description)
+    - isActive (optional; default true)
+  - Return list of items with key fields (id, type, name, sku, category, cost, unitPrice, isTaxable, isActive).
+
+- `GET /items/:id`
+  - Return full item details including cost, markupPercent, unitPrice, tax flags, category, and QBO fields.
+
+- `POST /items`
+  - Create new item.
+  - Expect payload:
+
+    {
+      type: "product" | "service",
+      name: string,
+      sku?: string,
+      description?: string,
+      cost?: number,
+      markupPercent?: number,
+      unitPrice?: number,
+      isTaxable?: boolean,
+      taxCode?: string,
+      category?: string,
+      isActive?: boolean
+    }
+
+  - On create:
+    - If cost and markupPercent are provided but unitPrice is missing, calculate unitPrice as described above.
+    - If unitPrice is provided, leave markupPercent as-is or null if not provided.
+
+- `PUT /items/:id`
+  - Update existing item with same fields as POST.
+  - Apply same pricing logic.
+
+- `DELETE /items/:id`
+  - Perform a soft delete if the app convention uses `isActive`:
+    - Set isActive = false.
+  - Or follow the existing deletion convention.
+
+------------------------------------------------
+3) UI – PRODUCTS & SERVICES LIST PAGE
+------------------------------------------------
+
+Refine the existing Products & Services list to show more useful information while staying compact.
+
+### Header Area
+
+- Keep title: “Products & Services”.
+- Under title, retain tabs:
+  - Products (shows items where type = "product")
+  - Services (shows items where type = "service")
+
+- On the right side of the header row:
+  - Search input (placeholder: “Search products, filters, belts…”)
+  - `Import` button
+  - `Export` button
+  - `+ Add Item` button (rename from “Add New” to “Add Item”).
+
+### List/Grid Layout
+
+For each item row/card, show:
+
+- Left side:
+  - **Name** (bold)
+  - SKU (small, muted text under name)
+  - Category (muted tag or small label, if present)
+
+- Right side:
+  - Unit price (e.g. “$45.00”)
+  - Cost (e.g. “$30.00”)
+  - Optional margin display: e.g. “50%” (computed as `(unitPrice - cost) / cost * 100` if cost > 0)
+  - Icons/buttons for:
+    - Edit (pencil)
+    - Delete (trash)
+
+Use the existing card/list styling but reduce vertical padding enough to see multiple items at once. Support a multi-column grid on large screens if the design system already does that.
+
+Filtering:
+
+- The active tab (Products/Services) should filter `type` at the API level.
+- The search box should filter by name/sku/description on the backend or frontend (prefer backend).
+
+------------------------------------------------
+4) UI – ADD / EDIT ITEM MODAL OR PAGE
+------------------------------------------------
+
+When the user clicks **Add Item** or the edit icon on a row:
+
+- Open an Add/Edit Item form (modal is preferred if that’s the pattern used elsewhere).
+
+Form fields:
+
+- **Item Type** (radio or dropdown):
+  - “Product”
+  - “Service”
+
+- **Name** (text input, required)
+
+- **SKU / Code** (text input, optional)
+
+- **Description** (textarea)
+
+- **Category** (text input or simple dropdown; optional)
+  - For now, treat as a free-text label.
+  - You do not need to implement full category management yet.
+
+- **Cost** (number input)
+
+- **Markup %** (number input; optional)
+  - When cost changes and markupPercent is set:
+    - Auto-update `unitPrice` field.
+  - Display unitPrice as read/write.
+
+- **Unit Price** (number input)
+  - User can override manually; if they change this, consider leaving markupPercent as-is or clearing it (you can use a simple approach and document in comments).
+
+- **Tax**:
+  - Checkbox: “Taxable”
+  - (Optional, advanced) taxCode select; can be hidden or simple text input for now.
+
+- **Active**:
+  - Toggle/checkbox (Active / Inactive) mapped to isActive.
+
+QBO fields:
+
+- Small, advanced-only section (may be collapsed by default):
+  - If qboItemId is present, show a read-only label:
+    - “Linked to QuickBooks Online item (ID: …)”.
+  - Do not allow editing QBO IDs from this screen.
+
+Validation:
+
+- Require type and name.
+- Validate cost/unitPrice/markupPercent as non-negative numbers.
+
+Actions:
+
+- Save
+- Cancel
+
+On save:
+
+- POST /items (for new item) or PUT /items/:id (for editing).
+- On success, close the modal and refresh the list.
+
+------------------------------------------------
+5) CSV EXPORT
+------------------------------------------------
+
+Implement CSV export of items.
+
+Endpoint:
+
+- `GET /items/export`
+  - Query params:
+    - type (optional: "product" or "service")
+  - Returns a CSV file.
+
+Columns:
+
+- type
+- name
+- sku
+- description
+- cost
+- markupPercent
+- unitPrice
+- isTaxable
+- taxCode
+- category
+- isActive
+
+The Products tab export should pass `type=product`; Services tab should pass `type=service`.
+
+Bind the **Export** button on the UI to:
+
+- Call `/items/export?type=product` when Products tab is active.
+- Call `/items/export?type=service` when Services tab is active.
+- Trigger a file download in the browser.
+
+------------------------------------------------
+6) CSV IMPORT
+------------------------------------------------
+
+Implement CSV import to allow users to bring in their own parts lists.
+
+Endpoint:
+
+- `POST /items/import`
+  - Accepts CSV upload (multipart/form-data).
+  - Server parses CSV and maps rows to Item fields.
+
+Basic mapping rules:
+
+- Columns expected (case-insensitive match preferred):
+  - type
+  - name
+  - sku
+  - description
+  - cost
+  - markupPercent
+  - unitPrice
+  - isTaxable
+  - taxCode
+  - category
+  - isActive
+
+- Required at minimum:
+  - `name`
+  - `type` (default to “product” if omitted and we are importing in the Products tab context, or “service” if from Services tab; document in comments).
+
+- For each row:
+  - If sku matches an existing item (sku is non-null and unique constraint or index is present):
+    - Optionally update that item (based on a flag, see below).
+  - Else:
+    - Create a new item.
+
+Import behavior and options:
+
+- For the first iteration, keep it simple:
+  - In the frontend, when user clicks Import:
+    - Show a small modal:
+      - File input for CSV.
+      - A checkbox:
+        - “Update existing items where SKU matches” (default: unchecked).
+  - Pass this flag as a query param or part of the form data, e.g. `updateExisting=true/false`.
+
+- Backend logic:
+  - If `updateExisting` is true and an item with the same sku exists:
+    - Update that item’s fields from CSV row (except qboItemId, qboSyncToken).
+  - If `updateExisting` is false:
+    - Skip rows that match existing sku or treat them as errors (log or collect and return a summary).
+
+Validation:
+
+- Skip or log rows where name is missing.
+- For boolean fields (isTaxable, isActive), accept:
+  - “true”/“false”, “yes”/“no”, “1”/“0”.
+
+Frontend:
+
+- The Import button opens an “Import Items” modal:
+  - File picker for CSV.
+  - Checkbox: “Update existing items when SKU matches”.
+  - On submit, show a basic success/failure summary (e.g., “Imported 245 items, updated 3, skipped 2.”).
+
+------------------------------------------------
+7) QUICKBOOKS ONLINE ALIGNMENT (NOT FULL SYNC YET)
+------------------------------------------------
+
+For now, just ensure:
+
+- The Item model fields are compatible with QBO’s idea of an Item:
+  - type (product/service)
+  - name
+  - description
+  - unitPrice (sales price)
+  - cost
+  - isTaxable
+- qboItemId and qboSyncToken are stored but not directly edited from this page.
+
+Add comments in the code (near the model and API definitions) explaining that:
+
+- These Items are designed to sync to QBO Items in the future.
+- The app is currently the primary master for item details, and QBO mapping will be handled via qboItemId.
+
+------------------------------------------------
+WHAT TO DELIVER
+------------------------------------------------
+
+1. ORM/entity definition or migration for the `Item` model with fields above.
+2. Backend API endpoints:
+   - /items (GET, POST)
+   - /items/:id (GET, PUT, DELETE or deactivate)
+   - /items/export (GET, CSV output)
+   - /items/import (POST, CSV upload + processing)
+3. Frontend updates:
+   - Refined Products & Services list page:
+     - Tabs for Products/Services, search, Import/Export, Add Item.
+     - List rows with name, sku, category, cost, unitPrice, margin, and edit/delete actions.
+   - Add/Edit Item modal or page with all fields.
+   - Import modal and wire-up to /items/import.
+   - Export button wired to /items/export with appropriate type filter.
+
+Follow existing styling, components, and patterns so everything looks native to the rest of the app.

@@ -146,6 +146,15 @@ export interface IStorage {
   getPart(companyId: string, id: string): Promise<Part | undefined>;
   getAllParts(companyId: string): Promise<Part[]>;
   getPartsByType(companyId: string, type: string): Promise<Part[]>;
+  getPartBySku(companyId: string, sku: string): Promise<Part | undefined>;
+  getPartsPaginated(companyId: string, options: { 
+    limit?: number; 
+    offset?: number; 
+    type?: string; 
+    search?: string; 
+    isActive?: boolean; 
+    category?: string;
+  }): Promise<{ items: Part[]; total: number; hasMore: boolean }>;
   findDuplicatePart(companyId: string, part: InsertPart): Promise<Part | undefined>;
   createPart(companyId: string, userId: string, part: InsertPart): Promise<Part>;
   updatePart(companyId: string, id: string, part: Partial<InsertPart>): Promise<Part | undefined>;
@@ -696,6 +705,53 @@ export class MemStorage implements IStorage {
       .filter(part => part.companyId === companyId && part.type === type);
   }
 
+  async getPartBySku(companyId: string, sku: string): Promise<Part | undefined> {
+    return Array.from(this.parts.values())
+      .find(part => part.companyId === companyId && part.sku === sku);
+  }
+
+  async getPartsPaginated(companyId: string, options: { 
+    limit?: number; 
+    offset?: number; 
+    type?: string; 
+    search?: string; 
+    isActive?: boolean; 
+    category?: string;
+  }): Promise<{ items: Part[]; total: number; hasMore: boolean }> {
+    const { limit = 50, offset = 0, type, search, isActive, category } = options;
+    
+    let filtered = Array.from(this.parts.values())
+      .filter(part => part.companyId === companyId);
+    
+    if (type) {
+      filtered = filtered.filter(part => part.type === type);
+    }
+    
+    if (isActive !== undefined) {
+      filtered = filtered.filter(part => part.isActive === isActive);
+    }
+    
+    if (category) {
+      filtered = filtered.filter(part => part.category === category);
+    }
+    
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      filtered = filtered.filter(part => 
+        (part.name?.toLowerCase().includes(lowerSearch)) ||
+        (part.sku?.toLowerCase().includes(lowerSearch)) ||
+        (part.description?.toLowerCase().includes(lowerSearch))
+      );
+    }
+    
+    const total = filtered.length;
+    const items = filtered
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(offset, offset + limit);
+    
+    return { items, total, hasMore: offset + limit < total };
+  }
+
   async findDuplicatePart(companyId: string, insertPart: InsertPart): Promise<Part | undefined> {
     return Array.from(this.parts.values()).find(part => {
       if (part.companyId !== companyId) return false;
@@ -730,11 +786,20 @@ export class MemStorage implements IStorage {
       beltType: insertPart.beltType ?? null,
       size: insertPart.size ?? null,
       name: insertPart.name ?? null,
+      sku: insertPart.sku ?? null,
       description: insertPart.description ?? null,
       cost: insertPart.cost ?? null,
+      markupPercent: insertPart.markupPercent ?? null,
       unitPrice: insertPart.unitPrice ?? null,
+      isTaxable: insertPart.isTaxable ?? true,
       taxExempt: insertPart.taxExempt ?? false,
-      createdAt: new Date().toISOString()
+      taxCode: insertPart.taxCode ?? null,
+      category: insertPart.category ?? null,
+      isActive: insertPart.isActive ?? true,
+      qboItemId: insertPart.qboItemId ?? null,
+      qboSyncToken: insertPart.qboSyncToken ?? null,
+      createdAt: new Date().toISOString(),
+      updatedAt: null
     };
     this.parts.set(id, part);
     return part;
@@ -2584,6 +2649,58 @@ export class DbStorage implements IStorage {
 
   async getPartsByType(companyId: string, type: string): Promise<Part[]> {
     return db.select().from(parts).where(and(eq(parts.companyId, companyId), eq(parts.type, type)));
+  }
+
+  async getPartBySku(companyId: string, sku: string): Promise<Part | undefined> {
+    const result = await db.select().from(parts)
+      .where(and(eq(parts.companyId, companyId), eq(parts.sku, sku)))
+      .limit(1);
+    return result[0];
+  }
+
+  async getPartsPaginated(companyId: string, options: { 
+    limit?: number; 
+    offset?: number; 
+    type?: string; 
+    search?: string; 
+    isActive?: boolean; 
+    category?: string;
+  }): Promise<{ items: Part[]; total: number; hasMore: boolean }> {
+    const { limit = 50, offset = 0, type, search, isActive, category } = options;
+    
+    const conditions = [eq(parts.companyId, companyId)];
+    
+    if (type) {
+      conditions.push(eq(parts.type, type));
+    }
+    
+    if (isActive !== undefined) {
+      conditions.push(eq(parts.isActive, isActive));
+    }
+    
+    if (category) {
+      conditions.push(eq(parts.category, category));
+    }
+    
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      conditions.push(sql`(
+        LOWER(${parts.name}) LIKE ${`%${lowerSearch}%`} OR 
+        LOWER(${parts.sku}) LIKE ${`%${lowerSearch}%`} OR 
+        LOWER(${parts.description}) LIKE ${`%${lowerSearch}%`}
+      )`);
+    }
+    
+    const whereClause = and(...conditions);
+    
+    const [countResult, items] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(parts).where(whereClause),
+      db.select().from(parts).where(whereClause).orderBy(desc(parts.createdAt)).limit(limit).offset(offset)
+    ]);
+    
+    const total = Number(countResult[0]?.count ?? 0);
+    
+    return { items, total, hasMore: offset + limit < total };
   }
 
   async findDuplicatePart(companyId: string, insertPart: InsertPart): Promise<Part | undefined> {

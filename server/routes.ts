@@ -1042,6 +1042,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validated = insertPartSchema.parse(req.body);
       
+      // Calculate unitPrice from markup if cost and markupPercent are provided but unitPrice is not
+      let computedUnitPrice = validated.unitPrice;
+      if (validated.cost && validated.markupPercent && !validated.unitPrice) {
+        const cost = parseFloat(validated.cost);
+        const markupPercent = parseFloat(validated.markupPercent);
+        if (!isNaN(cost) && !isNaN(markupPercent)) {
+          computedUnitPrice = (cost * (1 + markupPercent / 100)).toFixed(2);
+        }
+      }
+      
       // Check for duplicate part
       const existingPart = await storage.findDuplicatePart(req.user!.companyId, validated);
       
@@ -1051,14 +1061,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           errorMessage = `A filter with type "${validated.filterType}" and size "${validated.size}" already exists`;
         } else if (validated.type === 'belt') {
           errorMessage = `A belt with type "${validated.beltType}" and size "${validated.size}" already exists`;
-        } else if (validated.type === 'other') {
-          errorMessage = `A part named "${validated.name}" already exists`;
+        } else if (validated.type === 'other' || validated.type === 'product' || validated.type === 'service') {
+          errorMessage = `An item named "${validated.name}" already exists`;
         }
         
         return res.status(409).json({ error: errorMessage });
       }
       
-      const part = await storage.createPart(req.user!.companyId, req.user!.id, validated);
+      const part = await storage.createPart(req.user!.companyId, req.user!.id, {
+        ...validated,
+        unitPrice: computedUnitPrice ?? validated.unitPrice
+      });
       res.json(part);
     } catch (error) {
       res.status(400).json({ error: "Invalid part data" });
@@ -1107,7 +1120,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/parts/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertPartSchema.partial().parse(req.body);
-      const part = await storage.updatePart(req.user!.companyId, req.params.id, validated);
+      
+      // Calculate unitPrice from markup if cost and markupPercent are provided
+      let computedUnitPrice = validated.unitPrice;
+      if (validated.cost && validated.markupPercent && validated.unitPrice === undefined) {
+        const cost = parseFloat(validated.cost);
+        const markupPercent = parseFloat(validated.markupPercent);
+        if (!isNaN(cost) && !isNaN(markupPercent)) {
+          computedUnitPrice = (cost * (1 + markupPercent / 100)).toFixed(2);
+        }
+      }
+      
+      const part = await storage.updatePart(req.user!.companyId, req.params.id, {
+        ...validated,
+        unitPrice: computedUnitPrice ?? validated.unitPrice
+      });
       if (!part) {
         return res.status(404).json({ error: "Part not found" });
       }
@@ -1164,7 +1191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Export products/services to CSV
+  // Export products/services to CSV with all Item fields (QBO aligned)
   app.get("/api/parts/export", isAuthenticated, async (req, res) => {
     try {
       const category = typeof req.query.category === 'string' ? req.query.category : 'all';
@@ -1186,8 +1213,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       
       // Create CSV
-      const escapeCSV = (value: string | null | undefined) => {
+      const escapeCSV = (value: string | null | undefined | boolean) => {
         if (value === null || value === undefined) return '';
+        if (typeof value === 'boolean') return value ? 'true' : 'false';
         const str = String(value);
         if (str.includes(',') || str.includes('"') || str.includes('\n')) {
           return `"${str.replace(/"/g, '""')}"`;
@@ -1195,34 +1223,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return str;
       };
       
-      const headers = ['name', 'description', 'type', 'unit_price', 'cost', 'tax_exempt'];
+      // Include all Item fields as per spec
+      const headers = ['type', 'name', 'sku', 'description', 'cost', 'markup_percent', 'unit_price', 'is_taxable', 'tax_code', 'category', 'is_active'];
       const rows = filtered.map(p => [
-        escapeCSV(p.name),
-        escapeCSV(p.description),
         escapeCSV(p.type),
-        escapeCSV(p.unitPrice),
+        escapeCSV(p.name),
+        escapeCSV(p.sku),
+        escapeCSV(p.description),
         escapeCSV(p.cost),
-        p.taxExempt ? 'true' : 'false'
+        escapeCSV(p.markupPercent),
+        escapeCSV(p.unitPrice),
+        escapeCSV(p.isTaxable ?? true),
+        escapeCSV(p.taxCode),
+        escapeCSV(p.category),
+        escapeCSV(p.isActive ?? true)
       ].join(','));
       
       const csv = [headers.join(','), ...rows].join('\n');
       
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="products_services_${new Date().toISOString().split('T')[0]}.csv"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${category}_${new Date().toISOString().split('T')[0]}.csv"`);
       res.send(csv);
     } catch (error) {
       res.status(500).json({ error: "Failed to export products/services" });
     }
   });
 
-  // Import products/services from CSV
+  // Import products/services from CSV with all Item fields and update-existing option
   app.post("/api/parts/import", isAuthenticated, async (req, res) => {
     try {
       const requestSchema = z.object({
         csvData: z.string(),
-        skipDuplicates: z.boolean().optional().default(true)
+        skipDuplicates: z.boolean().optional().default(true),
+        updateExisting: z.boolean().optional().default(false),
+        defaultType: z.enum(['product', 'service']).optional()
       });
-      const { csvData, skipDuplicates } = requestSchema.parse(req.body);
+      const { csvData, skipDuplicates, updateExisting, defaultType } = requestSchema.parse(req.body);
       
       // Parse CSV values (handles quoted values properly)
       const parseCSVLine = (line: string): string[] => {
@@ -1250,6 +1286,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return result;
       };
       
+      // Parse boolean values from CSV
+      const parseBoolean = (value: string | undefined, defaultValue: boolean): boolean => {
+        if (!value) return defaultValue;
+        const lower = value.toLowerCase().trim();
+        if (['true', 'yes', '1', 'y'].includes(lower)) return true;
+        if (['false', 'no', '0', 'n'].includes(lower)) return false;
+        return defaultValue;
+      };
+      
       // Split lines, keeping empty lines for accurate row numbers
       const allLines = csvData.split(/\r?\n/);
       const lines: { index: number; content: string }[] = [];
@@ -1266,27 +1311,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Parse header using the same CSV parser
       const headerValues = parseCSVLine(lines[0].content);
-      const headers = headerValues.map(h => h.toLowerCase().replace(/^"|"$/g, '').trim());
+      const headers = headerValues.map(h => h.toLowerCase().replace(/^"|"$/g, '').replace(/_/g, '').trim());
       
-      // Validate required headers
-      const requiredHeaders = ['name', 'type'];
-      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
-      if (missingHeaders.length > 0) {
-        return res.status(400).json({ error: `Missing required columns: ${missingHeaders.join(', ')}` });
+      // Map common column name variations
+      const headerMap: Record<string, string> = {
+        'name': 'name',
+        'sku': 'sku',
+        'type': 'type',
+        'description': 'description',
+        'cost': 'cost',
+        'markuppercent': 'markupPercent',
+        'markup': 'markupPercent',
+        'unitprice': 'unitPrice',
+        'price': 'unitPrice',
+        'istaxable': 'isTaxable',
+        'taxable': 'isTaxable',
+        'taxcode': 'taxCode',
+        'category': 'category',
+        'isactive': 'isActive',
+        'active': 'isActive'
+      };
+      
+      // Validate required header (name only, type can default)
+      if (!headers.includes('name')) {
+        return res.status(400).json({ error: "Missing required column: name" });
       }
-      
-      // Validation schema for import rows
-      const importRowSchema = z.object({
-        type: z.enum(['product', 'service']),
-        name: z.string().min(1, 'Name is required'),
-        description: z.string().nullable().optional(),
-        unitPrice: z.string().nullable().optional(),
-        cost: z.string().nullable().optional(),
-        taxExempt: z.boolean().optional().default(false)
-      });
       
       const results = {
         imported: 0,
+        updated: 0,
         skipped: 0,
         errors: [] as { row: number; error: string }[]
       };
@@ -1294,67 +1347,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process data rows
       for (let i = 1; i < lines.length; i++) {
         const { index, content } = lines[i];
-        const rowNumber = index + 1; // 1-based row number for user display
+        const rowNumber = index + 1;
         const values = parseCSVLine(content);
         
-        // Skip completely empty rows
         if (values.every(v => !v)) continue;
         
         try {
-          // Map values to headers
+          // Map values to normalized headers
           const row: Record<string, string> = {};
           headers.forEach((h, idx) => {
-            row[h] = values[idx] !== undefined ? values[idx] : '';
+            const normalizedHeader = headerMap[h] || h;
+            row[normalizedHeader] = values[idx] !== undefined ? values[idx] : '';
           });
           
           // Extract and normalize values
           const name = row['name']?.trim();
-          const typeRaw = (row['type'] || '').toLowerCase().trim();
-          const description = row['description']?.trim() || null;
-          const unitPrice = row['unit_price']?.trim() || row['unitprice']?.trim() || row['price']?.trim() || null;
-          const cost = row['cost']?.trim() || null;
-          const taxExemptRaw = (row['tax_exempt'] || row['taxexempt'] || '').toLowerCase().trim();
-          const taxExempt = ['true', 'yes', '1', 'y'].includes(taxExemptRaw);
+          if (!name) {
+            results.errors.push({ row: rowNumber, error: 'Name is required' });
+            continue;
+          }
           
-          // Validate type
+          // Type can default based on context or defaultType parameter
+          let typeRaw = (row['type'] || '').toLowerCase().trim();
+          if (!typeRaw && defaultType) {
+            typeRaw = defaultType;
+          }
           if (typeRaw !== 'product' && typeRaw !== 'service') {
             results.errors.push({ row: rowNumber, error: `Type must be "product" or "service", got "${row['type'] || '(empty)'}"` });
             continue;
           }
           
-          // Build part data for validation
-          const partData = {
-            type: typeRaw as 'product' | 'service',
-            name: name || '',
-            description,
-            unitPrice,
-            cost,
-            taxExempt
-          };
+          const sku = row['sku']?.trim() || null;
+          const description = row['description']?.trim() || null;
+          const cost = row['cost']?.trim() || null;
+          const markupPercent = row['markupPercent']?.trim() || null;
+          let unitPrice = row['unitPrice']?.trim() || null;
+          const isTaxable = parseBoolean(row['isTaxable'], true);
+          const taxCode = row['taxCode']?.trim() || null;
+          const category = row['category']?.trim() || null;
+          const isActive = parseBoolean(row['isActive'], true);
           
-          // Validate with schema
-          const validationResult = importRowSchema.safeParse(partData);
-          if (!validationResult.success) {
-            const errorMessages = validationResult.error.errors.map(e => e.message).join(', ');
-            results.errors.push({ row: rowNumber, error: errorMessages });
-            continue;
-          }
-          
-          const validatedData = validationResult.data;
-          
-          // Check for duplicate (case-insensitive name check)
-          const existingPart = await storage.findDuplicatePart(req.user!.companyId, validatedData);
-          if (existingPart) {
-            if (skipDuplicates) {
-              results.skipped++;
-              continue;
-            } else {
-              results.errors.push({ row: rowNumber, error: `"${validatedData.name}" already exists` });
-              continue;
+          // Calculate unitPrice from markup if not provided
+          if (!unitPrice && cost && markupPercent) {
+            const costNum = parseFloat(cost);
+            const markupNum = parseFloat(markupPercent);
+            if (!isNaN(costNum) && !isNaN(markupNum)) {
+              unitPrice = (costNum * (1 + markupNum / 100)).toFixed(2);
             }
           }
           
-          await storage.createPart(req.user!.companyId, req.user!.id, validatedData);
+          // Build part data
+          const partData = {
+            type: typeRaw as 'product' | 'service',
+            name,
+            sku,
+            description,
+            cost,
+            markupPercent,
+            unitPrice,
+            isTaxable,
+            taxCode,
+            category,
+            isActive
+          };
+          
+          // Check for existing item by SKU first, then by name
+          let existingPart = sku ? await storage.getPartBySku(req.user!.companyId, sku) : null;
+          if (!existingPart) {
+            existingPart = await storage.findDuplicatePart(req.user!.companyId, partData);
+          }
+          
+          if (existingPart) {
+            if (updateExisting) {
+              // Update existing item (don't update QBO fields from CSV)
+              await storage.updatePart(req.user!.companyId, existingPart.id, partData);
+              results.updated++;
+            } else if (skipDuplicates) {
+              results.skipped++;
+            } else {
+              results.errors.push({ row: rowNumber, error: `"${name}" already exists` });
+            }
+            continue;
+          }
+          
+          await storage.createPart(req.user!.companyId, req.user!.id, partData);
           results.imported++;
         } catch (err) {
           results.errors.push({ row: rowNumber, error: 'Invalid data format' });

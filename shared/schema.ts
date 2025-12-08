@@ -193,6 +193,9 @@ export const insertClientSchema = createInsertSchema(clients).omit({
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 
+// Parts/Items table - represents both legacy parts (filters/belts) and QBO-aligned Items (products/services)
+// These Items are designed to sync to QuickBooks Online Items in the future.
+// The app is currently the primary master for item details, and QBO mapping will be handled via qboItemId.
 export const parts = pgTable("parts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
@@ -204,14 +207,28 @@ export const parts = pgTable("parts", {
   beltType: text("belt_type"), // "A", "B", "Other"
   // Shared between filters and belts
   size: text("size"),
-  // Other parts/products/services fields
+  // Item fields (products/services - QBO aligned)
   name: text("name"),
+  sku: text("sku"), // belt/filter code or internal item code
   description: text("description"),
   // Pricing fields (for products and services)
   cost: text("cost"), // Cost price in dollars (stored as text to preserve decimals)
+  markupPercent: text("markup_percent"), // Optional markup percentage for auto-calculating unitPrice
   unitPrice: text("unit_price"), // Selling price in dollars
-  taxExempt: boolean("tax_exempt").default(false),
+  // Tax fields
+  isTaxable: boolean("is_taxable").default(true),
+  taxExempt: boolean("tax_exempt").default(false), // Legacy field - use isTaxable for new items
+  taxCode: text("tax_code"), // Reserved for future tax integration
+  // Categorization
+  category: text("category"), // Simple category/group label
+  // Status
+  isActive: boolean("is_active").default(true),
+  // QBO sync fields for Items
+  qboItemId: text("qbo_item_id"), // QBO Item id if/when synced
+  qboSyncToken: text("qbo_sync_token"), // QBO sync token if needed
+  // Metadata
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
 });
 
 export const insertPartSchema = createInsertSchema(parts).omit({
