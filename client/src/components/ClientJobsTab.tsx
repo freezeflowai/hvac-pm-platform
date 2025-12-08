@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Briefcase, Calendar, MapPin, User, CheckCircle, Clock, AlertCircle } from "lucide-react";
-import type { Client, CalendarAssignment } from "@shared/schema";
+import { Plus, Briefcase, Calendar, MapPin, User, CheckCircle, Clock, AlertCircle, ExternalLink } from "lucide-react";
+import type { Client, Job } from "@shared/schema";
+import { format } from "date-fns";
 
-interface JobWithLocation extends CalendarAssignment {
+interface JobWithLocation extends Job {
   locationName?: string;
   locationCity?: string;
 }
@@ -22,36 +24,63 @@ interface ClientJobsTabProps {
   onCreateJob?: (locationId?: string) => void;
 }
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function getStatusBadge(job: CalendarAssignment) {
-  if (job.completed) {
-    return (
-      <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
-        <CheckCircle className="h-3 w-3 mr-1" />
-        Completed
-      </Badge>
-    );
+function getStatusBadge(job: Job) {
+  switch (job.status) {
+    case "completed":
+    case "invoiced":
+      return (
+        <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          {job.status === "invoiced" ? "Invoiced" : "Completed"}
+        </Badge>
+      );
+    case "in_progress":
+      return (
+        <Badge variant="default" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
+          <Clock className="h-3 w-3 mr-1" />
+          In Progress
+        </Badge>
+      );
+    case "on_hold":
+      return (
+        <Badge variant="secondary">
+          <Clock className="h-3 w-3 mr-1" />
+          On Hold
+        </Badge>
+      );
+    case "cancelled":
+      return (
+        <Badge variant="outline" className="text-muted-foreground">
+          Cancelled
+        </Badge>
+      );
+    case "draft":
+      return (
+        <Badge variant="outline">
+          Draft
+        </Badge>
+      );
+    case "scheduled":
+    default:
+      const now = new Date();
+      const scheduledStart = job.scheduledStart ? new Date(job.scheduledStart) : null;
+      
+      if (scheduledStart && scheduledStart < now) {
+        return (
+          <Badge variant="destructive">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Overdue
+          </Badge>
+        );
+      }
+      
+      return (
+        <Badge variant="secondary">
+          <Clock className="h-3 w-3 mr-1" />
+          Scheduled
+        </Badge>
+      );
   }
-  
-  const now = new Date();
-  const jobDate = new Date(job.year, job.month - 1, job.day || 15);
-  
-  if (jobDate < now) {
-    return (
-      <Badge variant="destructive">
-        <AlertCircle className="h-3 w-3 mr-1" />
-        Overdue
-      </Badge>
-    );
-  }
-  
-  return (
-    <Badge variant="secondary">
-      <Clock className="h-3 w-3 mr-1" />
-      Scheduled
-    </Badge>
-  );
 }
 
 export default function ClientJobsTab({ 
@@ -69,26 +98,48 @@ export default function ClientJobsTab({
     }
   }, [initialLocationId]);
 
+  // Get all locations under the parent company for the filter dropdown
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Client[]>({
     queryKey: ["/api/customer-companies", parentCompanyId, "locations"],
     enabled: Boolean(parentCompanyId),
   });
 
-  const locationParam = selectedLocationId !== "all" ? selectedLocationId : undefined;
+  // Build the locationId filter - if specific location selected, use it; otherwise get all jobs for all locations
+  const locationIds = selectedLocationId !== "all" 
+    ? [selectedLocationId] 
+    : (parentCompanyId ? locations.map(l => l.id) : [clientId]);
   
+  // Fetch jobs from the Jobs API with location filter
   const { data: jobs = [], isLoading: jobsLoading } = useQuery<JobWithLocation[]>({
-    queryKey: ["/api/customer-companies", parentCompanyId, "jobs", { locationId: locationParam }],
+    queryKey: ["/api/jobs", { locationIds }],
     queryFn: async () => {
-      const baseUrl = `/api/customer-companies/${parentCompanyId}/jobs`;
-      const url = locationParam ? `${baseUrl}?locationId=${encodeURIComponent(locationParam)}` : baseUrl;
-      const res = await fetch(url, { credentials: "include" });
+      // If we have specific location IDs to filter, use the first one
+      // The API supports single locationId filter
+      if (selectedLocationId !== "all") {
+        const res = await fetch(`/api/jobs?locationId=${encodeURIComponent(selectedLocationId)}`, { credentials: "include" });
+        if (!res.ok) throw new Error(`Failed to fetch jobs: ${res.statusText}`);
+        return res.json();
+      }
+      
+      // For "all locations", fetch all jobs and filter client-side
+      const res = await fetch("/api/jobs", { credentials: "include" });
       if (!res.ok) throw new Error(`Failed to fetch jobs: ${res.statusText}`);
-      return res.json();
+      const allJobs: JobWithLocation[] = await res.json();
+      
+      // Filter to only jobs for locations under this parent company
+      if (parentCompanyId && locations.length > 0) {
+        const locationIdSet = new Set(locations.map(l => l.id));
+        return allJobs.filter(job => job.locationId && locationIdSet.has(job.locationId));
+      }
+      
+      // If no parent company, filter to just this client's jobs
+      return allJobs.filter(job => job.locationId === clientId);
     },
-    enabled: Boolean(parentCompanyId),
+    enabled: !locationsLoading,
   });
 
-  const getLocationName = (locationClientId: string) => {
+  const getLocationName = (locationClientId: string | null) => {
+    if (!locationClientId) return "Unknown Location";
     const location = locations.find(l => l.id === locationClientId);
     return location?.location || location?.companyName || "Unknown Location";
   };
@@ -99,14 +150,13 @@ export default function ClientJobsTab({
     }
   };
 
-  if (!parentCompanyId) {
+  if (!parentCompanyId && !clientId) {
     return (
       <Card>
         <CardContent className="py-12">
           <div className="text-center text-muted-foreground">
             <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>This client is not linked to a parent company.</p>
-            <p className="text-sm mt-2">Jobs are organized under parent companies.</p>
+            <p>Unable to load jobs.</p>
           </div>
         </CardContent>
       </Card>
@@ -148,22 +198,24 @@ export default function ClientJobsTab({
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Location:</span>
-          <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-            <SelectTrigger className="w-[200px]" data-testid="select-location-filter">
-              <SelectValue placeholder="All Locations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  {location.location || location.companyName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {parentCompanyId && locations.length > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Location:</span>
+            <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+              <SelectTrigger className="w-[200px]" data-testid="select-location-filter">
+                <SelectValue placeholder="All Locations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map((location) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    {location.location || location.companyName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {jobs.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
@@ -176,42 +228,47 @@ export default function ClientJobsTab({
             <TableHeader>
               <TableRow>
                 <TableHead>Job #</TableHead>
+                <TableHead>Summary</TableHead>
                 <TableHead>Scheduled</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Technician</TableHead>
+                {parentCompanyId && locations.length > 1 && <TableHead>Location</TableHead>}
                 <TableHead>Status</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {jobs.map((job) => (
                 <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
                   <TableCell className="font-medium">
-                    #{job.jobNumber}
+                    {job.jobNumber || `#${job.id.slice(0, 8)}`}
+                  </TableCell>
+                  <TableCell>
+                    <span className="line-clamp-1">{job.summary || "No summary"}</span>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3 text-muted-foreground" />
-                      {job.day ? `${MONTH_NAMES[job.month - 1]} ${job.day}, ${job.year}` : `${MONTH_NAMES[job.month - 1]} ${job.year}`}
+                      {job.scheduledStart 
+                        ? format(new Date(job.scheduledStart), "MMM d, yyyy")
+                        : "Not scheduled"}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="font-normal">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      {job.locationName || getLocationName(job.clientId)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {job.assignedTechnicianIds && job.assignedTechnicianIds.length > 0 ? (
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <User className="h-3 w-3" />
-                        <span className="text-sm">{job.assignedTechnicianIds.length} assigned</span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">Unassigned</span>
-                    )}
-                  </TableCell>
+                  {parentCompanyId && locations.length > 1 && (
+                    <TableCell>
+                      <Badge variant="outline" className="font-normal">
+                        <MapPin className="h-3 w-3 mr-1" />
+                        {job.locationName || getLocationName(job.locationId)}
+                      </Badge>
+                    </TableCell>
+                  )}
                   <TableCell>
                     {getStatusBadge(job)}
+                  </TableCell>
+                  <TableCell>
+                    <Link href={`/jobs/${job.id}`}>
+                      <Button variant="ghost" size="icon" data-testid={`button-view-job-${job.id}`}>
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}
