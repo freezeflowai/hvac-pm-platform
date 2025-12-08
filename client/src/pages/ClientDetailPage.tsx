@@ -252,6 +252,8 @@ export default function ClientDetailPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
+          {/* Properties and Notes Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Properties Section */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
@@ -429,6 +431,7 @@ export default function ClientDetailPage() {
               )}
             </CardContent>
           </Card>
+          </div>
 
           {/* Overview / Active Work Section */}
           <Card>
