@@ -592,13 +592,11 @@ export default function ProductsServicesManager() {
                 data-testid={`checkbox-select-${part.id}`}
               />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <p className="font-medium text-sm truncate" data-testid={`text-name-${part.id}`}>{display.primary}</p>
-                  {partType && (
-                    <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground shrink-0" data-testid={`badge-category-${part.id}`}>
-                      {partType}
-                    </span>
-                  )}
+                  <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium shrink-0" data-testid={`badge-category-${part.id}`}>
+                    {part.type || 'no-type'}
+                  </span>
                 </div>
                 {display.secondary && (
                   <p className="text-xs text-muted-foreground truncate" data-testid={`text-sku-${part.id}`}>{display.secondary}</p>
