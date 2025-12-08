@@ -1,0 +1,272 @@
+You are helping me refactor the EXISTING Job Detail page in my HVAC dispatch app.
+
+Current state (based on the UI):
+
+- Top bar with:
+  - Back button
+  - Job ID and title (e.g. “Job #10133 – Emergency Job”)
+  - A red “Overdue” pill and a “Medium” priority pill
+  - A status dropdown in the top-right (Scheduled / In Progress / On Hold / Cancelled)
+  - A red delete (trash) button
+
+- Main content layout:
+  - Left big card: "Job Details"
+    - Summary
+    - Access Instructions
+    - Scheduled Start / Scheduled End
+  - Right column cards:
+    - Location (with “View Location Details” button)
+    - Assigned Technicians (currently “No technicians assigned”)
+    - Metadata (Created date)
+  - Large card at the bottom: "Equipment"
+    - Shows "No equipment linked to this job. No equipment registered at this location yet."
+    - "+ Add Equipment" button
+
+Use the existing stack (React or whatever is already in the project), UI components, routing, and styling conventions. Do NOT introduce new frameworks. Refactor the current Job Detail component instead of rewriting everything from scratch.
+
+The main goal: make this Job Detail page **workflow-first** (help the dispatcher or office staff understand “what’s next?”) while keeping the clean layout.
+
+------------------------------------------------
+1) ADD A TOP ACTION BAR WITH STATUS PROGRESSION
+------------------------------------------------
+
+Replace the simple status dropdown + floating delete button with a more structured **header action area**.
+
+### a) Status flow
+
+Instead of only a plain dropdown, add a **status progression** component that visually shows the job’s lifecycle, for example:
+
+- Draft
+- Scheduled
+- In Progress
+- Completed
+- Invoiced
+- (Optional) Paid
+- Cancelled is an “off-path” terminal status.
+
+You can implement this as:
+
+- A horizontal stepper / progress bar, or
+- A segmented status indicator with clickable stages (depending on what matches the existing design system).
+
+Behavior:
+
+- The current status should be clearly highlighted.
+- The user can change the status by clicking a stage or via a dropdown integrated into this component.
+- Keep status options in sync with whatever is already used on the backend (Scheduled, In Progress, On Hold, Cancelled, etc.). If adding new states (Completed, Invoiced, etc.), make sure they match or extend the enum used by the Job API.
+
+### b) Primary "Next Action" button
+
+Add a **primary action button** in the top-right of the main header that depends on the job’s status:
+
+Examples (pseudo-logic):
+
+- If status === "Scheduled":
+  - Show: **"Dispatch Technician"** (or “Start Job”, depending on your workflow).
+- If status === "In Progress":
+  - Show: **"Mark Completed"**.
+- If status === "Completed" and no invoice is associated:
+  - Show: **"Create Invoice"**.
+- If status === "Invoiced":
+  - Show: **"View Invoice"** (if invoiceId/qboInvoiceId is present).
+
+If there is no special next step, the button can default to **"Edit Job"**.
+
+These actions should call existing handlers or routes where possible. If those are not yet implemented, wire them to TODOs or placeholder handlers with clear comments.
+
+### c) Secondary actions
+
+Near the primary action, add secondary actions:
+
+- "Edit Job"
+- "Cancel Job" (sets status to Cancelled)
+- Existing Delete button (trash icon) if deletion is allowed
+
+Use the app’s standard button and icon components.
+
+------------------------------------------------
+2) RESTRUCTURE MAIN SECTIONS FOR CLEAR HIERARCHY
+------------------------------------------------
+
+Keep the current two-column layout, but make the sections more workflow-oriented.
+
+### Left column – Job-centric information
+
+1. **Job Details card** (keep but refine):
+
+   Fields (read-only or editable depending on design):
+
+   - Summary
+   - Job type (if available)
+   - Priority (convert “Medium” pill into a proper display here)
+   - Access instructions
+   - Scheduled Start
+   - Scheduled End
+   - Actual Start / Actual End (if present)
+
+   Include small icons for date/time like you already have.
+
+2. **Equipment card** (improved; see section 3 below)
+
+3. (Optional placeholder) **Parts & Billing card** (see section 5)
+
+### Right column – Context and people
+
+1. **Location card** (as you already have):
+   - Location name
+   - Client/company name
+   - Address (if available)
+   - "View Location Details" button
+
+2. **Assigned Technicians card** (improved; see section 4)
+
+3. **Metadata card**
+   - Created date
+   - Last updated date (if available)
+   - Created by (if available)
+
+4. (Optional) **Activity Timeline card** (see section 6)
+
+Make sure the card spacing and styling follow the current design (white cards with rounded corners, consistent padding).
+
+------------------------------------------------
+3) EQUIPMENT SECTION – MAKE IT ACTIONABLE
+------------------------------------------------
+
+Currently, Equipment displays an empty state.
+
+Refactor the **Equipment** card to support:
+
+- When equipment exists at this location:
+  - Show a list/table:
+
+    Columns:
+    - Equipment Name
+    - Type
+    - Model
+    - Serial
+    - (Optional) a short Notes preview
+
+  - Each row should have an indication if it is **linked to this job**.
+
+  Implementation example:
+
+  - Show two states:
+    - Equipment linked to this job (JobEquipment)
+    - Other equipment at the location that could be linked.
+
+  For the first iteration (simpler version):
+
+  - Only show equipment actually linked to this job (from JobEquipment).
+  - If none linked:
+    - Show message:
+      - “No equipment linked to this job.”
+      - If the location has equipment:
+        - “You can link existing equipment for this location.”
+  - Add a button: **“Add Equipment”**.
+
+- Clicking **“Add Equipment”**:
+  - Opens a modal/form with:
+    - Dropdown of equipment at this job’s location (LocationEquipment list).
+    - Optional notes field.
+  - On submit:
+    - Call the `/jobs/:jobId/equipment` POST endpoint we defined earlier.
+    - Refresh the equipment list.
+
+This will turn the Equipment section into something the dispatcher/tech can actually use.
+
+------------------------------------------------
+4) ASSIGNED TECHNICIANS – MAKE IT EASY TO ASSIGN
+------------------------------------------------
+
+Update the **Assigned Technicians** card:
+
+- If there are assigned technicians:
+  - Show them in a list:
+    - Name
+    - Role (if known)
+    - Primary / secondary indicator (if applicable)
+
+- If there are no technicians assigned:
+  - Show a helpful message like:
+    - “No technicians assigned to this job yet.”
+  - And a primary action:
+    - **“Assign Technician”** button.
+
+Clicking **“Assign Technician”** should:
+
+- Open a modal or dropdown that lists available technicians.
+- Let the user pick one or more technicians depending on existing model.
+- Submit to the existing job update API (e.g. PUT /jobs/:id with primaryTechnicianId or assignedTechnicianIds).
+- Refresh the job detail view.
+
+Optional quick actions:
+
+- “Assign to Myself” (if current user is a tech and the API/user model supports it).
+- Multi-select for multiple techs if supported by the backend.
+
+------------------------------------------------
+5) ADD A “PARTS & BILLING” CARD (STUBBED FOR NOW)
+------------------------------------------------
+
+Add a new card in the left column, below Job Details and/or Equipment:
+
+Title: **“Parts & Billing”**
+
+- Show summary info:
+
+  - “Parts added: X” (based on JobParts count, if JobParts exist in the model)
+  - “Invoice: Not created / Invoice #1234 / Synced to QuickBooks” (based on invoice link fields)
+
+- Buttons:
+
+  - **“Add Parts”** (opens existing or future job parts UI; can be a placeholder for now).
+  - **“Create Invoice”** (if no invoice exists yet – this should be consistent with the top-level next-action button when status is Completed).
+  - If invoice exists:
+    - **“View Invoice”**.
+
+If the underlying parts or invoice infrastructure is not present yet, stub this card with TODO comments and a simple placeholder UI that is easy to hook up later.
+
+------------------------------------------------
+6) ADD AN ACTIVITY TIMELINE / HISTORY (BASIC VERSION)
+------------------------------------------------
+
+In the right column, under Metadata, add a **“Activity”** or **“Job History”** card.
+
+- For now, you can implement a simple vertical list showing:
+
+  - Created timestamp (and user if available).
+  - Status changes (if you have that in the audit/log, or you can wire it later).
+  - Technician assignments (if such events are logged).
+
+If there is no logging infrastructure yet, build the UI component and populate it with basic items such as:
+
+- “Job created on [date].”
+- “Scheduled start set to [date/time].”
+
+Add TODO comments to hook into a future audit trail.
+
+------------------------------------------------
+7) RESPONSIVENESS & CONSISTENCY
+------------------------------------------------
+
+Ensure that:
+
+- The refactored layout is responsive in the same way the current one is.
+- All new buttons and labels use the app’s existing button, pill, badge, and card components.
+- The new logic for changing status, assigning technicians, and adding equipment connects to the existing API layer (or to minimal new endpoints if they were recently added as part of the job/equipment feature work).
+
+------------------------------------------------
+WHAT TO DELIVER
+------------------------------------------------
+
+Update the Job Detail page component(s) to:
+
+1. Include a status progression component and a context-aware **Next Action** primary button in the header.
+2. Keep the Job Details, Location, and Metadata cards, but reorganize them into a clearer two-column workflow layout.
+3. Enhance the Equipment card to let the user link equipment from the job’s location via a modal/dialog, and list currently linked equipment.
+4. Enhance the Assigned Technicians card with an “Assign Technician” flow and list of assigned techs.
+5. Add a “Parts & Billing” card stub that surfaces parts count and invoice state, plus actions for adding parts and creating/viewing invoices.
+6. Add a basic Activity/History card showing at least created date and any easily accessible metadata, prepared to support richer audit logs in the future.
+
+Use the existing styling, components, and patterns in the codebase so everything looks and feels consistent with the rest of the app.
