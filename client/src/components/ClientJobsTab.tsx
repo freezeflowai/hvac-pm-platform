@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Briefcase, Calendar, MapPin, User, CheckCircle, Clock, AlertCircle, ExternalLink } from "lucide-react";
+import { Plus, Briefcase, Calendar, MapPin, CheckCircle, Clock, AlertCircle } from "lucide-react";
 import type { Client, Job } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -90,6 +90,7 @@ export default function ClientJobsTab({
   initialLocationId,
   onCreateJob 
 }: ClientJobsTabProps) {
+  const [, setLocation] = useLocation();
   const [selectedLocationId, setSelectedLocationId] = useState<string>(initialLocationId || "all");
 
   useEffect(() => {
@@ -232,12 +233,16 @@ export default function ClientJobsTab({
                 <TableHead>Scheduled</TableHead>
                 {parentCompanyId && locations.length > 1 && <TableHead>Location</TableHead>}
                 <TableHead>Status</TableHead>
-                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {jobs.map((job) => (
-                <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
+                <TableRow 
+                  key={job.id} 
+                  data-testid={`row-job-${job.id}`}
+                  className="cursor-pointer hover-elevate"
+                  onClick={() => setLocation(`/jobs/${job.id}`)}
+                >
                   <TableCell className="font-medium">
                     {job.jobNumber || `#${job.id.slice(0, 8)}`}
                   </TableCell>
@@ -262,13 +267,6 @@ export default function ClientJobsTab({
                   )}
                   <TableCell>
                     {getStatusBadge(job)}
-                  </TableCell>
-                  <TableCell>
-                    <Link href={`/jobs/${job.id}`}>
-                      <Button variant="ghost" size="icon" data-testid={`button-view-job-${job.id}`}>
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </Link>
                   </TableCell>
                 </TableRow>
               ))}
