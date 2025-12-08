@@ -7,19 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Building2, MapPin, Package, StickyNote, Phone, Mail, MapPinned, FileText, Plus, Briefcase, Star, Pencil, Trash2, CheckCircle, Clock, AlertCircle, Calendar, DollarSign } from "lucide-react";
+import { ArrowLeft, Building2, MapPin, Package, StickyNote, Phone, Mail, MapPinned, FileText, Plus, Briefcase, Star, Pencil, Trash2, CheckCircle, Clock, AlertCircle, Calendar, DollarSign, Settings, Wrench } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import ClientLocationsTab from "@/components/ClientLocationsTab";
-import ClientNotesTab from "@/components/ClientNotesTab";
 import ClientJobsTab from "@/components/ClientJobsTab";
+import LocationFormModal from "@/components/LocationFormModal";
 import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import type { Client, CustomerCompany, ClientNote, Job } from "@shared/schema";
 
-type TabValue = "overview" | "jobs" | "locations" | "parts" | "notes";
+type TabValue = "overview" | "jobs" | "locations" | "parts";
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,7 +32,7 @@ export default function ClientDetailPage() {
     const tab = params.get("tab") as TabValue | null;
     const locationId = params.get("locationId");
     return {
-      tab: (tab && ["overview", "jobs", "locations", "parts", "notes"].includes(tab)) ? tab as TabValue : "overview",
+      tab: (tab && ["overview", "jobs", "locations", "parts"].includes(tab)) ? tab as TabValue : "overview",
       locationId: locationId || undefined
     };
   };
@@ -47,6 +48,8 @@ export default function ClientDetailPage() {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editNoteContent, setEditNoteContent] = useState("");
   const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
+  const [editLocationModalOpen, setEditLocationModalOpen] = useState(false);
+  const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
 
   useEffect(() => {
     const state = getInitialState();
@@ -99,20 +102,27 @@ export default function ClientDetailPage() {
     return locations.some(loc => loc.id === job.locationId);
   });
 
-  // Fetch notes for overview
+  // Determine which location is focused (selectedLocationId from Jobs tab filter, or current client)
+  const focusedLocationId = selectedLocationId || id;
+  const focusedLocation = locations.find(loc => loc.id === focusedLocationId) || client;
+
+  // Fetch notes for the focused location
   const { data: notes = [] } = useQuery<ClientNote[]>({
-    queryKey: ["/api/clients", id, "notes"],
-    enabled: Boolean(id),
+    queryKey: ["/api/client-notes", focusedLocationId],
+    enabled: Boolean(focusedLocationId),
   });
 
   // Note mutations
   const createNoteMutation = useMutation({
     mutationFn: async (noteText: string) => {
-      const res = await apiRequest("POST", `/api/clients/${id}/notes`, { noteText });
+      const res = await apiRequest("POST", `/api/client-notes`, { 
+        clientId: focusedLocationId, 
+        noteText 
+      });
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients", id, "notes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/client-notes", focusedLocationId] });
       setNewNoteContent("");
       setIsAddingNote(false);
       toast({ title: "Note added", description: "The note has been added successfully." });
@@ -124,11 +134,11 @@ export default function ClientDetailPage() {
 
   const updateNoteMutation = useMutation({
     mutationFn: async ({ noteId, noteText }: { noteId: string; noteText: string }) => {
-      const res = await apiRequest("PATCH", `/api/clients/${id}/notes/${noteId}`, { noteText });
+      const res = await apiRequest("PATCH", `/api/client-notes/${noteId}`, { noteText });
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients", id, "notes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/client-notes", focusedLocationId] });
       setEditingNoteId(null);
       setEditNoteContent("");
       toast({ title: "Note updated", description: "The note has been updated successfully." });
@@ -140,15 +150,61 @@ export default function ClientDetailPage() {
 
   const deleteNoteMutation = useMutation({
     mutationFn: async (noteId: string) => {
-      await apiRequest("DELETE", `/api/clients/${id}/notes/${noteId}`);
+      await apiRequest("DELETE", `/api/client-notes/${noteId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients", id, "notes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/client-notes", focusedLocationId] });
       setDeleteNoteId(null);
       toast({ title: "Note deleted", description: "The note has been deleted." });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete note.", variant: "destructive" });
+    },
+  });
+
+  // Fetch location-specific parts and equipment when on Jobs tab with selected location
+  const { data: locationParts = [] } = useQuery<any[]>({
+    queryKey: ["/api/locations", focusedLocationId, "pm-parts"],
+    enabled: Boolean(focusedLocationId) && activeTab === "jobs",
+  });
+
+  const { data: locationEquipment = [] } = useQuery<any[]>({
+    queryKey: ["/api/locations", focusedLocationId, "equipment"],
+    enabled: Boolean(focusedLocationId) && activeTab === "jobs",
+  });
+
+  // Toggle location active status
+  const toggleActiveMutation = useMutation({
+    mutationFn: async (inactive: boolean) => {
+      const res = await apiRequest("PATCH", `/api/clients/${focusedLocationId}`, { inactive });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-companies", client?.parentCompanyId, "locations"] });
+      setDeactivateDialogOpen(false);
+      toast({ title: "Status updated", description: `Location ${focusedLocation?.inactive ? "activated" : "deactivated"} successfully.` });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update status.", variant: "destructive" });
+    },
+  });
+
+  // Toggle bill with parent
+  const toggleBillWithParentMutation = useMutation({
+    mutationFn: async (billWithParent: boolean) => {
+      const res = await apiRequest("PATCH", `/api/clients/${focusedLocationId}`, { billWithParent });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-companies", client?.parentCompanyId, "locations"] });
+      toast({ title: "Billing updated", description: "Billing preference updated successfully." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update billing.", variant: "destructive" });
     },
   });
 
@@ -244,10 +300,6 @@ export default function ClientDetailPage() {
           <TabsTrigger value="parts" data-testid="tab-parts">
             <Package className="h-4 w-4 mr-2" />
             Parts
-          </TabsTrigger>
-          <TabsTrigger value="notes" data-testid="tab-notes">
-            <StickyNote className="h-4 w-4 mr-2" />
-            Notes
           </TabsTrigger>
         </TabsList>
 
@@ -492,9 +544,6 @@ export default function ClientDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="notes">
-          <ClientNotesTab clientId={id!} />
-        </TabsContent>
       </Tabs>
 
       <QuickAddJobDialog
@@ -506,47 +555,188 @@ export default function ClientDetailPage() {
 
         {/* Right Column - 30% */}
         <aside className="w-[30%] min-w-[280px] space-y-4 flex-shrink-0">
-          {/* Contact Information */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Contact</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {client.contactName && (
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-                    {client.contactName.slice(0, 1).toUpperCase()}
+          {/* Dynamic content based on tab */}
+          {activeTab === "jobs" && selectedLocationId ? (
+            <>
+              {/* Location Header with Status */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-base">{focusedLocation?.location || focusedLocation?.companyName || "Location"}</CardTitle>
+                    <Badge variant={focusedLocation?.inactive ? "secondary" : "default"}>
+                      {focusedLocation?.inactive ? "Inactive" : "Active"}
+                    </Badge>
                   </div>
-                  <span className="font-medium" data-testid="text-contact-name">{client.contactName}</span>
-                </div>
-              )}
-              {client.email && (
-                <a 
-                  href={`mailto:${client.email}`} 
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  data-testid="link-contact-email"
-                >
-                  <Mail className="h-4 w-4" />
-                  {client.email}
-                </a>
-              )}
-              {client.phone && (
-                <a 
-                  href={`tel:${client.phone}`} 
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  data-testid="link-contact-phone"
-                >
-                  <Phone className="h-4 w-4" />
-                  {client.phone}
-                </a>
-              )}
-              {!client.contactName && !client.email && !client.phone && (
-                <p className="text-sm text-muted-foreground">No contact information</p>
-              )}
-            </CardContent>
-          </Card>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Address */}
+                  {focusedLocation?.address && (
+                    <div className="text-sm text-muted-foreground">
+                      <p>{focusedLocation.address}</p>
+                      <p>{focusedLocation.city}, {focusedLocation.province} {focusedLocation.postalCode}</p>
+                    </div>
+                  )}
 
-          {/* Notes */}
+                  {/* Contact Info */}
+                  <div className="space-y-2">
+                    {focusedLocation?.contactName && (
+                      <p className="text-sm font-medium">{focusedLocation.contactName}</p>
+                    )}
+                    {focusedLocation?.email && (
+                      <a href={`mailto:${focusedLocation.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                        <Mail className="h-4 w-4" />
+                        {focusedLocation.email}
+                      </a>
+                    )}
+                    {focusedLocation?.phone && (
+                      <a href={`tel:${focusedLocation.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                        <Phone className="h-4 w-4" />
+                        {focusedLocation.phone}
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Bill with Parent Toggle */}
+                  <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-medium">Bill with Parent</p>
+                      <p className="text-xs text-muted-foreground">
+                        {focusedLocation?.billWithParent ? "Billed to parent company" : "Billed directly"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={focusedLocation?.billWithParent ?? true}
+                      onCheckedChange={(checked) => toggleBillWithParentMutation.mutate(checked)}
+                      disabled={toggleBillWithParentMutation.isPending}
+                      data-testid="switch-bill-with-parent"
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => setEditLocationModalOpen(true)}
+                      data-testid="button-edit-location"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button 
+                      variant={focusedLocation?.inactive ? "default" : "outline"}
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => focusedLocation?.inactive ? toggleActiveMutation.mutate(false) : setDeactivateDialogOpen(true)}
+                      disabled={toggleActiveMutation.isPending}
+                      data-testid="button-toggle-active"
+                    >
+                      {focusedLocation?.inactive ? "Activate" : "Deactivate"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Parts */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Parts ({locationParts.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {locationParts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No parts assigned</p>
+                  ) : (
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {locationParts.slice(0, 5).map((part: any, idx: number) => (
+                        <div key={idx} className="text-sm flex justify-between">
+                          <span>{part.partName || part.name || "Part"}</span>
+                          <span className="text-muted-foreground">x{part.quantity || 1}</span>
+                        </div>
+                      ))}
+                      {locationParts.length > 5 && (
+                        <p className="text-xs text-muted-foreground">+{locationParts.length - 5} more</p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Equipment */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Wrench className="h-4 w-4" />
+                    Equipment ({locationEquipment.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {locationEquipment.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No equipment registered</p>
+                  ) : (
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {locationEquipment.slice(0, 5).map((eq: any) => (
+                        <div key={eq.id} className="text-sm">
+                          <p className="font-medium">{eq.name}</p>
+                          <p className="text-xs text-muted-foreground">{eq.equipmentType}</p>
+                        </div>
+                      ))}
+                      {locationEquipment.length > 5 && (
+                        <p className="text-xs text-muted-foreground">+{locationEquipment.length - 5} more</p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              {/* Contact Information - for overview and other tabs */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Contact</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {client.contactName && (
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
+                        {client.contactName.slice(0, 1).toUpperCase()}
+                      </div>
+                      <span className="font-medium" data-testid="text-contact-name">{client.contactName}</span>
+                    </div>
+                  )}
+                  {client.email && (
+                    <a 
+                      href={`mailto:${client.email}`} 
+                      className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      data-testid="link-contact-email"
+                    >
+                      <Mail className="h-4 w-4" />
+                      {client.email}
+                    </a>
+                  )}
+                  {client.phone && (
+                    <a 
+                      href={`tel:${client.phone}`} 
+                      className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      data-testid="link-contact-phone"
+                    >
+                      <Phone className="h-4 w-4" />
+                      {client.phone}
+                    </a>
+                  )}
+                  {!client.contactName && !client.email && !client.phone && (
+                    <p className="text-sm text-muted-foreground">No contact information</p>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {/* Notes - always visible */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Notes</CardTitle>
@@ -595,7 +785,7 @@ export default function ClientDetailPage() {
 
               {notes.length > 0 && (
                 <div className="space-y-2">
-                  {notes.slice(0, 3).map((note) => (
+                  {notes.map((note) => (
                     <div 
                       key={note.id}
                       className="p-3 border rounded-lg cursor-pointer hover-elevate text-sm"
@@ -645,11 +835,6 @@ export default function ClientDetailPage() {
                       )}
                     </div>
                   ))}
-                  {notes.length > 3 && (
-                    <Button variant="ghost" size="sm" onClick={() => handleTabChange("notes")} className="text-primary hover:underline p-0 h-auto w-full justify-start">
-                      View all {notes.length} notes
-                    </Button>
-                  )}
                 </div>
               )}
             </CardContent>
@@ -675,8 +860,42 @@ export default function ClientDetailPage() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          {/* Deactivate Location Confirmation */}
+          <AlertDialog open={deactivateDialogOpen} onOpenChange={setDeactivateDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Deactivate Location</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to deactivate this location? It will be hidden from schedules and reports.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => toggleActiveMutation.mutate(true)}
+                >
+                  Deactivate
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </aside>
       </div>
+
+      {/* Edit Location Modal */}
+      <LocationFormModal
+        open={editLocationModalOpen}
+        onOpenChange={setEditLocationModalOpen}
+        location={focusedLocation as Client}
+        companyId={client.companyId}
+        parentCompanyId={client.parentCompanyId || undefined}
+        onSuccess={() => {
+          setEditLocationModalOpen(false);
+          queryClient.invalidateQueries({ queryKey: ["/api/clients", id] });
+          queryClient.invalidateQueries({ queryKey: ["/api/customer-companies", client.parentCompanyId, "locations"] });
+        }}
+      />
     </div>
   );
 }
