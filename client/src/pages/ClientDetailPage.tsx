@@ -189,24 +189,24 @@ export default function ClientDetailPage() {
   const locationName = client.location || "Primary Location";
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/?tab=clients")} data-testid="button-back-to-clients">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold" data-testid="text-client-name">
-              {companyName}
-            </h1>
-            <p className="text-sm text-muted-foreground flex items-center gap-2">
-              <MapPin className="h-3 w-3" />
-              {locationName}
-              {client.inactive && (
-                <Badge variant="secondary" className="ml-2">Inactive</Badge>
-              )}
-            </p>
-          </div>
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+        <div>
+          <h1 
+            className="text-2xl font-bold cursor-pointer hover:text-primary transition-colors" 
+            onClick={() => setLocation("/?tab=clients")}
+            data-testid="text-client-name"
+          >
+            {companyName}
+          </h1>
+          <p className="text-sm text-muted-foreground flex items-center gap-2">
+            <MapPin className="h-3 w-3" />
+            {locationName}
+            {client.inactive && (
+              <Badge variant="secondary" className="ml-2">Inactive</Badge>
+            )}
+          </p>
         </div>
         
         <div className="flex items-center gap-2 flex-wrap">
@@ -227,6 +227,10 @@ export default function ClientDetailPage() {
         </div>
       </div>
 
+      {/* Two Column Layout */}
+      <div className="flex gap-6">
+        {/* Left Column - 70% */}
+        <div className="flex-1 min-w-0" style={{ flexBasis: '70%' }}>
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview" data-testid="tab-overview">
@@ -252,8 +256,6 @@ export default function ClientDetailPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* Properties and Notes Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Properties Section */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
@@ -310,128 +312,6 @@ export default function ClientDetailPage() {
               )}
             </CardContent>
           </Card>
-
-          {/* Internal Notes Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <StickyNote className="h-5 w-5" />
-                Internal Notes
-              </CardTitle>
-              <CardDescription>
-                Internal notes will only be seen by your team
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isAddingNote ? (
-                <div className="space-y-3">
-                  <Textarea
-                    placeholder="Note details"
-                    value={newNoteContent}
-                    onChange={(e) => setNewNoteContent(e.target.value)}
-                    className="min-h-[100px]"
-                    data-testid="textarea-new-note"
-                  />
-                  <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      onClick={() => createNoteMutation.mutate(newNoteContent.trim())}
-                      disabled={!newNoteContent.trim() || createNoteMutation.isPending}
-                      data-testid="button-save-note"
-                    >
-                      Save Note
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => { setIsAddingNote(false); setNewNoteContent(""); }}
-                      data-testid="button-cancel-note"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsAddingNote(true)}
-                  data-testid="button-add-note"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Note
-                </Button>
-              )}
-
-              {notes.length > 0 && (
-                <div className="space-y-3 mt-4">
-                  {notes.slice(0, 3).map((note) => (
-                    <div 
-                      key={note.id}
-                      className="p-4 border rounded-lg cursor-pointer hover-elevate"
-                      onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.noteText); }}
-                      data-testid={`card-note-${note.id}`}
-                    >
-                      {editingNoteId === note.id ? (
-                        <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
-                          <Textarea
-                            value={editNoteContent}
-                            onChange={(e) => setEditNoteContent(e.target.value)}
-                            className="min-h-[80px]"
-                            data-testid="textarea-edit-note"
-                          />
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              onClick={() => updateNoteMutation.mutate({ noteId: note.id, noteText: editNoteContent.trim() })}
-                              disabled={!editNoteContent.trim() || updateNoteMutation.isPending}
-                            >
-                              Save
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => { setEditingNoteId(null); setEditNoteContent(""); }}
-                            >
-                              Cancel
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-destructive ml-auto"
-                              onClick={() => setDeleteNoteId(note.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-                              {note.userId?.slice(0, 1).toUpperCase() || "U"}
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">Team Member</p>
-                              <p className="text-xs text-muted-foreground">
-                                Created: {format(new Date(note.createdAt), "MM/dd/yyyy h:mma")}
-                              </p>
-                            </div>
-                          </div>
-                          <p className="text-sm whitespace-pre-wrap">{note.noteText}</p>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                  {notes.length > 3 && (
-                    <Button variant="ghost" onClick={() => handleTabChange("notes")} className="text-primary hover:underline p-0 h-auto">
-                      View all {notes.length} notes
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          </div>
 
           {/* Overview / Active Work Section */}
           <Card>
@@ -577,26 +457,6 @@ export default function ClientDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Delete Note Confirmation */}
-          <AlertDialog open={!!deleteNoteId} onOpenChange={(open) => !open && setDeleteNoteId(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Note</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete this note? This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => deleteNoteId && deleteNoteMutation.mutate(deleteNoteId)}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </TabsContent>
 
         <TabsContent value="jobs">
@@ -646,6 +506,181 @@ export default function ClientDetailPage() {
         onOpenChange={setJobDialogOpen}
         preselectedLocationId={preselectedLocationId}
       />
+        </div>
+
+        {/* Right Column - 30% */}
+        <aside className="w-[30%] min-w-[280px] space-y-4 flex-shrink-0">
+          {/* Contact Information */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Contact</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {client.contactName && (
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
+                    {client.contactName.slice(0, 1).toUpperCase()}
+                  </div>
+                  <span className="font-medium" data-testid="text-contact-name">{client.contactName}</span>
+                </div>
+              )}
+              {client.email && (
+                <a 
+                  href={`mailto:${client.email}`} 
+                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid="link-contact-email"
+                >
+                  <Mail className="h-4 w-4" />
+                  {client.email}
+                </a>
+              )}
+              {client.phone && (
+                <a 
+                  href={`tel:${client.phone}`} 
+                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid="link-contact-phone"
+                >
+                  <Phone className="h-4 w-4" />
+                  {client.phone}
+                </a>
+              )}
+              {!client.contactName && !client.email && !client.phone && (
+                <p className="text-sm text-muted-foreground">No contact information</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Notes */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Notes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {isAddingNote ? (
+                <div className="space-y-3">
+                  <Textarea
+                    placeholder="Note details"
+                    value={newNoteContent}
+                    onChange={(e) => setNewNoteContent(e.target.value)}
+                    className="min-h-[80px]"
+                    data-testid="textarea-new-note"
+                  />
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      onClick={() => createNoteMutation.mutate(newNoteContent.trim())}
+                      disabled={!newNoteContent.trim() || createNoteMutation.isPending}
+                      data-testid="button-save-note"
+                    >
+                      Save
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => { setIsAddingNote(false); setNewNoteContent(""); }}
+                      data-testid="button-cancel-note"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setIsAddingNote(true)}
+                  data-testid="button-add-note"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Note
+                </Button>
+              )}
+
+              {notes.length > 0 && (
+                <div className="space-y-2">
+                  {notes.slice(0, 3).map((note) => (
+                    <div 
+                      key={note.id}
+                      className="p-3 border rounded-lg cursor-pointer hover-elevate text-sm"
+                      onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.noteText); }}
+                      data-testid={`card-note-${note.id}`}
+                    >
+                      {editingNoteId === note.id ? (
+                        <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                          <Textarea
+                            value={editNoteContent}
+                            onChange={(e) => setEditNoteContent(e.target.value)}
+                            className="min-h-[60px]"
+                            data-testid="textarea-edit-note"
+                          />
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              onClick={() => updateNoteMutation.mutate({ noteId: note.id, noteText: editNoteContent.trim() })}
+                              disabled={!editNoteContent.trim() || updateNoteMutation.isPending}
+                            >
+                              Save
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => { setEditingNoteId(null); setEditNoteContent(""); }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="text-destructive ml-auto"
+                              onClick={() => setDeleteNoteId(note.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {format(new Date(note.createdAt), "MM/dd/yyyy")}
+                          </p>
+                          <p className="whitespace-pre-wrap line-clamp-3">{note.noteText}</p>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  {notes.length > 3 && (
+                    <Button variant="ghost" size="sm" onClick={() => handleTabChange("notes")} className="text-primary hover:underline p-0 h-auto w-full justify-start">
+                      View all {notes.length} notes
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Delete Note Confirmation */}
+          <AlertDialog open={!!deleteNoteId} onOpenChange={(open) => !open && setDeleteNoteId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Note</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete this note? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteNoteId && deleteNoteMutation.mutate(deleteNoteId)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </aside>
+      </div>
     </div>
   );
 }
