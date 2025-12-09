@@ -161,12 +161,12 @@ export default function ClientDetailPage() {
   return (
     <div className="p-6">
       {/* Breadcrumb */}
-      <nav className="mb-4 text-sm text-muted-foreground" data-testid="breadcrumb">
+      <nav className="mb-4 text-sm" data-testid="breadcrumb">
         <ol className="flex flex-wrap items-center gap-1">
           <li>
             <button
               type="button"
-              className="hover:text-foreground transition-colors"
+              className="font-medium text-primary hover:text-primary/80 hover:underline transition-colors"
               onClick={() => setLocation("/?tab=clients")}
               data-testid="breadcrumb-clients"
             >
@@ -174,7 +174,7 @@ export default function ClientDetailPage() {
             </button>
           </li>
           <li className="flex items-center">
-            <span className="mx-1">›</span>
+            <span className="mx-1 text-muted-foreground">/</span>
             <span className="font-medium text-foreground">{companyName}</span>
           </li>
         </ol>
