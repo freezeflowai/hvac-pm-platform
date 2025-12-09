@@ -748,6 +748,39 @@ export default function JobDetailPage() {
             </CardContent>
           </Card>
 
+          {/* Visits */}
+          <Card data-testid="card-visits">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+              <CardTitle className="text-sm font-semibold">Visits</CardTitle>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs h-auto p-0 text-primary"
+                onClick={() => toast({ title: "Coming Soon", description: "Visit scheduling coming soon." })}
+                data-testid="button-new-visit"
+              >
+                New Visit
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                No visits scheduled yet. Use visits to track on-site appointments for this job.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Invoices */}
+          <Card data-testid="card-invoices">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Invoices</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                No invoices yet for this job.
+              </p>
+            </CardContent>
+          </Card>
+
           {job.recurringSeries && (
             <Card data-testid="card-recurring">
               <CardHeader className="pb-3">
