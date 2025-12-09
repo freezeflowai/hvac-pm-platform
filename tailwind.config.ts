@@ -9,8 +9,33 @@ export default {
         lg: ".5625rem", /* 9px */
         md: ".375rem", /* 6px */
         sm: ".1875rem", /* 3px */
+        card: "10px",
+      },
+      boxShadow: {
+        card: "0 8px 18px rgba(15, 23, 42, 0.04)",
+      },
+      fontSize: {
+        xs: "0.8rem",
+        sm: "0.9rem",
+        base: "1rem",
+        lg: "1.125rem",
+        xl: "1.25rem",
+        "2xl": "1.5rem",
       },
       colors: {
+        // Accessible neutral gray palette
+        gray: {
+          50: "#FAFAFC",
+          100: "#F4F5F9",
+          200: "#E3E5E8",
+          300: "#C5C8CF",
+          400: "#A1A5B0",
+          500: "#7C808C",
+          600: "#616571",
+          700: "#3E4250",
+          800: "#252937",
+          900: "#151824",
+        },
         // Flat / base colors (regular buttons)
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
