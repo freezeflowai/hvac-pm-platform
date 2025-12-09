@@ -8,7 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Briefcase, FileText, Trash2 } from "lucide-react";
+import { ArrowLeft, Briefcase, FileText, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
 import LocationFormModal from "@/components/LocationFormModal";
@@ -27,6 +28,13 @@ export default function LocationDetailPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [partsModalOpen, setPartsModalOpen] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
+  
+  // Collapsible states - Notes open by default, others collapsed
+  const [pmOpen, setPmOpen] = useState(false);
+  const [equipmentOpen, setEquipmentOpen] = useState(false);
+  const [partsOpen, setPartsOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(true);
+  const [billingOpen, setBillingOpen] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editNoteContent, setEditNoteContent] = useState("");
@@ -278,247 +286,298 @@ export default function LocationDetailPage() {
           </Card>
         </div>
 
-        {/* RIGHT: PM, Equipment, Parts, Notes, Billing */}
-        <div className="space-y-4">
-          {/* PM Schedule */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Preventive Maintenance Schedule</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">PM Type</div>
-                <Select defaultValue="quarterly">
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select PM type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="quarterly">Quarterly PM</SelectItem>
-                    <SelectItem value="biannual">Bi-Annual PM</SelectItem>
-                    <SelectItem value="annual">Annual PM</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* RIGHT: PM, Equipment, Parts, Notes, Billing - All Collapsible */}
+        <div className="space-y-3">
+          {/* PM Schedule - Collapsible */}
+          <Collapsible open={pmOpen} onOpenChange={setPmOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-pm-schedule">
+                  <span className="text-sm font-semibold">Preventive Maintenance Schedule</span>
+                  {pmOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t px-4 pb-4 pt-3 space-y-3 text-sm">
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground">PM Type</div>
+                    <Select defaultValue="quarterly">
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select PM type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="quarterly">Quarterly PM</SelectItem>
+                        <SelectItem value="biannual">Bi-Annual PM</SelectItem>
+                        <SelectItem value="annual">Annual PM</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">Scheduled Months</div>
-                <div className="flex flex-wrap gap-1">
-                  <span className="text-xs text-muted-foreground">Not configured</span>
-                </div>
-              </div>
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground">Scheduled Months</div>
+                    <div className="flex flex-wrap gap-1">
+                      <span className="text-xs text-muted-foreground">Not configured</span>
+                    </div>
+                  </div>
 
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <div>
-                  Last PM: <span className="font-medium text-foreground">—</span>
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <div>
+                      Last PM: <span className="font-medium text-foreground">—</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span>Next PM: <span className="font-medium text-foreground">—</span></span>
+                      {overdueJobs.length > 0 && (
+                        <Badge variant="destructive" className="text-xs">Overdue</Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span>Next PM: <span className="font-medium text-foreground">—</span></span>
-                  {overdueJobs.length > 0 && (
-                    <Badge variant="destructive" className="text-xs">Overdue</Badge>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+
+          {/* Equipment - Collapsible */}
+          <Collapsible open={equipmentOpen} onOpenChange={setEquipmentOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-equipment">
+                  <span className="text-sm font-semibold">Equipment</span>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs h-auto p-0 text-primary" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toast({ title: "Coming soon", description: "Equipment management will be available soon." });
+                      }}
+                      data-testid="button-add-equipment"
+                    >
+                      + Add
+                    </Button>
+                    {equipmentOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t px-4 pb-4 pt-3 max-h-48 overflow-y-auto space-y-2">
+                  {equipment.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No equipment added yet for this location.
+                    </p>
+                  ) : (
+                    equipment.map((eq: any) => (
+                      <div key={eq.id} className="rounded-lg border p-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{eq.name}</div>
+                            <div className="text-xs text-muted-foreground">{eq.equipmentType}</div>
+                          </div>
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {eq.manufacturer} {eq.modelNumber} • S/N: {eq.serialNumber || "—"}
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
-          {/* Equipment */}
-          <Card>
-            <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-sm font-semibold">Equipment</CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-xs h-auto p-0 text-primary" 
-                onClick={() => toast({ title: "Coming soon", description: "Equipment management will be available soon." })}
-                data-testid="button-add-equipment"
-              >
-                + Add Equipment
-              </Button>
-            </CardHeader>
-            <CardContent className="max-h-48 overflow-y-auto space-y-2">
-              {equipment.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No equipment added yet for this location.
-                </p>
-              ) : (
-                equipment.map((eq: any) => (
-                  <div key={eq.id} className="rounded-lg border p-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{eq.name}</div>
-                        <div className="text-xs text-muted-foreground">{eq.equipmentType}</div>
-                      </div>
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {eq.manufacturer} {eq.modelNumber} • S/N: {eq.serialNumber || "—"}
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          {/* PM Parts */}
-          <Card>
-            <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-sm font-semibold">PM Parts / Filters / Belts</CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-xs h-auto p-0 text-primary" 
-                onClick={() => setPartsModalOpen(true)}
-                data-testid="button-add-parts"
-              >
-                + Add Parts
-              </Button>
-            </CardHeader>
-            <CardContent className="max-h-48 overflow-y-auto">
-              {pmParts.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No PM parts configured. Add filters, belts, and other recurring parts.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {pmParts.map((pmPart) => {
-                    const part = allParts.find(p => p.id === pmPart.productId);
-                    return (
-                      <div key={pmPart.id} className="flex items-center justify-between text-sm rounded-lg border p-2">
-                        <div>
-                          <div className="font-medium">{part?.name || "Unknown Part"}</div>
-                          <div className="text-xs text-muted-foreground">{part?.sku || ""}</div>
-                        </div>
-                        <span className="text-xs text-muted-foreground">x{pmPart.quantityPerVisit}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Notes */}
-          <Card>
-            <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-sm font-semibold">Notes</CardTitle>
-              {!isAddingNote && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs h-auto p-0 text-primary"
-                  onClick={() => setIsAddingNote(true)}
-                  data-testid="button-add-note"
-                >
-                  + Add Note
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="max-h-48 overflow-y-auto space-y-2">
-              {isAddingNote && (
-                <div className="space-y-2">
-                  <Textarea
-                    placeholder="Enter note..."
-                    value={newNoteContent}
-                    onChange={(e) => setNewNoteContent(e.target.value)}
-                    className="min-h-[60px]"
-                    data-testid="textarea-new-note"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => createNoteMutation.mutate(newNoteContent.trim())}
-                      disabled={!newNoteContent.trim() || createNoteMutation.isPending}
+          {/* PM Parts - Collapsible */}
+          <Collapsible open={partsOpen} onOpenChange={setPartsOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-parts">
+                  <span className="text-sm font-semibold">PM Parts / Filters / Belts</span>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs h-auto p-0 text-primary" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPartsModalOpen(true);
+                      }}
+                      data-testid="button-add-parts"
                     >
-                      Save
+                      + Add
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => { setIsAddingNote(false); setNewNoteContent(""); }}
-                    >
-                      Cancel
-                    </Button>
+                    {partsOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                   </div>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t px-4 pb-4 pt-3 max-h-48 overflow-y-auto">
+                  {pmParts.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No PM parts configured. Add filters, belts, and other recurring parts.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {pmParts.map((pmPart) => {
+                        const part = allParts.find(p => p.id === pmPart.productId);
+                        return (
+                          <div key={pmPart.id} className="flex items-center justify-between text-sm rounded-lg border p-2">
+                            <div>
+                              <div className="font-medium">{part?.name || "Unknown Part"}</div>
+                              <div className="text-xs text-muted-foreground">{part?.sku || ""}</div>
+                            </div>
+                            <span className="text-xs text-muted-foreground">x{pmPart.quantityPerVisit}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
-              {notes.length === 0 && !isAddingNote && (
-                <p className="text-xs text-muted-foreground">
-                  No notes yet. Use notes to record access info, landlord details, etc.
-                </p>
-              )}
-
-              {notes.map((note) => (
-                <div key={note.id} className="p-2 border rounded-lg text-sm" data-testid={`card-note-${note.id}`}>
-                  {editingNoteId === note.id ? (
+          {/* Notes - Collapsible (Open by default) */}
+          <Collapsible open={notesOpen} onOpenChange={setNotesOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-notes">
+                  <span className="text-sm font-semibold">Notes</span>
+                  <div className="flex items-center gap-2">
+                    {!isAddingNote && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-auto p-0 text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNotesOpen(true);
+                          setIsAddingNote(true);
+                        }}
+                        data-testid="button-add-note"
+                      >
+                        + Add
+                      </Button>
+                    )}
+                    {notesOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t px-4 pb-4 pt-3 max-h-48 overflow-y-auto space-y-2">
+                  {isAddingNote && (
                     <div className="space-y-2">
                       <Textarea
-                        value={editNoteContent}
-                        onChange={(e) => setEditNoteContent(e.target.value)}
+                        placeholder="Enter note..."
+                        value={newNoteContent}
+                        onChange={(e) => setNewNoteContent(e.target.value)}
                         className="min-h-[60px]"
+                        data-testid="textarea-new-note"
                       />
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          onClick={() => updateNoteMutation.mutate({ noteId: note.id, noteText: editNoteContent.trim() })}
-                          disabled={!editNoteContent.trim() || updateNoteMutation.isPending}
+                          onClick={() => createNoteMutation.mutate(newNoteContent.trim())}
+                          disabled={!newNoteContent.trim() || createNoteMutation.isPending}
                         >
                           Save
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => { setEditingNoteId(null); setEditNoteContent(""); }}
+                          onClick={() => { setIsAddingNote(false); setNewNoteContent(""); }}
                         >
                           Cancel
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive ml-auto"
-                          onClick={() => setDeleteNoteId(note.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     </div>
-                  ) : (
-                    <div
-                      className="cursor-pointer"
-                      onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.noteText); }}
-                    >
-                      <p className="text-xs text-muted-foreground mb-1">
-                        {format(new Date(note.createdAt), "MMM dd, yyyy")}
-                      </p>
-                      <p className="whitespace-pre-wrap text-xs">{note.noteText}</p>
-                    </div>
                   )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
 
-          {/* Billing Settings */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Billing Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium">Bill with Parent</p>
-                  <p className="text-xs text-muted-foreground">
-                    {billParent ? "Invoices go to parent company" : "Invoices go directly to this location"}
-                  </p>
+                  {notes.length === 0 && !isAddingNote && (
+                    <p className="text-xs text-muted-foreground">
+                      No notes yet. Use notes to record access info, landlord details, etc.
+                    </p>
+                  )}
+
+                  {notes.map((note) => (
+                    <div key={note.id} className="p-2 border rounded-lg text-sm" data-testid={`card-note-${note.id}`}>
+                      {editingNoteId === note.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={editNoteContent}
+                            onChange={(e) => setEditNoteContent(e.target.value)}
+                            className="min-h-[60px]"
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => updateNoteMutation.mutate({ noteId: note.id, noteText: editNoteContent.trim() })}
+                              disabled={!editNoteContent.trim() || updateNoteMutation.isPending}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => { setEditingNoteId(null); setEditNoteContent(""); }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive ml-auto"
+                              onClick={() => setDeleteNoteId(note.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.noteText); }}
+                        >
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {format(new Date(note.createdAt), "MMM dd, yyyy")}
+                          </p>
+                          <p className="whitespace-pre-wrap text-xs">{note.noteText}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <Switch
-                  checked={billParent}
-                  onCheckedChange={(checked) => toggleBillWithParentMutation.mutate(checked)}
-                  disabled={toggleBillWithParentMutation.isPending}
-                  data-testid="switch-bill-with-parent"
-                />
-              </div>
-            </CardContent>
-          </Card>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+
+          {/* Billing Settings - Collapsible */}
+          <Collapsible open={billingOpen} onOpenChange={setBillingOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-billing">
+                  <span className="text-sm font-semibold">Billing Settings</span>
+                  {billingOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t px-4 pb-4 pt-3">
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-medium">Bill with Parent</p>
+                      <p className="text-xs text-muted-foreground">
+                        {billParent ? "Invoices go to parent company" : "Invoices go directly to this location"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={billParent}
+                      onCheckedChange={(checked) => toggleBillWithParentMutation.mutate(checked)}
+                      disabled={toggleBillWithParentMutation.isPending}
+                      data-testid="switch-bill-with-parent"
+                    />
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         </div>
       </div>
 
