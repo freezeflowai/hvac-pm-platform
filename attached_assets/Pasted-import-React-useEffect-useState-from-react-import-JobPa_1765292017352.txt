@@ -1,0 +1,327 @@
+import React, { useEffect, useState } from "react";
+import { JobPage } from "./JobPage"; // <-- adjust path if needed
+
+// Simple helper to format dates coming from your API
+function formatDate(dateString, withTime = false) {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  return d.toLocaleString("en-CA", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    ...(withTime && { hour: "numeric", minute: "2-digit" }),
+  });
+}
+
+/**
+ * Map your API job response into the props that <JobPage /> expects.
+ *
+ * Adjust the field names (comments marked with // <--) to match
+ * whatever your backend is actually sending.
+ */
+function mapApiJobToJobPageProps(apiJob) {
+  // ----- JOB HEADER -----
+  const job = {
+    id: apiJob.id,
+    // e.g. apiJob.summary or apiJob.title
+    title: apiJob.summary || apiJob.title || "",
+    type: apiJob.jobType || apiJob.type || "Maintenance",
+    priority: apiJob.priority || "Medium",
+    status: apiJob.status || "Scheduled",
+    scheduledStart: formatDate(apiJob.scheduledStart, true),
+    scheduledEnd: formatDate(apiJob.scheduledEnd, true),
+    client: {
+      id: apiJob.client?.id,
+      name: apiJob.client?.name || "",
+    },
+    location: {
+      id: apiJob.location?.id,
+      name: apiJob.location?.name || apiJob.location?.label || "",
+      // adjust these to whatever you use (address1/street/etc)
+      addressLine: apiJob.location?.addressLine || apiJob.location?.street || "",
+      city: apiJob.location?.city || "",
+      province: apiJob.location?.province || apiJob.location?.state || "",
+      postal: apiJob.location?.postalCode || apiJob.location?.postal || "",
+    },
+    createdAt: formatDate(apiJob.createdAt, true),
+  };
+
+  // ----- LINE ITEMS (parts / services) -----
+  const lineItems =
+    apiJob.lineItems?.map((li) => ({
+      id: li.id,
+      // maybe li.product.name, li.service.name, or li.description
+      name: li.name || li.product?.name || li.description || "Line item",
+      qty: li.quantity ?? li.qty ?? 1,
+      cost: li.cost ?? 0,
+      price: li.price ?? 0,
+    })) || [];
+
+  // ----- LABOUR ENTRIES -----
+  const labourEntries =
+    apiJob.labourEntries?.map((entry) => ({
+      id: entry.id,
+      techName: entry.technician?.name || entry.techName || "Technician",
+      date: formatDate(entry.startTime || entry.date),
+      startTime: entry.startTime
+        ? new Date(entry.startTime).toLocaleTimeString("en-CA", {
+            hour: "numeric",
+            minute: "2-digit",
+          })
+        : "",
+      endTime: entry.endTime
+        ? new Date(entry.endTime).toLocaleTimeString("en-CA", {
+            hour: "numeric",
+            minute: "2-digit",
+          })
+        : "",
+      hoursFormatted: entry.hoursFormatted || entry.duration || "",
+      cost:
+        typeof entry.cost === "number"
+          ? `$${entry.cost.toFixed(2)}`
+          : entry.cost || "",
+    })) || [];
+
+  // ----- EXPENSES -----
+  const expenses =
+    apiJob.expenses?.map((exp) => ({
+      id: exp.id,
+      label: exp.label || exp.description || "Expense",
+      amount: exp.amount ?? 0,
+    })) || [];
+
+  // ----- TECHNICIANS ASSIGNED -----
+  const technicians =
+    apiJob.assignedTechnicians?.map((t) => ({
+      id: t.id,
+      name: t.name,
+    })) || [];
+
+  // ----- VISITS / APPOINTMENTS -----
+  const visits =
+    apiJob.visits?.map((v) => {
+      const start = v.startTime || v.date;
+      const techName = v.technician?.name || v.techName;
+      return {
+        id: v.id,
+        dateLabel: formatDate(start),
+        timeLabel: start
+          ? new Date(start).toLocaleTimeString("en-CA", {
+              hour: "numeric",
+              minute: "2-digit",
+            })
+          : "",
+        status: v.status || "Scheduled",
+        technicianName: techName || "",
+      };
+    }) || [];
+
+  // ----- INVOICES -----
+  const invoices =
+    apiJob.invoices?.map((inv) => ({
+      id: inv.id,
+      number: inv.number || inv.invoiceNumber || `INV-${inv.id}`,
+      dueDate: formatDate(inv.dueDate),
+      status: inv.status || "Upcoming",
+      subject: inv.subject || inv.description || "For Services Rendered",
+      balance: inv.balance ?? inv.amountDue ?? inv.total ?? 0,
+      total: inv.total ?? inv.amount ?? 0,
+    })) || [];
+
+  return {
+    job,
+    lineItems,
+    labourEntries,
+    expenses,
+    technicians,
+    visits,
+    invoices,
+  };
+}
+
+/**
+ * Container component:
+ * - Fetches job from /api/jobs/:id
+ * - Maps it
+ * - Wires up callbacks (status change, create invoice, etc)
+ *
+ * You can get jobId from:
+ *   - React Router (useParams)
+ *   - props
+ *   - or hard-code for now while testing
+ */
+export function JobPageContainer({ jobId: jobIdProp }) {
+  const [loading, setLoading] = useState(true);
+  const [jobData, setJobData] = useState(null);
+  const [error, setError] = useState(null);
+
+  // If you're using React Router:
+  // import { useParams } from "react-router-dom";
+  // const { jobId } = useParams();
+  const jobId = jobIdProp; // change this line if you use useParams
+
+  useEffect(() => {
+    if (!jobId) return;
+
+    let isCancelled = false;
+
+    async function fetchJob() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/jobs/${jobId}`);
+        if (!res.ok) throw new Error("Failed to load job");
+        const apiJob = await res.json();
+        if (isCancelled) return;
+        const mapped = mapApiJobToJobPageProps(apiJob);
+        setJobData(mapped);
+      } catch (err) {
+        console.error(err);
+        if (!isCancelled) setError(err.message || "Error loading job");
+      } finally {
+        if (!isCancelled) setLoading(false);
+      }
+    }
+
+    fetchJob();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [jobId]);
+
+  // ---- Callbacks wired to your API ----
+
+  const handleStatusChange = async (newStatus) => {
+    if (!jobData) return;
+
+    // optimistic UI update
+    setJobData((prev) =>
+      prev
+        ? {
+            ...prev,
+            job: {
+              ...prev.job,
+              status: newStatus,
+            },
+          }
+        : prev
+    );
+
+    try {
+      await fetch(`/api/jobs/${jobId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch (err) {
+      console.error(err);
+      // optional: revert on failure
+    }
+  };
+
+  const handleCreateInvoice = async () => {
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/invoices`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to create invoice");
+      const newInvoice = await res.json();
+
+      setJobData((prev) =>
+        prev
+          ? {
+              ...prev,
+              invoices: [
+                ...prev.invoices,
+                mapApiJobToJobPageProps({ invoices: [newInvoice] }).invoices[0],
+              ],
+            }
+          : prev
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAddLineItem = () => {
+    // Open your "Add line item" drawer/modal here instead of alert.
+    console.log("Open Add Line Item form for job", jobId);
+  };
+
+  const handleAddTimeEntry = () => {
+    console.log("Open Add Time Entry form for job", jobId);
+  };
+
+  const handleAddExpense = () => {
+    console.log("Open Add Expense form for job", jobId);
+  };
+
+  const handleAssignTech = () => {
+    console.log("Open Assign Technician dialog for job", jobId);
+  };
+
+  const handleAddEquipment = () => {
+    console.log("Open Add Equipment dialog for job", jobId);
+  };
+
+  const handleEditJob = () => {
+    console.log("Open Edit Job form", jobId);
+  };
+
+  const handleDeleteJob = async () => {
+    if (!window.confirm("Delete this job?")) return;
+    try {
+      await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
+      // TODO: redirect back to jobs list
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // ---- Render states ----
+  if (!jobId) {
+    return (
+      <div className="p-6 text-sm text-red-600">
+        No job id provided to JobPageContainer.
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 text-sm text-gray-500">
+        Loading job #{jobId}…
+      </div>
+    );
+  }
+
+  if (error || !jobData) {
+    return (
+      <div className="p-6 text-sm text-red-600">
+        Failed to load job: {error || "Unknown error"}
+      </div>
+    );
+  }
+
+  return (
+    <JobPage
+      job={jobData.job}
+      lineItems={jobData.lineItems}
+      labourEntries={jobData.labourEntries}
+      expenses={jobData.expenses}
+      technicians={jobData.technicians}
+      visits={jobData.visits}
+      invoices={jobData.invoices}
+      onStatusChange={handleStatusChange}
+      onCreateInvoice={handleCreateInvoice}
+      onAddLineItem={handleAddLineItem}
+      onAddTimeEntry={handleAddTimeEntry}
+      onAddExpense={handleAddExpense}
+      onAssignTech={handleAssignTech}
+      onAddEquipment={handleAddEquipment}
+      onEditJob={handleEditJob}
+      onDeleteJob={handleDeleteJob}
+    />
+  );
+}

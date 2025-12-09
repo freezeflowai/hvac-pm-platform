@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
-import { Plus, Trash2, Loader2, Wrench, Info } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Plus, Trash2, Loader2, Wrench, Info, ChevronDown, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { LocationEquipment, JobEquipment } from "@shared/schema";
@@ -21,6 +22,7 @@ interface JobEquipmentWithDetails extends JobEquipment {
 interface JobEquipmentSectionProps {
   jobId: string;
   locationId: string | null;
+  defaultOpen?: boolean;
 }
 
 const EQUIPMENT_TYPES: Record<string, string> = {
@@ -42,8 +44,9 @@ const EQUIPMENT_TYPES: Record<string, string> = {
   other: "Other",
 };
 
-export default function JobEquipmentSection({ jobId, locationId }: JobEquipmentSectionProps) {
+export default function JobEquipmentSection({ jobId, locationId, defaultOpen = false }: JobEquipmentSectionProps) {
   const { toast } = useToast();
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>("");
   const [notes, setNotes] = useState("");
@@ -132,161 +135,166 @@ export default function JobEquipmentSection({ jobId, locationId }: JobEquipmentS
   }
 
   return (
-    <Card data-testid="card-job-equipment">
-      <CardHeader>
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Wrench className="h-5 w-5" />
-              Equipment
-            </CardTitle>
-            <CardDescription>
-              Equipment serviced on this job
-            </CardDescription>
-          </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card data-testid="card-job-equipment">
+        <CollapsibleTrigger asChild>
+          <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-equipment">
+            <span className="text-sm font-semibold">Equipment</span>
+            <div className="flex items-center gap-2">
               <Button 
+                variant="ghost"
                 size="sm" 
+                className="text-xs h-auto p-0 text-primary"
                 disabled={!locationId || availableEquipment.length === 0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsAddDialogOpen(true);
+                }}
                 data-testid="button-add-job-equipment"
               >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Equipment
+                + Add Equipment
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Equipment to Job</DialogTitle>
-                <DialogDescription>
-                  Select equipment from this location to link to this job for service tracking.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Equipment</label>
-                  <Select
-                    value={selectedEquipmentId}
-                    onValueChange={setSelectedEquipmentId}
-                  >
-                    <SelectTrigger data-testid="select-job-equipment">
-                      <SelectValue placeholder="Select equipment..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableEquipment.map(eq => (
-                        <SelectItem key={eq.id} value={eq.id}>
-                          {eq.name} ({getEquipmentTypeLabel(eq.equipmentType)})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Notes (optional)</label>
-                  <Textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Service notes for this equipment..."
-                    data-testid="input-job-equipment-notes"
-                  />
-                </div>
+              {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            </div>
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="border-t px-4 pb-4 pt-3">
+            {!locationId ? (
+              <div className="text-center py-4 text-muted-foreground">
+                <Info className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                <p className="text-xs">No location assigned to this job.</p>
               </div>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="outline" data-testid="button-cancel-job-equipment">Cancel</Button>
-                </DialogClose>
-                <Button
-                  onClick={handleAddEquipment}
-                  disabled={!selectedEquipmentId || addMutation.isPending}
-                  data-testid="button-save-job-equipment"
-                >
-                  {addMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                  ) : null}
-                  Add to Job
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {!locationId ? (
-          <div className="text-center py-6 text-muted-foreground">
-            <Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>No location assigned to this job.</p>
-          </div>
-        ) : jobEquipment.length === 0 ? (
-          <div className="text-center py-6 text-muted-foreground">
-            <Wrench className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>No equipment linked to this job.</p>
-            {availableEquipment.length === 0 && locationEquipment.length === 0 ? (
-              <p className="text-sm mt-1">No equipment registered at this location yet.</p>
-            ) : availableEquipment.length === 0 ? (
-              <p className="text-sm mt-1">All location equipment is already linked.</p>
+            ) : jobEquipment.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                <Wrench className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                <p className="text-xs">No equipment linked to this job.</p>
+                {availableEquipment.length === 0 && locationEquipment.length === 0 ? (
+                  <p className="text-xs mt-1">No equipment registered at this location yet.</p>
+                ) : availableEquipment.length === 0 ? (
+                  <p className="text-xs mt-1">All location equipment is already linked.</p>
+                ) : (
+                  <p className="text-xs mt-1">Click "+ Add Equipment" to link equipment.</p>
+                )}
+              </div>
             ) : (
-              <p className="text-sm mt-1">Click "Add Equipment" to link equipment from the location.</p>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Make/Model</TableHead>
+                      <TableHead>Serial #</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="w-16">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {jobEquipment.map(je => (
+                      <TableRow key={je.id} data-testid={`row-job-equipment-${je.id}`}>
+                        <TableCell className="font-medium">{je.equipment.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {getEquipmentTypeLabel(je.equipment.equipmentType)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {je.equipment.manufacturer || je.equipment.modelNumber ? (
+                            <span className="text-sm">
+                              {je.equipment.manufacturer}
+                              {je.equipment.manufacturer && je.equipment.modelNumber ? " - " : ""}
+                              {je.equipment.modelNumber}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {je.equipment.serialNumber || <span className="text-muted-foreground">-</span>}
+                        </TableCell>
+                        <TableCell>
+                          {je.notes ? (
+                            <span className="text-sm">{je.notes}</span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeMutation.mutate(je.id)}
+                            disabled={removeMutation.isPending}
+                            data-testid={`button-remove-job-equipment-${je.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Make/Model</TableHead>
-                <TableHead>Serial #</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead className="w-16">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {jobEquipment.map(je => (
-                <TableRow key={je.id} data-testid={`row-job-equipment-${je.id}`}>
-                  <TableCell className="font-medium">{je.equipment.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {getEquipmentTypeLabel(je.equipment.equipmentType)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {je.equipment.manufacturer || je.equipment.modelNumber ? (
-                      <span className="text-sm">
-                        {je.equipment.manufacturer}
-                        {je.equipment.manufacturer && je.equipment.modelNumber ? " - " : ""}
-                        {je.equipment.modelNumber}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {je.equipment.serialNumber || <span className="text-muted-foreground">-</span>}
-                  </TableCell>
-                  <TableCell>
-                    {je.notes ? (
-                      <span className="text-sm">{je.notes}</span>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeMutation.mutate(je.id)}
-                      disabled={removeMutation.isPending}
-                      data-testid={`button-remove-job-equipment-${je.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
+        </CollapsibleContent>
+      </Card>
+
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Equipment to Job</DialogTitle>
+            <DialogDescription>
+              Select equipment from this location to link to this job for service tracking.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Equipment</label>
+              <Select
+                value={selectedEquipmentId}
+                onValueChange={setSelectedEquipmentId}
+              >
+                <SelectTrigger data-testid="select-job-equipment">
+                  <SelectValue placeholder="Select equipment..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableEquipment.map(eq => (
+                    <SelectItem key={eq.id} value={eq.id}>
+                      {eq.name} ({getEquipmentTypeLabel(eq.equipmentType)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Notes (optional)</label>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Service notes for this equipment..."
+                data-testid="input-job-equipment-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" data-testid="button-cancel-job-equipment">Cancel</Button>
+            </DialogClose>
+            <Button
+              onClick={handleAddEquipment}
+              disabled={!selectedEquipmentId || addMutation.isPending}
+              data-testid="button-save-job-equipment"
+            >
+              {addMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : null}
+              Add to Job
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Collapsible>
   );
 }

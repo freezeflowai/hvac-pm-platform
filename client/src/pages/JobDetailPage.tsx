@@ -417,8 +417,11 @@ export default function JobDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssignTech, setShowAssignTech] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [equipmentOpen, setEquipmentOpen] = useState(true);
-  const [activityOpen, setActivityOpen] = useState(true);
+  const [notesOpen, setNotesOpen] = useState(true);
+  const [invoicesOpen, setInvoicesOpen] = useState(true);
+  const [visitsOpen, setVisitsOpen] = useState(false);
+  const [equipmentOpen, setEquipmentOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const [metadataOpen, setMetadataOpen] = useState(false);
   const jobId = params?.id;
 
@@ -627,27 +630,8 @@ export default function JobDetailPage() {
         <div className="space-y-4">
           {/* Parts & Billing / Line Items */}
           <Card data-testid="card-parts-billing">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+            <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Parts & Billing</CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-xs h-auto p-0 text-primary"
-                onClick={() => {
-                  if (!job.locationId) {
-                    toast({ title: "Cannot Create Invoice", description: "This job is not linked to a location.", variant: "destructive" });
-                    return;
-                  }
-                  if (job.status === "completed") {
-                    setLocation(`/invoices/new?jobId=${job.id}&locationId=${job.locationId}`);
-                  } else {
-                    toast({ title: "Complete job first", description: "Mark job as completed before creating an invoice." });
-                  }
-                }}
-                data-testid="button-create-invoice"
-              >
-                Create Invoice
-              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Profitability strip */}
@@ -748,39 +732,6 @@ export default function JobDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Visits */}
-          <Card data-testid="card-visits">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-              <CardTitle className="text-sm font-semibold">Visits</CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-xs h-auto p-0 text-primary"
-                onClick={() => toast({ title: "Coming Soon", description: "Visit scheduling coming soon." })}
-                data-testid="button-new-visit"
-              >
-                New Visit
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                No visits scheduled yet. Use visits to track on-site appointments for this job.
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Invoices */}
-          <Card data-testid="card-invoices">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Invoices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                No invoices yet for this job.
-              </p>
-            </CardContent>
-          </Card>
-
           {job.recurringSeries && (
             <Card data-testid="card-recurring">
               <CardHeader className="pb-3">
@@ -796,9 +747,9 @@ export default function JobDetailPage() {
           )}
         </div>
 
-        {/* RIGHT COLUMN: Techs, Equipment, Activity, Metadata */}
+        {/* RIGHT COLUMN: Techs, Notes, Invoices, Visits, Equipment, Activity, Metadata */}
         <div className="space-y-4">
-          {/* Assigned Technicians – always open, compact */}
+          {/* Assigned Technicians – always open */}
           <Card data-testid="card-technicians">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
               <CardTitle className="text-sm font-semibold">Assigned Technicians</CardTitle>
@@ -834,7 +785,102 @@ export default function JobDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Equipment - Using existing JobEquipmentSection */}
+          {/* Notes – always open */}
+          <Card data-testid="card-notes">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+              <CardTitle className="text-sm font-semibold">Notes</CardTitle>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs h-auto p-0 text-primary"
+                onClick={() => toast({ title: "Coming Soon", description: "Job notes coming soon." })}
+                data-testid="button-add-note"
+              >
+                + Add Note
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                No notes yet. Add notes to track job details and communication.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Invoices – open by default */}
+          <Collapsible open={invoicesOpen} onOpenChange={setInvoicesOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-invoices">
+                  <span className="text-sm font-semibold">Invoices</span>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs h-auto p-0 text-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!job.locationId) {
+                          toast({ title: "Cannot Create Invoice", description: "This job is not linked to a location.", variant: "destructive" });
+                          return;
+                        }
+                        if (job.status === "completed") {
+                          setLocation(`/invoices/new?jobId=${job.id}&locationId=${job.locationId}`);
+                        } else {
+                          toast({ title: "Complete job first", description: "Mark job as completed before creating an invoice." });
+                        }
+                      }}
+                      data-testid="button-create-invoice-right"
+                    >
+                      Create Invoice
+                    </Button>
+                    {invoicesOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t px-4 pb-4 pt-3">
+                  <p className="text-xs text-muted-foreground">
+                    No invoices yet for this job.
+                  </p>
+                </div>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+
+          {/* Visits – collapsed by default */}
+          <Collapsible open={visitsOpen} onOpenChange={setVisitsOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-visits">
+                  <span className="text-sm font-semibold">Visits</span>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs h-auto p-0 text-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toast({ title: "Coming Soon", description: "Visit scheduling coming soon." });
+                      }}
+                      data-testid="button-new-visit"
+                    >
+                      New Visit
+                    </Button>
+                    {visitsOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t px-4 pb-4 pt-3">
+                  <p className="text-xs text-muted-foreground">
+                    No visits scheduled yet. Use visits to track on-site appointments for this job.
+                  </p>
+                </div>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+
+          {/* Equipment - collapsed by default */}
           <JobEquipmentSection jobId={job.id} locationId={job.locationId} />
 
           {/* Activity - Collapsible */}
