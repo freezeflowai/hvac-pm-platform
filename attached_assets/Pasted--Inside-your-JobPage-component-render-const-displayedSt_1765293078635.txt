@@ -1,0 +1,104 @@
+// Inside your JobPage component render:
+
+const displayedStatus = status || "Scheduled";
+const statusChipClass =
+  displayedStatus === "Completed"
+    ? "bg-green-50 text-green-700"
+    : displayedStatus === "In Progress"
+    ? "bg-blue-50 text-blue-700"
+    : displayedStatus === "Cancelled"
+    ? "bg-red-50 text-red-700"
+    : displayedStatus === "Invoiced"
+    ? "bg-purple-50 text-purple-700"
+    : "bg-gray-50 text-gray-700";
+
+<header className="mb-5 flex flex-wrap items-start justify-between gap-4">
+  {/* LEFT: job identity */}
+  <div>
+    {/* Main job title */}
+    <h1 className="text-2xl font-semibold text-gray-900">
+      {job.title || "Job"}
+    </h1>
+
+    {/* Secondary line: Job # + type */}
+    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-700">
+      <span className="font-medium">Job #{job.id}</span>
+      {job.type && (
+        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+          {job.type}
+        </span>
+      )}
+    </div>
+
+    {/* Client + location + address */}
+    <p className="mt-1 text-xs text-gray-500">
+      {job.client?.name} • {job.location?.name} •{" "}
+      {job.location?.addressLine}, {job.location?.city}{" "}
+      {job.location?.province} {job.location?.postal}
+    </p>
+
+    {/* Next visit + overdue flag */}
+    {job.scheduledStart && (
+      <p className="mt-1 text-xs text-gray-500">
+        Next visit:{" "}
+        <span className="font-medium text-gray-700">
+          {job.scheduledStart}
+        </span>{" "}
+        {job.isOverdue && (
+          <span className="ml-1 inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700">
+            Overdue
+          </span>
+        )}
+      </p>
+    )}
+  </div>
+
+  {/* RIGHT: status / priority panel */}
+  <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-xs text-gray-700 shadow-sm min-w-[220px]">
+    {/* Status row */}
+    <div className="mb-2 flex items-center justify-between gap-2">
+      <span className="font-medium text-gray-800">Status</span>
+      <div className="flex items-center gap-2">
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${statusChipClass}`}
+        >
+          {displayedStatus}
+        </span>
+        <select
+          value={status}
+          onChange={(e) => onStatusChange?.(e.target.value)}
+          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option>Scheduled</option>
+          <option>En Route</option>
+          <option>In Progress</option>
+          <option>Completed</option>
+          <option>Invoiced</option>
+          <option>Cancelled</option>
+        </select>
+      </div>
+    </div>
+
+    {/* Priority */}
+    {job.priority && (
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="font-medium text-gray-800">Priority</span>
+        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700">
+          {job.priority}
+        </span>
+      </div>
+    )}
+
+    {/* Scheduled start */}
+    {job.scheduledStart && (
+      <div className="flex items-start justify-between gap-2">
+        <span className="mt-[2px] font-medium text-gray-800">
+          Scheduled
+        </span>
+        <span className="text-right text-[11px] text-gray-600">
+          {job.scheduledStart}
+        </span>
+      </div>
+    )}
+  </div>
+</header>

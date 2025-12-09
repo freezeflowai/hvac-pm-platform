@@ -545,29 +545,66 @@ export default function JobDetailPage() {
 
       {/* HEADER */}
       <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
+        {/* LEFT: job identity */}
         <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-semibold" data-testid="text-job-number">
-              Job #{job.jobNumber}
-            </h1>
-            {statusInfo.isOverdue && (
-              <Badge variant="destructive" className="text-xs" data-testid="badge-overdue">
-                Overdue
-              </Badge>
-            )}
-            <Badge variant="outline" className="text-xs capitalize" data-testid="badge-job-type">
+          <h1 className="text-2xl font-semibold" data-testid="text-job-title">
+            {job.summary || "Job"}
+          </h1>
+
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium" data-testid="text-job-number">Job #{job.jobNumber}</span>
+            <Badge variant="secondary" className="text-xs capitalize" data-testid="badge-job-type">
               {job.jobType}
             </Badge>
           </div>
-          <p className="mt-1 text-sm" data-testid="text-summary">{job.summary}</p>
+
           <p className="mt-1 text-xs text-muted-foreground" data-testid="text-location-info">
             {clientName} • {locationName} • {fullAddress || "No address"}
           </p>
 
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <span className="font-medium text-foreground">Status:</span>
-              <Badge variant={statusInfo.variant} className="text-xs">
+          {job.scheduledStart && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Next visit:{" "}
+              <span className="font-medium text-foreground">
+                {format(new Date(job.scheduledStart), "MMM d, yyyy 'at' h:mm a")}
+              </span>
+              {statusInfo.isOverdue && (
+                <Badge variant="destructive" className="ml-2 text-[11px]" data-testid="badge-overdue">
+                  Overdue
+                </Badge>
+              )}
+            </p>
+          )}
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowEditDialog(true)}
+              data-testid="button-edit"
+            >
+              Edit Job
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deleteJobMutation.isPending}
+              className="text-destructive border-destructive/50 hover:bg-destructive/10"
+              data-testid="button-delete"
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+
+        {/* RIGHT: status / priority panel */}
+        <div className="rounded-2xl border bg-card px-4 py-3 text-xs shadow-sm min-w-[220px]">
+          {/* Status row */}
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="font-medium">Status</span>
+            <div className="flex items-center gap-2">
+              <Badge variant={statusInfo.variant} className="text-[11px]">
                 {statusInfo.label}
               </Badge>
               <Select
@@ -575,8 +612,8 @@ export default function JobDetailPage() {
                 onValueChange={handleStatusChange}
                 disabled={updateStatusMutation.isPending}
               >
-                <SelectTrigger className="ml-1 h-6 w-auto min-w-[100px] text-xs border-dashed" data-testid="select-status">
-                  <SelectValue placeholder="Change status" />
+                <SelectTrigger className="h-6 w-auto min-w-[90px] text-[11px]" data-testid="select-status">
+                  <SelectValue placeholder="Change" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="draft">Draft</SelectItem>
@@ -589,38 +626,23 @@ export default function JobDetailPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="font-medium text-foreground">Priority:</span>
-              <Badge variant={priorityInfo.variant} className="text-xs">
-                {priorityInfo.label}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="font-medium text-foreground">Scheduled:</span>
-              <span>{job.scheduledStart ? format(new Date(job.scheduledStart), "MMMM do, yyyy h:mm a") : "Not scheduled"}</span>
-            </div>
           </div>
-        </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowEditDialog(true)}
-            data-testid="button-edit"
-          >
-            Edit Job
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowDeleteConfirm(true)}
-            disabled={deleteJobMutation.isPending}
-            className="text-destructive border-destructive/50 hover:bg-destructive/10"
-            data-testid="button-delete"
-          >
-            Delete
-          </Button>
+          {/* Priority */}
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="font-medium">Priority</span>
+            <Badge variant={priorityInfo.variant} className="text-[11px]">
+              {priorityInfo.label}
+            </Badge>
+          </div>
+
+          {/* Scheduled */}
+          <div className="flex items-start justify-between gap-2">
+            <span className="font-medium">Scheduled</span>
+            <span className="text-right text-[11px] text-muted-foreground">
+              {job.scheduledStart ? format(new Date(job.scheduledStart), "MMM d, yyyy h:mm a") : "Not set"}
+            </span>
+          </div>
         </div>
       </header>
 
