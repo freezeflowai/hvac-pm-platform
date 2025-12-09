@@ -417,8 +417,8 @@ export default function JobDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssignTech, setShowAssignTech] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(true);
-  const [invoicesOpen, setInvoicesOpen] = useState(true);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [invoicesOpen, setInvoicesOpen] = useState(false);
   const [visitsOpen, setVisitsOpen] = useState(false);
   const [equipmentOpen, setEquipmentOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
