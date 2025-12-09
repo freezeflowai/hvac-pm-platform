@@ -12,10 +12,11 @@ import { ArrowLeft, Briefcase, FileText, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
 import LocationFormModal from "@/components/LocationFormModal";
+import { PartsSelectorModal } from "@/components/PartsSelectorModal";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
-import type { Client, CustomerCompany, ClientNote, Job } from "@shared/schema";
+import type { Client, CustomerCompany, ClientNote, Job, LocationPMPartTemplate } from "@shared/schema";
 
 export default function LocationDetailPage() {
   const { id, locationId } = useParams<{ id: string; locationId: string }>();
@@ -24,6 +25,7 @@ export default function LocationDetailPage() {
 
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [partsModalOpen, setPartsModalOpen] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -55,9 +57,14 @@ export default function LocationDetailPage() {
     enabled: Boolean(locationId),
   });
 
-  const { data: pmParts = [] } = useQuery<any[]>({
+  const { data: pmParts = [] } = useQuery<LocationPMPartTemplate[]>({
     queryKey: ["/api/locations", locationId, "pm-parts"],
     enabled: Boolean(locationId),
+  });
+
+  const { data: allParts = [] } = useQuery<{ id: string; name: string | null; sku: string | null }[]>({
+    queryKey: ["/api/parts"],
+    enabled: Boolean(locationId) && pmParts.length > 0,
   });
 
   const { data: jobs = [] } = useQuery<Job[]>({
@@ -358,7 +365,7 @@ export default function LocationDetailPage() {
                 variant="ghost" 
                 size="sm" 
                 className="text-xs h-auto p-0 text-primary" 
-                onClick={() => toast({ title: "Coming soon", description: "Parts management will be available soon." })}
+                onClick={() => setPartsModalOpen(true)}
                 data-testid="button-add-parts"
               >
                 + Add Parts
@@ -371,15 +378,18 @@ export default function LocationDetailPage() {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {pmParts.map((part: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between text-sm rounded-lg border p-2">
-                      <div>
-                        <div className="font-medium">{part.partName || part.name}</div>
-                        <div className="text-xs text-muted-foreground">{part.sku || ""}</div>
+                  {pmParts.map((pmPart) => {
+                    const part = allParts.find(p => p.id === pmPart.productId);
+                    return (
+                      <div key={pmPart.id} className="flex items-center justify-between text-sm rounded-lg border p-2">
+                        <div>
+                          <div className="font-medium">{part?.name || "Unknown Part"}</div>
+                          <div className="text-xs text-muted-foreground">{part?.sku || ""}</div>
+                        </div>
+                        <span className="text-xs text-muted-foreground">x{pmPart.quantityPerVisit}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground">x{part.quantity || 1}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -516,6 +526,13 @@ export default function LocationDetailPage() {
         open={jobDialogOpen}
         onOpenChange={setJobDialogOpen}
         preselectedLocationId={locationId}
+      />
+
+      <PartsSelectorModal
+        open={partsModalOpen}
+        onOpenChange={setPartsModalOpen}
+        locationId={locationId!}
+        existingParts={pmParts}
       />
 
       <LocationFormModal
