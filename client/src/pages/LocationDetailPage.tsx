@@ -246,6 +246,7 @@ export default function LocationDetailPage() {
                     <div 
                       key={job.id} 
                       className="flex items-center justify-between rounded-lg border p-3 text-sm hover-elevate cursor-pointer"
+                      onClick={() => setLocation(`/jobs/${job.id}`)}
                       data-testid={`row-job-${job.id}`}
                     >
                       <div>
