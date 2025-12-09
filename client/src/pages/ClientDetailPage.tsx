@@ -209,61 +209,182 @@ export default function ClientDetailPage() {
         </div>
       </header>
 
-      {/* Main Grid: Properties (2fr) + Contact/Notes (1fr) */}
+      {/* Main Grid: Properties + Overview (2fr) | Contact + Notes (1fr) */}
       <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
-        {/* Properties Section */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-            <CardTitle className="text-sm font-semibold">Properties</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y">
-              {locations.length === 0 ? (
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between px-4 py-3 text-left hover-elevate"
-                  onClick={() => handleGoToLocation(id!)}
-                  data-testid={`row-location-${id}`}
-                >
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                      <span>{client.location || "Primary Location"}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {client.city}, {client.province} {client.postalCode}
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </button>
-              ) : (
-                locations.map((loc) => (
+        {/* LEFT COLUMN: Properties + Overview */}
+        <div className="space-y-4">
+          {/* Properties */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+              <CardTitle className="text-sm font-semibold">Properties</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {locations.length === 0 ? (
                   <button
-                    key={loc.id}
                     type="button"
                     className="flex w-full items-center justify-between px-4 py-3 text-left hover-elevate"
-                    onClick={() => handleGoToLocation(loc.id)}
-                    data-testid={`row-location-${loc.id}`}
+                    onClick={() => handleGoToLocation(id!)}
+                    data-testid={`row-location-${id}`}
                   >
                     <div>
                       <div className="flex items-center gap-2 text-sm font-medium">
-                        {loc.id === id && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
-                        <span>{loc.location || loc.companyName}</span>
-                        {loc.inactive && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                        <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                        <span>{client.location || "Primary Location"}</span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        {loc.city}, {loc.province} {loc.postalCode}
+                        {client.city}, {client.province} {client.postalCode}
                       </div>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </button>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                ) : (
+                  locations.map((loc) => (
+                    <button
+                      key={loc.id}
+                      type="button"
+                      className="flex w-full items-center justify-between px-4 py-3 text-left hover-elevate"
+                      onClick={() => handleGoToLocation(loc.id)}
+                      data-testid={`row-location-${loc.id}`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          {loc.id === id && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
+                          <span>{loc.location || loc.companyName}</span>
+                          {loc.inactive && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {loc.city}, {loc.province} {loc.postalCode}
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Contact + Notes Column */}
+          {/* Overview */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="border-b mb-4">
+                <nav className="-mb-px flex flex-wrap gap-4">
+                  {[
+                    { value: "activeWork", label: "Active Work" },
+                    { value: "jobs", label: "Jobs" },
+                    { value: "invoices", label: "Invoices" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => setOverviewTab(tab.value as OverviewTab)}
+                      className={`whitespace-nowrap border-b-2 px-1 pb-2 text-sm font-medium transition-colors ${
+                        overviewTab === tab.value
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"
+                      }`}
+                      data-testid={`tab-overview-${tab.value}`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </nav>
+              </div>
+
+              <div className="max-h-72 overflow-y-auto pr-1">
+                {overviewTab === "activeWork" && (
+                  <div className="space-y-4">
+                    {activeJobs.length === 0 && overdueJobs.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No active jobs for this client.</p>
+                    ) : (
+                      <>
+                        {overdueJobs.length > 0 && (
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-medium text-destructive uppercase">Overdue ({overdueJobs.length})</h4>
+                            {overdueJobs.map((job) => (
+                              <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                <div>
+                                  <p className="font-medium text-sm text-primary hover:underline cursor-pointer">
+                                    #{job.jobNumber} • {job.summary}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {locations.find(l => l.id === job.locationId)?.location || "Location"}
+                                  </p>
+                                </div>
+                                <Badge variant="destructive">Overdue</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {activeJobs.length > 0 && (
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-medium text-muted-foreground uppercase">Active ({activeJobs.length})</h4>
+                            {activeJobs.map((job) => (
+                              <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                <div>
+                                  <p className="font-medium text-sm text-primary hover:underline cursor-pointer">
+                                    #{job.jobNumber} • {job.summary}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {locations.find(l => l.id === job.locationId)?.location || "Location"}
+                                  </p>
+                                </div>
+                                <Badge variant={job.status === "in_progress" ? "default" : "secondary"}>
+                                  {job.status === "in_progress" ? "In Progress" : "Scheduled"}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {overviewTab === "jobs" && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Total jobs: {companyJobs.length}
+                    </p>
+                    {companyJobs.slice(0, 5).map((job) => (
+                      <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <p className="font-medium text-sm text-primary hover:underline cursor-pointer">
+                            #{job.jobNumber} • {job.summary}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {locations.find(l => l.id === job.locationId)?.location || "Location"}
+                          </p>
+                        </div>
+                        <Badge variant={
+                          job.status === "completed" ? "default" :
+                          job.status === "in_progress" ? "default" :
+                          job.status === "scheduled" ? "secondary" :
+                          "outline"
+                        }>
+                          {job.status}
+                        </Badge>
+                      </div>
+                    ))}
+                    {companyJobs.length > 5 && (
+                      <p className="text-xs text-muted-foreground">+ {companyJobs.length - 5} more jobs</p>
+                    )}
+                  </div>
+                )}
+
+                {overviewTab === "invoices" && (
+                  <p className="text-sm text-muted-foreground">No invoices yet.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* RIGHT COLUMN: Contact + Notes */}
         <div className="space-y-4">
           {/* Contact Card */}
           <Card>
@@ -314,7 +435,7 @@ export default function ClientDetailPage() {
                 </Button>
               )}
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="max-h-80 overflow-y-auto space-y-3">
               {isAddingNote && (
                 <div className="space-y-2">
                   <Textarea
@@ -407,116 +528,6 @@ export default function ClientDetailPage() {
           </Card>
         </div>
       </div>
-
-      {/* Overview Section */}
-      <Card className="mt-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="border-b mb-4">
-            <nav className="-mb-px flex flex-wrap gap-4">
-              {[
-                { value: "activeWork", label: "Active Work" },
-                { value: "jobs", label: "Jobs" },
-                { value: "invoices", label: "Invoices" },
-              ].map((tab) => (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => setOverviewTab(tab.value as OverviewTab)}
-                  className={`whitespace-nowrap border-b-2 px-1 pb-2 text-sm font-medium transition-colors ${
-                    overviewTab === tab.value
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"
-                  }`}
-                  data-testid={`tab-overview-${tab.value}`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-
-          {overviewTab === "activeWork" && (
-            <div className="space-y-4">
-              {activeJobs.length === 0 && overdueJobs.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No active jobs for this client.</p>
-              ) : (
-                <>
-                  {overdueJobs.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-medium text-destructive uppercase">Overdue ({overdueJobs.length})</h4>
-                      {overdueJobs.map((job) => (
-                        <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium text-sm">#{job.jobNumber} • {job.summary}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {locations.find(l => l.id === job.locationId)?.location || "Location"}
-                            </p>
-                          </div>
-                          <Badge variant="destructive">Overdue</Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {activeJobs.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-medium text-muted-foreground uppercase">Active ({activeJobs.length})</h4>
-                      {activeJobs.map((job) => (
-                        <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium text-sm">#{job.jobNumber} • {job.summary}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {locations.find(l => l.id === job.locationId)?.location || "Location"}
-                            </p>
-                          </div>
-                          <Badge variant={job.status === "in_progress" ? "default" : "secondary"}>
-                            {job.status === "in_progress" ? "In Progress" : "Scheduled"}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {overviewTab === "jobs" && (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Total jobs: {companyJobs.length}
-              </p>
-              {companyJobs.slice(0, 5).map((job) => (
-                <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium text-sm">#{job.jobNumber} • {job.summary}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {locations.find(l => l.id === job.locationId)?.location || "Location"}
-                    </p>
-                  </div>
-                  <Badge variant={
-                    job.status === "completed" ? "default" :
-                    job.status === "in_progress" ? "default" :
-                    job.status === "scheduled" ? "secondary" :
-                    "outline"
-                  }>
-                    {job.status}
-                  </Badge>
-                </div>
-              ))}
-              {companyJobs.length > 5 && (
-                <p className="text-xs text-muted-foreground">+ {companyJobs.length - 5} more jobs</p>
-              )}
-            </div>
-          )}
-
-          {overviewTab === "invoices" && (
-            <p className="text-sm text-muted-foreground">No invoices yet.</p>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Dialogs */}
       <QuickAddJobDialog
