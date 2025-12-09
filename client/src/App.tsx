@@ -14,6 +14,7 @@ import Admin from "@/pages/Admin";
 import SupportConsole from "@/pages/SupportConsole";
 import AddClientPage from "@/pages/AddClientPage";
 import ClientDetailPage from "@/pages/ClientDetailPage";
+import LocationDetailPage from "@/pages/LocationDetailPage";
 import PartsManagementPage from "@/pages/PartsManagementPage";
 import CompanySettingsPage from "@/pages/CompanySettingsPage";
 import TechnicianDashboard from "@/pages/TechnicianDashboard";
@@ -112,6 +113,11 @@ function Router() {
       <Route path="/clients/:id">
         <ProtectedRoute requireAdmin>
           <ClientDetailPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/clients/:id/locations/:locationId">
+        <ProtectedRoute requireAdmin>
+          <LocationDetailPage />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />
