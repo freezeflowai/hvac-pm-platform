@@ -31,10 +31,11 @@ export function PartsSelectorModal({ open, onOpenChange, locationId, existingPar
   const [selected, setSelected] = useState<SelectedPart[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  const { data: parts = [], isLoading } = useQuery<Part[]>({
+  const { data: partsData, isLoading } = useQuery<{ items: Part[] }>({
     queryKey: ["/api/parts"],
     enabled: open,
   });
+  const parts = partsData?.items || [];
 
   useEffect(() => {
     if (open && existingParts.length > 0) {

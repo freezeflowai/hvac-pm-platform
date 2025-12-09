@@ -62,10 +62,11 @@ export default function LocationDetailPage() {
     enabled: Boolean(locationId),
   });
 
-  const { data: allParts = [] } = useQuery<{ id: string; name: string | null; sku: string | null }[]>({
+  const { data: partsData } = useQuery<{ items: { id: string; name: string | null; sku: string | null }[] }>({
     queryKey: ["/api/parts"],
     enabled: Boolean(locationId) && pmParts.length > 0,
   });
+  const allParts = partsData?.items || [];
 
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: ["/api/jobs"],
