@@ -227,8 +227,14 @@
     @apply border-border;
   }
 
+  /* Base font size */
   html {
-    font-size: 16px; /* 1rem = 16px - global base */
+    font-size: 16px; /* normal mode */
+  }
+
+  /* Large-text mode: applied when we add this class from JS */
+  html.text-scale-large {
+    font-size: 18px; /* bump everything that uses rem */
   }
 
   body {

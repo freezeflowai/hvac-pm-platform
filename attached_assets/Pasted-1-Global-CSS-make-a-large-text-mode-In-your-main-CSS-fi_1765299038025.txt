@@ -1,0 +1,127 @@
+1️⃣ Global CSS: make a “large text mode”
+
+In your main CSS file (whatever has @tailwind base; – usually client/src/index.css or src/index.css), add this near the top or bottom:
+
+/* Base font size */
+html {
+  font-size: 16px; /* normal mode */
+}
+
+/* Large-text mode: applied when we add this class from JS */
+html.text-scale-large {
+  font-size: 18px; /* bump everything that uses rem */
+}
+
+
+Because Tailwind uses rem, this will scale all text and spacing nicely when the class is present.
+
+2️⃣ Create a hook to manage the text scale
+
+Create a new file, for example:
+
+client/src/hooks/useTextScale.js (or src/hooks/useTextScale.js depending on your structure)
+
+Paste this:
+
+// client/src/hooks/useTextScale.js
+import { useEffect, useState } from "react";
+
+const STORAGE_KEY = "textScale"; // "normal" | "large"
+
+export function useTextScale() {
+  const [scale, setScale] = useState("normal");
+
+  // On mount: read from localStorage and apply class to <html>
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const saved =
+      window.localStorage.getItem(STORAGE_KEY) === "large" ? "large" : "normal";
+
+    setScale(saved);
+    applyClass(saved);
+  }, []);
+
+  const applyClass = (value) => {
+    if (typeof document === "undefined") return;
+
+    const html = document.documentElement;
+
+    if (value === "large") {
+      html.classList.add("text-scale-large");
+    } else {
+      html.classList.remove("text-scale-large");
+    }
+  };
+
+  const toggleScale = () => {
+    setScale((prev) => {
+      const next = prev === "normal" ? "large" : "normal";
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(STORAGE_KEY, next);
+      }
+      applyClass(next);
+      return next;
+    });
+  };
+
+  return { scale, toggleScale };
+}
+
+
+This hook:
+
+Reads the saved preference from localStorage
+
+Adds/removes html.text-scale-large
+
+Lets any component toggle between normal and large.
+
+3️⃣ Add the toggle button to your header/top bar
+
+Find the component that renders your top bar (where search and “+ Add Client” are).
+It might be something like Header.tsx, TopNav.tsx, or inside AppLayout.
+
+At the top of that file, import the hook:
+
+import { useTextScale } from "../hooks/useTextScale"; // adjust path if needed
+
+
+Then, inside the component:
+
+function Header() {
+  const { scale, toggleScale } = useTextScale();
+
+  return (
+    <header className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-white">
+      {/* left side (logo / title) */}
+      <div className="flex items-center gap-3">
+        {/* ...your existing stuff... */}
+      </div>
+
+      {/* right side (search, buttons, etc.) */}
+      <div className="flex items-center gap-3">
+        {/* your existing header content (search, Add Client, etc.) */}
+
+        {/* Large text toggle */}
+        <button
+          type="button"
+          onClick={toggleScale}
+          className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+          aria-pressed={scale === "large"}
+          aria-label={
+            scale === "large"
+              ? "Switch to normal text size"
+              : "Switch to large text size"
+          }
+        >
+          <span className="text-sm">A</span>
+          <span className="text-lg font-semibold">A</span>
+          {scale === "large" && (
+            <span className="ml-1 text-[11px] text-gray-500">Large</span>
+          )}
+        </button>
+      </div>
+    </header>
+  );
+}
