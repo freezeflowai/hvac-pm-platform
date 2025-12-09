@@ -562,20 +562,6 @@ export default function JobDetailPage() {
             {clientName} • {locationName} • {fullAddress || "No address"}
           </p>
 
-          {job.scheduledStart && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Next visit:{" "}
-              <span className="font-medium text-foreground">
-                {format(new Date(job.scheduledStart), "MMM d, yyyy 'at' h:mm a")}
-              </span>
-              {statusInfo.isOverdue && (
-                <Badge variant="destructive" className="ml-2 text-[11px]" data-testid="badge-overdue">
-                  Overdue
-                </Badge>
-              )}
-            </p>
-          )}
-
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
               variant="outline"
@@ -607,6 +593,11 @@ export default function JobDetailPage() {
               <Badge variant={statusInfo.variant} className="text-[11px]">
                 {statusInfo.label}
               </Badge>
+              {statusInfo.isOverdue && (
+                <Badge variant="destructive" className="text-[11px]" data-testid="badge-overdue">
+                  Overdue
+                </Badge>
+              )}
               <Select
                 value={job.status}
                 onValueChange={handleStatusChange}
@@ -807,26 +798,38 @@ export default function JobDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Notes – always open */}
-          <Card data-testid="card-notes">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-              <CardTitle className="text-sm font-semibold">Notes</CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-xs h-auto p-0 text-primary"
-                onClick={() => toast({ title: "Coming Soon", description: "Job notes coming soon." })}
-                data-testid="button-add-note"
-              >
-                + Add Note
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                No notes yet. Add notes to track job details and communication.
-              </p>
-            </CardContent>
-          </Card>
+          {/* Notes – collapsible */}
+          <Collapsible open={notesOpen} onOpenChange={setNotesOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-notes">
+                  <span className="text-sm font-semibold">Notes</span>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs h-auto p-0 text-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toast({ title: "Coming Soon", description: "Job notes coming soon." });
+                      }}
+                      data-testid="button-add-note"
+                    >
+                      + Add Note
+                    </Button>
+                    {notesOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t px-4 pb-4 pt-3">
+                  <p className="text-xs text-muted-foreground">
+                    No notes yet. Add notes to track job details and communication.
+                  </p>
+                </div>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
           {/* Invoices – open by default */}
           <Collapsible open={invoicesOpen} onOpenChange={setInvoicesOpen}>
