@@ -35,6 +35,10 @@ export default function LocationDetailPage() {
   const [partsOpen, setPartsOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(true);
   const [billingOpen, setBillingOpen] = useState(false);
+  
+  // Overview tabs
+  type OverviewTab = "activeWork" | "jobs" | "invoices";
+  const [overviewTab, setOverviewTab] = useState<OverviewTab>("activeWork");
   const [newNoteContent, setNewNoteContent] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editNoteContent, setEditNoteContent] = useState("");
@@ -86,6 +90,11 @@ export default function LocationDetailPage() {
     if (!j.scheduledStart) return false;
     return new Date(j.scheduledStart) < new Date() && j.status !== "completed" && j.status !== "cancelled";
   });
+  const activeJobs = locationJobs.filter(j => 
+    (j.status === "scheduled" || j.status === "in_progress") && 
+    !overdueJobs.some(o => o.id === j.id)
+  );
+  const completedJobs = locationJobs.filter(j => j.status === "completed");
 
   const toggleBillWithParentMutation = useMutation({
     mutationFn: async (billWithParent: boolean) => {
@@ -188,7 +197,7 @@ export default function LocationDetailPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-6 h-full flex flex-col">
       {/* Breadcrumb */}
       <nav className="mb-4 text-sm" data-testid="breadcrumb">
         <ol className="flex flex-wrap items-center gap-1">
@@ -241,47 +250,145 @@ export default function LocationDetailPage() {
         </div>
       </header>
 
-      {/* Main 2-Column Layout: Job History (3fr) | Settings (2fr) */}
-      <div className="grid gap-6 lg:grid-cols-[3fr,2fr]">
-        {/* LEFT: Job History */}
-        <div className="space-y-4">
-          <Card>
+      {/* Main 2-Column Layout: Overview (3fr) | Settings (2fr) */}
+      <div className="grid gap-6 lg:grid-cols-[3fr,2fr] flex-1 min-h-0">
+        {/* LEFT: Overview with tabs */}
+        <div className="flex flex-col min-h-0">
+          <Card className="flex-1 flex flex-col min-h-0">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Job History</CardTitle>
+              <CardTitle className="text-sm font-semibold">Overview</CardTitle>
             </CardHeader>
-            <CardContent className="max-h-[600px] overflow-y-auto space-y-2">
-              {locationJobs.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No jobs yet for this location.</p>
-              ) : (
-                locationJobs.map((job) => {
-                  const isOverdue = job.scheduledStart && 
-                    new Date(job.scheduledStart) < new Date() && 
-                    job.status !== "completed" && 
-                    job.status !== "cancelled";
-                  return (
-                    <div 
-                      key={job.id} 
-                      className="flex items-center justify-between rounded-lg border p-3 text-sm hover-elevate cursor-pointer"
-                      onClick={() => setLocation(`/jobs/${job.id}`)}
-                      data-testid={`row-job-${job.id}`}
+            <CardContent className="flex-1 flex flex-col min-h-0">
+              <div className="border-b mb-4">
+                <nav className="-mb-px flex flex-wrap gap-4">
+                  {[
+                    { value: "activeWork", label: "Active Work" },
+                    { value: "jobs", label: "Jobs" },
+                    { value: "invoices", label: "Invoices" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => setOverviewTab(tab.value as OverviewTab)}
+                      className={`whitespace-nowrap border-b-2 px-1 pb-2 text-sm font-medium transition-colors ${
+                        overviewTab === tab.value
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"
+                      }`}
+                      data-testid={`tab-overview-${tab.value}`}
                     >
-                      <div>
-                        <div className="font-medium text-primary hover:underline">
-                          #{job.jobNumber} • {job.summary}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {job.scheduledStart ? format(new Date(job.scheduledStart), "MMM dd, yyyy") : "Not scheduled"}
-                        </div>
-                      </div>
-                      {isOverdue ? (
-                        <Badge variant="destructive">Overdue</Badge>
-                      ) : (
-                        getStatusBadge(job.status)
-                      )}
-                    </div>
-                  );
-                })
-              )}
+                      {tab.label}
+                    </button>
+                  ))}
+                </nav>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-1 min-h-0">
+                {overviewTab === "activeWork" && (
+                  <div className="space-y-4">
+                    {activeJobs.length === 0 && overdueJobs.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No active jobs for this location.</p>
+                    ) : (
+                      <>
+                        {overdueJobs.length > 0 && (
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-medium text-destructive uppercase">Overdue ({overdueJobs.length})</h4>
+                            {overdueJobs.map((job) => (
+                              <div 
+                                key={job.id} 
+                                className="flex items-center justify-between p-3 border rounded-lg hover-elevate cursor-pointer"
+                                onClick={() => setLocation(`/jobs/${job.id}`)}
+                                data-testid={`row-job-${job.id}`}
+                              >
+                                <div>
+                                  <p className="font-medium text-sm text-primary hover:underline">
+                                    #{job.jobNumber} • {job.summary}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {job.scheduledStart ? format(new Date(job.scheduledStart), "MMM dd, yyyy") : "Not scheduled"}
+                                  </p>
+                                </div>
+                                <Badge variant="destructive">Overdue</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {activeJobs.length > 0 && (
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-medium text-muted-foreground uppercase">Active ({activeJobs.length})</h4>
+                            {activeJobs.map((job) => (
+                              <div 
+                                key={job.id} 
+                                className="flex items-center justify-between p-3 border rounded-lg hover-elevate cursor-pointer"
+                                onClick={() => setLocation(`/jobs/${job.id}`)}
+                                data-testid={`row-job-${job.id}`}
+                              >
+                                <div>
+                                  <p className="font-medium text-sm text-primary hover:underline">
+                                    #{job.jobNumber} • {job.summary}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {job.scheduledStart ? format(new Date(job.scheduledStart), "MMM dd, yyyy") : "Not scheduled"}
+                                  </p>
+                                </div>
+                                <Badge variant={job.status === "in_progress" ? "default" : "secondary"}>
+                                  {job.status === "in_progress" ? "In Progress" : "Scheduled"}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {overviewTab === "jobs" && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Total jobs: {locationJobs.length}
+                    </p>
+                    {locationJobs.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No jobs yet for this location.</p>
+                    ) : (
+                      locationJobs.map((job) => {
+                        const isOverdue = job.scheduledStart && 
+                          new Date(job.scheduledStart) < new Date() && 
+                          job.status !== "completed" && 
+                          job.status !== "cancelled";
+                        return (
+                          <div 
+                            key={job.id} 
+                            className="flex items-center justify-between rounded-lg border p-3 text-sm hover-elevate cursor-pointer"
+                            onClick={() => setLocation(`/jobs/${job.id}`)}
+                            data-testid={`row-job-${job.id}`}
+                          >
+                            <div>
+                              <div className="font-medium text-primary hover:underline">
+                                #{job.jobNumber} • {job.summary}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {job.scheduledStart ? format(new Date(job.scheduledStart), "MMM dd, yyyy") : "Not scheduled"}
+                              </div>
+                            </div>
+                            {isOverdue ? (
+                              <Badge variant="destructive">Overdue</Badge>
+                            ) : (
+                              getStatusBadge(job.status)
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+
+                {overviewTab === "invoices" && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">No invoices yet for this location.</p>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
