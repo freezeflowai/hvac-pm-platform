@@ -14,75 +14,76 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 220 33% 97%;
+  /* New accessible color palette */
+  --background: 240 20% 99%;
 
-  --foreground: 218 19% 27%;
+  --foreground: 228 14% 28%;
 
-  --border: 220 13% 91%;
+  --border: 216 12% 90%;
 
   --card: 0 0% 100%;
 
-  --card-foreground: 218 19% 27%;
+  --card-foreground: 228 14% 28%;
 
-  --card-border: 220 13% 91%;
+  --card-border: 216 12% 90%;
 
-  --sidebar: 220 13% 95%;
+  --sidebar: 228 26% 97%;
 
-  --sidebar-foreground: 218 19% 27%;
+  --sidebar-foreground: 228 14% 28%;
 
-  --sidebar-border: 220 13% 91%;
+  --sidebar-border: 216 12% 90%;
 
-  --sidebar-primary: 217 85% 53%;
+  --sidebar-primary: 220 96% 58%;
 
   --sidebar-primary-foreground: 0 0% 100%;
 
-  --sidebar-accent: 220 13% 91%;
+  --sidebar-accent: 216 12% 90%;
 
-  --sidebar-accent-foreground: 218 19% 27%;
+  --sidebar-accent-foreground: 228 14% 28%;
 
-  --sidebar-ring: 217 85% 53%;
+  --sidebar-ring: 220 96% 58%;
 
   --popover: 0 0% 100%;
 
-  --popover-foreground: 218 19% 27%;
+  --popover-foreground: 228 14% 28%;
 
-  --popover-border: 220 13% 91%;
+  --popover-border: 216 12% 90%;
 
-  --primary: 217 85% 53%;
+  --primary: 220 96% 58%;
 
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 220 13% 91%;
+  --secondary: 228 26% 97%;
 
-  --secondary-foreground: 218 19% 27%;
+  --secondary-foreground: 228 14% 28%;
 
-  --muted: 220 13% 91%;
+  --muted: 228 26% 97%;
 
-  --muted-foreground: 220 9% 46%;
+  --muted-foreground: 228 7% 41%;
 
-  --accent: 220 13% 91%;
+  --accent: 216 12% 90%;
 
-  --accent-foreground: 218 19% 27%;
+  --accent-foreground: 228 14% 28%;
 
-  --destructive: 0 84% 60%;
+  --destructive: 1 78% 55%;
 
   --destructive-foreground: 0 0% 100%;
 
-  /* Maintenance status colors */
-  --status-overdue: 0 84% 60%;
+  /* Status colors - Success/Warning/Danger */
+  --status-overdue: 1 78% 55%;
   --status-overdue-foreground: 0 0% 100%;
   
-  --status-upcoming: 38 92% 50%;
-  --status-upcoming-foreground: 0 0% 100%;
+  --status-upcoming: 42 95% 56%;
+  --status-upcoming-foreground: 228 14% 28%;
   
-  --status-this-month: 160 84% 39%;
+  --status-this-month: 123 46% 34%;
   --status-this-month-foreground: 0 0% 100%;
   
-  --status-unscheduled: 220 9% 46%;
+  --status-unscheduled: 228 7% 41%;
   --status-unscheduled-foreground: 0 0% 100%;
 
-  --input: 220 13% 91%;
-  --ring: 217 85% 53%;
+  --input: 216 12% 90%;
+  --ring: 220 96% 58%;
   --chart-1: 217 91% 35%;
   --chart-2: 45 93% 38%;
   --chart-3: 142 76% 32%;
@@ -158,75 +159,76 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 220 13% 9%;
+  /* Dark mode - new accessible color palette */
+  --background: 228 25% 9%;
 
-  --foreground: 220 13% 91%;
+  --foreground: 228 12% 90%;
 
-  --border: 220 13% 18%;
+  --border: 228 14% 18%;
 
-  --card: 220 13% 11%;
+  --card: 228 22% 11%;
 
-  --card-foreground: 220 13% 91%;
+  --card-foreground: 228 12% 90%;
 
-  --card-border: 220 13% 18%;
+  --card-border: 228 14% 18%;
 
-  --sidebar: 220 13% 12%;
+  --sidebar: 228 22% 12%;
 
-  --sidebar-foreground: 220 13% 91%;
+  --sidebar-foreground: 228 12% 90%;
 
-  --sidebar-border: 220 13% 18%;
+  --sidebar-border: 228 14% 18%;
 
-  --sidebar-primary: 217 85% 53%;
+  --sidebar-primary: 220 96% 58%;
 
   --sidebar-primary-foreground: 0 0% 100%;
 
-  --sidebar-accent: 220 13% 18%;
+  --sidebar-accent: 228 14% 18%;
 
-  --sidebar-accent-foreground: 220 13% 91%;
+  --sidebar-accent-foreground: 228 12% 90%;
 
-  --sidebar-ring: 217 85% 53%;
+  --sidebar-ring: 220 96% 58%;
 
-  --popover: 220 13% 11%;
+  --popover: 228 22% 11%;
 
-  --popover-foreground: 220 13% 91%;
+  --popover-foreground: 228 12% 90%;
 
-  --popover-border: 220 13% 18%;
+  --popover-border: 228 14% 18%;
 
-  --primary: 217 85% 53%;
+  --primary: 220 96% 58%;
 
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 220 13% 18%;
+  --secondary: 228 14% 18%;
 
-  --secondary-foreground: 220 13% 91%;
+  --secondary-foreground: 228 12% 90%;
 
-  --muted: 220 13% 18%;
+  --muted: 228 14% 18%;
 
-  --muted-foreground: 220 9% 46%;
+  --muted-foreground: 228 10% 55%;
 
-  --accent: 220 13% 18%;
+  --accent: 228 14% 18%;
 
-  --accent-foreground: 220 13% 91%;
+  --accent-foreground: 228 12% 90%;
 
-  --destructive: 0 84% 60%;
+  --destructive: 1 78% 55%;
 
   --destructive-foreground: 0 0% 100%;
 
-  /* Maintenance status colors - dark mode */
-  --status-overdue: 0 84% 60%;
+  /* Status colors - dark mode */
+  --status-overdue: 1 78% 55%;
   --status-overdue-foreground: 0 0% 100%;
   
-  --status-upcoming: 38 92% 50%;
-  --status-upcoming-foreground: 0 0% 100%;
+  --status-upcoming: 42 95% 56%;
+  --status-upcoming-foreground: 228 14% 28%;
   
-  --status-this-month: 160 84% 39%;
+  --status-this-month: 123 46% 45%;
   --status-this-month-foreground: 0 0% 100%;
   
-  --status-unscheduled: 220 9% 46%;
+  --status-unscheduled: 228 10% 55%;
   --status-unscheduled-foreground: 0 0% 100%;
 
-  --input: 220 13% 18%;
-  --ring: 217 85% 53%;
+  --input: 228 14% 18%;
+  --ring: 220 96% 58%;
   --chart-1: 217 91% 65%;
   --chart-2: 45 93% 62%;
   --chart-3: 142 76% 58%;
