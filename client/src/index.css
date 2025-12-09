@@ -15,36 +15,36 @@
   --elevate-2: rgba(0,0,0, .08);
 
   /* 
-   * New accessible color palette
-   * Gray: #FAFAFC (bg) to #3E4250 (text)
-   * Primary Blue: #2D6CFB
-   * Success: #2E7D32, Warning: #F9A825, Danger: #E53935
+   * Custom color palette
+   * Background: #F7F8FC | Card: #FFFFFF | Border: #E0E3ED
+   * Foreground: #1F2933 | Muted: #6B7280
+   * Primary: #2D6CFB | Success: #2E7D32 | Warning: #F9A825 | Danger: #E53935
    */
-  --background: 240 20% 98%;
-  --foreground: 227 14% 28%;
-  --border: 220 10% 90%;
+  --background: 228 33% 98%;
+  --foreground: 209 27% 16%;
+  --border: 224 25% 91%;
   --card: 0 0% 100%;
-  --card-foreground: 227 14% 28%;
-  --card-border: 220 10% 90%;
-  --sidebar: 230 26% 97%;
-  --sidebar-foreground: 227 14% 28%;
-  --sidebar-border: 220 10% 90%;
+  --card-foreground: 209 27% 16%;
+  --card-border: 224 25% 91%;
+  --sidebar: 228 33% 98%;
+  --sidebar-foreground: 209 27% 16%;
+  --sidebar-border: 224 25% 91%;
   --sidebar-primary: 220 96% 58%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 220 10% 90%;
-  --sidebar-accent-foreground: 227 14% 28%;
+  --sidebar-accent: 224 25% 91%;
+  --sidebar-accent-foreground: 209 27% 16%;
   --sidebar-ring: 220 96% 58%;
   --popover: 0 0% 100%;
-  --popover-foreground: 227 14% 28%;
-  --popover-border: 220 10% 90%;
+  --popover-foreground: 209 27% 16%;
+  --popover-border: 224 25% 91%;
   --primary: 220 96% 58%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 230 26% 97%;
-  --secondary-foreground: 227 14% 28%;
-  --muted: 230 26% 97%;
-  --muted-foreground: 227 8% 41%;
-  --accent: 220 10% 90%;
-  --accent-foreground: 227 14% 28%;
+  --secondary: 228 33% 98%;
+  --secondary-foreground: 209 27% 16%;
+  --muted: 228 33% 98%;
+  --muted-foreground: 220 9% 46%;
+  --accent: 224 25% 91%;
+  --accent-foreground: 209 27% 16%;
   --destructive: 1 76% 55%;
   --destructive-foreground: 0 0% 100%;
 
@@ -52,13 +52,13 @@
   --status-overdue: 1 76% 55%;
   --status-overdue-foreground: 0 0% 100%;
   --status-upcoming: 42 95% 56%;
-  --status-upcoming-foreground: 227 14% 28%;
+  --status-upcoming-foreground: 209 27% 16%;
   --status-this-month: 123 46% 34%;
   --status-this-month-foreground: 0 0% 100%;
-  --status-unscheduled: 227 8% 41%;
+  --status-unscheduled: 220 9% 46%;
   --status-unscheduled-foreground: 0 0% 100%;
 
-  --input: 220 10% 90%;
+  --input: 224 25% 91%;
   --ring: 220 96% 58%;
   --chart-1: 217 91% 35%;
   --chart-2: 45 93% 38%;
