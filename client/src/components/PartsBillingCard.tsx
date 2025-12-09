@@ -33,6 +33,7 @@ interface LocalLineItem {
   isNew?: boolean;
   productId?: string | null;
   description: string;
+  notes: string;
   quantity: string;
   unitCost: string;
   unitPrice: string;
@@ -71,21 +72,26 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
   const { data: catalogData } = useQuery<{ items: Part[] }>({
     queryKey: ["/api/parts"],
   });
-  const catalogParts = catalogData?.items || [];
+  const catalogParts = useMemo(() => catalogData?.items || [], [catalogData]);
 
   useEffect(() => {
-    if (jobParts && !hasChanges) {
+    if (jobParts && jobParts.length >= 0 && !hasChanges) {
       setItems(
-        jobParts.map((jp) => ({
-          id: jp.id,
-          isNew: false,
-          productId: jp.productId,
-          description: jp.description,
-          quantity: jp.quantity,
-          unitCost: catalogParts.find((p) => p.id === jp.productId)?.cost || "0",
-          unitPrice: jp.unitPrice || "0",
-          source: jp.source,
-        }))
+        jobParts.map((jp) => {
+          const catalogItem = catalogParts.find((p) => p.id === jp.productId);
+          const productName = catalogItem?.name || catalogItem?.description || "";
+          return {
+            id: jp.id,
+            isNew: false,
+            productId: jp.productId,
+            description: productName || jp.description,
+            notes: productName ? jp.description : "",
+            quantity: jp.quantity,
+            unitCost: catalogItem?.cost || "0",
+            unitPrice: jp.unitPrice || "0",
+            source: jp.source,
+          };
+        })
       );
     }
   }, [jobParts, catalogParts, hasChanges]);
@@ -110,6 +116,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
       id,
       isNew: true,
       description: "",
+      notes: "",
       quantity: "1",
       unitCost: "0",
       unitPrice: "0",
@@ -140,10 +147,11 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
       for (const item of items) {
         const qty = String(parseFloat(item.quantity) || 1);
         const price = String(parseFloat(item.unitPrice) || 0);
+        const desc = item.notes?.trim() || item.description || "Unnamed item";
         
         if (item.isNew) {
           await apiRequest("POST", `/api/jobs/${jobId}/parts`, {
-            description: item.description || "Unnamed item",
+            description: desc,
             quantity: qty,
             unitPrice: price,
             productId: item.productId || null,
@@ -151,7 +159,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
           });
         } else {
           await apiRequest("PUT", `/api/jobs/${jobId}/parts/${item.id}`, {
-            description: item.description,
+            description: desc,
             quantity: qty,
             unitPrice: price,
             productId: item.productId || null,
@@ -184,6 +192,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
     handleRowChange(lineId, {
       productId: product.id,
       description: product.name || product.description || "",
+      notes: "",
       unitCost: product.cost || "0",
       unitPrice: product.unitPrice || "0",
     });
@@ -237,12 +246,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
       <Card data-testid="card-parts-billing">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-sm font-semibold">Parts & Billing</CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Add parts and services for this job. Changes are saved when you click <span className="font-medium">Save</span>.
-              </p>
-            </div>
+            <CardTitle className="text-sm font-semibold">Parts & Billing</CardTitle>
             <div className="flex items-center gap-6 text-xs">
               <div className="text-right">
                 <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Price</div>
@@ -263,7 +267,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="overflow-x-auto">
+          <div className="overflow-visible">
             <table className="min-w-full text-xs">
               <thead className="border-b text-[11px] uppercase tracking-wide text-muted-foreground">
                 <tr>
@@ -393,6 +397,9 @@ function LineItemRow({
           <div className="text-xs font-medium">
             {item.description || <span className="italic text-muted-foreground">No product</span>}
           </div>
+          {item.notes && (
+            <div className="mt-0.5 text-[11px] text-muted-foreground">{item.notes}</div>
+          )}
         </td>
         <td className="py-3 px-3 text-right align-top text-xs">{item.quantity}</td>
         <td className="py-3 px-3 text-right align-top text-xs">{formatCurrency(parseFloat(item.unitCost || "0"))}</td>
@@ -420,7 +427,7 @@ function LineItemRow({
             data-testid={`input-product-search-${item.id}`}
           />
           {showDropdown && (
-            <div className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-popover shadow-lg">
+            <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover shadow-lg">
               {suggestions.map((c) => (
                 <button
                   key={c.id}
@@ -449,6 +456,13 @@ function LineItemRow({
             </div>
           )}
         </div>
+        <Input
+          className="mt-1.5 text-xs"
+          placeholder="Description / notes..."
+          value={item.notes}
+          onChange={(e) => onChange({ notes: e.target.value })}
+          data-testid={`input-notes-${item.id}`}
+        />
         <Button
           type="button"
           variant="ghost"
