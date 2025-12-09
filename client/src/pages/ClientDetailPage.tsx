@@ -306,9 +306,14 @@ export default function ClientDetailPage() {
                           <div className="space-y-2">
                             <h4 className="text-xs font-medium text-destructive uppercase">Overdue ({overdueJobs.length})</h4>
                             {overdueJobs.map((job) => (
-                              <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
+                              <div 
+                                key={job.id} 
+                                className="flex items-center justify-between p-3 border rounded-lg hover-elevate cursor-pointer"
+                                onClick={() => setLocation(`/jobs/${job.id}`)}
+                                data-testid={`row-job-${job.id}`}
+                              >
                                 <div>
-                                  <p className="font-medium text-sm text-primary hover:underline cursor-pointer">
+                                  <p className="font-medium text-sm text-primary hover:underline">
                                     #{job.jobNumber} • {job.summary}
                                   </p>
                                   <p className="text-xs text-muted-foreground">
@@ -324,9 +329,14 @@ export default function ClientDetailPage() {
                           <div className="space-y-2">
                             <h4 className="text-xs font-medium text-muted-foreground uppercase">Active ({activeJobs.length})</h4>
                             {activeJobs.map((job) => (
-                              <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
+                              <div 
+                                key={job.id} 
+                                className="flex items-center justify-between p-3 border rounded-lg hover-elevate cursor-pointer"
+                                onClick={() => setLocation(`/jobs/${job.id}`)}
+                                data-testid={`row-job-${job.id}`}
+                              >
                                 <div>
-                                  <p className="font-medium text-sm text-primary hover:underline cursor-pointer">
+                                  <p className="font-medium text-sm text-primary hover:underline">
                                     #{job.jobNumber} • {job.summary}
                                   </p>
                                   <p className="text-xs text-muted-foreground">
@@ -351,9 +361,14 @@ export default function ClientDetailPage() {
                       Total jobs: {companyJobs.length}
                     </p>
                     {companyJobs.slice(0, 5).map((job) => (
-                      <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div 
+                        key={job.id} 
+                        className="flex items-center justify-between p-3 border rounded-lg hover-elevate cursor-pointer"
+                        onClick={() => setLocation(`/jobs/${job.id}`)}
+                        data-testid={`row-job-${job.id}`}
+                      >
                         <div>
-                          <p className="font-medium text-sm text-primary hover:underline cursor-pointer">
+                          <p className="font-medium text-sm text-primary hover:underline">
                             #{job.jobNumber} • {job.summary}
                           </p>
                           <p className="text-xs text-muted-foreground">
