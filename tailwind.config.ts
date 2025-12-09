@@ -15,12 +15,12 @@ export default {
         card: "0 8px 18px rgba(15, 23, 42, 0.04)",
       },
       fontSize: {
-        xs: "0.8rem",
-        sm: "0.9rem",
-        base: "1rem",
-        lg: "1.125rem",
-        xl: "1.25rem",
-        "2xl": "1.5rem",
+        xs: ["0.8rem", "1.2rem"],      // ~12.8px - timestamps, tiny labels
+        sm: ["0.9rem", "1.3rem"],      // ~14.4px - helper text, secondary labels
+        base: ["1rem", "1.5rem"],      // 16px - main body / card content
+        lg: ["1.125rem", "1.6rem"],    // ~18px - section headings, card titles
+        xl: ["1.25rem", "1.75rem"],    // ~20px - page headings
+        "2xl": ["1.5rem", "2rem"],     // 24px - big titles
       },
       colors: {
         // Accessible neutral gray palette
