@@ -195,7 +195,7 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
                       asChild 
                       isActive={item.isActive} 
                       data-testid={item.testId}
-                      className="h-10 data-[active=true]:bg-[#EEF4FF] data-[active=true]:border-l-[3px] data-[active=true]:border-l-primary data-[active=true]:font-semibold data-[active=true]:pl-[7px] hover:bg-[#F8F9FB]"
+                      className="h-10 data-[active=true]:bg-primary/10 data-[active=true]:border-l-[3px] data-[active=true]:border-l-primary data-[active=true]:font-semibold data-[active=true]:pl-[7px] hover:bg-gray-100"
                     >
                       <Link href={item.href}>
                         <item.icon className="h-4 w-4" />
@@ -207,7 +207,7 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
                       isActive={item.isActive} 
                       onClick={item.onClick} 
                       data-testid={item.testId}
-                      className="h-10 data-[active=true]:bg-[#EEF4FF] data-[active=true]:border-l-[3px] data-[active=true]:border-l-primary data-[active=true]:font-semibold data-[active=true]:pl-[7px] hover:bg-[#F8F9FB]"
+                      className="h-10 data-[active=true]:bg-primary/10 data-[active=true]:border-l-[3px] data-[active=true]:border-l-primary data-[active=true]:font-semibold data-[active=true]:pl-[7px] hover:bg-gray-100"
                     >
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
@@ -222,13 +222,13 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       <SidebarFooter className="border-t">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => setFeedbackOpen(true)} data-testid="button-feedback" className="h-10 hover:bg-[#F8F9FB]">
+            <SidebarMenuButton onClick={() => setFeedbackOpen(true)} data-testid="button-feedback" className="h-10 hover:bg-gray-100">
               <MessageCircle className="h-4 w-4" />
               <span>Feedback</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleLogout} data-testid="button-logout" className="h-10 hover:bg-[#F8F9FB]">
+            <SidebarMenuButton onClick={handleLogout} data-testid="button-logout" className="h-10 hover:bg-gray-100">
               <LogOut className="h-4 w-4" />
               <span>Logout</span>
             </SidebarMenuButton>
