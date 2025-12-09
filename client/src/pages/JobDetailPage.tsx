@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import JobEquipmentSection from "@/components/JobEquipmentSection";
+import { PartsBillingCard } from "@/components/PartsBillingCard";
 import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -642,66 +643,7 @@ export default function JobDetailPage() {
         {/* LEFT COLUMN: Parts & Billing + Labour + Expenses */}
         <div className="space-y-4">
           {/* Parts & Billing / Line Items */}
-          <Card data-testid="card-parts-billing">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Parts & Billing</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Profitability strip */}
-              <div className="grid gap-3 rounded-xl bg-muted/50 px-3 py-2 text-xs sm:grid-cols-3">
-                <div>
-                  <div className="font-semibold">Total Price</div>
-                  <div>$0.00</div>
-                </div>
-                <div>
-                  <div className="font-semibold">Total Cost</div>
-                  <div>$0.00</div>
-                </div>
-                <div>
-                  <div className="font-semibold">Profit Margin</div>
-                  <div>$0.00 • 0%</div>
-                </div>
-              </div>
-
-              {/* Line items table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="px-3 py-2 font-medium">Product / Service</th>
-                      <th className="px-3 py-2 font-medium text-right">Qty</th>
-                      <th className="px-3 py-2 font-medium text-right">Cost</th>
-                      <th className="px-3 py-2 font-medium text-right">Price</th>
-                      <th className="px-3 py-2 font-medium text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td colSpan={5} className="px-3 py-4 text-center text-muted-foreground">
-                        No line items yet. Add parts or services to this job.
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Add line item */}
-              <div className="flex items-center justify-between">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => toast({ title: "Coming Soon", description: "Line item management coming soon." })}
-                  data-testid="button-add-line-item"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add Line Item
-                </Button>
-                <div className="text-xs text-muted-foreground">
-                  Subtotal: <span className="font-semibold text-foreground">$0.00</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <PartsBillingCard jobId={jobId!} />
 
           {/* Labour */}
           <Card data-testid="card-labour">
