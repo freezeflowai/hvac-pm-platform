@@ -25,14 +25,17 @@ import {
   DollarSign,
   Repeat,
   ChevronRight,
+  ChevronDown,
   UserPlus,
   Package,
   Receipt,
   History,
   Wrench,
   Send,
-  Check
+  Check,
+  Plus
 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import JobEquipmentSection from "@/components/JobEquipmentSection";
 import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
 import { Button } from "@/components/ui/button";
@@ -414,6 +417,9 @@ export default function JobDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssignTech, setShowAssignTech] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [equipmentOpen, setEquipmentOpen] = useState(true);
+  const [activityOpen, setActivityOpen] = useState(true);
+  const [metadataOpen, setMetadataOpen] = useState(false);
   const jobId = params?.id;
 
   const { data: job, isLoading, error } = useQuery<JobDetailResponse>({
@@ -507,474 +513,378 @@ export default function JobDetailPage() {
   const statusInfo = getJobStatusDisplay(job.status, job.scheduledStart);
   const priorityInfo = getPriorityDisplay(job.priority);
 
-  return (
-    <div className="p-6 space-y-6" data-testid="job-detail-page">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setLocation("/jobs")}
-              data-testid="button-back"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl font-bold" data-testid="text-job-number">
-                  Job #{job.jobNumber}
-                </h1>
-                {statusInfo.isOverdue && (
-                  <Badge variant="destructive" className="gap-1" data-testid="badge-overdue">
-                    <AlertTriangle className="h-3 w-3" />
-                    Overdue
-                  </Badge>
-                )}
-                <Badge variant={priorityInfo.variant} data-testid="badge-priority">
-                  {priorityInfo.label}
-                </Badge>
-              </div>
-              <p className="text-muted-foreground capitalize" data-testid="text-job-type">
-                {job.jobType} job
-              </p>
-            </div>
-          </div>
+  const locationName = job.location?.location || job.location?.companyName || "Location";
+  const clientName = job.parentCompany?.name || job.location?.companyName || "Client";
+  const fullAddress = job.location ? 
+    [job.location.address, job.location.city, job.location.province, job.location.postalCode].filter(Boolean).join(", ") : "";
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowEditDialog(true)}
-              data-testid="button-edit"
+  return (
+    <div className="p-6" data-testid="job-detail-page">
+      {/* Breadcrumb */}
+      <nav className="mb-3 text-sm" data-testid="breadcrumb">
+        <ol className="flex flex-wrap items-center gap-1">
+          <li>
+            <button
+              type="button"
+              className="font-medium text-primary hover:text-primary/80 hover:underline transition-colors"
+              onClick={() => setLocation("/jobs")}
+              data-testid="breadcrumb-jobs"
             >
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={deleteJobMutation.isPending}
-              className="text-destructive hover:text-destructive"
-              data-testid="button-delete"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </Button>
+              Jobs
+            </button>
+          </li>
+          <li className="flex items-center">
+            <span className="mx-1 text-muted-foreground">/</span>
+            <span className="font-medium text-foreground">#{job.jobNumber}</span>
+          </li>
+        </ol>
+      </nav>
+
+      {/* HEADER */}
+      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-semibold" data-testid="text-job-number">
+              Job #{job.jobNumber}
+            </h1>
+            {statusInfo.isOverdue && (
+              <Badge variant="destructive" className="text-xs" data-testid="badge-overdue">
+                Overdue
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-xs capitalize" data-testid="badge-job-type">
+              {job.jobType}
+            </Badge>
+          </div>
+          <p className="mt-1 text-sm" data-testid="text-summary">{job.summary}</p>
+          <p className="mt-1 text-xs text-muted-foreground" data-testid="text-location-info">
+            {clientName} • {locationName} • {fullAddress || "No address"}
+          </p>
+
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-foreground">Status:</span>
+              <Badge variant={statusInfo.variant} className="text-xs">
+                {statusInfo.label}
+              </Badge>
+              <Select
+                value={job.status}
+                onValueChange={handleStatusChange}
+                disabled={updateStatusMutation.isPending}
+              >
+                <SelectTrigger className="ml-1 h-6 w-auto min-w-[100px] text-xs border-dashed" data-testid="select-status">
+                  <SelectValue placeholder="Change status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="on_hold">On Hold</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="invoiced">Invoiced</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-foreground">Priority:</span>
+              <Badge variant={priorityInfo.variant} className="text-xs">
+                {priorityInfo.label}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-foreground">Scheduled:</span>
+              <span>{job.scheduledStart ? format(new Date(job.scheduledStart), "MMMM do, yyyy h:mm a") : "Not scheduled"}</span>
+            </div>
           </div>
         </div>
 
-        <StatusProgressBar
-          currentStatus={job.status}
-          onStatusChange={handleStatusChange}
-          isUpdating={updateStatusMutation.isPending}
-        />
-      </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowEditDialog(true)}
+            data-testid="button-edit"
+          >
+            Edit Job
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={deleteJobMutation.isPending}
+            className="text-destructive border-destructive/50 hover:bg-destructive/10"
+            data-testid="button-delete"
+          >
+            Delete
+          </Button>
+        </div>
+      </header>
 
-      {/* Two-column layout: Left = Job work, Right = Supporting context */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* LEFT COLUMN: Primary job information and billing */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Job Details Card */}
-          <Card data-testid="card-job-details">
-            <CardHeader className="pb-3">
-              <CardTitle>Job Details</CardTitle>
+      {/* MAIN 2-COLUMN LAYOUT */}
+      <div className="grid gap-4 lg:grid-cols-[3fr,2fr]">
+        {/* LEFT COLUMN: Parts & Billing + Labour + Expenses */}
+        <div className="space-y-4">
+          {/* Parts & Billing / Line Items */}
+          <Card data-testid="card-parts-billing">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+              <CardTitle className="text-sm font-semibold">Parts & Billing</CardTitle>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs h-auto p-0 text-primary"
+                onClick={() => {
+                  if (!job.locationId) {
+                    toast({ title: "Cannot Create Invoice", description: "This job is not linked to a location.", variant: "destructive" });
+                    return;
+                  }
+                  if (job.status === "completed") {
+                    setLocation(`/invoices/new?jobId=${job.id}&locationId=${job.locationId}`);
+                  } else {
+                    toast({ title: "Complete job first", description: "Mark job as completed before creating an invoice." });
+                  }
+                }}
+                data-testid="button-create-invoice"
+              >
+                Create Invoice
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              {/* Profitability strip */}
+              <div className="grid gap-3 rounded-xl bg-muted/50 px-3 py-2 text-xs sm:grid-cols-3">
                 <div>
-                  <p className="text-sm text-muted-foreground">Job Type</p>
-                  <p className="font-medium capitalize" data-testid="text-job-type-value">{job.jobType}</p>
+                  <div className="font-semibold">Total Price</div>
+                  <div>$0.00</div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Priority</p>
-                  <Badge variant={priorityInfo.variant}>{priorityInfo.label}</Badge>
+                  <div className="font-semibold">Total Cost</div>
+                  <div>$0.00</div>
+                </div>
+                <div>
+                  <div className="font-semibold">Profit Margin</div>
+                  <div>$0.00 • 0%</div>
                 </div>
               </div>
 
-              <Separator />
-
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Summary</p>
-                <p className="font-medium" data-testid="text-summary">{job.summary}</p>
-              </div>
-              
-              {job.description && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Description</p>
-                  <p className="whitespace-pre-wrap" data-testid="text-description">
-                    {job.description}
-                  </p>
-                </div>
-              )}
-
-              {job.accessInstructions && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Access Instructions</p>
-                  <p className="whitespace-pre-wrap" data-testid="text-access">
-                    {job.accessInstructions}
-                  </p>
-                </div>
-              )}
-
-              <Separator />
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    Scheduled Start
-                  </p>
-                  <p data-testid="text-scheduled-start">
-                    {job.scheduledStart 
-                      ? format(new Date(job.scheduledStart), "PPP p")
-                      : "Not scheduled"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Scheduled End
-                  </p>
-                  <p data-testid="text-scheduled-end">
-                    {job.scheduledEnd 
-                      ? format(new Date(job.scheduledEnd), "PPP p")
-                      : "Not set"}
-                  </p>
-                </div>
+              {/* Line items table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="px-3 py-2 font-medium">Product / Service</th>
+                      <th className="px-3 py-2 font-medium text-right">Qty</th>
+                      <th className="px-3 py-2 font-medium text-right">Cost</th>
+                      <th className="px-3 py-2 font-medium text-right">Price</th>
+                      <th className="px-3 py-2 font-medium text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan={5} className="px-3 py-4 text-center text-muted-foreground">
+                        No line items yet. Add parts or services to this job.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
-              {(job.actualStart || job.actualEnd) && (
-                <div className="grid grid-cols-2 gap-4 pt-2 border-t">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Actual Start</p>
-                    <p data-testid="text-actual-start">
-                      {job.actualStart 
-                        ? format(new Date(job.actualStart), "PPP p")
-                        : "-"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Actual End</p>
-                    <p data-testid="text-actual-end">
-                      {job.actualEnd 
-                        ? format(new Date(job.actualEnd), "PPP p")
-                        : "-"}
-                    </p>
-                  </div>
+              {/* Add line item */}
+              <div className="flex items-center justify-between">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => toast({ title: "Coming Soon", description: "Line item management coming soon." })}
+                  data-testid="button-add-line-item"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Line Item
+                </Button>
+                <div className="text-xs text-muted-foreground">
+                  Subtotal: <span className="font-semibold text-foreground">$0.00</span>
                 </div>
-              )}
+              </div>
             </CardContent>
           </Card>
 
-          {/* Parts & Billing Card */}
-          <Card data-testid="card-parts-billing">
-            <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Parts & Billing
-              </CardTitle>
+          {/* Labour */}
+          <Card data-testid="card-labour">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+              <CardTitle className="text-sm font-semibold">Labour</CardTitle>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs h-auto p-0 text-primary"
+                onClick={() => toast({ title: "Coming Soon", description: "Time tracking coming soon." })}
+                data-testid="button-new-time-entry"
+              >
+                New Time Entry
+              </Button>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-sm text-muted-foreground">Parts Added</p>
-                  <p className="text-xl font-semibold">0</p>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-sm text-muted-foreground">Invoice Status</p>
-                  <p className="font-medium">
-                    {job.status === "invoiced" ? (
-                      <span className="text-green-600 flex items-center gap-1">
-                        <Check className="h-4 w-4" />
-                        Invoiced
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">Not Created</span>
-                    )}
-                  </p>
-                </div>
-              </div>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                No labour entries yet. Track time against this job here.
+              </p>
+            </CardContent>
+          </Card>
 
-              {job.billingNotes && (
-                <div className="pt-2 border-t">
-                  <p className="text-sm text-muted-foreground mb-1">Billing Notes</p>
-                  <p className="whitespace-pre-wrap text-sm" data-testid="text-billing-notes">
-                    {job.billingNotes}
-                  </p>
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => toast({ title: "Coming Soon", description: "Parts management coming soon." })}
-                  data-testid="button-add-parts"
-                >
-                  <Package className="h-4 w-4 mr-2" />
-                  Add Parts
-                </Button>
-                {job.status === "completed" ? (
-                  <Button 
-                    size="sm"
-                    onClick={() => {
-                      if (!job.locationId) {
-                        toast({ 
-                          title: "Cannot Create Invoice", 
-                          description: "This job is not linked to a location.", 
-                          variant: "destructive" 
-                        });
-                        return;
-                      }
-                      setLocation(`/invoices/new?jobId=${job.id}&locationId=${job.locationId}`);
-                    }}
-                    data-testid="button-create-invoice"
-                  >
-                    <Receipt className="h-4 w-4 mr-2" />
-                    Create Invoice
-                  </Button>
-                ) : job.status === "invoiced" ? (
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toast({ title: "Coming Soon", description: "Invoice viewing will be available soon." })}
-                    data-testid="button-view-invoice"
-                  >
-                    <Receipt className="h-4 w-4 mr-2" />
-                    View Invoice
-                  </Button>
-                ) : null}
-              </div>
+          {/* Expenses */}
+          <Card data-testid="card-expenses">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+              <CardTitle className="text-sm font-semibold">Expenses</CardTitle>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs h-auto p-0 text-primary"
+                onClick={() => toast({ title: "Coming Soon", description: "Expense tracking coming soon." })}
+                data-testid="button-new-expense"
+              >
+                New Expense
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                Track additional job costs (parking, materials, etc.) here.
+              </p>
             </CardContent>
           </Card>
 
           {job.recurringSeries && (
             <Card data-testid="card-recurring">
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2">
-                  <Repeat className="h-5 w-5" />
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Repeat className="h-4 w-4" />
                   Recurring Series
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p data-testid="text-series-summary">{job.recurringSeries.baseSummary}</p>
+                <p className="text-sm" data-testid="text-series-summary">{job.recurringSeries.baseSummary}</p>
               </CardContent>
             </Card>
           )}
         </div>
 
-        {/* RIGHT COLUMN: Supporting context */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Location Card */}
-          <Card data-testid="card-location">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Location
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {job.location ? (
-                <>
-                  <div>
-                    <p className="font-medium" data-testid="text-location-name">
-                      {job.location.companyName}
-                    </p>
-                    {job.parentCompany && (
-                      <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Building2 className="h-3 w-3" />
-                        {job.parentCompany.name}
-                      </p>
-                    )}
-                  </div>
-
-                  {job.location.address && (
-                    <div className="text-sm text-muted-foreground" data-testid="text-location-address">
-                      <p>{job.location.address}</p>
-                      <p>
-                        {[job.location.city, job.location.province, job.location.postalCode]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    {job.location.phone && (
-                      <Button variant="outline" size="sm" asChild data-testid="button-call">
-                        <a href={`tel:${job.location.phone}`}>
-                          <Phone className="h-3 w-3 mr-1" />
-                          Call
-                        </a>
-                      </Button>
-                    )}
-                    {job.location.email && (
-                      <Button variant="outline" size="sm" asChild data-testid="button-email">
-                        <a href={`mailto:${job.location.email}`}>
-                          <Mail className="h-3 w-3 mr-1" />
-                          Email
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full mt-2"
-                    onClick={() => setLocation(`/clients/${job.locationId}`)}
-                    data-testid="button-view-location"
-                  >
-                    View Location Details
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </>
-              ) : (
-                <p className="text-muted-foreground text-sm">Location not found</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Assigned Technicians Card */}
+        {/* RIGHT COLUMN: Techs, Equipment, Activity, Metadata */}
+        <div className="space-y-4">
+          {/* Assigned Technicians – always open, compact */}
           <Card data-testid="card-technicians">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Assigned Technicians
-              </CardTitle>
+              <CardTitle className="text-sm font-semibold">Assigned Technicians</CardTitle>
               <Button 
                 variant="ghost" 
                 size="sm" 
+                className="text-xs h-auto p-0 text-primary"
                 onClick={() => setShowAssignTech(true)}
                 data-testid="button-assign-technician"
               >
-                <UserPlus className="h-4 w-4 mr-1" />
-                {job.technicians && job.technicians.length > 0 ? "Manage" : "Assign"}
+                Assign
               </Button>
             </CardHeader>
             <CardContent>
               {job.technicians && job.technicians.length > 0 ? (
-                <div className="space-y-2">
+                <ul className="space-y-1 text-sm">
                   {job.technicians.map(tech => (
-                    <div 
-                      key={tech.id} 
-                      className="flex items-center gap-2 p-2 rounded-lg bg-muted/50"
-                      data-testid={`text-technician-${tech.id}`}
-                    >
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <User className="h-4 w-4 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">
-                          {tech.firstName && tech.lastName 
-                            ? `${tech.firstName} ${tech.lastName}`
-                            : tech.email}
-                        </p>
-                      </div>
+                    <li key={tech.id} className="flex items-center gap-2" data-testid={`text-technician-${tech.id}`}>
+                      <span>
+                        {tech.firstName && tech.lastName 
+                          ? `${tech.firstName} ${tech.lastName}`
+                          : tech.email}
+                      </span>
                       {tech.id === job.primaryTechnicianId && (
-                        <Badge variant="secondary" className="shrink-0">Primary</Badge>
+                        <Badge variant="secondary" className="text-xs">Primary</Badge>
                       )}
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  <User className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No technicians assigned yet.</p>
-                </div>
+                <p className="text-xs text-muted-foreground">No technicians assigned yet.</p>
               )}
             </CardContent>
           </Card>
 
-          {/* Equipment Card */}
+          {/* Equipment - Using existing JobEquipmentSection */}
           <JobEquipmentSection jobId={job.id} locationId={job.locationId} />
 
-          {/* Activity Card */}
-          <Card data-testid="card-activity">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5" />
-                Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex gap-2 text-sm">
-                  <div className="h-2 w-2 rounded-full bg-primary mt-1.5 shrink-0" />
-                  <div>
-                    <p>Job created</p>
-                    <p className="text-muted-foreground text-xs">
-                      {format(new Date(job.createdAt), "PPP")}
-                    </p>
-                  </div>
+          {/* Activity - Collapsible */}
+          <Collapsible open={activityOpen} onOpenChange={setActivityOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-activity">
+                  <span className="text-sm font-semibold">Activity</span>
+                  {activityOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t px-4 pb-4 pt-3">
+                  <ul className="space-y-2 text-xs">
+                    <li className="flex items-start gap-2">
+                      <span className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" />
+                      <div>
+                        <div className="font-medium">Job created</div>
+                        <div className="text-muted-foreground">{format(new Date(job.createdAt), "MMMM do, yyyy")}</div>
+                      </div>
+                    </li>
+                    {job.scheduledStart && (
+                      <li className="flex items-start gap-2">
+                        <span className="mt-1 h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                        <div>
+                          <div className="font-medium">Scheduled</div>
+                          <div className="text-muted-foreground">{format(new Date(job.scheduledStart), "MMMM do, yyyy")}</div>
+                        </div>
+                      </li>
+                    )}
+                    {job.actualStart && (
+                      <li className="flex items-start gap-2">
+                        <span className="mt-1 h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                        <div>
+                          <div className="font-medium">Work started</div>
+                          <div className="text-muted-foreground">{format(new Date(job.actualStart), "MMMM do, yyyy")}</div>
+                        </div>
+                      </li>
+                    )}
+                    {job.actualEnd && (
+                      <li className="flex items-start gap-2">
+                        <span className="mt-1 h-2 w-2 rounded-full bg-green-600 shrink-0" />
+                        <div>
+                          <div className="font-medium">Work completed</div>
+                          <div className="text-muted-foreground">{format(new Date(job.actualEnd), "MMMM do, yyyy")}</div>
+                        </div>
+                      </li>
+                    )}
+                  </ul>
                 </div>
-                {job.scheduledStart && (
-                  <div className="flex gap-2 text-sm">
-                    <div className="h-2 w-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
-                    <div>
-                      <p>Scheduled</p>
-                      <p className="text-muted-foreground text-xs">
-                        {format(new Date(job.scheduledStart), "PPP")}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {job.actualStart && (
-                  <div className="flex gap-2 text-sm">
-                    <div className="h-2 w-2 rounded-full bg-green-500 mt-1.5 shrink-0" />
-                    <div>
-                      <p>Work started</p>
-                      <p className="text-muted-foreground text-xs">
-                        {format(new Date(job.actualStart), "PPP")}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {job.actualEnd && (
-                  <div className="flex gap-2 text-sm">
-                    <div className="h-2 w-2 rounded-full bg-green-600 mt-1.5 shrink-0" />
-                    <div>
-                      <p>Work completed</p>
-                      <p className="text-muted-foreground text-xs">
-                        {format(new Date(job.actualEnd), "PPP")}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
-          {/* Metadata Card */}
-          <Card data-testid="card-metadata">
-            <CardHeader className="pb-3">
-              <CardTitle>Metadata</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Created</span>
-                <span data-testid="text-created-at">
-                  {format(new Date(job.createdAt), "PP")}
-                </span>
-              </div>
-              {job.updatedAt && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Updated</span>
-                  <span data-testid="text-updated-at">
-                    {format(new Date(job.updatedAt), "PP")}
-                  </span>
+          {/* Metadata - Collapsible, closed by default */}
+          <Collapsible open={metadataOpen} onOpenChange={setMetadataOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-metadata">
+                  <span className="text-sm font-semibold">Metadata</span>
+                  {metadataOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t px-4 pb-4 pt-3 space-y-1 text-xs">
+                  <div>
+                    <span className="font-medium">Created:</span>{" "}
+                    <span data-testid="text-created-at">{format(new Date(job.createdAt), "PP")}</span>
+                  </div>
+                  {job.updatedAt && (
+                    <div>
+                      <span className="font-medium">Updated:</span>{" "}
+                      <span data-testid="text-updated-at">{format(new Date(job.updatedAt), "PP")}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-medium">Job ID:</span>{" "}
+                    <span className="font-mono" data-testid="text-job-id">{job.id.slice(0, 8)}</span>
+                  </div>
                 </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Job ID</span>
-                <span className="font-mono text-xs" data-testid="text-job-id">
-                  {job.id.slice(0, 8)}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         </div>
       </div>
 
