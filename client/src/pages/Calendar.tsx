@@ -1216,10 +1216,13 @@ export default function Calendar() {
       return { hour: i, display: ampm };
     });
 
+    const gridCols = "grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]";
+    
     return (
-      <div className="flex flex-col h-full min-h-0 max-h-full">
-        <div className="grid grid-cols-[auto_repeat(7,1fr)] sticky top-0 bg-background z-10 border-b flex-shrink-0" style={{ marginRight: 'var(--scrollbar-width, 0px)' }}>
-          <div className="w-14 px-1.5 py-2 border-r flex items-center justify-center"></div>
+      <div ref={weeklyScrollContainerRef} className="overflow-y-auto flex-1 min-h-0 max-h-full">
+        {/* Header Row - Sticky at top */}
+        <div className={`grid ${gridCols} sticky top-0 bg-background z-30 border-b`}>
+          <div className="px-1.5 py-2 border-r flex items-center justify-center"></div>
           {weekDaysData.map((d) => {
             const isToday = d.date.toDateString() === new Date().toDateString();
             return (
@@ -1232,13 +1235,12 @@ export default function Calendar() {
           })}
         </div>
 
-        {/* All Day Slot - Pinned outside scrollable area */}
-        <div className="grid grid-cols-[auto_repeat(7,1fr)] border-b bg-primary/5 flex-shrink-0" style={{ marginRight: 'var(--scrollbar-width, 0px)' }}>
-          <div className="w-14 px-1.5 py-1 text-[10px] font-semibold border-r sticky left-0 z-20 bg-primary/10 flex items-center">
+        {/* All Day Slot - Sticky below header */}
+        <div className={`grid ${gridCols} sticky top-[41px] bg-primary/5 z-20 border-b`}>
+          <div className="px-1.5 py-1 text-[10px] font-semibold border-r bg-primary/10 flex items-center">
             All Day
           </div>
           {weekDaysData.map((dayData) => {
-            // Only show assignments without a scheduled hour (all-day events)
             const allDayAssignments = dayData.dayAssignments.filter((a: any) => a.scheduledHour === null || a.scheduledHour === undefined);
             const slotKey = `${dayData.dayName}-${dayData.dayNumber}`;
             const isExpanded = expandedAllDaySlots.has(slotKey);
@@ -1302,19 +1304,17 @@ export default function Calendar() {
           })}
         </div>
 
-        {/* Scrollable Hourly Slots */}
-        <div ref={weeklyScrollContainerRef} className="overflow-y-scroll flex-1 min-h-0 max-h-full" style={{ scrollbarWidth: 'auto', overflowX: 'hidden' }}>
-          {hours.map((h) => (
-            <div key={h.hour} className="grid grid-cols-[auto_repeat(7,1fr)] border-b">
-              <div className={`w-14 px-1.5 py-1 text-[10px] font-medium border-r sticky left-0 z-20 flex items-center justify-center ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
-                {h.display}
-              </div>
-              {weekDaysData.map((dayData) => (
-                <HourlyDropZone key={`${dayData.dayName}-${h.hour}`} dayName={dayData.dayName} hour={h.hour} dayNumber={dayData.dayNumber} dayAssignments={dayData.dayAssignments} />
-              ))}
+        {/* Hourly Slots */}
+        {hours.map((h) => (
+          <div key={h.hour} className={`grid ${gridCols} border-b`}>
+            <div className={`px-1.5 py-1 text-[10px] font-medium border-r flex items-center justify-center ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
+              {h.display}
             </div>
-          ))}
-        </div>
+            {weekDaysData.map((dayData) => (
+              <HourlyDropZone key={`${dayData.dayName}-${h.hour}`} dayName={dayData.dayName} hour={h.hour} dayNumber={dayData.dayNumber} dayAssignments={dayData.dayAssignments} />
+            ))}
+          </div>
+        ))}
       </div>
     );
   };
