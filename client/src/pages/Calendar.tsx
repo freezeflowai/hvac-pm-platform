@@ -1219,13 +1219,17 @@ export default function Calendar() {
     return (
       <div className="flex flex-col h-full min-h-0 max-h-full">
         <div className="grid grid-cols-8 sticky top-0 bg-background z-10 border-b flex-shrink-0 pr-[17px]">
-          <div className="px-1.5 py-1 text-[10px] border-r flex items-center justify-center"></div>
-          {weekDaysData.map((d) => (
-            <div key={d.dayName} className="px-1 py-1 text-center border-r text-[10px] font-semibold">
-              <div>{d.dayName}</div>
-              <div className="text-muted-foreground">{d.date.getDate()}</div>
-            </div>
-          ))}
+          <div className="px-1.5 py-2 border-r flex items-center justify-center"></div>
+          {weekDaysData.map((d) => {
+            const isToday = d.date.toDateString() === new Date().toDateString();
+            return (
+              <div key={d.dayName} className="px-1 py-2 text-center border-r">
+                <span className={`text-sm font-medium ${isToday ? 'bg-primary text-primary-foreground px-2 py-0.5 rounded-full' : ''}`}>
+                  {d.dayName} {d.date.getDate()}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         {/* All Day Slot - Pinned outside scrollable area */}
