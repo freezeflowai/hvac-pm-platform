@@ -9,7 +9,7 @@ import { sendInvitationEmail } from "./emailService";
 import { impersonationService } from "./impersonationService";
 import { auditService } from "./auditService";
 import { requirePlatformAdmin, blockImpersonation } from "./impersonationMiddleware";
-import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, insertJobNoteSchema, updateJobNoteSchema, insertClientNoteSchema, updateClientNoteSchema, insertCustomerCompanySchema, updateCustomerCompanySchema, insertInvoiceSchema, updateInvoiceSchema, insertInvoiceLineSchema, updateInvoiceLineSchema, insertJobSchema, updateJobSchema, insertRecurringJobSeriesSchema, insertRecurringJobPhaseSchema, jobStatusEnum, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
+import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, insertJobNoteSchema, updateJobNoteSchema, insertClientNoteSchema, updateClientNoteSchema, insertCustomerCompanySchema, updateCustomerCompanySchema, insertInvoiceSchema, updateInvoiceSchema, insertInvoiceLineSchema, updateInvoiceLineSchema, insertPaymentSchema, insertJobSchema, updateJobSchema, insertRecurringJobSeriesSchema, insertRecurringJobPhaseSchema, jobStatusEnum, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
 import { db } from "./db";
@@ -2814,6 +2814,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Void invoice error:', error);
       res.status(500).json({ error: "Failed to void invoice" });
+    }
+  });
+
+  // Invoice send route
+  app.post("/api/invoices/:id/send", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const invoice = await storage.sendInvoice(req.user!.companyId, id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error('Send invoice error:', error);
+      res.status(500).json({ error: "Failed to send invoice" });
+    }
+  });
+
+  // Create invoice from job
+  app.post("/api/invoices/from-job/:jobId", isAuthenticated, async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const { includeLineItems = true, includeNotes = true } = req.body;
+      const invoice = await storage.createInvoiceFromJob(req.user!.companyId, jobId, {
+        includeLineItems,
+        includeNotes,
+      });
+      res.status(201).json(invoice);
+    } catch (error: any) {
+      console.error('Create invoice from job error:', error);
+      res.status(500).json({ error: error.message || "Failed to create invoice from job" });
+    }
+  });
+
+  // Invoice stats for dashboard
+  app.get("/api/invoices/stats", isAuthenticated, async (req, res) => {
+    try {
+      const stats = await storage.getInvoiceSummaryStats(req.user!.companyId);
+      res.json(stats);
+    } catch (error) {
+      console.error('Get invoice stats error:', error);
+      res.status(500).json({ error: "Failed to get invoice stats" });
+    }
+  });
+
+  // Invoice with filters (for list page)
+  app.get("/api/invoices/list", isAuthenticated, async (req, res) => {
+    try {
+      const { status, clientId, search, from, to } = req.query;
+      const invoices = await storage.getInvoicesWithStats(req.user!.companyId, {
+        status: status as string | undefined,
+        clientId: clientId as string | undefined,
+        search: search as string | undefined,
+        from: from as string | undefined,
+        to: to as string | undefined,
+      });
+      res.json(invoices);
+    } catch (error) {
+      console.error('Get invoices list error:', error);
+      res.status(500).json({ error: "Failed to get invoices list" });
+    }
+  });
+
+  // Invoice payments routes
+  app.get("/api/invoices/:invoiceId/payments", isAuthenticated, async (req, res) => {
+    try {
+      const { invoiceId } = req.params;
+      const invoice = await storage.getInvoice(req.user!.companyId, invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const payments = await storage.getPayments(invoiceId);
+      res.json(payments);
+    } catch (error) {
+      console.error('Get invoice payments error:', error);
+      res.status(500).json({ error: "Failed to get invoice payments" });
+    }
+  });
+
+  app.post("/api/invoices/:invoiceId/payments", isAuthenticated, async (req, res) => {
+    try {
+      const { invoiceId } = req.params;
+      const parseResult = insertPaymentSchema.safeParse({ ...req.body, invoiceId });
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid payment data", details: parseResult.error.flatten() });
+      }
+      const payment = await storage.createPayment(req.user!.companyId, invoiceId, parseResult.data);
+      res.status(201).json(payment);
+    } catch (error: any) {
+      console.error('Create payment error:', error);
+      if (error.message === "Invoice not found") {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      res.status(500).json({ error: error.message || "Failed to create payment" });
+    }
+  });
+
+  app.delete("/api/invoices/:invoiceId/payments/:paymentId", isAuthenticated, async (req, res) => {
+    try {
+      const { invoiceId, paymentId } = req.params;
+      const deleted = await storage.deletePayment(req.user!.companyId, invoiceId, paymentId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Delete payment error:', error);
+      if (error.message === "Invoice not found") {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      res.status(500).json({ error: error.message || "Failed to delete payment" });
     }
   });
 

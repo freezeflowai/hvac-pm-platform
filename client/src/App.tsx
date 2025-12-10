@@ -9,6 +9,8 @@ import Dashboard from "@/pages/Dashboard";
 import Calendar from "@/pages/Calendar";
 import Jobs from "@/pages/Jobs";
 import JobDetailPage from "@/pages/JobDetailPage";
+import InvoicesListPage from "@/pages/InvoicesListPage";
+import InvoiceDetailPage from "@/pages/InvoiceDetailPage";
 import Reports from "@/pages/Reports";
 import Admin from "@/pages/Admin";
 import SupportConsole from "@/pages/SupportConsole";
@@ -78,6 +80,16 @@ function Router() {
       <Route path="/jobs/:id">
         <ProtectedRoute requireAdmin>
           <JobDetailPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/invoices">
+        <ProtectedRoute requireAdmin>
+          <InvoicesListPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/invoices/:id">
+        <ProtectedRoute requireAdmin>
+          <InvoiceDetailPage />
         </ProtectedRoute>
       </Route>
       <Route path="/reports">

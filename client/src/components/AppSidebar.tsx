@@ -11,7 +11,8 @@ import {
   UserCheck,
   ShieldAlert,
   Settings,
-  Package
+  Package,
+  Receipt
 } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -113,6 +114,13 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       href: "/jobs",
       isActive: location === "/jobs" || location.startsWith("/jobs/"),
       testId: "nav-jobs"
+    });
+    menuItems.push({
+      title: "Invoices",
+      icon: Receipt,
+      href: "/invoices",
+      isActive: location === "/invoices" || location.startsWith("/invoices/"),
+      testId: "nav-invoices"
     });
     menuItems.push({
       title: "Clients",

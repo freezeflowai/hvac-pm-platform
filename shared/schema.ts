@@ -508,8 +508,16 @@ export type UpdateClientNote = z.infer<typeof updateClientNoteSchema>;
 export type ClientNote = typeof clientNotes.$inferSelect;
 
 // Invoice statuses
-export const invoiceStatusEnum = ["draft", "sent", "paid", "void", "cancelled"] as const;
+export const invoiceStatusEnum = ["draft", "sent", "viewed", "partial_paid", "paid", "voided"] as const;
 export type InvoiceStatus = typeof invoiceStatusEnum[number];
+
+// Invoice line item types
+export const lineItemTypeEnum = ["service", "material", "fee", "discount"] as const;
+export type LineItemType = typeof lineItemTypeEnum[number];
+
+// Payment methods
+export const paymentMethodEnum = ["cash", "credit", "debit", "e-transfer", "cheque", "other"] as const;
+export type PaymentMethod = typeof paymentMethodEnum[number];
 
 // Invoices table - syncs with QBO Invoices
 // Always belongs to a Location; billing target (Company vs Location) determined by billWithParent flag
@@ -530,6 +538,13 @@ export const invoices = pgTable("invoices", {
   subtotal: text("subtotal").notNull().default("0"),
   taxTotal: text("tax_total").notNull().default("0"),
   total: text("total").notNull().default("0"),
+  amountPaid: text("amount_paid").notNull().default("0"), // Sum of all payments
+  balance: text("balance").notNull().default("0"), // total - amountPaid
+  // Job reference (if created from a job)
+  jobId: varchar("job_id"), // Will be linked after jobs table is defined
+  // Tracking
+  sentAt: timestamp("sent_at"), // When invoice was sent to client
+  viewedAt: timestamp("viewed_at"), // When client viewed the invoice
   // Notes
   notesInternal: text("notes_internal"), // Not sent to QBO
   notesCustomer: text("notes_customer"), // Maps to QBO CustomerMemo
@@ -566,6 +581,11 @@ export const updateInvoiceSchema = z.object({
   subtotal: z.string().optional(),
   taxTotal: z.string().optional(),
   total: z.string().optional(),
+  amountPaid: z.string().optional(),
+  balance: z.string().optional(),
+  jobId: z.string().nullable().optional(),
+  sentAt: z.date().nullable().optional(),
+  viewedAt: z.date().nullable().optional(),
   notesInternal: z.string().nullable().optional(),
   notesCustomer: z.string().nullable().optional(),
   qboInvoiceId: z.string().nullable().optional(),
@@ -584,11 +604,17 @@ export const invoiceLines = pgTable("invoice_lines", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   invoiceId: varchar("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
   lineNumber: integer("line_number").notNull(), // Ordering
+  lineItemType: text("line_item_type").notNull().default("service"), // service, material, fee, discount
   description: text("description").notNull(),
+  date: date("date"), // Optional date for the line item
+  technicianId: varchar("technician_id"), // Optional technician reference
   quantity: text("quantity").notNull().default("1"), // Stored as text for decimal precision
   unitPrice: text("unit_price").notNull().default("0"), // Stored as text for decimal precision
+  taxRate: text("tax_rate").notNull().default("0"), // Tax rate as decimal (e.g., "0.13" for 13%)
   lineSubtotal: text("line_subtotal").notNull().default("0"), // quantity * unitPrice
   taxCode: text("tax_code"), // Tax code name/identifier
+  // Job reference (if converted from job)
+  jobLineItemId: varchar("job_line_item_id"), // Reference to original job part
   // QBO mapping fields
   qboItemRefId: text("qbo_item_ref_id"), // Maps to QBO ItemRef (product/service)
   qboTaxCodeRefId: text("qbo_tax_code_ref_id"), // Maps to QBO TaxCodeRef
@@ -603,15 +629,22 @@ export const insertInvoiceLineSchema = createInsertSchema(invoiceLines).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  lineItemType: z.enum(lineItemTypeEnum).default("service"),
 });
 
 export const updateInvoiceLineSchema = z.object({
   lineNumber: z.number().int().optional(),
+  lineItemType: z.enum(lineItemTypeEnum).optional(),
   description: z.string().optional(),
+  date: z.string().nullable().optional(),
+  technicianId: z.string().nullable().optional(),
   quantity: z.string().optional(),
   unitPrice: z.string().optional(),
+  taxRate: z.string().optional(),
   lineSubtotal: z.string().optional(),
   taxCode: z.string().nullable().optional(),
+  jobLineItemId: z.string().nullable().optional(),
   qboItemRefId: z.string().nullable().optional(),
   qboTaxCodeRefId: z.string().nullable().optional(),
   metadata: z.string().nullable().optional(),
@@ -620,6 +653,38 @@ export const updateInvoiceLineSchema = z.object({
 export type InsertInvoiceLine = z.infer<typeof insertInvoiceLineSchema>;
 export type UpdateInvoiceLine = z.infer<typeof updateInvoiceLineSchema>;
 export type InvoiceLine = typeof invoiceLines.$inferSelect;
+
+// Payments table - tracks payments against invoices
+export const payments = pgTable("payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  amount: text("amount").notNull(), // Stored as text for decimal precision
+  method: text("method").notNull().default("other"), // cash, credit, debit, e-transfer, cheque, other
+  reference: text("reference"), // Transaction ID, cheque number, etc.
+  receivedAt: timestamp("received_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertPaymentSchema = createInsertSchema(payments).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  method: z.enum(paymentMethodEnum).default("other"),
+  receivedAt: z.string().optional(), // Accept string for date input
+});
+
+export const updatePaymentSchema = z.object({
+  amount: z.string().optional(),
+  method: z.enum(paymentMethodEnum).optional(),
+  reference: z.string().nullable().optional(),
+  receivedAt: z.string().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type UpdatePayment = z.infer<typeof updatePaymentSchema>;
+export type Payment = typeof payments.$inferSelect;
 
 // ============================================
 // JOBS SYSTEM

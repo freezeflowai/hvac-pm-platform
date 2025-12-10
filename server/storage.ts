@@ -60,9 +60,13 @@ import {
   type TechnicianProfile,
   type WorkingHours,
   type UserPermissionOverride,
+  type Payment,
+  type InsertPayment,
+  type UpdatePayment,
   customerCompanies,
   invoices,
   invoiceLines,
+  payments,
   jobs,
   recurringJobSeries,
   recurringJobPhases,
@@ -4196,7 +4200,7 @@ export class DbStorage implements IStorage {
   }
 
   async voidInvoice(companyId: string, id: string): Promise<Invoice | undefined> {
-    return this.updateInvoice(companyId, id, { status: "void", isActive: false });
+    return this.updateInvoice(companyId, id, { status: "voided", isActive: false });
   }
 
   // Invoice Line methods
@@ -4279,6 +4283,339 @@ export class DbStorage implements IStorage {
     }
 
     return { invoice, lines, location, customerCompany };
+  }
+
+  // Payment methods
+  async getPayments(invoiceId: string): Promise<Payment[]> {
+    return db.select()
+      .from(payments)
+      .where(eq(payments.invoiceId, invoiceId))
+      .orderBy(desc(payments.receivedAt));
+  }
+
+  async getPayment(invoiceId: string, id: string): Promise<Payment | undefined> {
+    const result = await db.select()
+      .from(payments)
+      .where(and(eq(payments.id, id), eq(payments.invoiceId, invoiceId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createPayment(companyId: string, invoiceId: string, data: InsertPayment): Promise<Payment> {
+    // Verify invoice belongs to company
+    const invoice = await this.getInvoice(companyId, invoiceId);
+    if (!invoice) throw new Error("Invoice not found");
+    
+    const result = await db.insert(payments).values({
+      invoiceId,
+      amount: data.amount,
+      method: data.method || "other",
+      reference: data.reference || null,
+      receivedAt: data.receivedAt ? new Date(data.receivedAt) : new Date(),
+      notes: data.notes || null,
+    }).returning();
+    
+    // Update invoice amountPaid and balance
+    const allPayments = await this.getPayments(invoiceId);
+    const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    const invoiceTotal = parseFloat(invoice.total);
+    const newBalance = invoiceTotal - totalPaid;
+    
+    // Determine new status
+    let newStatus = invoice.status;
+    if (newBalance <= 0) {
+      newStatus = "paid";
+    } else if (totalPaid > 0) {
+      newStatus = "partial_paid";
+    }
+    
+    await this.updateInvoice(companyId, invoiceId, {
+      amountPaid: totalPaid.toFixed(2),
+      balance: newBalance.toFixed(2),
+      status: newStatus as any,
+    });
+    
+    return result[0];
+  }
+
+  async updatePayment(companyId: string, invoiceId: string, id: string, data: UpdatePayment): Promise<Payment | undefined> {
+    // Verify invoice belongs to company
+    const invoice = await this.getInvoice(companyId, invoiceId);
+    if (!invoice) throw new Error("Invoice not found");
+    
+    const updates: Partial<Payment> = {};
+    if (data.amount !== undefined) updates.amount = data.amount;
+    if (data.method !== undefined) updates.method = data.method;
+    if (data.reference !== undefined) updates.reference = data.reference;
+    if (data.receivedAt !== undefined) updates.receivedAt = new Date(data.receivedAt);
+    if (data.notes !== undefined) updates.notes = data.notes;
+
+    const result = await db.update(payments)
+      .set(updates)
+      .where(and(eq(payments.id, id), eq(payments.invoiceId, invoiceId)))
+      .returning();
+    
+    // Recalculate invoice totals
+    if (result.length > 0) {
+      const allPayments = await this.getPayments(invoiceId);
+      const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      const invoiceTotal = parseFloat(invoice.total);
+      const newBalance = invoiceTotal - totalPaid;
+      
+      let newStatus = invoice.status;
+      if (newBalance <= 0) {
+        newStatus = "paid";
+      } else if (totalPaid > 0) {
+        newStatus = "partial_paid";
+      }
+      
+      await this.updateInvoice(companyId, invoiceId, {
+        amountPaid: totalPaid.toFixed(2),
+        balance: newBalance.toFixed(2),
+        status: newStatus as any,
+      });
+    }
+    
+    return result[0];
+  }
+
+  async deletePayment(companyId: string, invoiceId: string, id: string): Promise<boolean> {
+    // Verify invoice belongs to company
+    const invoice = await this.getInvoice(companyId, invoiceId);
+    if (!invoice) throw new Error("Invoice not found");
+    
+    const result = await db.delete(payments)
+      .where(and(eq(payments.id, id), eq(payments.invoiceId, invoiceId)))
+      .returning();
+    
+    // Recalculate invoice totals
+    if (result.length > 0) {
+      const allPayments = await this.getPayments(invoiceId);
+      const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      const invoiceTotal = parseFloat(invoice.total);
+      const newBalance = invoiceTotal - totalPaid;
+      
+      let newStatus: string = invoice.status;
+      if (newBalance >= invoiceTotal) {
+        newStatus = invoice.sentAt ? "sent" : "draft";
+      } else if (newBalance > 0 && totalPaid > 0) {
+        newStatus = "partial_paid";
+      }
+      
+      await this.updateInvoice(companyId, invoiceId, {
+        amountPaid: totalPaid.toFixed(2),
+        balance: newBalance.toFixed(2),
+        status: newStatus as any,
+      });
+    }
+    
+    return result.length > 0;
+  }
+
+  // Get invoices with statistics for list view
+  async getInvoicesWithStats(companyId: string, filters?: {
+    status?: string;
+    clientId?: string;
+    search?: string;
+    from?: string;
+    to?: string;
+  }): Promise<(Invoice & { locationName?: string; customerCompanyName?: string })[]> {
+    const conditions = [eq(invoices.companyId, companyId), eq(invoices.isActive, true)];
+    
+    if (filters?.status) {
+      conditions.push(eq(invoices.status, filters.status));
+    }
+    if (filters?.clientId) {
+      conditions.push(eq(invoices.locationId, filters.clientId));
+    }
+    if (filters?.from) {
+      conditions.push(sql`${invoices.issueDate} >= ${filters.from}`);
+    }
+    if (filters?.to) {
+      conditions.push(sql`${invoices.issueDate} <= ${filters.to}`);
+    }
+    if (filters?.search) {
+      const searchTerm = `%${filters.search.toLowerCase()}%`;
+      conditions.push(
+        sql`(LOWER(${invoices.invoiceNumber}) LIKE ${searchTerm})`
+      );
+    }
+    
+    const result = await db.select()
+      .from(invoices)
+      .where(and(...conditions))
+      .orderBy(desc(invoices.createdAt));
+    
+    // Enrich with location and customer company names
+    const enriched = await Promise.all(result.map(async (inv) => {
+      const location = await this.getClient(companyId, inv.locationId);
+      let customerCompanyName: string | undefined;
+      if (inv.customerCompanyId) {
+        const cc = await this.getCustomerCompany(companyId, inv.customerCompanyId);
+        customerCompanyName = cc?.name;
+      }
+      return {
+        ...inv,
+        locationName: location?.companyName,
+        customerCompanyName,
+      };
+    }));
+    
+    return enriched;
+  }
+
+  // Get invoice summary stats
+  async getInvoiceSummaryStats(companyId: string): Promise<{
+    outstanding: { amount: number; count: number };
+    issuedLast30Days: { count: number };
+    averageInvoice: number;
+    overdue: { amount: number; count: number };
+  }> {
+    const allInvoices = await db.select()
+      .from(invoices)
+      .where(and(eq(invoices.companyId, companyId), eq(invoices.isActive, true)));
+    
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    let outstandingAmount = 0;
+    let outstandingCount = 0;
+    let overdueAmount = 0;
+    let overdueCount = 0;
+    let issuedLast30Count = 0;
+    let totalAmount = 0;
+    
+    for (const inv of allInvoices) {
+      const balance = parseFloat(inv.balance);
+      const total = parseFloat(inv.total);
+      
+      // Outstanding (unpaid balance)
+      if (balance > 0 && inv.status !== "voided") {
+        outstandingAmount += balance;
+        outstandingCount++;
+        
+        // Overdue
+        if (inv.dueDate && new Date(inv.dueDate) < today) {
+          overdueAmount += balance;
+          overdueCount++;
+        }
+      }
+      
+      // Issued in last 30 days
+      if (new Date(inv.issueDate) >= thirtyDaysAgo) {
+        issuedLast30Count++;
+      }
+      
+      // Total for average
+      if (inv.status !== "voided") {
+        totalAmount += total;
+      }
+    }
+    
+    const nonVoidedCount = allInvoices.filter(i => i.status !== "voided").length;
+    
+    return {
+      outstanding: { amount: outstandingAmount, count: outstandingCount },
+      issuedLast30Days: { count: issuedLast30Count },
+      averageInvoice: nonVoidedCount > 0 ? totalAmount / nonVoidedCount : 0,
+      overdue: { amount: overdueAmount, count: overdueCount },
+    };
+  }
+
+  // Create invoice from job
+  async createInvoiceFromJob(companyId: string, jobId: string, options?: {
+    includeLineItems?: boolean;
+    includeNotes?: boolean;
+  }): Promise<Invoice> {
+    const job = await this.getJob(companyId, jobId);
+    if (!job) throw new Error("Job not found");
+    
+    const location = await this.getClient(companyId, job.locationId);
+    if (!location) throw new Error("Location not found");
+    
+    // Get next invoice number
+    const counter = await db.select().from(companyCounters).where(eq(companyCounters.companyId, companyId)).limit(1);
+    let nextInvoiceNumber = 1001;
+    if (counter.length > 0) {
+      nextInvoiceNumber = (counter[0].nextJobNumber || 1000) + 1000; // Offset from job numbers
+    }
+    
+    const today = new Date();
+    const dueDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000); // Net 30
+    
+    // Create the invoice
+    const invoiceData: InsertInvoice = {
+      locationId: job.locationId,
+      customerCompanyId: location.parentCompanyId || null,
+      invoiceNumber: `INV-${nextInvoiceNumber}`,
+      status: "draft",
+      issueDate: today.toISOString().split('T')[0],
+      dueDate: dueDate.toISOString().split('T')[0],
+      currency: "CAD",
+      subtotal: "0",
+      taxTotal: "0",
+      total: "0",
+      notesInternal: options?.includeNotes ? job.description || null : null,
+    };
+    
+    const invoice = await this.createInvoice(companyId, invoiceData);
+    
+    // Link job to invoice
+    await this.updateJob(companyId, jobId, { invoiceId: invoice.id });
+    
+    // Update invoice with jobId reference
+    await this.updateInvoice(companyId, invoice.id, { jobId: jobId });
+    
+    // Copy job parts as invoice line items
+    if (options?.includeLineItems !== false) {
+      const jobParts = await this.getJobParts(jobId);
+      let lineNumber = 1;
+      let subtotal = 0;
+      
+      for (const part of jobParts) {
+        const qty = parseFloat(part.quantity);
+        const price = parseFloat(part.unitPrice || "0");
+        const lineTotal = qty * price;
+        subtotal += lineTotal;
+        
+        await this.createInvoiceLine({
+          invoiceId: invoice.id,
+          lineNumber: lineNumber++,
+          lineItemType: "material",
+          description: part.description,
+          quantity: part.quantity,
+          unitPrice: part.unitPrice || "0",
+          taxRate: "0.13", // Default 13% HST
+          lineSubtotal: lineTotal.toFixed(2),
+          jobLineItemId: part.id,
+        });
+      }
+      
+      // Update invoice totals
+      const taxTotal = subtotal * 0.13;
+      const total = subtotal + taxTotal;
+      
+      await this.updateInvoice(companyId, invoice.id, {
+        subtotal: subtotal.toFixed(2),
+        taxTotal: taxTotal.toFixed(2),
+        total: total.toFixed(2),
+        balance: total.toFixed(2),
+      });
+    }
+    
+    // Return updated invoice
+    return (await this.getInvoice(companyId, invoice.id))!;
+  }
+
+  // Send invoice
+  async sendInvoice(companyId: string, id: string): Promise<Invoice | undefined> {
+    const invoice = await this.getInvoice(companyId, id);
+    if (!invoice) return undefined;
+    
+    return this.updateInvoice(companyId, id, {
+      status: "sent",
+      sentAt: new Date(),
+    });
   }
 
   // Jobs methods

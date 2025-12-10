@@ -416,6 +416,7 @@ export default function JobDetailPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCreateInvoiceDialog, setShowCreateInvoiceDialog] = useState(false);
   const [showAssignTech, setShowAssignTech] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [techsOpen, setTechsOpen] = useState(false);
@@ -474,6 +475,32 @@ export default function JobDetailPage() {
     },
   });
 
+  const createInvoiceMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/invoices/from-job/${jobId}`, {
+        includeLineItems: true,
+        includeNotes: true,
+      });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices/list"] });
+      toast({
+        title: "Invoice Created",
+        description: "Invoice has been created from this job.",
+      });
+      setShowCreateInvoiceDialog(false);
+      setLocation(`/invoices/${data.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create invoice",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleStatusChange = (newStatus: string) => {
     updateStatusMutation.mutate(newStatus);
   };
@@ -481,6 +508,10 @@ export default function JobDetailPage() {
   const handleDelete = () => {
     deleteJobMutation.mutate();
     setShowDeleteConfirm(false);
+  };
+
+  const handleCreateInvoice = () => {
+    createInvoiceMutation.mutate();
   };
 
 
@@ -582,6 +613,17 @@ export default function JobDetailPage() {
             >
               Delete
             </Button>
+            {job.status === "completed" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCreateInvoiceDialog(true)}
+                data-testid="button-create-invoice"
+              >
+                <Receipt className="h-4 w-4 mr-1" />
+                Create Invoice
+              </Button>
+            )}
           </div>
         </div>
 
@@ -980,6 +1022,37 @@ export default function JobDetailPage() {
           queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId] });
         }}
       />
+
+      <Dialog open={showCreateInvoiceDialog} onOpenChange={setShowCreateInvoiceDialog}>
+        <DialogContent data-testid="dialog-create-invoice">
+          <DialogHeader>
+            <DialogTitle>Create Invoice from Job</DialogTitle>
+            <DialogDescription>
+              This will create a new invoice with line items from this job's parts and billing.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Job: #{job.jobNumber} - {job.summary || "No summary"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Client: {job.parentCompany?.name || job.location?.companyName || "Unknown"}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateInvoiceDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateInvoice}
+              disabled={createInvoiceMutation.isPending}
+              data-testid="button-confirm-create-invoice"
+            >
+              {createInvoiceMutation.isPending ? "Creating..." : "Create Invoice"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

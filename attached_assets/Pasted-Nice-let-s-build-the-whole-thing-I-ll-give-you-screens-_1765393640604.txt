@@ -1,0 +1,777 @@
+Nice, let’s build the whole thing. I’ll give you screens, workflows, data model, API contract, UI mockups, and a full Replit prompt you can paste straight in.
+
+1️⃣ Screens & UX Overview
+
+You’ll end up with these main pieces:
+
+Invoices List
+
+Route: /invoices
+
+Same overall layout style as Jobs list (filters + table).
+
+Shows your summary cards at the top + searchable, filterable table.
+
+Optional “Compact rows” toggle.
+
+Invoice Detail / Edit Page
+
+Route: /invoices/:invoiceId
+
+View + “Edit” mode in the same layout.
+
+Left: client & invoice meta.
+
+Center: line items table.
+
+Bottom: internal notes & attachments.
+
+Convert Job → Invoice Flow
+
+From Job row (if status = Completed): “Create Invoice” button.
+
+From Job detail: big “Create Invoice” button.
+
+Converts job fields & line items into a draft invoice.
+
+Opens invoice in “Edit draft” mode.
+
+New Invoice (standalone)
+
+“New Invoice” button from the Invoices list.
+
+Same UI as “Edit Invoice from Job”, but with empty client & line items.
+
+2️⃣ Key Workflows (Text Diagrams)
+A. Job Completion → Invoice
+
+Flow:
+
+Tech / dispatcher marks a job as Completed.
+
+System shows a modal:
+
+Close job only
+
+Create invoice from this job
+
+Close job & create invoice (recommended default)
+
+If “Create invoice…”:
+
+Backend: POST /invoices/from-job/:jobId
+
+Creates invoice with:
+
+client, property, contact
+
+job reference
+
+services & materials from job line items
+
+internal notes copied from job (flagged as “from job”)
+
+Redirect to /invoices/:invoiceId?mode=edit.
+
+User reviews invoice, adjusts quantities, adds any charges, then:
+
+Save as Draft
+
+Save & Send
+
+Save & Mark Paid (for phone payments)
+
+B. Standalone Invoice Creation
+
+User clicks New Invoice on /invoices.
+
+Opens /invoices/new with:
+
+Client selector (search existing client or “New Client”).
+
+Property selector.
+
+Empty line items table.
+
+On save → POST /invoices.
+
+C. Invoice Lifecycle
+
+Statuses (enum):
+
+draft → sent → viewed → partial_paid → paid → voided
+
+Overdue is derived: dueDate < today && balance > 0.
+
+Timeline events per invoice:
+
+Created
+
+Sent to client
+
+Email opened
+
+Payment received (with amounts)
+
+You can show this as a simple vertical timeline on the detail page.
+
+3️⃣ Data Model (Core Entities)
+
+Use this as your reference schema (Prisma-style pseudo-code):
+
+model Invoice {
+  id              string   @id @default(uuid())
+  number          string   // human readable: 100234, INV-2025-0012
+  clientId        string
+  propertyId      string?
+  jobId           string?  // original job, if converted
+
+  status          InvoiceStatus  // 'draft' | 'sent' | 'viewed' | 'partial_paid' | 'paid' | 'voided'
+  issueDate       DateTime
+  dueDate         DateTime
+  currency        string         // 'CAD', etc.
+
+  subtotal        Decimal        // sum of line items before tax
+  taxTotal        Decimal
+  total           Decimal        // subtotal + tax
+  amountPaid      Decimal        // sum of payments
+  balance         Decimal        // total - amountPaid
+
+  notesPublic     string?        // optional message to client
+  notesInternal   string?        // for office only
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  lineItems       InvoiceLineItem[]
+  payments        Payment[]
+}
+
+model InvoiceLineItem {
+  id            string   @id @default(uuid())
+  invoiceId     string
+  jobLineItemId string?  // back-reference to job line item if converted
+
+  type          LineItemType // 'service' | 'material' | 'fee' | 'discount'
+  description   string
+  date          DateTime?
+  technicianId  string?
+  quantity      Decimal      @default(1)
+  unitPrice     Decimal
+  taxRate       Decimal      @default(0) // e.g. 0.13 for 13% HST
+  total         Decimal      // quantity * unitPrice (optionally including tax)
+
+  sortOrder     Int          @default(0)
+}
+
+model Payment {
+  id         string   @id @default(uuid())
+  invoiceId  string
+  amount     Decimal
+  method     string   // 'cash', 'credit', 'e-transfer', etc.
+  reference  string?  // transaction ID, cheque #, etc.
+  receivedAt DateTime @default(now())
+  notes      string?
+
+  createdAt  DateTime @default(now())
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  viewed
+  partial_paid
+  paid
+  voided
+}
+
+enum LineItemType {
+  service
+  material
+  fee
+  discount
+}
+
+
+Jobs model only needs a status & optional invoiceId/invoiceIds link.
+
+4️⃣ Backend API Contract (REST-style)
+
+You can adapt this to whatever you’re using (Express, Nest, etc.).
+
+Invoices
+
+GET /api/invoices
+
+Query params: status, clientId, search, from, to, page, pageSize.
+
+Returns { data: Invoice[], meta: { total, page, pageSize } }.
+
+GET /api/invoices/:id
+
+Returns full invoice with lineItems, payments, client, property, job.
+
+POST /api/invoices
+
+Body: invoice payload (without id).
+
+Creates standalone invoice.
+
+POST /api/invoices/from-job/:jobId
+
+Uses the job’s data to pre-populate invoice.
+
+Optional body override: { issueDate?, dueDate?, status? }.
+
+PUT /api/invoices/:id
+
+Update basic fields, line items, notes.
+
+POST /api/invoices/:id/send
+
+Marks status as sent, triggers email (later).
+
+POST /api/invoices/:id/payments
+
+Adds a payment record & updates amountPaid, balance, status.
+
+DELETE /api/invoices/:id
+
+Soft delete or mark as voided.
+
+5️⃣ UI Mockups (Text Spec)
+A. Invoices List /invoices
+
+Header row (matches Jobs):
+
+Title: Invoices
+
+Right side:
+
+New Invoice primary button
+
+Optional “More Actions” dropdown (Export CSV, etc.)
+
+Summary cards (row of 3–4 cards):
+
+Outstanding
+
+Amount & count.
+
+Issued (30 days)
+
+Count + trend arrow.
+
+Average invoice
+
+Invoice payment time (can be hidden on small accounts).
+
+Filters bar (single row):
+
+Search: "Search by client, invoice #, subject"
+
+Status dropdown: All / Draft / Sent / Overdue / Paid / Partially paid / Voided
+
+Date range: Issue date
+
+Compact toggle: [ ] Compact rows
+
+Table columns:
+
+Client
+
+Invoice #
+
+Issue date
+
+Due date
+
+Status badge
+
+Total
+
+Balance
+
+“⋮” actions menu (view, edit, send, mark paid, download).
+
+B. Invoice Detail /invoices/:id
+
+Layout: 2-column with sticky header.
+
+Sticky top bar:
+Left: Back to Invoices ← | Invoice # ####
+Right: Status badge (e.g. Past due) + buttons:
+
+Collect Payment
+
+Edit (if not paid/voided)
+
+More… (Duplicate, Download PDF, Void)
+
+Left column (about 40% width) – “Overview Panel”
+
+Sections:
+
+Client Block
+
+Client name
+
+Billing address
+
+Property (drop-down if multiple sites)
+
+Contact name, phone, email
+
+Invoice Details Block
+
+Issue date
+
+Due date (highlight red if overdue)
+
+Linked Job (clickable)
+
+Salesperson (optional, dropdown)
+
+Summary Block
+
+Subtotal
+
+Tax
+
+Total
+
+Amount paid
+
+Balance
+
+Timeline (Activity)
+
+Created (date/time)
+
+Sent
+
+Viewed
+
+Payment received events
+
+Right column (60% width) – “Line Items + Notes”
+
+Line Items Table
+
+Row per item:
+
+Drag handle (for sorting)
+
+Description (multi-line input in edit)
+
+Date (optional)
+
+Technician (optional dropdown)
+
+Qty
+
+Rate
+
+Total
+
+Footer showing totals:
+
+Subtotal
+
+Tax
+
+Total
+
+Public Notes (to client)
+
+Internal Notes & Attachments
+
+Text area for internal notes.
+
+File dropzone.
+
+Show thumbnails of photos (pulled from job + invoice attachments).
+
+C. Convert Job → Invoice (Modal Spec)
+
+When a Job transitions to Completed:
+
+Modal: “Wrap up this job”
+
+Title: Job Completed – What’s next?
+
+Options (radio):
+
+Close job only (no invoice)
+
+Create invoice from this job
+
+Close job and create invoice (pre-selected)
+
+Extra toggles:
+
+[x] Include job line items
+
+[x] Include job notes as internal notes
+
+[ ] Include attachments from job
+
+Buttons: Cancel | Continue
+
+On continue → call /api/invoices/from-job/:jobId and redirect.
+
+6️⃣ Replit Prompt (Copy-Paste)
+
+Here’s the big one you can paste directly into Replit’s AI:
+
+4️⃣ Replit Prompt (Copy-Paste)
+
+You are an expert full-stack engineer. Extend our existing service management app with an Invoices module and job → invoice conversion, following this spec.
+
+1. Context
+
+We have a web app for an HVAC / service company with:
+
+Global layout with left sidebar: Dashboard, Jobs, Clients, Calendar, Reports, Settings, etc.
+
+A Jobs module already exists (list + detail).
+
+A Team Management / working hours module also exists.
+
+We now want to add a full Invoices module that:
+
+Uses the same visual style and table layout as the Jobs list for consistency.
+
+Allows creating standalone invoices, and converting a completed job directly into an invoice.
+
+Has a clean, modern UI (React + TypeScript + Tailwind recommended).
+
+Uses a Node/Express backend (or equivalent) with a simple REST API and a relational DB (Prisma/postgres style schema is fine).
+
+If you need to stub backend calls, create a simple in-memory or mock service but keep the API shape realistic.
+
+2. Data Model
+
+Implement these core entities (Prisma-like pseudo schema; adapt to your ORM):
+
+model Invoice {
+  id              string   @id @default(uuid())
+  number          string
+  clientId        string
+  propertyId      string?
+  jobId           string?
+  status          InvoiceStatus
+  issueDate       Date
+  dueDate         Date
+  currency        string
+
+  subtotal        number
+  taxTotal        number
+  total           number
+  amountPaid      number
+  balance         number
+
+  notesPublic     string?
+  notesInternal   string?
+
+  createdAt       Date
+  updatedAt       Date
+}
+
+model InvoiceLineItem {
+  id            string   @id @default(uuid())
+  invoiceId     string
+  jobLineItemId string?
+
+  type          LineItemType
+  description   string
+  date          Date?
+  technicianId  string?
+  quantity      number
+  unitPrice     number
+  taxRate       number
+  total         number
+  sortOrder     number
+}
+
+model Payment {
+  id         string   @id @default(uuid())
+  invoiceId  string
+  amount     number
+  method     string
+  reference  string?
+  receivedAt Date
+  notes      string?
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  viewed
+  partial_paid
+  paid
+  voided
+}
+
+enum LineItemType {
+  service
+  material
+  fee
+  discount
+}
+
+
+Assume there is already a Job model with at least:
+
+model Job {
+  id          string
+  clientId    string
+  propertyId  string?
+  status      string   // 'scheduled', 'in_progress', 'completed', etc.
+  // line items, notes, attachments, etc...
+}
+
+
+Add job.invoiceId or an association so invoices can link back to jobs.
+
+3. Backend: API Endpoints
+
+Implement these REST endpoints under /api/invoices:
+
+GET /api/invoices
+
+Query params: status, clientId, search, from, to, page, pageSize.
+
+Return list with pagination metadata.
+
+GET /api/invoices/:id
+
+Return full invoice, including lineItems, payments, client, property, job.
+
+POST /api/invoices
+
+Create a standalone invoice with given client, dates, line items, etc.
+
+PUT /api/invoices/:id
+
+Update invoice header fields + line items.
+
+DELETE /api/invoices/:id
+
+Mark as voided or soft delete. Don’t hard delete by default.
+
+POST /api/invoices/:id/send
+
+Update status to sent and set a sentAt timestamp (email details can be mocked).
+
+POST /api/invoices/:id/payments
+
+Body: { amount, method, reference?, receivedAt?, notes? }
+
+Create a Payment, update amountPaid, balance, and status:
+
+if balance === 0 → paid
+
+if balance > 0 && amountPaid > 0 → partial_paid.
+
+POST /api/invoices/from-job/:jobId
+
+Reads job data and:
+
+Creates an invoice.
+
+Copies clientId, propertyId, job reference.
+
+Converts job line items into InvoiceLineItem records.
+
+Optionally copies job notes into notesInternal.
+
+Returns created invoice.
+
+Implement simple validation and error handling.
+
+4. Frontend: Routes & Pages
+
+Use React + TypeScript. Add these routes:
+
+/invoices → <InvoiceListPage />
+
+/invoices/new → <InvoiceEditorPage mode="create" />
+
+/invoices/:invoiceId → <InvoiceDetailPage /> (view + edit toggle)
+
+Also extend the Job detail page with:
+
+A “Create Invoice” button when job.status === 'completed' and no invoice exists yet.
+
+A modal that appears when closing a job, with three options:
+
+Close job only
+
+Create invoice from this job
+
+Close job & create invoice (default selected)
+
+Components to implement
+
+InvoiceListPage
+
+Reuse layout components from Jobs (same sidebar/header).
+
+Top row: page title “Invoices” and a New Invoice button.
+
+Under that: summary cards (you can mock the stats):
+
+Outstanding
+
+Issued (30 days)
+
+Average invoice
+
+Payment time
+
+Filters bar:
+
+Search input
+
+Status dropdown
+
+Date range filter
+
+“Compact rows” toggle
+
+Table columns:
+
+Client
+
+Invoice #
+
+Issue date
+
+Due date
+
+Status badge
+
+Total
+
+Balance
+
+“⋮” menu for row actions.
+
+Implement compact mode as a simple Tailwind class change (reduced row height and typography).
+
+InvoiceDetailPage
+
+Layout: two columns (40% left, 60% right) under a sticky top bar.
+
+Sticky header includes:
+
+Back button
+
+Invoice number
+
+Status badge
+
+Buttons: “Collect Payment”, “Edit”, “More…(dropdown)”
+
+Left column: “Overview” panel with:
+
+Client info (name, phone, email, billing address, property address).
+
+Invoice info (issue date, due date, linked job, salesperson).
+
+Summary (subtotal, tax, total, paid, balance).
+
+Timeline component listing key events (created, sent, viewed, payments).
+
+Right column:
+
+Line items table:
+
+Editable rows for description, date, technician, qty, rate, type, total.
+
+Add / remove line items.
+
+Show calculated subtotal, tax, total at bottom.
+
+Public notes (to client).
+
+Internal notes and file attachments block (attachment list mocked is fine).
+
+Support read-only vs edit mode:
+
+Default: read-only.
+
+Clicking “Edit” switches fields to inputs, shows Save / Cancel buttons.
+
+InvoiceEditorPage
+
+Reuse InvoiceDetail layout, but:
+
+For /invoices/new, start with empty client + line items.
+
+For /invoices/:id?edit=true, load existing and start in edit mode.
+
+Job → Invoice conversion UI
+
+In JobDetailPage:
+
+If job is completed and has no invoiceId, show a main button:
+
+“Create Invoice” → calls POST /api/invoices/from-job/:jobId, then navigates to the new invoice page in edit mode.
+
+When changing job status to completed, show a modal:
+
+Radio options:
+
+Close job only
+
+Create invoice from this job
+
+Close job and create invoice (default)
+
+Checkboxes:
+
+Include job line items
+
+Include job notes as internal
+
+Include job attachments
+
+On confirm, call the appropriate endpoint and navigate.
+
+5. Visual & UX Guidelines
+
+Use the same typography, spacing, and border-radius as the existing app (modern, clean).
+
+Keep the Invoices table visually consistent with the Jobs table (same header style, hover, row separators).
+
+Status badges:
+
+draft → neutral
+
+sent → blue
+
+viewed → blue outline
+
+partial_paid → amber
+
+paid → green
+
+voided → gray
+
+Overdue (derived) can show a red outline/badge “Past due”.
+
+Make sure the UI works well on laptop-sized screens; horizontal scrolling should be avoided on the invoices list.
+
+6. Implementation Notes
+
+Encapsulate invoice-related logic in a separate service/module (e.g., invoiceService.ts) on both frontend and backend for easier testing.
+
+On the frontend, use React Query or a similar data-fetching library if available; otherwise implement simple useEffect + fetch with loading / error states.
+
+Include basic form validation for required fields (client, issue date, due date, at least one line item).
+
+Make sure the invoice total, tax, amountPaid, and balance are always in sync with line items and payments (do the math server-side, but also recalc on the client for live preview).
+
+Goal: Deliver a production-ready Invoices module with list, detail, edit, standalone creation, and job→invoice conversion that feels cohesive with the existing Jobs UI.
