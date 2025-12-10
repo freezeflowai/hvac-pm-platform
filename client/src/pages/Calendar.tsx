@@ -345,20 +345,6 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
           ) : null;
         })}
       </div>
-      {assignments.length > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClearDay(day, assignments);
-          }}
-          className="mt-1 h-6 text-xs w-full"
-          data-testid={`button-clear-day-${day}`}
-        >
-          Clear Day
-        </Button>
-      )}
     </div>
   );
 }
@@ -1546,15 +1532,6 @@ export default function Calendar() {
                   </Button>
                 ))}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowClearConfirm(true)}
-                disabled={clearSchedule.isPending || assignments.length === 0}
-                data-testid="button-clear-schedule"
-              >
-                Clear Schedule
-              </Button>
               <div className="flex gap-1 bg-muted/50 p-1 rounded-full">
                 <Button
                   variant={view === "monthly" ? "default" : "ghost"}
@@ -1690,31 +1667,6 @@ export default function Calendar() {
       />
 
 
-
-      <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Clear Schedule for {monthNames[month - 1]} {year}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove all scheduled assignments for {monthNames[month - 1]} and move them back to unscheduled. 
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-clear">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => {
-                clearSchedule.mutate(assignments);
-                setShowClearConfirm(false);
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-clear"
-            >
-              Clear Schedule
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <PartsDialog
         open={partsDialogOpen}
