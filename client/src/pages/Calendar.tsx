@@ -1321,7 +1321,7 @@ export default function Calendar() {
       collisionDetection={customCollisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      autoScroll={{ threshold: { x: 0.2, y: 0.2 } }}
+      autoScroll={false}
     >
       <div className="h-screen bg-background flex flex-col">
         {/* Alert banner for old unscheduled items */}
