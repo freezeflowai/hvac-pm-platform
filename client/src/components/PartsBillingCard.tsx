@@ -81,7 +81,12 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
   });
 
   const { data: catalogData } = useQuery<{ items: Part[] }>({
-    queryKey: ["/api/parts"],
+    queryKey: ["/api/parts", { limit: 1000 }],
+    queryFn: async () => {
+      const res = await fetch("/api/parts?limit=1000", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch catalog");
+      return res.json();
+    },
   });
   const catalogParts = useMemo(() => catalogData?.items || [], [catalogData]);
 
