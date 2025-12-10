@@ -30,15 +30,18 @@ export function PartsDialog({ open, onOpenChange, title, parts, weekDays }: Part
     ? parts 
     : parts.filter(p => p.date === selectedFilter);
 
-  const groupedParts = filteredParts.reduce((acc, part) => {
-    const existing = acc.find(p => p.description === part.description);
-    if (existing) {
-      existing.quantity += part.quantity;
-    } else {
-      acc.push({ ...part });
-    }
-    return acc;
-  }, [] as PartItem[]);
+  // Aggregate parts by description and sort alphabetically
+  const groupedParts = filteredParts
+    .reduce((acc, part) => {
+      const existing = acc.find(p => p.description === part.description);
+      if (existing) {
+        existing.quantity += part.quantity;
+      } else {
+        acc.push({ ...part });
+      }
+      return acc;
+    }, [] as PartItem[])
+    .sort((a, b) => a.description.localeCompare(b.description));
 
   const partsByDate = parts.reduce((acc, part) => {
     if (part.date) {
@@ -59,7 +62,7 @@ export function PartsDialog({ open, onOpenChange, title, parts, weekDays }: Part
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-3xl">
         <button
           onClick={() => handleOpenChange(false)}
           className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
@@ -113,65 +116,24 @@ export function PartsDialog({ open, onOpenChange, title, parts, weekDays }: Part
             {selectedFilter === "week" ? "Week total" : "Day total"}: {totalParts} part{totalParts !== 1 ? 's' : ''}
           </div>
 
-          {selectedFilter === "week" && weekDays && weekDays.length > 0 ? (
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {weekDays.map((day) => {
-                const dateKey = day.date.toISOString().split('T')[0];
-                const dayParts = (partsByDate[dateKey] || []);
-                const groupedDayParts = dayParts.reduce((acc, part) => {
-                  const existing = acc.find(p => p.description === part.description);
-                  if (existing) {
-                    existing.quantity += part.quantity;
-                  } else {
-                    acc.push({ ...part });
-                  }
-                  return acc;
-                }, [] as PartItem[]);
-                
-                if (groupedDayParts.length === 0) return null;
-                
-                return (
-                  <div key={dateKey} className="space-y-1">
-                    <div className="text-xs font-semibold text-muted-foreground">
-                      {day.dayName} {day.date.getDate()}
-                    </div>
-                    <div className="bg-muted/30 rounded-md p-2 space-y-1">
-                      {groupedDayParts.map((part, index) => (
-                        <div 
-                          key={index} 
-                          className="flex justify-between text-sm py-0.5"
-                          data-testid={`part-row-${dateKey}-${index}`}
-                        >
-                          <span className="flex-1">{part.description}</span>
-                          <span className="font-medium ml-4">{part.quantity}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-              {Object.keys(partsByDate).length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No parts scheduled this week</p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-2 bg-muted/30 rounded-md p-3 max-h-96 overflow-y-auto">
-              {groupedParts.length > 0 ? (
-                groupedParts.map((part, index) => (
+          <div className="bg-muted/30 rounded-md p-3 max-h-96 overflow-y-auto">
+            {groupedParts.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1">
+                {groupedParts.map((part, index) => (
                   <div 
                     key={index} 
-                    className="flex justify-between text-sm py-1"
+                    className="flex justify-between text-sm py-0.5"
                     data-testid={`part-row-${index}`}
                   >
-                    <span className="flex-1">{part.description}</span>
-                    <span className="font-medium ml-4">{part.quantity}</span>
+                    <span className="truncate flex-1 mr-2">{part.description}</span>
+                    <span className="font-medium">{part.quantity}</span>
                   </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">No parts scheduled</p>
-              )}
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No parts scheduled</p>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-end pt-2">

@@ -155,18 +155,16 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     opacity: isDragging ? 0.5 : 1,
   };
 
-  // Card styling: left border for technician color, subtle background
-  // For overdue items in calendar: use red left border instead of badge
+  // Card styling: left border for technician color ONLY (not overdue status)
+  // Overdue is always indicated by red dot, not border color
   const getCardStyle = () => {
     const baseStyle = 'bg-card border border-border shadow-sm hover:shadow-md';
     if (!inCalendar) {
-      if (isPastMonth) return `${baseStyle} border-l-4 border-l-red-400`;
-      if (isOffMonth) return `${baseStyle} border-l-4 border-l-muted-foreground/40`;
-      return baseStyle;
+      // Unscheduled drawer: neutral border (no technician assigned), overdue shown as red dot
+      return `${baseStyle} border-l-4 border-l-muted-foreground/40`;
     }
-    // Use technician left border for calendar items (ALWAYS technician color, never red)
+    // Calendar items: technician color on left border, never red
     const completedOpacity = isCompleted ? 'opacity-60' : '';
-    // Left border always shows technician color - overdue is indicated by red dot only
     const leftBorder = technicianColor?.borderLeft || 'border-l-muted-foreground/40';
     return `${baseStyle} border-l-4 ${leftBorder} ${completedOpacity}`;
   };
@@ -714,7 +712,7 @@ export default function Calendar() {
       return apiRequest('PATCH', `/api/calendar/assign/${assignmentId}`, { assignedTechnicianIds: technicianIds });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
       toast({
         title: "Updated",
         description: "Technician assignments updated",
@@ -1408,7 +1406,7 @@ export default function Calendar() {
           </DialogContent>
         </Dialog>
 
-        <main className={`flex flex-col flex-1 min-h-0 w-full px-2 sm:px-3 lg:px-4 py-2 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
+        <main className={`flex flex-col flex-1 min-h-0 w-full py-2 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Button
