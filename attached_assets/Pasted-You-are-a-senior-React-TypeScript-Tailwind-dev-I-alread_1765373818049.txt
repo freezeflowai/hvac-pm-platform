@@ -1,0 +1,172 @@
+You are a senior React + TypeScript + Tailwind dev.
+I already have a working Calendar with weekly view, unscheduled drawer, and a Parts button. I need you to fix some specific UX/layout issues.
+Do not change any core business logic or drag-and-drop behavior.
+
+1. Fix Parts button behavior (week vs individual days)
+
+Right now the Parts button shows parts for the whole week only. I need a clear filter so I can see parts per week or per specific day.
+
+Requirements:
+
+Keep the existing Parts button in the calendar toolbar (near the technicians filter and location filter).
+
+When the user clicks Parts, open a modal (or side panel) with:
+
+Title: Parts for this schedule
+
+A row of filter chips or buttons at the top:
+
+First chip: This Week
+
+Then one chip for each visible day in the current view, e.g. Mon 8, Tue 9, etc.
+
+Behavior:
+
+Default selection should be This Week (current behavior: all visible week jobs).
+
+When This Week is selected, show the full week parts list grouped by date.
+
+When a day chip is selected, show only parts for that specific day.
+
+Reuse the existing parts aggregation logic you already have for the week pills; just scope it by date when a day is selected.
+
+Keep this modal strictly read-only for now; no editing required.
+
+Make sure closing the modal (X button or Close button) resets nothing else in the calendar.
+
+2. Fix All-Day vs time row alignment
+
+The grid is still slightly misaligned: the vertical line between the “All Day” row and the time rows (7 AM, 8 AM, etc.) is not perfectly continuous.
+
+Requirements:
+
+Find the calendar layout where:
+
+The All Day row is rendered.
+
+The time rows (7 AM, 8 AM, …) and day columns are rendered.
+
+Ensure that All Day + all time rows share the exact same grid definition:
+
+They must use the same parent grid container or share the same grid-template-columns class.
+
+There should be no extra ml-*, mr-*, pl-*, or pr-* on either the All Day row or the time rows that shift the columns.
+
+If the All Day row currently has its own wrapper, refactor so that:
+
+There is a single grid container that renders:
+
+Row 0: All Day
+
+Row 1+: each time slot
+
+Or both share a reusable CSS/Tailwind class that guarantees the same grid-template-columns and column gaps.
+
+Visually verify after changes: the vertical borders under each weekday must be perfectly straight from the All Day row down through all time rows.
+
+3. Use full width between sidebar and right edge
+
+The calendar still has large outer gaps. It should behave more like Jobber: the grid nearly touches the content edges.
+
+Requirements:
+
+Find the top-level container wrapping the calendar (not the global sidebar).
+
+Remove or reduce any:
+
+max-w-* constraints that keep it narrow.
+
+Large horizontal mx-* or px-* that create big gutters.
+
+Desired behavior:
+
+The calendar grid should start just after the left sidebar with only a small padding (e.g. px-3 or px-4 on the main content, not big gaps).
+
+The Unscheduled drawer should sit very close to the right viewport edge, again with only minimal padding.
+
+Keep responsiveness:
+
+On smaller screens it’s okay if the calendar scrolls horizontally, but on desktop it should stretch almost full width.
+
+4. Color logic: technician colors vs overdue indicator
+
+Right now I like the red dot and the colored vertical line, but the meanings need to be separated:
+
+Red dot = overdue job
+
+Vertical colored line = technician color (who the job is assigned to)
+
+Also, in the unscheduled drawer the “Nov 25” pill in the top-right is redundant.
+
+Requirements:
+
+4.1 Job cards inside the calendar grid
+
+Each job card inside the calendar cells should have:
+
+A thin vertical bar (left side) whose color is based on the assigned technician.
+
+Use the technician’s assigned color (from existing technician config).
+
+If no technician is assigned, use a neutral gray.
+
+A small red dot somewhere near the top-right or near the title only if the job is overdue.
+
+Overdue = whatever status flag you already use; reuse existing logic.
+
+Make sure overdue styling does NOT override technician color:
+
+The vertical bar must always show the technician’s color.
+
+Overdue is indicated only by the red dot and/or subtle text, not by changing the bar color.
+
+Do not re-introduce big “Overdue/Scheduled” badges on the card itself; keep the cards clean and compact (title + short description).
+
+4.2 Unscheduled drawer cards
+
+Each unscheduled card should:
+
+Use a technician-color vertical bar on the left, exactly like the calendar cards.
+
+If overdue, show a red dot (same style as the main grid) in a consistent spot on the card.
+
+Remove the top-right date pill (e.g., the small “Nov 25” badge).
+
+Keep only the bottom text line which already says something like “Overdue Nov 25” or “Due Nov 25”.
+
+This unclutters the card and frees horizontal space.
+
+Make sure overdue styling does not override the technician color; same rules as above.
+
+5. Keep existing filters but don’t change their behavior
+
+You will see filters like:
+
+Technicians filter
+
+Location filter (just added)
+
+Start time selector
+
+Density dropdown (Dens Comfort etc.)
+
+Weekly/Monthly toggle
+
+Important:
+Do not alter their logic. You may adjust spacing slightly to keep the toolbar neat, but the behavior must remain unchanged.
+
+6. Summary
+
+At the end, please:
+
+List which files you changed (Calendar layout, Parts modal, JobCard component, Unscheduled drawer, etc.).
+
+Briefly describe how you:
+
+Implemented the Parts modal filters (week vs days),
+
+Fixed the grid alignment and width,
+
+Implemented technician color bars + overdue red dots,
+
+Removed the duplicate date pill from unscheduled cards.

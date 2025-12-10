@@ -164,10 +164,10 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
       if (isOffMonth) return `${baseStyle} border-l-4 border-l-muted-foreground/40`;
       return baseStyle;
     }
-    // Use technician left border for calendar items, or red for overdue
+    // Use technician left border for calendar items (ALWAYS technician color, never red)
     const completedOpacity = isCompleted ? 'opacity-60' : '';
-    // Overdue items get red border, else use technician color
-    const leftBorder = isOverdue ? 'border-l-red-500' : (technicianColor?.borderLeft || 'border-l-muted-foreground/40');
+    // Left border always shows technician color - overdue is indicated by red dot only
+    const leftBorder = technicianColor?.borderLeft || 'border-l-muted-foreground/40';
     return `${baseStyle} border-l-4 ${leftBorder} ${completedOpacity}`;
   };
 
@@ -212,17 +212,15 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
             )}
           </>
         ) : (
-          /* Unscheduled drawer: Stacked 3-line layout */
+          /* Unscheduled drawer: Stacked 3-line layout - no date pill, only bottom text line */
           <>
-            {/* Line 1: Client name + month badge */}
-            <div className="flex items-start justify-between gap-1">
+            {/* Line 1: Client name + red dot if overdue */}
+            <div className="flex items-start gap-1">
               <div className={`font-semibold text-[11px] leading-tight truncate flex-1 min-w-0 ${isPastMonth ? 'text-red-700 dark:text-red-300' : ''}`}>
                 {client.companyName}
               </div>
-              {monthLabel && (
-                <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap flex-shrink-0 ${isPastMonth ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-muted text-muted-foreground'}`}>
-                  {monthLabel}
-                </span>
+              {isPastMonth && (
+                <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 mt-0.5" title="Overdue" />
               )}
             </div>
             {/* Line 2: Location info */}
@@ -406,7 +404,8 @@ export default function Calendar() {
   const [expandedAllDaySlots, setExpandedAllDaySlots] = useState<Set<string>>(new Set());
   const [partsDialogOpen, setPartsDialogOpen] = useState(false);
   const [partsDialogTitle, setPartsDialogTitle] = useState("");
-  const [partsDialogParts, setPartsDialogParts] = useState<Array<{ description: string; quantity: number }>>([]);
+  const [partsDialogParts, setPartsDialogParts] = useState<Array<{ description: string; quantity: number; date?: string }>>([]);
+  const [partsDialogWeekDays, setPartsDialogWeekDays] = useState<Array<{ dayName: string; dateLabel: string; date: Date }>>([]);
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const [addClientDialogOpen, setAddClientDialogOpen] = useState(false);
@@ -488,12 +487,15 @@ export default function Calendar() {
     staleTime: 60 * 1000,
   });
 
-  // Helper to calculate parts from assignments
-  const calculateParts = (assignments: any[]) => {
-    const partsList: Array<{ description: string; quantity: number }> = [];
+  // Helper to calculate parts from assignments with optional date tagging
+  const calculatePartsWithDates = (assignments: any[]) => {
+    const partsList: Array<{ description: string; quantity: number; date?: string }> = [];
     
     assignments.forEach((assignment: any) => {
       const clientPartsList = bulkParts[assignment.clientId] || [];
+      const assignmentDate = new Date(assignment.year, assignment.month - 1, assignment.day);
+      const dateKey = assignmentDate.toISOString().split('T')[0];
+      
       clientPartsList.forEach((cp: any) => {
         const part = cp.part;
         let partLabel = '';
@@ -508,7 +510,8 @@ export default function Calendar() {
         
         partsList.push({ 
           description: partLabel,
-          quantity: cp.quantity || 1
+          quantity: cp.quantity || 1,
+          date: dateKey
         });
       });
     });
@@ -1489,23 +1492,35 @@ export default function Calendar() {
                         });
                         return;
                       }
-                      // Calculate parts for entire visible week
+                      // Calculate parts for entire visible week with dates
                       const weekStart = getMondayOfWeek(currentDate);
+                      const weekDays: Array<{ dayName: string; dateLabel: string; date: Date }> = [];
+                      
+                      for (let i = 0; i < 7; i++) {
+                        const date = new Date(weekStart);
+                        date.setDate(weekStart.getDate() + i);
+                        weekDays.push({
+                          dayName: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i],
+                          dateLabel: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                          date: new Date(date)
+                        });
+                      }
+                      
                       const allWeekAssignments = assignments.filter((a: any) => {
                         for (let i = 0; i < 7; i++) {
-                          const date = new Date(weekStart);
-                          date.setDate(weekStart.getDate() + i);
+                          const date = weekDays[i].date;
                           if (a.year === date.getFullYear() && a.month === date.getMonth() + 1 && a.day === date.getDate()) {
                             return true;
                           }
                         }
                         return false;
                       });
-                      const parts = calculateParts(allWeekAssignments);
-                      const weekEnd = new Date(weekStart);
-                      weekEnd.setDate(weekEnd.getDate() + 6);
+                      
+                      const parts = calculatePartsWithDates(allWeekAssignments);
+                      const weekEnd = weekDays[6].date;
                       setPartsDialogTitle(`Parts for ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`);
                       setPartsDialogParts(parts);
+                      setPartsDialogWeekDays(weekDays);
                       setPartsDialogOpen(true);
                     }}
                     data-testid="button-parts"
@@ -1727,6 +1742,7 @@ export default function Calendar() {
         onOpenChange={setPartsDialogOpen}
         title={partsDialogTitle}
         parts={partsDialogParts}
+        weekDays={partsDialogWeekDays}
       />
     </DndContext>
   );
