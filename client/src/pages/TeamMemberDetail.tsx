@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useRoute, Link } from "wouter";
@@ -37,7 +37,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, UserCircle, Clock, Shield, DollarSign, AlertTriangle, Copy, Plus, Check, X, Info } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ArrowLeft, Save, UserCircle, Clock, Shield, DollarSign, AlertTriangle, Copy, Plus, Check, X, Info, Search, ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
 
 interface TeamMemberWithDetails {
   id: string;
@@ -138,6 +143,9 @@ export default function TeamMemberDetail() {
   const [showActivateDialog, setShowActivateDialog] = useState(false);
   const [showCreateRoleDialog, setShowCreateRoleDialog] = useState(false);
   const [newRole, setNewRole] = useState({ name: "", description: "" });
+  const [permissionSearch, setPermissionSearch] = useState("");
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["admin"]));
+  const [prevSearch, setPrevSearch] = useState("");
 
   const { data: member, isLoading } = useQuery<TeamMemberWithDetails>({
     queryKey: ["/api/team", userId],
@@ -161,6 +169,18 @@ export default function TeamMemberDetail() {
     queryKey: ["/api/roles", member?.roleId, "permissions"],
     enabled: !!member?.roleId,
   });
+
+  const permissionNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    permissions.forEach((p) => { map[p.id] = p.name; });
+    return map;
+  }, [permissions]);
+
+  const permissionIdByName = useMemo(() => {
+    const map: Record<string, string> = {};
+    permissions.forEach((p) => { map[p.name] = p.id; });
+    return map;
+  }, [permissions]);
 
   useEffect(() => {
     if (member) {
@@ -194,16 +214,21 @@ export default function TeamMemberDetail() {
         }));
       }
 
-      if (member.permissionOverrides && member.permissionOverrides.length > 0) {
+      if (member.permissionOverrides && member.permissionOverrides.length > 0 && Object.keys(permissionNameById).length > 0) {
         setOverridePermissions(true);
         const overrides: Record<string, "grant" | "revoke"> = {};
         member.permissionOverrides.forEach(o => {
-          overrides[o.permissionId] = o.override as "grant" | "revoke";
+          const permName = permissionNameById[o.permissionId];
+          if (permName) {
+            overrides[permName] = o.override as "grant" | "revoke";
+          }
         });
         setPermissionOverrides(overrides);
+      } else if (Object.keys(permissionNameById).length > 0) {
+        setPermissionOverrides({});
       }
     }
-  }, [member]);
+  }, [member, permissionNameById]);
 
   const updateBasicMutation = useMutation({
     mutationFn: async (data: typeof basicInfo & { useCustomSchedule: boolean }) => {
@@ -332,10 +357,10 @@ export default function TeamMemberDetail() {
   const savePermissions = () => {
     const overrides = Object.entries(permissionOverrides)
       .filter(([_, value]) => value !== null)
-      .map(([permissionId, override]) => ({
-        permissionId,
-        override: override as "grant" | "revoke",
-      }));
+      .flatMap(([permName, override]) => {
+        const permissionId = permissionIdByName[permName];
+        return permissionId ? [{ permissionId, override: override as "grant" | "revoke" }] : [];
+      });
     updatePermissionsMutation.mutate(overrides);
   };
 
@@ -343,6 +368,51 @@ export default function TeamMemberDetail() {
     setPermissionOverrides({});
     updatePermissionsMutation.mutate([]);
   };
+
+  const setPermissionState = (permName: string, state: "inherited" | "allow" | "deny") => {
+    setPermissionOverrides(prev => {
+      if (state === "inherited") {
+        const { [permName]: _, ...rest } = prev;
+        return rest;
+      } else if (state === "allow") {
+        return { ...prev, [permName]: "grant" };
+      } else {
+        return { ...prev, [permName]: "revoke" };
+      }
+    });
+  };
+
+  const toggleSection = (category: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  };
+
+  const expandAllSections = () => {
+    const categories = Object.keys(permissionsByCategory).map(c => c.toLowerCase());
+    setExpandedSections(new Set(categories));
+  };
+
+  const collapseAllSections = () => {
+    setExpandedSections(new Set());
+  };
+
+  useEffect(() => {
+    if (permissionSearch && !prevSearch) {
+    } else if (!permissionSearch && prevSearch) {
+      const categories = Object.keys(permissionsByCategory).map(c => c.toLowerCase());
+      if (categories.length > 0) {
+        setExpandedSections(new Set([categories[0]]));
+      }
+    }
+    setPrevSearch(permissionSearch);
+  }, [permissionSearch, prevSearch, permissionsByCategory]);
 
   if (isLoading) {
     return (
@@ -748,18 +818,14 @@ export default function TeamMemberDetail() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="p-4 bg-muted rounded-lg mb-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Role: {currentRole?.displayName || member.role}</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        This member inherits permissions from their role. You can optionally override specific permissions below.
-                      </p>
-                    </div>
-                  </div>
+                <div className="p-4 bg-muted rounded-lg mb-4">
+                  <p className="font-medium">Role: {currentRole?.displayName || member.role}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    This member inherits permissions from their role. You can optionally override specific permissions below.
+                  </p>
                 </div>
 
-                <div className="flex items-center justify-between mb-6 pb-4 border-b">
+                <div className="flex items-center justify-between mb-4 pb-4 border-b">
                   <div>
                     <p className="font-medium">Override Role Permissions</p>
                     <p className="text-sm text-muted-foreground">Enable to grant or revoke specific permissions for this member</p>
@@ -771,78 +837,135 @@ export default function TeamMemberDetail() {
                   />
                 </div>
 
-                <div className="space-y-6">
-                  {Object.entries(permissionsByCategory).map(([category, categoryPerms]) => (
-                    <div key={category}>
-                      <h3 className="font-medium text-sm uppercase tracking-wider text-muted-foreground mb-3">
-                        {category}
-                      </h3>
-                      <div className="space-y-2">
-                        {categoryPerms.map((perm) => {
-                          const hasFromRole = rolePermissions.includes(perm.name);
-                          const override = permissionOverrides[perm.id];
-                          const hasPermission = override === "grant" 
-                            ? true 
-                            : override === "revoke" 
-                              ? false 
-                              : effectivePermissions.includes(perm.name);
+                <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search permissions..."
+                      value={permissionSearch}
+                      onChange={(e) => setPermissionSearch(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-permission-search"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={expandAllSections} data-testid="button-expand-all">
+                      Expand all
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={collapseAllSections} data-testid="button-collapse-all">
+                      Collapse all
+                    </Button>
+                  </div>
+                </div>
 
-                          return (
-                            <div
-                              key={perm.id}
-                              className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/50"
-                            >
-                              <div className="flex-1">
-                                <p className="font-medium text-sm">{perm.displayName}</p>
-                                {perm.description && (
-                                  <p className="text-xs text-muted-foreground">{perm.description}</p>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {!overridePermissions ? (
-                                  <>
-                                    <Badge variant="outline" className="text-xs">
-                                      Inherited
-                                    </Badge>
-                                    <Badge variant={hasPermission ? "default" : "secondary"}>
-                                      {hasPermission ? "Yes" : "No"}
-                                    </Badge>
-                                  </>
-                                ) : (
-                                  <>
-                                    {override && (
-                                      <Badge 
-                                        variant={override === "grant" ? "default" : "destructive"} 
-                                        className="text-xs"
-                                      >
-                                        {override === "grant" ? "Granted" : "Revoked"}
-                                      </Badge>
+                <div className="max-h-[60vh] overflow-y-auto space-y-2">
+                  {Object.entries(permissionsByCategory).map(([category, categoryPerms]) => {
+                    const searchLower = permissionSearch.toLowerCase();
+                    const filteredPerms = permissionSearch
+                      ? categoryPerms.filter(p => 
+                          p.displayName.toLowerCase().includes(searchLower) ||
+                          (p.description?.toLowerCase() || "").includes(searchLower)
+                        )
+                      : categoryPerms;
+
+                    if (filteredPerms.length === 0) return null;
+
+                    const isOpen = permissionSearch ? true : expandedSections.has(category.toLowerCase());
+
+                    return (
+                      <Collapsible
+                        key={category}
+                        open={isOpen}
+                        onOpenChange={() => !permissionSearch && toggleSection(category.toLowerCase())}
+                      >
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm uppercase tracking-wider">
+                              {category}
+                            </span>
+                            <Badge variant="secondary" className="text-xs">
+                              {filteredPerms.length}
+                            </Badge>
+                          </div>
+                          {isOpen ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="pt-2">
+                          <div className="space-y-1 pl-2">
+                            {filteredPerms.map((perm) => {
+                              const hasFromRole = rolePermissions.includes(perm.name);
+                              const override = permissionOverrides[perm.name];
+                              const currentState: "inherited" | "allow" | "deny" = 
+                                override === "grant" ? "allow" : 
+                                override === "revoke" ? "deny" : "inherited";
+                              const inheritedValue = hasFromRole;
+                              const isOverridden = currentState !== "inherited";
+
+                              return (
+                                <div
+                                  key={perm.id}
+                                  className={`flex items-center justify-between py-2 px-3 rounded-md transition-colors ${
+                                    isOverridden ? "bg-primary/5 border-l-2 border-primary" : "bg-muted/30"
+                                  }`}
+                                >
+                                  <div className="flex-1 min-w-0 mr-4">
+                                    <p className="text-sm font-medium">{perm.displayName}</p>
+                                    {perm.description && (
+                                      <p className="text-xs text-muted-foreground truncate">{perm.description}</p>
                                     )}
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
                                     <Button
-                                      variant={hasPermission ? "default" : "outline"}
+                                      variant={currentState === "inherited" ? "default" : "outline"}
                                       size="sm"
-                                      onClick={() => handlePermissionToggle(perm.id)}
-                                      data-testid={`button-toggle-perm-${perm.id}`}
+                                      className="text-xs h-7 px-2"
+                                      onClick={() => setPermissionState(perm.name, "inherited")}
+                                      disabled={!overridePermissions}
+                                      data-testid={`button-perm-inherited-${perm.id}`}
                                     >
-                                      {hasPermission ? (
-                                        <Check className="h-4 w-4" />
-                                      ) : (
-                                        <X className="h-4 w-4" />
+                                      Inherited
+                                      {currentState === "inherited" && (
+                                        <span className="ml-1 text-muted-foreground">
+                                          · {inheritedValue ? "Yes" : "No"}
+                                        </span>
                                       )}
                                     </Button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
+                                    <Button
+                                      variant={currentState === "allow" ? "default" : "outline"}
+                                      size="sm"
+                                      className="text-xs h-7 px-2"
+                                      onClick={() => setPermissionState(perm.name, "allow")}
+                                      disabled={!overridePermissions}
+                                      data-testid={`button-perm-allow-${perm.id}`}
+                                    >
+                                      Allow
+                                    </Button>
+                                    <Button
+                                      variant={currentState === "deny" ? "destructive" : "outline"}
+                                      size="sm"
+                                      className="text-xs h-7 px-2"
+                                      onClick={() => setPermissionState(perm.name, "deny")}
+                                      disabled={!overridePermissions}
+                                      data-testid={`button-perm-deny-${perm.id}`}
+                                    >
+                                      Deny
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    );
+                  })}
                 </div>
 
                 {overridePermissions && (
-                  <div className="flex justify-between pt-6 mt-6 border-t">
+                  <div className="flex justify-between pt-4 mt-4 border-t">
                     <Button
                       variant="outline"
                       onClick={clearAllOverrides}

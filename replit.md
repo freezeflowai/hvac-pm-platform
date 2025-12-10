@@ -36,9 +36,12 @@ The application uses a Material Design-inspired typography with the Inter font f
   - Permission inheritance: Role-based defaults with user-level overrides (grant/revoke).
   - Technician profiles: Labor cost per hour, billable rate per hour, calendar color, notes.
   - Working hours: Per-user weekly schedule with custom schedule override flag.
-  - Team Management UI: `/manage-team` list page with search/filter, `/manage-team/:id` detail page with tabs (Basic Info, Schedule, Billing, Permissions).
+  - Team Management UI: `/manage-team` list page with search/filter and "Manage Roles" link, `/manage-team/:id` detail page with tabs (Basic Info, Schedule, Billing, Permissions).
+  - Role Management: `/manage-roles` page with role listing, permission editor with collapsible accordion sections, and create/delete role functionality.
+  - Permissions Tab UX: Collapsible accordion sections grouped by category, search box for filtering permissions, Expand/Collapse all buttons, 3-state permission controls (Inherited / Allow / Deny) with visual indicators for overridden permissions.
+  - Permission State Architecture: UI state uses permission names as keys for consistency with role inheritance checks. Bidirectional lookup maps (`permissionNameById`, `permissionIdByName`) enable hydration from server IDs and conversion back to IDs for persistence.
   - Helper functions: `getUserPermissions()`, `hasPermission()`, `checkPermission()`, `requirePermission()` in `server/permissions.ts`.
-  - API endpoints: GET/PATCH `/api/team`, PUT `/api/team/:userId/profile`, PUT `/api/team/:userId/working-hours`, PUT `/api/team/:userId/permissions`, GET `/api/roles`, GET `/api/permissions`.
+  - API endpoints: GET/PATCH `/api/team`, PUT `/api/team/:userId/profile`, PUT `/api/team/:userId/working-hours`, PUT `/api/team/:userId/permissions`, GET `/api/roles`, GET `/api/permissions`, GET `/api/roles/:roleId/permissions`.
 - **Mobile Technician Dashboard**: Optimized view for field technicians with today's/upcoming schedules, client details, parts inventory, and equipment information. Includes tap-to-call/email.
 - **Technician System**: Technician-specific pages ("My Schedule", "Daily Parts"), assignment UI on Calendar, and PM visibility limited to assigned technicians.
 - **Subscription System (Feature Flagged)**: Tiered model (Free Trial, Silver, Gold, Enterprise) with location limits and usage tracking. Database schema includes `subscription_plans` and user subscription fields. Checks limits during client creation/import. Infrastructure ready for Stripe integration.
