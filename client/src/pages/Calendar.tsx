@@ -1218,7 +1218,7 @@ export default function Calendar() {
 
     return (
       <div className="flex flex-col h-full min-h-0 max-h-full">
-        <div className="grid grid-cols-8 sticky top-0 bg-background z-10 border-b flex-shrink-0">
+        <div className="grid grid-cols-8 sticky top-0 bg-background z-10 border-b flex-shrink-0 pr-[17px]">
           <div className="px-1.5 py-1 text-[10px] border-r flex items-center justify-center"></div>
           {weekDaysData.map((d) => (
             <div key={d.dayName} className="px-1 py-1 text-center border-r text-[10px] font-semibold">
@@ -1229,7 +1229,7 @@ export default function Calendar() {
         </div>
 
         {/* All Day Slot - Pinned outside scrollable area */}
-        <div className="grid grid-cols-8 border-b bg-primary/5 flex-shrink-0">
+        <div className="grid grid-cols-8 border-b bg-primary/5 flex-shrink-0 pr-[17px]">
           <div className="px-1.5 py-1 text-[10px] font-semibold border-r sticky left-0 z-20 bg-primary/10 flex items-center">
             All Day
           </div>
