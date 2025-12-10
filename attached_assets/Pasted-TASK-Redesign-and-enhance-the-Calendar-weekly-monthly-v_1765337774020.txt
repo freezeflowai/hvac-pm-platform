@@ -1,0 +1,257 @@
+TASK: Redesign and enhance the Calendar (weekly + monthly) views
+
+We already have working calendar pages (weekly + monthly) with unscheduled jobs on the right and a left sidebar. I want you to refactor and restyle the calendar to improve readability and usability, NOT to rewrite the app from scratch.
+
+Use the existing tech stack and components (React + TypeScript + Tailwind / current style system). Reuse existing data structures for jobs, technicians, and visits.
+
+1. Layout Goals
+
+High-level:
+
+Calendar grid should be the MAIN focus (roughly 70–75% of horizontal space).
+
+Left sidebar should be narrower.
+
+Right “Unscheduled” drawer should be slightly narrower and fully collapsible.
+
+Remove visual clutter and wasted padding / margins.
+
+1.1 Left Sidebar
+
+Reduce the width of the left navigation sidebar by ~20–30%.
+
+Keep the same menu items, but remove the company name/logo text from the top-left on calendar pages so long company names don’t break the layout.
+
+Keep existing items like:
+
+Dashboard
+
+Jobs
+
+Clients
+
+Calendar
+
+Reports
+
+Settings
+
+Admin
+
+Make sure “Settings” stays as its own menu item (do not merge with Admin).
+
+1.2 Main Calendar Area (Weekly + Monthly)
+
+Use more of the horizontal width for the calendar grid:
+
+Reduce the gap between the left calendar edge and the sidebar.
+
+Reduce the gap between the calendar grid and the right drawer.
+
+Reduce the vertical gaps between time rows and between job cards within the same day column.
+
+Implement row-density options for the calendar grid (user-facing toggle near the top-right of the calendar):
+
+Compact
+
+Comfortable
+
+Expanded
+This should change row height and vertical padding on job cards.
+
+1.3 Right “Unscheduled” Drawer
+
+Narrow the right drawer by ~15–20%.
+
+Add a collapse/expand chevron at the top-right of the drawer:
+
+Collapsed state: show a narrow vertical tab with a label like “Unscheduled (N)” that can be clicked to reopen.
+
+Keep the unscheduled jobs list scrollable.
+
+Maintain drag-and-drop from unscheduled → calendar.
+
+2. Visual & Interaction Changes
+2.1 Job Card Design (Weekly + Monthly)
+
+Improve readability and visual hierarchy for job cards.
+
+Weekly view job card content (inside each time slot):
+
+Top line: Client name (bold)
+
+Second line: short job description OR location nickname.
+
+Third line: optional details like:
+
+#JobNumber • 1h 45m
+
+Use good spacing and font sizes so it’s readable even for people with glasses.
+
+Monthly view job card content:
+
+Shorter variant, example:
+
+Basil Box – PM Visit
+
+On hover or click, show a tooltip/popover with more details (client, address, technician, times).
+
+2.2 Color Coding by Technician (NOT by status)
+
+Remove status-based background colors (red/green/others) from jobs.
+
+Implement color coding by technician instead:
+
+Each technician gets a distinct soft color (background or left border).
+
+Example: Tech A = blue tint, Tech B = green tint, Tech C = purple tint, etc.
+
+Maintain good contrast for text.
+
+Add a small technician legend somewhere above or below the calendar:
+
+e.g. ● Mikel – Blue | ● Nad – Green | ● Solomon – Purple
+
+2.3 Technician Filtering / Compare
+
+At the top of the calendar, update the “All Technicians” selector to support three modes:
+
+All Technicians – show all jobs (current default).
+
+Single Technician – user selects one tech; show only that technician’s jobs.
+
+Compare – user can select multiple technicians, and their jobs appear together, using the technician color coding.
+
+(Use whatever UI pattern fits best with our existing select component: multi-select dropdown or segmented control.)
+
+2.4 Drag and Drop Behavior
+
+Keep drag-and-drop scheduling:
+
+Drag from Unscheduled → calendar to assign date/time.
+
+Drag between days/time slots to reschedule.
+
+If drag-and-drop is already implemented, make sure the new layout doesn’t break it and that the drop zones are still easy to hit.
+
+3. Business Logic & Features
+3.1 Start Time & Time Scale Controls
+
+At the top of the weekly calendar, add a Start Time control:
+
+Allow the user to choose the first visible time for the day column (e.g. 5AM, 6AM, 7AM, 8AM).
+
+Remember their choice (per user) if we already have a place for user preferences; otherwise, keep it in local state for now.
+
+Add a time increment selector:
+
+Options: 15 min, 30 min, 60 min.
+
+This changes the vertical grid spacing.
+
+3.2 Remove “Optimize Route”
+
+Remove the “Optimize Route” button from the calendar header for now.
+
+Make sure removing this button doesn’t break layout spacing; adjust the header alignment accordingly.
+
+3.3 Week Parts Button (KEEP, but no hard requirement logic)
+
+Keep the existing Week Parts button / feature, but:
+
+Do not make parts mandatory for scheduling.
+
+Do not block scheduling if parts are missing.
+
+Do not color jobs based on parts readiness.
+
+Week Parts is purely informational, based on currently scheduled jobs for that week.
+
+3.4 Unscheduled Jobs Behavior
+
+Unscheduled jobs should persist in the right drawer across week and month changes until they are scheduled.
+
+Each unscheduled job tile should:
+
+Show client name.
+
+Show the originally intended or due date (like “Nov 25”) so we can see that it’s overdue.
+
+Use a consistent, subtle style (no technician color-coding here; these are unscheduled).
+
+4. Status, Titles, and Header Clean-up
+
+At the top of the job detail header on calendar pages, there’s currently duplicate job information:
+
+Example: “Jobs / #10134” and another “Job #10134” label below it.
+
+Remove the duplicate and keep only one clear breadcrumb + title.
+
+On the calendar itself:
+
+Keep the date range display (e.g. “December 8–14, 2025”).
+
+Keep the “Today” button.
+
+Keep toggles for Weekly / Monthly.
+
+Remove any redundant status label that repeats the same information that’s already in the job tile or details panel.
+
+5. Accessibility & Readability
+
+Ensure all text meets accessible contrast ratios against backgrounds, especially for technician colors.
+
+Make sure font sizes in job cards and unscheduled items are at least as large as the improved font sizes we used on the Jobs and Clients pages.
+
+When the user changes the global font size (e.g. the “A / A Large” control in the header), calendar job cards and unscheduled list should respect that setting.
+
+6. Implementation Notes
+
+Update the existing calendar components rather than creating entirely new ones. Look for files like:
+
+CalendarPage.tsx / Calendar.tsx
+
+WeekView.tsx / MonthView.tsx
+
+UnscheduledPanel.tsx or similar
+
+Centralize the technician color mapping in a shared utility or config so the same colors can be reused later in other views (e.g., job list, technician management).
+
+Carefully adjust Tailwind / CSS classes to:
+
+Reduce horizontal/vertical gaps.
+
+Control density based on the Compact/Comfortable/Expanded setting.
+
+After changes, verify:
+
+Weekly view still scrolls correctly vertically.
+
+Monthly view still scrolls vertically when needed.
+
+Drag-and-drop works at different densities and time increments.
+
+The UI is responsive on smaller laptop viewports.
+
+Deliverable:
+Refactored weekly and monthly calendar views with:
+
+Narrower left sidebar and right unscheduled drawer (collapsible),
+
+Wider central calendar grid,
+
+Technician-based color coding,
+
+Improved job card layout,
+
+Start time + time increment controls,
+
+Removed Optimize Route,
+
+Non-blocking parts logic,
+
+Technician filter with multi-compare,
+
+Cleaned up headers and duplication.
+
+Please implement all of the above and then summarize what files you changed and how the new behavior works.

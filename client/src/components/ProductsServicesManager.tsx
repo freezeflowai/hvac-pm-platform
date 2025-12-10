@@ -929,16 +929,52 @@ export default function ProductsServicesManager() {
               <p className="text-sm font-medium mb-3">Pricing</p>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-2">
-                  <Label>Cost ($)</Label>
-                  <Input type="number" step="0.01" min="0" value={formData.cost} onChange={(e) => setFormData((prev) => ({ ...prev, cost: e.target.value }))} placeholder="0.00" data-testid="input-cost" />
+                  <Label>Cost</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      min="0" 
+                      value={formData.cost} 
+                      onChange={(e) => setFormData((prev) => ({ ...prev, cost: e.target.value }))} 
+                      placeholder="0.00" 
+                      className="pl-7"
+                      data-testid="input-cost" 
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Markup (%)</Label>
-                  <Input type="number" step="1" min="0" value={formData.markupPercent} onChange={(e) => setFormData((prev) => ({ ...prev, markupPercent: e.target.value }))} placeholder="50" data-testid="input-markup" />
+                  <Label>Markup</Label>
+                  <div className="relative">
+                    <Input 
+                      type="number" 
+                      step="1" 
+                      min="0" 
+                      value={formData.markupPercent} 
+                      onChange={(e) => setFormData((prev) => ({ ...prev, markupPercent: e.target.value }))} 
+                      placeholder="50" 
+                      className="pr-7"
+                      data-testid="input-markup" 
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Price ($)</Label>
-                  <Input type="number" step="0.01" min="0" value={formData.unitPrice} onChange={(e) => setFormData((prev) => ({ ...prev, unitPrice: e.target.value }))} placeholder="0.00" data-testid="input-price" />
+                  <Label>Price</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      min="0" 
+                      value={formData.unitPrice} 
+                      onChange={(e) => setFormData((prev) => ({ ...prev, unitPrice: e.target.value }))} 
+                      placeholder="0.00" 
+                      className="pl-7"
+                      data-testid="input-price" 
+                    />
+                  </div>
                 </div>
               </div>
             </div>

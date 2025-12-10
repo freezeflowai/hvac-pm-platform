@@ -1,24 +1,43 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable, pointerWithin, CollisionDetection, useDraggable, PointerSensor, useSensor, useSensors, rectIntersection } from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import { JobDetailDialog } from "@/components/JobDetailDialog";
-import { RouteOptimizationDialog } from "@/components/RouteOptimizationDialog";
 import { PartsDialog } from "@/components/PartsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ChevronsRight, ChevronsLeft, Route, Users, Info, AlertTriangle, Trash2, Archive } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ChevronsRight, ChevronsLeft, Users, Info, AlertTriangle, Trash2, Archive } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 
 const MONTH_ABBREV = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Technician color palette - soft, accessible colors
+const TECHNICIAN_COLORS = [
+  { bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-400', text: 'text-blue-700 dark:text-blue-300', label: 'Blue' },
+  { bg: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-400', text: 'text-green-700 dark:text-green-300', label: 'Green' },
+  { bg: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-400', text: 'text-purple-700 dark:text-purple-300', label: 'Purple' },
+  { bg: 'bg-amber-100 dark:bg-amber-900/30', border: 'border-amber-400', text: 'text-amber-700 dark:text-amber-300', label: 'Amber' },
+  { bg: 'bg-rose-100 dark:bg-rose-900/30', border: 'border-rose-400', text: 'text-rose-700 dark:text-rose-300', label: 'Rose' },
+  { bg: 'bg-cyan-100 dark:bg-cyan-900/30', border: 'border-cyan-400', text: 'text-cyan-700 dark:text-cyan-300', label: 'Cyan' },
+  { bg: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-400', text: 'text-orange-700 dark:text-orange-300', label: 'Orange' },
+  { bg: 'bg-indigo-100 dark:bg-indigo-900/30', border: 'border-indigo-400', text: 'text-indigo-700 dark:text-indigo-300', label: 'Indigo' },
+];
+
+type CalendarDensity = 'compact' | 'comfortable' | 'expanded';
+
+const DENSITY_STYLES = {
+  compact: { card: 'py-0.5 px-1', row: 'min-h-12', gap: 'gap-0.5', rowHeight: 48 },
+  comfortable: { card: 'py-1 px-1.5', row: 'min-h-16', gap: 'gap-1', rowHeight: 64 },
+  expanded: { card: 'py-1.5 px-2', row: 'min-h-20', gap: 'gap-1.5', rowHeight: 80 },
+};
 
 function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimize, currentMonth, currentYear }: { 
   clients: any[]; 
@@ -109,7 +128,7 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
   );
 }
 
-function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician, monthLabel, isOffMonth, isPastMonth }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void; monthLabel?: string | null; isOffMonth?: boolean; isPastMonth?: boolean }) {
+function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician, monthLabel, isOffMonth, isPastMonth, technicianColor, densityStyle }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void; monthLabel?: string | null; isOffMonth?: boolean; isPastMonth?: boolean; technicianColor?: { bg: string; border: string; text: string }; densityStyle?: string }) {
   // Calendar items: use ONLY useDraggable for unrestricted movement
   // Unscheduled items: use ONLY useSortable for sorting in panel
   const draggableResult = inCalendar ? useDraggable({ 
@@ -136,16 +155,22 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     opacity: isDragging ? 0.5 : 1,
   };
 
-  // Color coding: red/orange = past month (overdue), muted = future month, blue = this month (scheduled), primary = completed
+  // Color coding: technician-based for calendar items, status-based for unscheduled
   const getBackgroundColor = () => {
     if (!inCalendar) {
       if (isPastMonth) return 'bg-status-overdue/10 border border-status-overdue/30';
       if (isOffMonth) return 'bg-muted/50 border border-muted-foreground/20';
       return 'bg-status-unscheduled/10 border border-status-unscheduled/30';
     }
+    // Use technician color for calendar items
+    if (technicianColor) {
+      const completedStyle = isCompleted ? 'opacity-60' : '';
+      return `${technicianColor.bg} border ${technicianColor.border} ${completedStyle}`;
+    }
+    // Fallback to status colors if no technician color
     if (isCompleted) return 'bg-primary/10 border-primary/30';
     if (isOverdue) return 'bg-status-overdue/10 border-status-overdue/30';
-    return 'bg-status-this-month/10 border-status-this-month/30';
+    return 'bg-muted/50 border border-muted-foreground/30';
   };
 
   return (
@@ -153,7 +178,7 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className={`text-xs px-1.5 py-1 rounded hover:shadow-md transition-all relative select-none group ${getBackgroundColor()}`}
+      className={`text-xs rounded hover:shadow-md transition-all relative select-none group ${densityStyle || 'px-1.5 py-1'} ${getBackgroundColor()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
       <div 
@@ -246,7 +271,7 @@ function DayPartsCell({ assignments, clients, dayName, date, showOnlyOutstanding
   );
 }
 
-function DroppableDay({ day, year, month, assignments, clients, onRemove, onClientClick, onClearDay, showParts = false }: { 
+function DroppableDay({ day, year, month, assignments, clients, onRemove, onClientClick, onClearDay, showParts = false, getTechnicianColor, densityStyle, gapStyle }: { 
   day: number; 
   year: number; 
   month: number; 
@@ -256,6 +281,9 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   onClientClick: (client: any, assignment: any) => void;
   onClearDay: (day: number, dayAssignments: any[]) => void;
   showParts?: boolean;
+  getTechnicianColor?: (assignment: any) => { bg: string; border: string; text: string };
+  densityStyle?: string;
+  gapStyle?: string;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day-${day}` });
   
@@ -267,15 +295,15 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-24 px-1 py-2 border transition-all flex flex-col ${
+      className={`min-h-20 px-1 py-1 border transition-all flex flex-col ${
         isOver 
           ? 'bg-primary/10 border-primary border-2 ring-2 ring-primary/30 shadow-md' 
           : 'bg-background'
       }`}
       data-testid={`calendar-day-${day}`}
     >
-      <div className="text-sm text-muted-foreground mb-1 px-0.5">{day}</div>
-      <div className="space-y-1 flex-1">
+      <div className="text-xs text-muted-foreground mb-0.5 px-0.5">{day}</div>
+      <div className={`flex-1 flex flex-col ${gapStyle || 'gap-1'}`}>
         {assignments.map((assignment: any) => {
           const client = clients.find((c: any) => c.id === assignment.clientId);
           return client ? (
@@ -288,6 +316,8 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
                 isCompleted={assignment.completed}
                 isOverdue={!assignment.completed && isOverdue}
                 assignment={assignment}
+                technicianColor={getTechnicianColor?.(assignment)}
+                densityStyle={densityStyle}
                 onAssignTechnician={(assignmentId: string, technicianId: string | null) => {
                   queryClient.setQueryData(['/api/calendar', year, month], (old: any) => {
                     if (!old) return old;
@@ -341,9 +371,9 @@ export default function Calendar() {
   const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
   const [reportDialogClientId, setReportDialogClientId] = useState<string | null>(null);
   const [isUnscheduledMinimized, setIsUnscheduledMinimized] = useState(false);
+  const [density, setDensity] = useState<CalendarDensity>('comfortable');
   const [showOnlyOutstanding, setShowOnlyOutstanding] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [routeOptimizationOpen, setRouteOptimizationOpen] = useState(false);
   const [clientDetailOpen, setClientDetailOpen] = useState(false);
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | null>(null);
   const [expandedAllDaySlots, setExpandedAllDaySlots] = useState<Set<string>>(new Set());
@@ -462,6 +492,31 @@ export default function Calendar() {
   const { data: technicians = [] } = useQuery<any[]>({
     queryKey: ['/api/technicians'],
   });
+
+  // Create technician color map for consistent coloring
+  const technicianColorMap = useMemo(() => {
+    const map = new Map<string, typeof TECHNICIAN_COLORS[0]>();
+    technicians.forEach((tech: any, index: number) => {
+      map.set(tech.id, TECHNICIAN_COLORS[index % TECHNICIAN_COLORS.length]);
+    });
+    return map;
+  }, [technicians]);
+
+  // Helper to get technician color for an assignment
+  const getTechnicianColor = (assignment: any) => {
+    // Check both new (assignedTechnicianIds) and legacy (assignedTechnicianId) fields
+    const techIds = assignment?.assignedTechnicianIds || [];
+    const legacyTechId = assignment?.assignedTechnicianId;
+    
+    if (techIds.length > 0) {
+      return technicianColorMap.get(techIds[0]) || TECHNICIAN_COLORS[0];
+    }
+    if (legacyTechId) {
+      return technicianColorMap.get(legacyTechId) || TECHNICIAN_COLORS[0];
+    }
+    // Unassigned - use neutral color
+    return { bg: 'bg-muted/50', border: 'border-muted-foreground/30', text: 'text-muted-foreground' };
+  };
 
   const { data: companySettings } = useQuery<any>({
     queryKey: ['/api/company-settings'],
@@ -922,8 +977,8 @@ export default function Calendar() {
         !isLoadingUnscheduled) {
       
       const startHour = companySettings.calendarStartHour;
-      // Each hourly slot is 64px (min-h-16)
-      const slotHeight = 64;
+      // Hourly slot height matches density setting
+      const slotHeight = DENSITY_STYLES[density].rowHeight;
       const scrollPosition = startHour * slotHeight;
       
       // Use setTimeout to ensure DOM is fully rendered after all data loads
@@ -1035,9 +1090,12 @@ export default function Calendar() {
             onClientClick={handleClientClick}
             onClearDay={handleClearDay}
             showParts={false}
+            getTechnicianColor={getTechnicianColor}
+            densityStyle={DENSITY_STYLES[density].card}
+            gapStyle={DENSITY_STYLES[density].gap}
           />
         ) : (
-          <div key={i} className="min-h-24 p-2 border bg-muted/10" />
+          <div key={i} className="min-h-20 p-1 border bg-muted/10" />
         )
       );
     }
@@ -1049,7 +1107,7 @@ export default function Calendar() {
   const AllDayDropZone = ({ dayName, dayNumber, children }: { dayName: string; dayNumber: number; children: React.ReactNode }) => {
     const { setNodeRef, isOver } = useDroppable({ id: `allday-${dayName}-${dayNumber}` });
     return (
-      <div ref={setNodeRef} className={`p-1 border-r min-h-16 ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`}>
+      <div ref={setNodeRef} className={`p-1 border-r ${DENSITY_STYLES[density].row} ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`}>
         {children}
       </div>
     );
@@ -1063,7 +1121,7 @@ export default function Calendar() {
     const hourlyAssignments = (dayAssignments || []).filter((a: any) => a.scheduledHour !== null && a.scheduledHour !== undefined && a.scheduledHour === hour);
     
     return (
-      <div ref={setNodeRef} className={`p-1 border-r min-h-16 ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`}>
+      <div ref={setNodeRef} className={`p-1 border-r ${DENSITY_STYLES[density].row} ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`}>
         {hourlyAssignments.map((assignment: any) => {
           const client = clients.find((c: any) => c.id === assignment.clientId);
           return client ? (
@@ -1076,6 +1134,8 @@ export default function Calendar() {
               isCompleted={assignment.completed}
               isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
               assignment={assignment}
+              technicianColor={getTechnicianColor(assignment)}
+              densityStyle={DENSITY_STYLES[density].card}
             />
           ) : null;
         })}
@@ -1201,6 +1261,8 @@ export default function Calendar() {
                         isCompleted={isCompleted}
                         isOverdue={!isCompleted && new Date(assignment.scheduledDate) < new Date()}
                         assignment={assignment}
+                        technicianColor={getTechnicianColor(assignment)}
+                        densityStyle={DENSITY_STYLES[density].card}
                       />
                     ) : null;
                   })}
@@ -1470,16 +1532,20 @@ export default function Calendar() {
                   </Button>
                 </>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setRouteOptimizationOpen(true)}
-                disabled={assignments.filter((a: any) => !a.completed).length === 0}
-                data-testid="button-optimize-route"
-              >
-                <Route className="h-4 w-4 mr-2" />
-                Optimize Route
-              </Button>
+              <div className="flex gap-1 bg-muted/50 p-0.5 rounded text-xs">
+                {(['compact', 'comfortable', 'expanded'] as const).map((d) => (
+                  <Button
+                    key={d}
+                    variant={density === d ? "default" : "ghost"}
+                    size="sm"
+                    className="h-7 px-2 text-xs capitalize"
+                    onClick={() => setDensity(d)}
+                    data-testid={`button-density-${d}`}
+                  >
+                    {d}
+                  </Button>
+                ))}
+              </div>
               <Button
                 variant="outline"
                 size="sm"
@@ -1512,8 +1578,28 @@ export default function Calendar() {
             </div>
           </div>
 
-          <div className={`grid gap-4 flex-1 min-h-0 overflow-hidden ${isUnscheduledMinimized ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-4'}`}>
-            <div className={`${isUnscheduledMinimized ? 'col-span-1' : 'lg:col-span-3'} flex flex-col h-full min-h-0 max-h-full`}>
+          {/* Technician Legend */}
+          {technicians.length > 0 && (
+            <div className="flex items-center gap-3 flex-wrap text-xs">
+              <span className="text-muted-foreground font-medium">Technicians:</span>
+              {technicians.map((tech: any, index: number) => {
+                const color = TECHNICIAN_COLORS[index % TECHNICIAN_COLORS.length];
+                return (
+                  <div key={tech.id} className="flex items-center gap-1.5">
+                    <div className={`w-3 h-3 rounded ${color.bg} ${color.border} border`} />
+                    <span>{tech.firstName} {tech.lastName?.[0]}.</span>
+                  </div>
+                );
+              })}
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-muted/50 border border-muted-foreground/30" />
+                <span className="text-muted-foreground">Unassigned</span>
+              </div>
+            </div>
+          )}
+
+          <div className={`grid gap-2 flex-1 min-h-0 overflow-hidden ${isUnscheduledMinimized ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-6'}`}>
+            <div className={`${isUnscheduledMinimized ? 'col-span-1' : 'lg:col-span-5'} flex flex-col h-full min-h-0 max-h-full`}>
               <Card className="h-full flex flex-col">
                 <CardContent className="flex-1 overflow-auto p-0">
                   {view === "monthly" && (
@@ -1540,7 +1626,7 @@ export default function Calendar() {
             </div>
 
             {!isUnscheduledMinimized && (
-              <div className="h-full overflow-hidden">
+              <div className="h-full overflow-hidden lg:col-span-1">
                 <UnscheduledPanel 
                   clients={unscheduledClients} 
                   onClientClick={setReportDialogClientId}
@@ -1604,89 +1690,6 @@ export default function Calendar() {
       />
 
 
-      <RouteOptimizationDialog
-        open={routeOptimizationOpen}
-        onOpenChange={setRouteOptimizationOpen}
-        clients={assignments
-          .filter((a: any) => !a.completed)
-          .map((a: any) => clients.find((c: any) => c.id === a.clientId))
-          .filter((c: any): c is NonNullable<typeof c> => c !== null)}
-        onApplyRoute={(optimizedClients) => {
-          // Get all current assignments sorted by day (only non-completed)
-          const sortedAssignments = [...assignments]
-            .filter((a: any) => !a.completed)
-            .sort((a: any, b: any) => a.day - b.day);
-          
-          // Verify counts match
-          if (optimizedClients.length !== sortedAssignments.length) {
-            toast({
-              title: "Route optimization error",
-              description: `Client count mismatch: ${optimizedClients.length} optimized vs ${sortedAssignments.length} scheduled`,
-              variant: "destructive"
-            });
-            return;
-          }
-          
-          // Create a mapping of clientId to original assignment for quick lookup
-          // Note: The backend prevents duplicate client assignments per month,
-          // so this Map is safe (each clientId appears exactly once)
-          const assignmentByClient = new Map(
-            sortedAssignments.map((a: any) => [a.clientId, a])
-          );
-          
-          // Verify no duplicate clients (defensive check)
-          if (assignmentByClient.size !== sortedAssignments.length) {
-            toast({
-              title: "Route optimization error",
-              description: "Found duplicate client assignments. Please contact support.",
-              variant: "destructive"
-            });
-            return;
-          }
-          
-          // Build update mutations: for each position in sorted order,
-          // swap the assignment at that position to point to the optimized client
-          const updatePromises = sortedAssignments.map((originalAssignment: any, index) => {
-            const optimizedClient = optimizedClients[index];
-            const assignmentForOptimizedClient = assignmentByClient.get(optimizedClient.id);
-            
-            if (!assignmentForOptimizedClient) {
-              console.error(`No assignment found for optimized client ${optimizedClient.id}`);
-              return Promise.resolve();
-            }
-            
-            // If this assignment is already in the correct position, skip
-            if (assignmentForOptimizedClient.day === originalAssignment.day) {
-              return Promise.resolve();
-            }
-            
-            // Update the assignment to the target day/date
-            const newDay = originalAssignment.day;
-            const newScheduledDate = new Date(year, month - 1, newDay).toISOString().split('T')[0];
-            
-            return apiRequest("PATCH", `/api/calendar/assign/${assignmentForOptimizedClient.id}`, { 
-              day: newDay,
-              scheduledDate: newScheduledDate
-            });
-          });
-
-          Promise.all(updatePromises)
-            .then(() => {
-              queryClient.invalidateQueries({ queryKey: ["/api/calendar", year, month] });
-              toast({
-                title: "Route optimized",
-                description: "Calendar has been reordered to follow the optimal route"
-              });
-            })
-            .catch((error) => {
-              toast({
-                title: "Failed to apply route",
-                description: error.message || "Could not update calendar assignments",
-                variant: "destructive"
-              });
-            });
-        }}
-      />
 
       <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
         <AlertDialogContent>
