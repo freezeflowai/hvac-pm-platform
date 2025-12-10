@@ -29,7 +29,16 @@ The application uses a Material Design-inspired typography with the Inter font f
 - **Client Management**: Alphabetical sorting, client deletion, and "Inactive" status to exclude clients from reports and schedules. CSV import for clients with validation and import statistics.
 - **Maintenance Scheduling**: Monthly PM schedule reports, recently completed maintenance with undo option, and automated next due date assignment upon completion.
 - **UI/UX Enhancements**: Redesigned maintenance cards for higher density and categorized parts selection for improved user experience. Enhanced typography with 16.5px base font size and improved muted-foreground contrast (36% lightness). Job Detail page uses 70/30 grid layout with collapsible right column cards (Notes expanded by default). Parts & Billing line items feature per-line Save/Cancel controls with draft state visual indicators.
-- **Authentication & Authorization**: Secure login, Role-Based Access Control (RBAC) with Admin and Technician roles. New accounts default to Technician; first user becomes Admin. Admins can promote technicians.
+- **Authentication & Authorization**: Secure login with comprehensive Role-Based Access Control (RBAC):
+  - Database schema: `roles`, `permissions`, `role_permissions`, `user_permission_overrides`, `technician_profiles`, `working_hours` tables.
+  - 5 default roles: Owner, Admin, Manager, Dispatcher, Technician with hierarchical permissions.
+  - 24 granular permissions covering: clients (view, create, edit, delete), jobs (view, create, edit, delete, assign), scheduling (calendar view, calendar manage, route optimize), invoicing (view, create, edit, delete, send), team (view, manage, invite), reports (view PM, view financial, export), settings (company, billing, integrations, subscription).
+  - Permission inheritance: Role-based defaults with user-level overrides (grant/revoke).
+  - Technician profiles: Labor cost per hour, billable rate per hour, calendar color, notes.
+  - Working hours: Per-user weekly schedule with custom schedule override flag.
+  - Team Management UI: `/manage-team` list page with search/filter, `/manage-team/:id` detail page with tabs (Basic Info, Schedule, Billing, Permissions).
+  - Helper functions: `getUserPermissions()`, `hasPermission()`, `checkPermission()`, `requirePermission()` in `server/permissions.ts`.
+  - API endpoints: GET/PATCH `/api/team`, PUT `/api/team/:userId/profile`, PUT `/api/team/:userId/working-hours`, PUT `/api/team/:userId/permissions`, GET `/api/roles`, GET `/api/permissions`.
 - **Mobile Technician Dashboard**: Optimized view for field technicians with today's/upcoming schedules, client details, parts inventory, and equipment information. Includes tap-to-call/email.
 - **Technician System**: Technician-specific pages ("My Schedule", "Daily Parts"), assignment UI on Calendar, and PM visibility limited to assigned technicians.
 - **Subscription System (Feature Flagged)**: Tiered model (Free Trial, Silver, Gold, Enterprise) with location limits and usage tracking. Database schema includes `subscription_plans` and user subscription fields. Checks limits during client creation/import. Infrastructure ready for Stripe integration.
