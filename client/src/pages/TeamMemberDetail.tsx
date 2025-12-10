@@ -182,6 +182,14 @@ export default function TeamMemberDetail() {
     return map;
   }, [permissions]);
 
+  const permissionsByCategory = useMemo(() => {
+    return permissions.reduce((acc, perm) => {
+      if (!acc[perm.category]) acc[perm.category] = [];
+      acc[perm.category].push(perm);
+      return acc;
+    }, {} as Record<string, Permission[]>);
+  }, [permissions]);
+
   useEffect(() => {
     if (member) {
       setBasicInfo({
@@ -443,12 +451,6 @@ export default function TeamMemberDetail() {
     }
     return member.email[0].toUpperCase();
   };
-
-  const permissionsByCategory = permissions.reduce((acc, perm) => {
-    if (!acc[perm.category]) acc[perm.category] = [];
-    acc[perm.category].push(perm);
-    return acc;
-  }, {} as Record<string, Permission[]>);
 
   const isBillableRole = BILLABLE_ROLES.includes(member.role.toLowerCase());
   const currentRole = roles.find(r => r.id === basicInfo.roleId);
