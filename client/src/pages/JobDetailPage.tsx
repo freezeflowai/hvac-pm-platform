@@ -477,10 +477,11 @@ export default function JobDetailPage() {
 
   const createInvoiceMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/invoices/from-job/${jobId}`, {
+      const response = await apiRequest("POST", `/api/invoices/from-job/${jobId}`, {
         includeLineItems: true,
         includeNotes: true,
       });
+      return response.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
