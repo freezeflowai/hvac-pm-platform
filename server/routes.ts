@@ -2772,6 +2772,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { jobId } = req.params;
       const { includeLineItems = true, includeNotes = true, markJobCompleted = false } = req.body;
       
+      // Check if an invoice already exists for this job
+      const existingInvoices = await storage.getInvoicesByJob(req.user!.companyId, jobId);
+      if (existingInvoices.length > 0) {
+        return res.status(400).json({ 
+          error: "An invoice already exists for this job", 
+          existingInvoiceId: existingInvoices[0].id 
+        });
+      }
+      
       // Optionally mark job as completed first
       if (markJobCompleted) {
         await storage.updateJob(req.user!.companyId, jobId, { status: "completed" });

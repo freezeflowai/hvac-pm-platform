@@ -13,7 +13,7 @@ import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
-import type { Client, CustomerCompany, ClientNote, Job } from "@shared/schema";
+import type { Client, CustomerCompany, ClientNote, Job, Invoice } from "@shared/schema";
 
 type OverviewTab = "activeWork" | "jobs" | "invoices";
 
@@ -53,6 +53,16 @@ export default function ClientDetailPage() {
 
   const { data: notes = [] } = useQuery<ClientNote[]>({
     queryKey: ["/api/client-notes", id],
+    enabled: Boolean(id),
+  });
+
+  const { data: invoices = [] } = useQuery<Invoice[]>({
+    queryKey: ["/api/invoices", { locationId: id }],
+    queryFn: async () => {
+      const res = await fetch(`/api/invoices?locationId=${id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch invoices");
+      return res.json();
+    },
     enabled: Boolean(id),
   });
 
@@ -392,7 +402,45 @@ export default function ClientDetailPage() {
                 )}
 
                 {overviewTab === "invoices" && (
-                  <p className="text-sm text-muted-foreground">No invoices yet.</p>
+                  invoices.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No invoices yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {invoices.slice(0, 5).map((inv) => (
+                        <div 
+                          key={inv.id} 
+                          className="flex items-center justify-between p-3 border rounded-lg hover-elevate cursor-pointer"
+                          onClick={() => setLocation(`/invoices/${inv.id}`)}
+                          data-testid={`row-invoice-${inv.id}`}
+                        >
+                          <div>
+                            <p className="font-medium text-sm text-primary hover:underline">
+                              {inv.invoiceNumber || `INV-${inv.id.slice(0, 6).toUpperCase()}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(inv.issueDate), "MMM d, yyyy")} • Due: {inv.dueDate ? format(new Date(inv.dueDate), "MMM d, yyyy") : "—"}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant={
+                              inv.status === "paid" ? "default" :
+                              inv.status === "sent" ? "secondary" :
+                              inv.status === "draft" ? "outline" :
+                              "destructive"
+                            }>
+                              {inv.status}
+                            </Badge>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              ${parseFloat(inv.total).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      {invoices.length > 5 && (
+                        <p className="text-xs text-muted-foreground">+ {invoices.length - 5} more invoices</p>
+                      )}
+                    </div>
+                  )
                 )}
               </div>
             </CardContent>
