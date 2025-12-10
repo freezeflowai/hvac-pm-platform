@@ -1071,8 +1071,8 @@ export default function Calendar() {
 
   if (isLoadingCalendar || isLoadingClients || isLoadingUnscheduled) {
     return (
-      <div className="min-h-screen bg-background">
-        <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
+      <div className="h-screen bg-background flex flex-col">
+        <main className="flex-1 flex items-center justify-center">
           <div className="text-center py-8">Loading calendar...</div>
         </main>
       </div>

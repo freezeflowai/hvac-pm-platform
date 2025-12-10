@@ -61,7 +61,7 @@ export function PartsDialog({ open, onOpenChange, title, parts, weekDays }: Part
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md sm:max-w-lg">
+      <DialogContent className="max-w-4xl">
         <button
           onClick={() => handleOpenChange(false)}
           className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
@@ -117,26 +117,39 @@ export function PartsDialog({ open, onOpenChange, title, parts, weekDays }: Part
 
           <div className="bg-muted/30 rounded-md max-h-96 overflow-y-auto">
             {groupedParts.length > 0 ? (
-              <table className="w-full text-sm" data-testid="parts-table">
-                <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
-                  <tr className="border-b border-border/50">
-                    <th className="text-left py-2 px-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Part</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground text-xs uppercase tracking-wide w-16">Qty</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupedParts.map((part, index) => (
-                    <tr 
-                      key={index} 
-                      className="border-b border-border/30 last:border-b-0 hover:bg-muted/50 transition-colors"
-                      data-testid={`part-row-${index}`}
-                    >
-                      <td className="py-2 px-3 text-foreground">{part.description}</td>
-                      <td className="py-2 px-3 text-right font-medium text-foreground tabular-nums">{part.quantity}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6" data-testid="parts-table">
+                {[0, 1].map((colIndex) => {
+                  const halfLength = Math.ceil(groupedParts.length / 2);
+                  const columnParts = colIndex === 0 
+                    ? groupedParts.slice(0, halfLength) 
+                    : groupedParts.slice(halfLength);
+                  
+                  if (columnParts.length === 0) return null;
+                  
+                  return (
+                    <table key={colIndex} className="w-full text-sm">
+                      <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
+                        <tr className="border-b border-border/50">
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Part</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground text-xs uppercase tracking-wide w-12">Qty</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {columnParts.map((part, index) => (
+                          <tr 
+                            key={index} 
+                            className="border-b border-border/30 last:border-b-0 hover:bg-muted/50 transition-colors"
+                            data-testid={`part-row-${colIndex}-${index}`}
+                          >
+                            <td className="py-1.5 px-3 text-foreground">{part.description}</td>
+                            <td className="py-1.5 px-3 text-right font-medium text-foreground tabular-nums">{part.quantity}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })}
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-6">No parts scheduled</p>
             )}
