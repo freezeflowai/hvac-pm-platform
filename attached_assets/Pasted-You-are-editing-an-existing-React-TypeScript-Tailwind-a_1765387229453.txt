@@ -1,0 +1,257 @@
+You are editing an existing React + TypeScript + Tailwind app for an HVAC field-service tool. The app already has:
+
+- A left sidebar with navigation (Dashboard, Jobs, Clients, Calendar, Reports, Settings, Admin).
+- A “Team Management” view under Settings that lists members and shows summary cards:
+  - Total Members
+  - Active Members
+  - Roles Defined
+  - Pending Invites
+- A member details screen with tabs:
+  - Basic Info
+  - Schedule
+  - Billing
+  - Permissions
+
+IMPORTANT: Do NOT break existing routing, APIs, or data models. Assume the current backend for members, roles and permissions is correct. We are refactoring and enhancing the UI and UX only.
+
+=====================================================
+1) TEAM LIST / TEAM MANAGEMENT SCREEN
+=====================================================
+
+The current Team Management index page should behave as follows:
+
+- Top summary cards (already visible):
+  - Total Members
+  - Active Members
+  - Roles Defined
+  - Pending Invites
+- Search bar:
+  - Placeholder: “Search by name, email, role, or phone…”
+  - Filters by any of those fields (case-insensitive).
+- Filters:
+  - Status filter (All Statuses / Active / Disabled).
+  - Role filter (All Roles + each defined role).
+  - Sorting dropdown (Name A–Z, Name Z–A, Newest, Oldest).
+
+TABLE LAYOUT:
+- Columns:
+  - Member (primary line: full name if present, otherwise email; secondary line: email).
+  - Role (pill-style label, e.g. “owner”, “technician”).
+  - Status (Active / Disabled pill).
+  - Last Login.
+- Clicking a row opens the member detail page in the same layout you already have.
+
+If any of this behavior is already implemented, KEEP it. Only adjust labels/layout to match the above. Do not remove existing functionality.
+
+=====================================================
+2) MEMBER DETAIL TABS (BASIC INFO, SCHEDULE, BILLING)
+=====================================================
+
+You already have tabs: Basic Info, Schedule, Billing, Permissions. Keep that structure.
+
+BASIC INFO TAB:
+- Show:
+  - First name
+  - Last name
+  - Email (read-only if used as login)
+  - Phone
+  - Role (select from defined roles)
+  - Status (Active / Disable Account)
+  - “Use Custom Schedule” toggle that links to the Schedule tab.
+- If “Use Custom Schedule” is OFF:
+  - Show short helper text: “This member uses the default company working hours.”
+- If ON:
+  - Show helper: “This member has their own working hours set on the Schedule tab.”
+
+SCHEDULE TAB:
+- Keep current layout:
+  - Days of week with toggle (On/Off).
+  - Start time and end time for each active day.
+- If “Use Custom Schedule” is OFF in Basic Info:
+  - Show a non-intrusive banner or message at the top: “This member is using the default company schedule. Enable ‘Use Custom Schedule’ on the Basic Info tab to customize their hours.”
+  - Keep inputs disabled in this state.
+
+BILLING TAB:
+- Keep:
+  - Labor Cost (per hour) – internal cost.
+  - Billable Rate (per hour) – what’s charged to customers.
+  - Calendar Color – used to identify this technician on the calendar.
+  - Internal Notes.
+- Make sure calendar color is clearly labeled as “Used to identify this technician on the calendar”.
+
+Do NOT change data structures or API calls for these three tabs; just ensure labels, helper text, and disable states behave as described.
+
+=====================================================
+3) ROLE MANAGEMENT & ROLE PRESETS
+=====================================================
+
+We need a better experience for managing roles (permission templates) separate from per-member overrides.
+
+If not already present, add a **Roles** management view accessible from Team Management:
+
+- Under the summary cards, add a link or button like “Manage Roles”.
+- This opens a Roles page (can be a separate route or a modal-driven screen) where you can:
+  - See a list of defined roles.
+  - Create a new role.
+  - Edit an existing role.
+  - Delete a role (with safeguard if it’s in use).
+
+ROLE LIST:
+- Columns:
+  - Role name.
+  - Description (short text).
+  - Members using this role (count).
+- Clicking a role opens a Role Detail screen.
+
+ROLE DETAIL SCREEN:
+- Fields:
+  - Role name (e.g. “Owner”, “Technician”, “Dispatcher”).
+  - Optional description.
+  - Permissions matrix for that role (same permissions categories as on the member Permissions tab: Admin, Billing, Clients, Jobs, Pricing, Reports, Schedule, Timesheets, etc.).
+- For each permission on the role:
+  - Simple toggle: Allow / Deny (boolean).
+- These role-level values become the “inherited” values for members assigned to this role.
+
+SEED SOME DEFAULT ROLES (if roles are currently empty):
+- Owner
+- Manager / Office Admin
+- Dispatcher
+- Technician
+- Read-only
+You don’t need to hard-code these names in logic; just seed them in the initial data if no roles exist.
+
+IMPORTANT:
+- Members assigned to a role inherit all permissions from that role unless explicitly overridden on the member Permissions screen.
+- Do NOT change how membership is linked to roles; just use whatever relation is already in place.
+
+=====================================================
+4) PERMISSIONS TAB – LAYOUT REFACTOR (ACCORDION + SEARCH)
+=====================================================
+
+The current Permissions tab for a member is very long and hard to scan. We will keep exactly the same data and behavior, but change the layout:
+
+KEEP:
+- The header that shows:
+  - Role name (e.g. “Role: technician”).
+  - Short explanation, like: “This member inherits permissions from their role. You can optionally override specific permissions below.”
+- Any existing “Override Role Permissions” master toggle must continue to work. If it currently controls whether overrides are allowed, keep that logic.
+
+ADD / CHANGE:
+
+A) Toolbar under the header
+- Directly beneath the “Role: X” block, add a toolbar:
+  - Left: Search box
+    - Placeholder: “Search permissions…”
+    - Filters permission names (and optionally descriptions) case-insensitively.
+    - When there is search text:
+      - Only show sections and rows that match.
+  - Right: Two small buttons:
+    - “Expand all”
+    - “Collapse all”
+  - These control the open/closed state of permission sections (see below).
+
+B) Group permissions into collapsible sections (accordions)
+- Group the existing permissions by category, using the same categories you already show:
+  - ADMIN
+  - BILLING
+  - CLIENTS
+  - JOBS
+  - PRICING
+  - REPORTS
+  - SCHEDULE
+  - TIMESHEETS
+  - (optionally MISC/OTHER for anything that doesn’t fit)
+- For each category, create an accordion (collapsible panel):
+  - Header row:
+    - Left: section title in ALL CAPS, e.g. “ADMIN”.
+    - Right: show a small count of permissions in that group, e.g. “(2)”.
+  - Clicking header toggles between open/closed.
+  - Default behavior when there is NO search:
+    - First section (ADMIN) is open by default.
+    - All other sections start collapsed.
+  - Behavior when there IS search:
+    - Automatically expand sections that have matching permissions and collapse those that do not.
+
+Implementation hint:
+- It’s fine to create a `PermissionSection` component with props:
+  - `title`
+  - `permissions`
+  - `isOpen`
+  - `onToggle`
+  - and possibly `isSearchActive`.
+
+C) Permission row redesign (3-state control)
+- For each permission row inside a section:
+  - Left side:
+    - Primary text: permission name (e.g. “Create Invoices”) in medium/bold.
+    - Secondary text: the existing description in smaller, muted text.
+  - Right side:
+    - Replace the current “Inherited / Yes / No” style with a clear **3-state selector**:
+      - `Inherited`
+      - `Allow`
+      - `Deny`
+    - Only one of the three states is active at a time:
+      - `Inherited` means no override; use the role’s value.
+      - `Allow` means override to true.
+      - `Deny` means override to false.
+    - When `Inherited` is selected:
+      - Also show the inherited value from the role (Yes or No), e.g.:
+        - `Inherited · Yes`
+        - `Inherited · No`
+      - This can be small grey text next to or under the Inherited pill.
+    - When `Allow` or `Deny` is selected:
+      - Treat this as an override for that member.
+
+- Visual cues:
+  - When a permission is overridden (Allow or Deny), highlight the row subtly:
+    - e.g. `bg-slate-50` or a thin colored border on the left side.
+  - Do NOT use loud colors; keep it aligned with the existing settings UI.
+
+D) Behavior & state wiring
+- Do not change the underlying permission storage format. Whatever data structure you are using for:
+  - role permissions
+  - member-level overrides
+  must remain unchanged.
+- When a user changes a permission:
+  - If they choose `Allow` or `Deny`, call the same handler you currently use for custom overrides.
+  - If they switch back to `Inherited`, clear that override and fall back to the role.
+- If there is an “Override Role Permissions” master toggle:
+  - When OFF:
+    - Disable the 3-state controls (but still show current inherited values).
+  - When ON:
+    - Enable the controls.
+
+E) Layout & scrolling
+- The Permissions content can be placed inside a scrollable container/card for better usability:
+  - Example Tailwind: `max-h-[70vh] overflow-y-auto`.
+- Slightly reduce vertical padding on each permission row to minimize overall height while keeping it comfortable to read.
+- Ensure there is no horizontal scrolling on normal laptop widths.
+
+=====================================================
+5) GENERAL STYLING NOTES
+=====================================================
+
+- Continue using existing Tailwind utility classes and overall design language.
+- Do NOT introduce completely new color palettes; reuse existing colors used on Settings/Team screens.
+- Make sure the Team Management and Permissions pages still look good at common desktop widths (no horizontal scroll).
+
+=====================================================
+SUMMARY
+=====================================================
+
+In summary, implement or refine:
+
+1. Team Management index page with:
+   - Name-first member display (name as primary, email as secondary).
+   - Search, filters, and summary cards as described.
+2. Member detail tabs:
+   - Basic Info, Schedule, Billing behavior as described (mostly already done).
+3. Roles management:
+   - Role list + Role detail editor acting as permission templates.
+4. Permissions tab:
+   - Toolbar (search + expand/collapse).
+   - Grouped accordion sections.
+   - 3-state permission control (Inherited / Allow / Deny) with clear indication of overrides.
+   - Compact, scrollable layout.
+
+Keep all existing business logic and APIs intact; only refactor and extend the frontend as specified.
