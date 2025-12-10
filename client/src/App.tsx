@@ -19,6 +19,8 @@ import PartsManagementPage from "@/pages/PartsManagementPage";
 import CompanySettingsPage from "@/pages/CompanySettingsPage";
 import TechnicianDashboard from "@/pages/TechnicianDashboard";
 import TechnicianManagementPage from "@/pages/TechnicianManagementPage";
+import ManageTeam from "@/pages/ManageTeam";
+import TeamMemberDetail from "@/pages/TeamMemberDetail";
 import Technician from "@/pages/Technician";
 import DailyParts from "@/pages/DailyParts";
 import SettingsPage from "@/pages/SettingsPage";
@@ -145,6 +147,16 @@ function Router() {
       <Route path="/manage-technicians">
         <ProtectedRoute requireAdmin>
           <TechnicianManagementPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/manage-team">
+        <ProtectedRoute requireAdmin>
+          <ManageTeam />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/manage-team/:userId">
+        <ProtectedRoute requireAdmin>
+          <TeamMemberDetail />
         </ProtectedRoute>
       </Route>
       <Route path="/technician">

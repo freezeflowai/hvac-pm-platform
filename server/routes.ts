@@ -4355,6 +4355,226 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // Team Management Routes
+  // ============================================
+
+  // Get all team members
+  app.get("/api/team", isAuthenticated, async (req, res) => {
+    try {
+      const members = await storage.getTeamMembers(req.user!.companyId);
+      // Don't return password hashes
+      const sanitized = members.map(m => ({
+        ...m,
+        password: undefined,
+      }));
+      res.json(sanitized);
+    } catch (error) {
+      console.error('Get team members error:', error);
+      res.status(500).json({ error: "Failed to get team members" });
+    }
+  });
+
+  // Get single team member with profile, working hours, and permissions
+  app.get("/api/team/:userId", isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const member = await storage.getTeamMember(req.user!.companyId, userId);
+      if (!member) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+      
+      const [profile, workingHours, permissionOverrides] = await Promise.all([
+        storage.getTechnicianProfile(userId),
+        storage.getWorkingHours(userId),
+        storage.getUserPermissionOverrides(userId),
+      ]);
+      
+      res.json({
+        ...member,
+        password: undefined,
+        profile,
+        workingHours,
+        permissionOverrides,
+      });
+    } catch (error) {
+      console.error('Get team member error:', error);
+      res.status(500).json({ error: "Failed to get team member" });
+    }
+  });
+
+  // Update team member basic info
+  app.patch("/api/team/:userId", isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { firstName, lastName, fullName, phone, roleId, status, useCustomSchedule } = req.body;
+      
+      const updated = await storage.updateTeamMember(req.user!.companyId, userId, {
+        firstName,
+        lastName,
+        fullName,
+        phone,
+        roleId,
+        status,
+        useCustomSchedule,
+      });
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+      
+      res.json({ ...updated, password: undefined });
+    } catch (error) {
+      console.error('Update team member error:', error);
+      res.status(500).json({ error: "Failed to update team member" });
+    }
+  });
+
+  // Deactivate team member
+  app.post("/api/team/:userId/deactivate", isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // Prevent self-deactivation
+      if (userId === req.user!.id) {
+        return res.status(400).json({ error: "Cannot deactivate your own account" });
+      }
+      
+      const updated = await storage.deactivateTeamMember(req.user!.companyId, userId);
+      if (!updated) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+      
+      res.json({ ...updated, password: undefined });
+    } catch (error) {
+      console.error('Deactivate team member error:', error);
+      res.status(500).json({ error: "Failed to deactivate team member" });
+    }
+  });
+
+  // Update technician profile
+  app.put("/api/team/:userId/profile", isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // Verify user belongs to company
+      const member = await storage.getTeamMember(req.user!.companyId, userId);
+      if (!member) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+      
+      const { laborCostPerHour, billableRatePerHour, color, phone, note } = req.body;
+      
+      const profile = await storage.upsertTechnicianProfile(userId, {
+        laborCostPerHour,
+        billableRatePerHour,
+        color,
+        phone,
+        note,
+      });
+      
+      res.json(profile);
+    } catch (error) {
+      console.error('Update technician profile error:', error);
+      res.status(500).json({ error: "Failed to update technician profile" });
+    }
+  });
+
+  // Set working hours
+  app.put("/api/team/:userId/working-hours", isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // Verify user belongs to company
+      const member = await storage.getTeamMember(req.user!.companyId, userId);
+      if (!member) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+      
+      const { hours } = req.body;
+      if (!Array.isArray(hours)) {
+        return res.status(400).json({ error: "hours must be an array" });
+      }
+      
+      const workingHours = await storage.setWorkingHours(userId, hours);
+      res.json(workingHours);
+    } catch (error) {
+      console.error('Set working hours error:', error);
+      res.status(500).json({ error: "Failed to set working hours" });
+    }
+  });
+
+  // Set permission overrides
+  app.put("/api/team/:userId/permissions", isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // Verify user belongs to company
+      const member = await storage.getTeamMember(req.user!.companyId, userId);
+      if (!member) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+      
+      const { overrides } = req.body;
+      if (!Array.isArray(overrides)) {
+        return res.status(400).json({ error: "overrides must be an array" });
+      }
+      
+      await storage.setUserPermissionOverrides(userId, overrides);
+      const updated = await storage.getUserPermissionOverrides(userId);
+      res.json(updated);
+    } catch (error) {
+      console.error('Set permission overrides error:', error);
+      res.status(500).json({ error: "Failed to set permission overrides" });
+    }
+  });
+
+  // Get all roles (for dropdown in team member edit)
+  app.get("/api/roles", isAuthenticated, async (req, res) => {
+    try {
+      const { roles } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const allRoles = await db.select().from(roles).orderBy(roles.hierarchy);
+      res.json(allRoles);
+    } catch (error) {
+      console.error('Get roles error:', error);
+      res.status(500).json({ error: "Failed to get roles" });
+    }
+  });
+
+  // Get all permissions (for permission override UI)
+  app.get("/api/permissions", isAuthenticated, async (req, res) => {
+    try {
+      const { permissions } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const allPermissions = await db.select().from(permissions).orderBy(permissions.category, permissions.name);
+      res.json(allPermissions);
+    } catch (error) {
+      console.error('Get permissions error:', error);
+      res.status(500).json({ error: "Failed to get permissions" });
+    }
+  });
+
+  // Get user's effective permissions (computed from role + overrides)
+  app.get("/api/team/:userId/effective-permissions", isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // Verify user belongs to company
+      const member = await storage.getTeamMember(req.user!.companyId, userId);
+      if (!member) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+      
+      const { getUserPermissions } = await import("./permissions");
+      const permissions = await getUserPermissions(userId);
+      res.json(permissions);
+    } catch (error) {
+      console.error('Get effective permissions error:', error);
+      res.status(500).json({ error: "Failed to get effective permissions" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

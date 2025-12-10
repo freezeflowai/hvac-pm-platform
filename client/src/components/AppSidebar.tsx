@@ -143,7 +143,7 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       title: "Settings",
       icon: Settings,
       href: "/settings",
-      isActive: location === "/settings" || location.startsWith("/settings/") || location === "/products" || location === "/manage-technicians",
+      isActive: location === "/settings" || location.startsWith("/settings/") || location === "/products" || location === "/manage-technicians" || location.startsWith("/manage-team"),
       testId: "nav-settings",
       isDivider: true
     });

@@ -48,11 +48,11 @@ export default function SettingsPage() {
       testId: "card-products-settings",
     },
     {
-      href: "/settings/team",
+      href: "/manage-team",
       icon: Users,
       title: "Team Management",
       description: "Manage technicians and staff",
-      detail: "Add team members, assign roles, and manage technician schedules.",
+      detail: "Add team members, assign roles, set permissions, and manage technician schedules.",
       testId: "card-team-settings",
     },
     {
