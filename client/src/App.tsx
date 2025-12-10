@@ -389,9 +389,7 @@ function AppContent() {
           <ImpersonationBanner />
           <SubscriptionBanner />
           <main className="flex-1 overflow-auto">
-            <div className="max-w-[1550px] mx-auto">
-              <Router />
-            </div>
+            <Router />
           </main>
         </div>
       </div>
