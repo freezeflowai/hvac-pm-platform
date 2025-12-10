@@ -2719,9 +2719,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Invoice routes
   app.get("/api/invoices", isAuthenticated, async (req, res) => {
     try {
-      const { locationId, customerCompanyId } = req.query;
+      const { locationId, customerCompanyId, jobId } = req.query;
       let invoices;
-      if (locationId && typeof locationId === 'string') {
+      if (jobId && typeof jobId === 'string') {
+        invoices = await storage.getInvoicesByJob(req.user!.companyId, jobId);
+      } else if (locationId && typeof locationId === 'string') {
         invoices = await storage.getInvoicesByLocation(req.user!.companyId, locationId);
       } else if (customerCompanyId && typeof customerCompanyId === 'string') {
         invoices = await storage.getInvoicesByCustomerCompany(req.user!.companyId, customerCompanyId);

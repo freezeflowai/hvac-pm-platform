@@ -70,7 +70,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import type { Job, Client, CustomerCompany, User as UserType, RecurringJobSeries } from "@shared/schema";
+import type { Job, Client, CustomerCompany, User as UserType, RecurringJobSeries, Invoice } from "@shared/schema";
 
 interface JobDetailResponse extends Job {
   location?: Client;
@@ -430,6 +430,16 @@ export default function JobDetailPage() {
 
   const { data: job, isLoading, error } = useQuery<JobDetailResponse>({
     queryKey: ["/api/jobs", jobId],
+    enabled: !!jobId,
+  });
+
+  const { data: jobInvoices = [] } = useQuery<Invoice[]>({
+    queryKey: ["/api/invoices", { jobId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/invoices?jobId=${jobId}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
     enabled: !!jobId,
   });
 
@@ -830,37 +840,56 @@ export default function JobDetailPage() {
             <Card>
               <CollapsibleTrigger asChild>
                 <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-invoices">
-                  <span className="text-sm font-semibold">Invoices</span>
+                  <span className="text-sm font-semibold">
+                    Invoices {jobInvoices.length > 0 && <span className="text-muted-foreground ml-1">({jobInvoices.length})</span>}
+                  </span>
                   <div className="flex items-center gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-xs h-auto p-0 text-primary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!job.locationId) {
-                          toast({ title: "Cannot Create Invoice", description: "This job is not linked to a location.", variant: "destructive" });
-                          return;
-                        }
-                        if (job.status === "completed") {
-                          setLocation(`/invoices/new?jobId=${job.id}&locationId=${job.locationId}`);
-                        } else {
-                          toast({ title: "Complete job first", description: "Mark job as completed before creating an invoice." });
-                        }
-                      }}
-                      data-testid="button-create-invoice-right"
-                    >
-                      Create Invoice
-                    </Button>
+                    {job.status === "completed" && jobInvoices.length === 0 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs h-auto p-0 text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowCreateInvoiceDialog(true);
+                        }}
+                        data-testid="button-create-invoice-right"
+                      >
+                        Create Invoice
+                      </Button>
+                    )}
                     {invoicesOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                   </div>
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="border-t px-4 pb-4 pt-3">
-                  <p className="text-xs text-muted-foreground">
-                    No invoices yet for this job.
-                  </p>
+                  {jobInvoices.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No invoices yet for this job.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {jobInvoices.map((inv) => (
+                        <Link key={inv.id} href={`/invoices/${inv.id}`}>
+                          <div className="flex items-center justify-between p-2 rounded-md hover-elevate cursor-pointer" data-testid={`link-invoice-${inv.id}`}>
+                            <div className="flex items-center gap-2">
+                              <Receipt className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm font-medium">
+                                {inv.invoiceNumber || `INV-${inv.id.slice(0, 6).toUpperCase()}`}
+                              </span>
+                              <Badge variant={inv.status === "paid" ? "default" : inv.status === "draft" ? "outline" : "secondary"} className="text-xs">
+                                {inv.status}
+                              </Badge>
+                            </div>
+                            <span className="text-sm font-medium">
+                              ${parseFloat(inv.total).toFixed(2)}
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </CollapsibleContent>
             </Card>

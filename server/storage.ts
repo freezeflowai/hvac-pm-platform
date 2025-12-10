@@ -4150,6 +4150,13 @@ export class DbStorage implements IStorage {
       .orderBy(desc(invoices.createdAt));
   }
 
+  async getInvoicesByJob(companyId: string, jobId: string): Promise<Invoice[]> {
+    return db.select()
+      .from(invoices)
+      .where(and(eq(invoices.companyId, companyId), eq(invoices.jobId, jobId)))
+      .orderBy(desc(invoices.createdAt));
+  }
+
   async getInvoicesByCustomerCompany(companyId: string, customerCompanyId: string): Promise<Invoice[]> {
     return db.select()
       .from(invoices)
