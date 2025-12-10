@@ -1,0 +1,137 @@
+I’ve attached screenshots of my current weekly calendar and job detail modal. Please implement the following UX and layout changes across the calendar views (weekly + monthly) and the job detail modal:
+
+Job tiles on the calendar
+
+Update each job tile layout to have:
+
+Top row: client + short location (bold, slightly larger).
+
+Second row: job type or summary text (normal).
+
+Third row: small, muted line with city or short address.
+
+Add a 3–4px coloured left border on each tile based on the assigned technician’s colour (see technician colour settings). This border is the main colour indicator, not a full tile background.
+
+Add a small status pill in the top-right corner of the tile:
+
+Overdue (red)
+
+Scheduled (neutral grey)
+
+Done (green, for completed jobs).
+
+Slightly increase the tile’s shadow or elevation so cards stand out more from the grid but remain subtle.
+
+Calendar header cleanup
+
+Remove the Optimize Route and Week Parts buttons from the calendar header entirely.
+
+Replace the three separate view density buttons (Compact, Comfortable, Expanded) with a single “Density” dropdown positioned near the existing text-size control (the A A button).
+
+Dropdown label: Density
+
+Options: Compact, Comfortable, Expanded
+
+Default value: Comfortable
+
+Keep only:
+
+Date range + navigation arrows
+
+Today button
+
+Technician filter (all technicians vs single tech)
+
+Start time selector
+
+View switch: Weekly / Monthly (right-aligned).
+
+Technician colour & filters
+
+Above the calendar grid, add a technician chip row:
+
+Example: Technicians: [● Nad] [● Mikel] [● Solomon] [Unassigned]
+
+Each chip shows a small coloured dot that matches the technician colour used on the job tile’s left border.
+
+Clicking a chip toggles that technician’s jobs on the calendar (hide/show).
+
+Unscheduled jobs drawer
+
+Keep the current right-side unscheduled list, but:
+
+Set a narrower default width so the main calendar grid has more space.
+
+For each unscheduled job card, show:
+
+First line: client + location
+
+Right-aligned date badge (e.g., Nov ’25) indicating the original or requested date.
+
+On hover or click, show additional details (e.g., job type, short address) using either a slightly expanded card or a tooltip.
+
+Add a small collapse/expand icon at the top-right of the drawer to allow completely hiding/showing the unscheduled panel.
+
+Keep drag-and-drop behaviour so unscheduled jobs can be dragged onto the calendar.
+
+Job detail modal redesign
+
+Redesign the job detail popup into a more structured layout:
+
+Header section:
+
+Large title: Client – Job Type (e.g., Basil Box – Preventive Maintenance).
+
+Subtitle below: Job #<id>.
+
+On the right side, show:
+
+Status pill (Overdue, Scheduled, Completed).
+
+Primary button: Mark Completed.
+
+Secondary actions: Reschedule, Unschedule.
+
+Body – two-column layout on desktop:
+
+Left column:
+
+Section “Details” with client, location, and full address.
+
+Section “Schedule” with date, time, and assigned technicians.
+
+Section “Parts” listing Qty × Name (e.g., 2 × P Filter 18x18x2), but only show this section if there are parts.
+
+Right column:
+
+Section “Notes”:
+
+Existing notes with timestamp/author styling.
+
+“Add note” textarea with an Add Note button.
+
+Section “Attachments”:
+
+Add Image button.
+
+List of any uploaded images/files.
+
+Footer:
+
+Muted text for Created and Last updated metadata.
+
+Delete Job button on the bottom-left (styled as a destructive action).
+
+Use clear section headings (Details, Schedule, Parts, Notes, Attachments) with subtle separators between sections and reduce large empty spaces.
+
+Slightly increase font size for the title and key labels to improve readability.
+
+Calendar grid spacing & alignment
+
+Slightly reduce vertical gaps between hourly rows to reclaim vertical space.
+
+Reduce padding inside job tiles by ~20% so more content fits cleanly.
+
+Ensure the main calendar grid stretches more horizontally (now that the sidebar is narrower and the unscheduled drawer is narrower by default) so the weekly view feels closer to full-width like Jobber’s.
+
+Please update the existing React components / CSS / Tailwind classes (whatever the project is using) to apply these changes globally to the weekly and monthly calendar views and the job detail modal. Don’t change any business logic or drag-and-drop behaviour; keep all current functionality, just improve the layout and styling as described.

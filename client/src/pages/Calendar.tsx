@@ -19,24 +19,24 @@ import { useAuth } from "@/lib/auth";
 
 const MONTH_ABBREV = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// Technician color palette - soft, accessible colors
+// Technician color palette - colors for left border indicator
 const TECHNICIAN_COLORS = [
-  { bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-400', text: 'text-blue-700 dark:text-blue-300', label: 'Blue' },
-  { bg: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-400', text: 'text-green-700 dark:text-green-300', label: 'Green' },
-  { bg: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-400', text: 'text-purple-700 dark:text-purple-300', label: 'Purple' },
-  { bg: 'bg-amber-100 dark:bg-amber-900/30', border: 'border-amber-400', text: 'text-amber-700 dark:text-amber-300', label: 'Amber' },
-  { bg: 'bg-rose-100 dark:bg-rose-900/30', border: 'border-rose-400', text: 'text-rose-700 dark:text-rose-300', label: 'Rose' },
-  { bg: 'bg-cyan-100 dark:bg-cyan-900/30', border: 'border-cyan-400', text: 'text-cyan-700 dark:text-cyan-300', label: 'Cyan' },
-  { bg: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-400', text: 'text-orange-700 dark:text-orange-300', label: 'Orange' },
-  { bg: 'bg-indigo-100 dark:bg-indigo-900/30', border: 'border-indigo-400', text: 'text-indigo-700 dark:text-indigo-300', label: 'Indigo' },
+  { bg: 'bg-blue-50 dark:bg-blue-950/20', border: 'border-blue-500', borderLeft: 'border-l-blue-500', dot: 'bg-blue-500', text: 'text-blue-700 dark:text-blue-300', label: 'Blue' },
+  { bg: 'bg-green-50 dark:bg-green-950/20', border: 'border-green-500', borderLeft: 'border-l-green-500', dot: 'bg-green-500', text: 'text-green-700 dark:text-green-300', label: 'Green' },
+  { bg: 'bg-purple-50 dark:bg-purple-950/20', border: 'border-purple-500', borderLeft: 'border-l-purple-500', dot: 'bg-purple-500', text: 'text-purple-700 dark:text-purple-300', label: 'Purple' },
+  { bg: 'bg-amber-50 dark:bg-amber-950/20', border: 'border-amber-500', borderLeft: 'border-l-amber-500', dot: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', label: 'Amber' },
+  { bg: 'bg-rose-50 dark:bg-rose-950/20', border: 'border-rose-500', borderLeft: 'border-l-rose-500', dot: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-300', label: 'Rose' },
+  { bg: 'bg-cyan-50 dark:bg-cyan-950/20', border: 'border-cyan-500', borderLeft: 'border-l-cyan-500', dot: 'bg-cyan-500', text: 'text-cyan-700 dark:text-cyan-300', label: 'Cyan' },
+  { bg: 'bg-orange-50 dark:bg-orange-950/20', border: 'border-orange-500', borderLeft: 'border-l-orange-500', dot: 'bg-orange-500', text: 'text-orange-700 dark:text-orange-300', label: 'Orange' },
+  { bg: 'bg-indigo-50 dark:bg-indigo-950/20', border: 'border-indigo-500', borderLeft: 'border-l-indigo-500', dot: 'bg-indigo-500', text: 'text-indigo-700 dark:text-indigo-300', label: 'Indigo' },
 ];
 
 type CalendarDensity = 'compact' | 'comfortable' | 'expanded';
 
 const DENSITY_STYLES = {
-  compact: { card: 'py-0.5 px-1', row: 'min-h-12', gap: 'gap-0.5', rowHeight: 48 },
-  comfortable: { card: 'py-1 px-1.5', row: 'min-h-16', gap: 'gap-1', rowHeight: 64 },
-  expanded: { card: 'py-1.5 px-2', row: 'min-h-20', gap: 'gap-1.5', rowHeight: 80 },
+  compact: { card: 'py-0.5 px-1', row: 'min-h-10', gap: 'gap-px', rowHeight: 40 },
+  comfortable: { card: 'py-0.5 px-1.5', row: 'min-h-12', gap: 'gap-0.5', rowHeight: 48 },
+  expanded: { card: 'py-1 px-1.5', row: 'min-h-14', gap: 'gap-1', rowHeight: 56 },
 };
 
 function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimize, currentMonth, currentYear }: { 
@@ -128,7 +128,7 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
   );
 }
 
-function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician, monthLabel, isOffMonth, isPastMonth, technicianColor, densityStyle }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void; monthLabel?: string | null; isOffMonth?: boolean; isPastMonth?: boolean; technicianColor?: { bg: string; border: string; text: string }; densityStyle?: string }) {
+function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician, monthLabel, isOffMonth, isPastMonth, technicianColor, densityStyle }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void; monthLabel?: string | null; isOffMonth?: boolean; isPastMonth?: boolean; technicianColor?: { bg: string; border: string; text: string; borderLeft?: string; dot?: string }; densityStyle?: string }) {
   // Calendar items: use ONLY useDraggable for unrestricted movement
   // Unscheduled items: use ONLY useSortable for sorting in panel
   const draggableResult = inCalendar ? useDraggable({ 
@@ -155,47 +155,75 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     opacity: isDragging ? 0.5 : 1,
   };
 
-  // Color coding: technician-based for calendar items, status-based for unscheduled
-  const getBackgroundColor = () => {
-    if (!inCalendar) {
-      if (isPastMonth) return 'bg-status-overdue/10 border border-status-overdue/30';
-      if (isOffMonth) return 'bg-muted/50 border border-muted-foreground/20';
-      return 'bg-status-unscheduled/10 border border-status-unscheduled/30';
-    }
-    // Use technician color for calendar items
-    if (technicianColor) {
-      const completedStyle = isCompleted ? 'opacity-60' : '';
-      return `${technicianColor.bg} border ${technicianColor.border} ${completedStyle}`;
-    }
-    // Fallback to status colors if no technician color
-    if (isCompleted) return 'bg-primary/10 border-primary/30';
-    if (isOverdue) return 'bg-status-overdue/10 border-status-overdue/30';
-    return 'bg-muted/50 border border-muted-foreground/30';
+  // Get status for pill display
+  const getStatusPill = () => {
+    if (!inCalendar) return null;
+    if (isCompleted) return { label: 'Done', className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' };
+    if (isOverdue) return { label: 'Overdue', className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' };
+    return { label: 'Scheduled', className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' };
   };
+
+  // Card styling: left border for technician color, subtle background
+  const getCardStyle = () => {
+    const baseStyle = 'bg-card border border-border shadow-sm hover:shadow-md';
+    if (!inCalendar) {
+      if (isPastMonth) return `${baseStyle} border-l-4 border-l-red-400`;
+      if (isOffMonth) return `${baseStyle} border-l-4 border-l-muted-foreground/40`;
+      return baseStyle;
+    }
+    // Use technician left border for calendar items
+    const completedOpacity = isCompleted ? 'opacity-60' : '';
+    const leftBorder = technicianColor?.borderLeft || 'border-l-muted-foreground/40';
+    return `${baseStyle} border-l-4 ${leftBorder} ${completedOpacity}`;
+  };
+
+  const statusPill = getStatusPill();
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className={`text-xs rounded hover:shadow-md transition-all relative select-none group ${densityStyle || 'px-1.5 py-1'} ${getBackgroundColor()}`}
+      className={`text-xs rounded-md transition-all relative select-none group ${densityStyle || 'py-1 px-1.5'} ${getCardStyle()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
       <div 
         {...listeners}
         className={inCalendar ? "cursor-grab active:cursor-grabbing" : ""}
       >
-        <div className="flex items-center gap-1">
-          <span className={`font-semibold leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.companyName}</span>
-          {inCalendar && assignment?.jobNumber && (
-            <span className="text-[9px] text-muted-foreground font-normal">#{assignment.jobNumber}</span>
+        {/* Top row: Client name + location + status pill */}
+        <div className="flex items-start justify-between gap-1">
+          <div className="flex-1 min-w-0">
+            <div className={`font-semibold text-[11px] leading-tight truncate ${isCompleted ? 'line-through' : ''}`}>
+              {client.companyName}
+              {client.location && <span className="font-normal text-muted-foreground"> - {client.location}</span>}
+            </div>
+          </div>
+          {inCalendar && statusPill && (
+            <span className={`text-[8px] px-1 py-0.5 rounded font-medium whitespace-nowrap ${statusPill.className}`}>
+              {statusPill.label}
+            </span>
           )}
           {!inCalendar && monthLabel && (
-            <span className={`text-[9px] px-1 py-0.5 rounded font-medium ${isPastMonth ? 'bg-status-overdue/20 text-status-overdue' : 'bg-muted text-muted-foreground'}`}>{monthLabel}</span>
+            <span className={`text-[9px] px-1 py-0.5 rounded font-medium whitespace-nowrap ${isPastMonth ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-muted text-muted-foreground'}`}>
+              {monthLabel}
+            </span>
           )}
         </div>
-        {client.location && (
-          <div className={`text-muted-foreground text-[10px] leading-tight ${isCompleted ? 'line-through opacity-60' : ''}`}>{client.location}</div>
+        
+        {/* Second row: Job type/summary */}
+        {inCalendar && (
+          <div className={`text-[10px] text-foreground/80 leading-tight mt-0.5 ${isCompleted ? 'line-through' : ''}`}>
+            Preventive Maintenance
+            {assignment?.jobNumber && <span className="text-muted-foreground ml-1">#{assignment.jobNumber}</span>}
+          </div>
+        )}
+        
+        {/* Third row: City/address (muted) */}
+        {inCalendar && client.city && (
+          <div className={`text-[9px] text-muted-foreground leading-tight ${isCompleted ? 'line-through' : ''}`}>
+            {client.city}
+          </div>
         )}
       </div>
       {inCalendar && onClick && (
@@ -362,6 +390,7 @@ export default function Calendar() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clientDetailOpen, setClientDetailOpen] = useState(false);
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | null>(null);
+  const [hiddenTechnicianIds, setHiddenTechnicianIds] = useState<Set<string>>(new Set());
   const [expandedAllDaySlots, setExpandedAllDaySlots] = useState<Set<string>>(new Set());
   const [partsDialogOpen, setPartsDialogOpen] = useState(false);
   const [partsDialogTitle, setPartsDialogTitle] = useState("");
@@ -1489,49 +1518,19 @@ export default function Calendar() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (isLoadingParts) {
-                        toast({
-                          title: "Loading parts data",
-                          description: "Please wait while parts are being loaded",
-                        });
-                        return;
-                      }
-                      // Calculate all parts for the week
-                      const weekStart = getMondayOfWeek(currentDate);
-                      const weekEnd = new Date(weekStart);
-                      weekEnd.setDate(weekEnd.getDate() + 6);
-                      
-                      const allAssignments = assignments || [];
-                      const parts = calculateParts(allAssignments);
-                      
-                      setPartsDialogTitle(`Parts for Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`);
-                      setPartsDialogParts(parts);
-                      setPartsDialogOpen(true);
-                    }}
-                    data-testid="button-weekly-parts"
-                  >
-                    Week Parts
-                  </Button>
                 </>
               )}
-              <div className="flex gap-1 bg-muted/50 p-0.5 rounded text-xs">
-                {(['compact', 'comfortable', 'expanded'] as const).map((d) => (
-                  <Button
-                    key={d}
-                    variant={density === d ? "default" : "ghost"}
-                    size="sm"
-                    className="h-7 px-2 text-xs capitalize"
-                    onClick={() => setDensity(d)}
-                    data-testid={`button-density-${d}`}
-                  >
-                    {d}
-                  </Button>
-                ))}
-              </div>
+              <Select value={density} onValueChange={(v) => setDensity(v as CalendarDensity)}>
+                <SelectTrigger className="w-28 text-xs h-8" data-testid="select-density">
+                  <span className="text-muted-foreground mr-1">Density:</span>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="compact">Compact</SelectItem>
+                  <SelectItem value="comfortable">Comfortable</SelectItem>
+                  <SelectItem value="expanded">Expanded</SelectItem>
+                </SelectContent>
+              </Select>
               <div className="flex gap-1 bg-muted/50 p-1 rounded-full">
                 <Button
                   variant={view === "monthly" ? "default" : "ghost"}
@@ -1555,28 +1554,66 @@ export default function Calendar() {
             </div>
           </div>
 
-          {/* Technician Legend */}
+          {/* Technician Filter Chips */}
           {technicians.length > 0 && (
-            <div className="flex items-center gap-3 flex-wrap text-xs">
+            <div className="flex items-center gap-2 flex-wrap text-xs">
               <span className="text-muted-foreground font-medium">Technicians:</span>
               {technicians.map((tech: any, index: number) => {
                 const color = TECHNICIAN_COLORS[index % TECHNICIAN_COLORS.length];
+                const isHidden = hiddenTechnicianIds.has(tech.id);
                 return (
-                  <div key={tech.id} className="flex items-center gap-1.5">
-                    <div className={`w-3 h-3 rounded ${color.bg} ${color.border} border`} />
-                    <span>{tech.firstName} {tech.lastName?.[0]}.</span>
-                  </div>
+                  <button
+                    key={tech.id}
+                    onClick={() => {
+                      setHiddenTechnicianIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(tech.id)) {
+                          next.delete(tech.id);
+                        } else {
+                          next.add(tech.id);
+                        }
+                        return next;
+                      });
+                    }}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all ${
+                      isHidden 
+                        ? 'bg-muted/30 border-muted-foreground/20 opacity-50' 
+                        : `${color.bg} ${color.border}`
+                    }`}
+                    data-testid={`chip-technician-${tech.id}`}
+                  >
+                    <div className={`w-2.5 h-2.5 rounded-full ${color.dot}`} />
+                    <span className={isHidden ? 'text-muted-foreground' : ''}>{tech.firstName} {tech.lastName?.[0]}.</span>
+                  </button>
                 );
               })}
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded bg-muted/50 border border-muted-foreground/30" />
-                <span className="text-muted-foreground">Unassigned</span>
-              </div>
+              <button
+                onClick={() => {
+                  setHiddenTechnicianIds(prev => {
+                    const next = new Set(prev);
+                    if (next.has('unassigned')) {
+                      next.delete('unassigned');
+                    } else {
+                      next.add('unassigned');
+                    }
+                    return next;
+                  });
+                }}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all ${
+                  hiddenTechnicianIds.has('unassigned')
+                    ? 'bg-muted/30 border-muted-foreground/20 opacity-50'
+                    : 'bg-muted/50 border-muted-foreground/30'
+                }`}
+                data-testid="chip-technician-unassigned"
+              >
+                <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/40" />
+                <span className={hiddenTechnicianIds.has('unassigned') ? 'text-muted-foreground' : ''}>Unassigned</span>
+              </button>
             </div>
           )}
 
-          <div className={`grid gap-2 flex-1 min-h-0 overflow-hidden ${isUnscheduledMinimized ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-6'}`}>
-            <div className={`${isUnscheduledMinimized ? 'col-span-1' : 'lg:col-span-5'} flex flex-col h-full min-h-0 max-h-full`}>
+          <div className={`grid gap-1.5 flex-1 min-h-0 overflow-hidden ${isUnscheduledMinimized ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-7'}`}>
+            <div className={`${isUnscheduledMinimized ? 'col-span-1' : 'lg:col-span-6'} flex flex-col h-full min-h-0 max-h-full`}>
               <Card className="h-full flex flex-col">
                 <CardContent className="flex-1 overflow-auto p-0">
                   {view === "monthly" && (

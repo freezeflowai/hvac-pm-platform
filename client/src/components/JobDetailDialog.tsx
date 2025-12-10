@@ -1,19 +1,15 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Trash2, Plus, Camera, Edit2, X, AlertTriangle, Save, AlertCircle, Calendar as CalendarIcon } from "lucide-react";
+import { Trash2, Plus, Camera, Edit2, X, AlertTriangle, Save, AlertCircle, Calendar as CalendarIcon, MapPin, Clock, User, Wrench, FileText, Image as ImageIcon, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -349,12 +345,13 @@ export function JobDetailDialog({
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > MAX_FILE_SIZE) {
-      toast({ title: "Image too large", description: "Maximum size is 5MB", variant: "destructive" });
-      e.target.value = "";
+      toast({ title: "File too large", description: "Maximum file size is 5MB", variant: "destructive" });
       return;
     }
     const reader = new FileReader();
-    reader.onloadend = () => setNewNoteImage(reader.result as string);
+    reader.onloadend = () => {
+      setNewNoteImage(reader.result as string);
+    };
     reader.readAsDataURL(file);
   };
 
@@ -362,12 +359,13 @@ export function JobDetailDialog({
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > MAX_FILE_SIZE) {
-      toast({ title: "Image too large", description: "Maximum size is 5MB", variant: "destructive" });
-      e.target.value = "";
+      toast({ title: "File too large", description: "Maximum file size is 5MB", variant: "destructive" });
       return;
     }
     const reader = new FileReader();
-    reader.onloadend = () => setEditingNoteImage(reader.result as string);
+    reader.onloadend = () => {
+      setEditingNoteImage(reader.result as string);
+    };
     reader.readAsDataURL(file);
   };
 
@@ -448,315 +446,389 @@ export function JobDetailDialog({
   const isOverdue = scheduledDate && scheduledDate < today && !assignment.completed;
   const isUnscheduled = !hasScheduledDay && !assignment.completed;
 
+  // Get status info for badge
+  const getStatusBadge = () => {
+    if (assignment.completed) {
+      return { label: 'Completed', variant: 'default' as const, icon: CheckCircle2, className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-green-200' };
+    }
+    if (isOverdue) {
+      return { label: 'Overdue', variant: 'destructive' as const, icon: AlertCircle, className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 border-red-200' };
+    }
+    if (isUnscheduled) {
+      return { label: 'Unscheduled', variant: 'outline' as const, icon: null, className: '' };
+    }
+    return { label: 'Scheduled', variant: 'secondary' as const, icon: null, className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' };
+  };
+
+  const statusBadge = getStatusBadge();
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="dialog-job-detail">
-          <button
-            onClick={() => onOpenChange(false)}
-            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            data-testid="button-close-dialog"
-          >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </button>
-
-          <DialogHeader>
-            <DialogTitle className="text-base font-semibold pr-6" data-testid="text-job-dialog-title">
-              {client?.companyName || "Unknown Client"} - Preventive Maintenance
-            </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
-              Job #{assignment.jobNumber}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 pt-2">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="completed"
-                checked={isCompleted}
-                onCheckedChange={handleToggleComplete}
-                data-testid="checkbox-completed"
-              />
-              <label
-                htmlFor="completed"
-                className="text-sm font-medium leading-none cursor-pointer"
-              >
-                Completed
-              </label>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-semibold mb-1">Details</h3>
-              <div className="flex gap-2 text-sm">
-                <span 
-                  className="text-primary hover:underline cursor-pointer" 
-                  onClick={() => setReportClientId(client?.id || null)}
-                  data-testid="link-client-details"
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0" aria-describedby={undefined} data-testid="dialog-job-detail">
+          {/* Header */}
+          <div className="border-b px-6 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-semibold leading-tight" data-testid="text-job-dialog-title">
+                  <span 
+                    className="text-primary hover:underline cursor-pointer"
+                    onClick={() => setReportClientId(client?.id || null)}
+                  >
+                    {client?.companyName || "Unknown Client"}
+                  </span>
+                  <span className="text-muted-foreground font-normal"> – Preventive Maintenance</span>
+                </h2>
+                <p className="text-sm text-muted-foreground mt-0.5">Job #{assignment.jobNumber}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Badge 
+                  variant={statusBadge.variant}
+                  className={`flex items-center gap-1 ${statusBadge.className}`}
+                  data-testid="badge-job-status"
                 >
-                  {client?.companyName}
-                </span>
-                <span className="text-muted-foreground">-</span>
-                <span className="text-muted-foreground" data-testid="text-job-id">
-                  Job #{assignment.jobNumber}
-                </span>
+                  {statusBadge.icon && <statusBadge.icon className="h-3 w-3" />}
+                  {statusBadge.label}
+                </Badge>
               </div>
             </div>
+            
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 mt-3">
+              <Button
+                onClick={handleToggleComplete}
+                variant={isCompleted ? "outline" : "default"}
+                size="sm"
+                disabled={toggleComplete.isPending}
+                data-testid="button-mark-completed"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                {isCompleted ? "Mark Incomplete" : "Mark Completed"}
+              </Button>
+              
+              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-reschedule">
+                    <CalendarIcon className="h-4 w-4 mr-1.5" />
+                    Reschedule
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
 
-            {onAssignTechnicians && (
-              <div>
-                <h3 className="text-sm font-semibold mb-2">Team</h3>
-                <div className="space-y-2">
-                  {selectedTechs.map((techId) => {
-                    const tech = technicians.find((t: any) => t.id === techId);
-                    if (!tech) return null;
-                    const techName = tech.firstName && tech.lastName 
-                      ? `${tech.firstName} ${tech.lastName}` 
-                      : tech.email;
-                    return (
-                      <div 
-                        key={techId} 
-                        className="flex items-center justify-between gap-2 text-sm p-2 rounded border"
-                        data-testid={`team-member-${techId}`}
+              {hasScheduledDay && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => unscheduleJob.mutate()}
+                  disabled={unscheduleJob.isPending}
+                  data-testid="button-unschedule"
+                >
+                  Unschedule
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Body - Two columns */}
+          <div className="overflow-y-auto max-h-[calc(90vh-200px)]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+              {/* Left Column */}
+              <div className="space-y-5">
+                {/* Details Section */}
+                <section>
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    Details
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Client:</span>{" "}
+                      <span 
+                        className="text-primary hover:underline cursor-pointer font-medium"
+                        onClick={() => setReportClientId(client?.id || null)}
+                        data-testid="link-client-details"
                       >
-                        <span>{techName}</span>
+                        {client?.companyName}
+                      </span>
+                    </div>
+                    {client?.location && (
+                      <div>
+                        <span className="text-muted-foreground">Location:</span>{" "}
+                        <span data-testid="text-site-location">{client.location}</span>
+                      </div>
+                    )}
+                    {fullAddress && (
+                      <div>
+                        <span className="text-muted-foreground">Address:</span>{" "}
+                        <span className="text-foreground" data-testid="text-address">{fullAddress}</span>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* Schedule Section */}
+                <section>
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    Schedule
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Date:</span>{" "}
+                      <span className="font-medium">
+                        {selectedDate ? format(selectedDate, "EEEE, MMMM d, yyyy") : "Not scheduled"}
+                      </span>
+                    </div>
+                    {assignment.scheduledHour != null && (
+                      <div>
+                        <span className="text-muted-foreground">Time:</span>{" "}
+                        <span>
+                          {assignment.scheduledHour === 0 ? '12 AM' : 
+                           assignment.scheduledHour < 12 ? `${assignment.scheduledHour} AM` : 
+                           assignment.scheduledHour === 12 ? '12 PM' : 
+                           `${assignment.scheduledHour - 12} PM`}
+                        </span>
+                      </div>
+                    )}
+                    {onAssignTechnicians && (
+                      <div>
+                        <span className="text-muted-foreground">Technicians:</span>
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {selectedTechs.map((techId) => {
+                            const tech = technicians.find((t: any) => t.id === techId);
+                            if (!tech) return null;
+                            return (
+                              <Badge 
+                                key={techId}
+                                variant="secondary"
+                                className="flex items-center gap-1 pr-1"
+                                data-testid={`team-member-${techId}`}
+                              >
+                                {tech.firstName} {tech.lastName?.[0]}.
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-4 w-4 ml-0.5 hover:bg-destructive/20"
+                                  onClick={() => handleTechnicianToggle(techId)}
+                                  data-testid={`button-remove-tech-${techId}`}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </Badge>
+                            );
+                          })}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2"
+                            onClick={() => {
+                              const availableTechs = technicians.filter((t: any) => !selectedTechs.includes(t.id));
+                              if (availableTechs.length > 0) {
+                                handleTechnicianToggle(availableTechs[0].id);
+                              }
+                            }}
+                            data-testid="button-add-technician"
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* Parts Section - only show if there are parts */}
+                {partsList.length > 0 && (
+                  <section>
+                    <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                      <Wrench className="h-4 w-4 text-muted-foreground" />
+                      Parts
+                    </h3>
+                    <div className="space-y-1.5 bg-muted/30 rounded-md p-3">
+                      {partsList.map((item, index) => (
+                        <div 
+                          key={index} 
+                          className="flex justify-between text-sm"
+                          data-testid={`part-item-${index}`}
+                        >
+                          <span>{item.quantity} × {item.description}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </div>
+
+              {/* Right Column */}
+              <div className="space-y-5">
+                {/* Notes Section */}
+                <section>
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    Notes
+                  </h3>
+                  
+                  {isLoadingNotes ? (
+                    <p className="text-sm text-muted-foreground">Loading notes...</p>
+                  ) : notes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground mb-3">No notes yet</p>
+                  ) : (
+                    <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
+                      {notes.map((note) => (
+                        <div key={note.id} className="border rounded-md p-2.5 text-sm" data-testid={`note-${note.id}`}>
+                          {editingNoteId === note.id ? (
+                            <div className="space-y-2">
+                              <Textarea
+                                value={editingNoteText}
+                                onChange={(e) => setEditingNoteText(e.target.value)}
+                                className="resize-none text-sm min-h-[60px]"
+                                rows={2}
+                                data-testid="input-edit-note"
+                              />
+                              {(editingNoteImage || note.imageUrl) && (
+                                <div className="relative inline-block">
+                                  <img 
+                                    src={editingNoteImage || note.imageUrl || ""} 
+                                    alt="Note attachment" 
+                                    className="max-h-24 rounded border"
+                                  />
+                                  <Button
+                                    size="icon"
+                                    variant="destructive"
+                                    className="absolute top-1 right-1 h-5 w-5"
+                                    onClick={() => setEditingNoteImage(null)}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2">
+                                <input type="file" accept="image/*" ref={editFileInputRef} onChange={handleEditImageSelect} className="hidden" />
+                                <Button size="sm" variant="ghost" className="h-7" onClick={() => editFileInputRef.current?.click()} data-testid="button-edit-add-image">
+                                  <Camera className="h-3.5 w-3.5" />
+                                </Button>
+                                <div className="flex-1" />
+                                <Button size="sm" variant="ghost" className="h-7" onClick={cancelEditing} data-testid="button-cancel-edit">Cancel</Button>
+                                <Button size="sm" className="h-7" onClick={handleSaveEdit} disabled={isSubmitting || !editingNoteText.trim()} data-testid="button-save-edit">
+                                  Save
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="flex-1" data-testid={`text-note-${note.id}`}>{note.noteText}</p>
+                                <div className="flex items-center gap-0.5 flex-shrink-0">
+                                  <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => startEditing(note)} data-testid={`button-edit-note-${note.id}`}>
+                                    <Edit2 className="h-3 w-3" />
+                                  </Button>
+                                  <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => deleteNoteMutation.mutate(note.id)} data-testid={`button-delete-note-${note.id}`}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                              {note.imageUrl && (
+                                <img src={note.imageUrl} alt="Note attachment" className="max-h-32 rounded border mt-2 cursor-pointer hover:opacity-90" onClick={() => window.open(note.imageUrl!, '_blank')} data-testid={`img-note-${note.id}`} />
+                              )}
+                              <p className="text-xs text-muted-foreground mt-1.5" data-testid={`text-note-date-${note.id}`}>
+                                {format(new Date(note.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                                {note.updatedAt !== note.createdAt && " (edited)"}
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add note form */}
+                  <div className="space-y-2 border-t pt-3">
+                    <Textarea
+                      placeholder="Add a note..."
+                      value={newNoteText}
+                      onChange={(e) => setNewNoteText(e.target.value)}
+                      className="resize-none text-sm min-h-[60px]"
+                      rows={2}
+                      data-testid="input-new-note"
+                    />
+                    {newNoteImage && (
+                      <div className="relative inline-block">
+                        <img src={newNoteImage} alt="Preview" className="max-h-24 rounded border" />
                         <Button
-                          variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
-                          onClick={() => handleTechnicianToggle(techId)}
-                          data-testid={`button-remove-tech-${techId}`}
+                          variant="destructive"
+                          className="absolute top-1 right-1 h-5 w-5"
+                          onClick={() => { setNewNoteImage(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
                         >
                           <X className="h-3 w-3" />
                         </Button>
                       </div>
-                    );
-                  })}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-8 h-8 p-0"
-                    onClick={() => {
-                      const availableTechs = technicians.filter((t: any) => !selectedTechs.includes(t.id));
-                      if (availableTechs.length > 0) {
-                        handleTechnicianToggle(availableTechs[0].id);
-                      }
-                    }}
-                    data-testid="button-add-technician"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {(client?.location || fullAddress) && (
-              <div>
-                <h3 className="text-sm font-semibold mb-1">Location</h3>
-                {client?.location && (
-                  <p className="text-sm font-medium" data-testid="text-site-location">{client.location}</p>
-                )}
-                {fullAddress && (
-                  <p className="text-sm text-muted-foreground" data-testid="text-address">{fullAddress}</p>
-                )}
-              </div>
-            )}
-
-            <div>
-              <h3 className="text-sm font-semibold mb-2">Status</h3>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge 
-                  variant={isOverdue ? "destructive" : assignment.completed ? "default" : isUnscheduled ? "outline" : "secondary"}
-                  className="flex items-center gap-1"
-                  data-testid="badge-job-status"
-                >
-                  {isOverdue && <AlertCircle className="h-3 w-3" />}
-                  {assignment.completed ? "Completed" : isOverdue ? "Overdue" : isUnscheduled ? "Unscheduled" : "Scheduled"}
-                </Badge>
-
-                <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="h-7 gap-1"
-                      data-testid="button-change-date"
-                    >
-                      <CalendarIcon className="h-3 w-3" />
-                      {selectedDate ? format(selectedDate, "MMM d, yyyy") : "Select date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={handleDateSelect}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-
-                {hasScheduledDay && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    className="h-7 text-destructive hover:text-destructive"
-                    onClick={() => unscheduleJob.mutate()}
-                    disabled={unscheduleJob.isPending}
-                    data-testid="button-unschedule"
-                  >
-                    Unschedule
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-semibold mb-2">Parts</h3>
-              <div className="space-y-2 bg-muted/30 rounded-md p-3">
-                {partsList.length > 0 ? (
-                  partsList.map((item, index) => (
-                    <div 
-                      key={index} 
-                      className="flex justify-between text-sm"
-                      data-testid={`part-item-${index}`}
-                    >
-                      <span>{item.description}</span>
-                      <span className="font-medium">{item.quantity}</span>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageSelect} className="hidden" />
+                      <Button size="sm" variant="outline" className="h-7" onClick={() => fileInputRef.current?.click()} data-testid="button-add-image">
+                        <Camera className="h-3.5 w-3.5 mr-1" />Image
+                      </Button>
+                      <div className="flex-1" />
+                      <Button size="sm" className="h-7" onClick={handleAddNote} disabled={isSubmitting || (!newNoteText.trim() && !newNoteImage)} data-testid="button-add-note">
+                        <Plus className="h-3.5 w-3.5 mr-1" />Add Note
+                      </Button>
                     </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">No parts assigned</p>
-                )}
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold">Notes</h3>
-              </div>
-
-              {isLoadingNotes ? (
-                <p className="text-sm text-muted-foreground">Loading notes...</p>
-              ) : notes.length === 0 ? (
-                <p className="text-sm text-muted-foreground mb-3">No notes yet</p>
-              ) : (
-                <div className="space-y-3 mb-3">
-                  {notes.map((note) => (
-                    <div key={note.id} className="border rounded-lg p-3 space-y-2" data-testid={`note-${note.id}`}>
-                      {editingNoteId === note.id ? (
-                        <div className="space-y-2">
-                          <Textarea
-                            value={editingNoteText}
-                            onChange={(e) => setEditingNoteText(e.target.value)}
-                            className="resize-none text-sm"
-                            rows={3}
-                            data-testid="input-edit-note"
-                          />
-                          {(editingNoteImage || note.imageUrl) && (
-                            <div className="relative inline-block">
-                              <img 
-                                src={editingNoteImage || note.imageUrl || ""} 
-                                alt="Note attachment" 
-                                className="max-h-32 rounded border"
-                              />
-                              <Button
-                                size="icon"
-                                variant="destructive"
-                                className="absolute top-1 right-1 h-6 w-6"
-                                onClick={() => setEditingNoteImage(null)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2">
-                            <input type="file" accept="image/*" ref={editFileInputRef} onChange={handleEditImageSelect} className="hidden" />
-                            <Button size="sm" variant="outline" onClick={() => editFileInputRef.current?.click()} data-testid="button-edit-add-image">
-                              <Camera className="h-4 w-4 mr-1" />
-                              {editingNoteImage ? "Change" : "Add"} Image
-                            </Button>
-                            <div className="flex-1" />
-                            <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="button-cancel-edit">Cancel</Button>
-                            <Button size="sm" onClick={handleSaveEdit} disabled={isSubmitting || !editingNoteText.trim()} data-testid="button-save-edit">
-                              <Save className="h-4 w-4 mr-1" />Save
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm flex-1" data-testid={`text-note-${note.id}`}>{note.noteText}</p>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditing(note)} data-testid={`button-edit-note-${note.id}`}>
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteNoteMutation.mutate(note.id)} data-testid={`button-delete-note-${note.id}`}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </div>
-                          {note.imageUrl && (
-                            <img src={note.imageUrl} alt="Note attachment" className="max-h-48 rounded border cursor-pointer hover:opacity-90" onClick={() => window.open(note.imageUrl!, '_blank')} data-testid={`img-note-${note.id}`} />
-                          )}
-                          <p className="text-xs text-muted-foreground" data-testid={`text-note-date-${note.id}`}>
-                            {format(new Date(note.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                            {note.updatedAt !== note.createdAt && " (edited)"}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="space-y-2 border-t pt-3">
-                <h4 className="text-sm font-medium">Add New Note</h4>
-                <Textarea
-                  placeholder="Enter note text..."
-                  value={newNoteText}
-                  onChange={(e) => setNewNoteText(e.target.value)}
-                  className="resize-none text-sm"
-                  rows={2}
-                  data-testid="input-new-note"
-                />
-                {newNoteImage && (
-                  <div className="relative inline-block">
-                    <img src={newNoteImage} alt="Preview" className="max-h-32 rounded border" />
-                    <Button
-                      size="icon"
-                      variant="destructive"
-                      className="absolute top-1 right-1 h-6 w-6"
-                      onClick={() => { setNewNoteImage(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
                   </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageSelect} className="hidden" />
-                  <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-add-image">
-                    <Camera className="h-4 w-4 mr-1" />Add Image
-                  </Button>
-                  <div className="flex-1" />
-                  <Button size="sm" onClick={handleAddNote} disabled={isSubmitting || (!newNoteText.trim() && !newNoteImage)} data-testid="button-add-note">
-                    <Plus className="h-4 w-4 mr-1" />Add Note
-                  </Button>
-                </div>
+                </section>
+
+                {/* Attachments Section */}
+                <section>
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                    Attachments
+                  </h3>
+                  <div className="text-sm text-muted-foreground">
+                    {notes.some(n => n.imageUrl) ? (
+                      <div className="grid grid-cols-3 gap-2">
+                        {notes.filter(n => n.imageUrl).map(note => (
+                          <img 
+                            key={note.id}
+                            src={note.imageUrl!} 
+                            alt="Attachment" 
+                            className="h-16 w-full object-cover rounded border cursor-pointer hover:opacity-90"
+                            onClick={() => window.open(note.imageUrl!, '_blank')}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p>No attachments</p>
+                    )}
+                  </div>
+                </section>
               </div>
             </div>
+          </div>
 
-            <div className="border-t pt-4">
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowDeleteConfirm(true)}
-                data-testid="button-delete-job"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Job
-              </Button>
-            </div>
+          {/* Footer */}
+          <div className="border-t px-6 py-3 flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => setShowDeleteConfirm(true)}
+              data-testid="button-delete-job"
+            >
+              <Trash2 className="h-4 w-4 mr-1.5" />
+              Delete Job
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Created {format(parseLocalDate(assignment.scheduledDate || `${assignment.year}-${assignment.month}-01`), "MMM d, yyyy")}
+            </p>
           </div>
         </DialogContent>
       </Dialog>
