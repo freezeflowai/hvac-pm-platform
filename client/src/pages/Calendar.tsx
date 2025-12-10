@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ChevronsRight, ChevronsLeft, Users, Info, AlertTriangle, Trash2, Archive } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ChevronsRight, ChevronsLeft, Users, Info, AlertTriangle, Trash2, Archive, Package } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -72,24 +72,24 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
 
   return (
     <div className="h-full flex flex-col">
-      <Card className="h-full shadow-md rounded-xl flex flex-col overflow-hidden">
-        <CardHeader className="pb-2 pt-3 px-4 flex flex-row items-center justify-between space-y-0 flex-shrink-0">
-          <CardTitle className="text-sm font-semibold">Unscheduled ({clients.length})</CardTitle>
+      <Card className="h-full shadow-md rounded-lg flex flex-col overflow-hidden">
+        <CardHeader className="pb-1.5 pt-2 px-3 flex flex-row items-center justify-between space-y-0 flex-shrink-0 border-b">
+          <CardTitle className="text-xs font-semibold">Unscheduled ({clients.length})</CardTitle>
           <Button
             variant="ghost"
             size="icon"
             onClick={onToggleMinimize}
-            className="h-7 w-7"
+            className="h-6 w-6"
             data-testid="button-minimize-unscheduled"
           >
-            <ChevronsRight className="h-3.5 w-3.5" />
+            <ChevronsRight className="h-3 w-3" />
           </Button>
         </CardHeader>
-        <CardContent className="flex-1 min-h-0 p-4 pt-2">
+        <CardContent className="flex-1 min-h-0 p-2">
           <SortableContext items={clients.map((c: any) => c.id)} strategy={verticalListSortingStrategy}>
             <div 
               ref={setNodeRef}
-              className="space-y-2 h-full overflow-y-auto pr-2"
+              className="space-y-1.5 h-full overflow-y-auto pr-1"
               style={{ scrollbarWidth: 'thin' }}
               data-testid="unscheduled-panel"
             >
@@ -155,15 +155,8 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     opacity: isDragging ? 0.5 : 1,
   };
 
-  // Get status for pill display
-  const getStatusPill = () => {
-    if (!inCalendar) return null;
-    if (isCompleted) return { label: 'Done', className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' };
-    if (isOverdue) return { label: 'Overdue', className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' };
-    return { label: 'Scheduled', className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' };
-  };
-
   // Card styling: left border for technician color, subtle background
+  // For overdue items in calendar: use red left border instead of badge
   const getCardStyle = () => {
     const baseStyle = 'bg-card border border-border shadow-sm hover:shadow-md';
     if (!inCalendar) {
@@ -171,13 +164,12 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
       if (isOffMonth) return `${baseStyle} border-l-4 border-l-muted-foreground/40`;
       return baseStyle;
     }
-    // Use technician left border for calendar items
+    // Use technician left border for calendar items, or red for overdue
     const completedOpacity = isCompleted ? 'opacity-60' : '';
-    const leftBorder = technicianColor?.borderLeft || 'border-l-muted-foreground/40';
+    // Overdue items get red border, else use technician color
+    const leftBorder = isOverdue ? 'border-l-red-500' : (technicianColor?.borderLeft || 'border-l-muted-foreground/40');
     return `${baseStyle} border-l-4 ${leftBorder} ${completedOpacity}`;
   };
-
-  const statusPill = getStatusPill();
 
   return (
     <div
@@ -191,39 +183,59 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
         {...listeners}
         className={inCalendar ? "cursor-grab active:cursor-grabbing" : ""}
       >
-        {/* Top row: Client name + location + status pill */}
-        <div className="flex items-start justify-between gap-1">
-          <div className="flex-1 min-w-0">
-            <div className={`font-semibold text-[11px] leading-tight truncate ${isCompleted ? 'line-through' : ''}`}>
-              {client.companyName}
-              {client.location && <span className="font-normal text-muted-foreground"> - {client.location}</span>}
+        {/* In Calendar: Clean layout - no status badges, job info only */}
+        {inCalendar ? (
+          <>
+            {/* Line 1: Client + Location */}
+            <div className="flex items-start gap-1">
+              <div className="flex-1 min-w-0">
+                <div className={`font-semibold text-[11px] leading-tight truncate ${isCompleted ? 'line-through opacity-60' : ''}`}>
+                  {client.companyName}
+                  {client.location && <span className="font-normal text-muted-foreground"> - {client.location}</span>}
+                </div>
+              </div>
+              {/* Small red dot for overdue instead of badge */}
+              {isOverdue && (
+                <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 mt-0.5" title="Overdue" />
+              )}
             </div>
-          </div>
-          {inCalendar && statusPill && (
-            <span className={`text-[8px] px-1 py-0.5 rounded font-medium whitespace-nowrap ${statusPill.className}`}>
-              {statusPill.label}
-            </span>
-          )}
-          {!inCalendar && monthLabel && (
-            <span className={`text-[9px] px-1 py-0.5 rounded font-medium whitespace-nowrap ${isPastMonth ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-muted text-muted-foreground'}`}>
-              {monthLabel}
-            </span>
-          )}
-        </div>
-        
-        {/* Second row: Job type/summary */}
-        {inCalendar && (
-          <div className={`text-[10px] text-foreground/80 leading-tight mt-0.5 ${isCompleted ? 'line-through' : ''}`}>
-            Preventive Maintenance
-            {assignment?.jobNumber && <span className="text-muted-foreground ml-1">#{assignment.jobNumber}</span>}
-          </div>
-        )}
-        
-        {/* Third row: City/address (muted) */}
-        {inCalendar && client.city && (
-          <div className={`text-[9px] text-muted-foreground leading-tight ${isCompleted ? 'line-through' : ''}`}>
-            {client.city}
-          </div>
+            {/* Line 2: Job description */}
+            <div className={`text-[10px] text-foreground/80 leading-tight mt-0.5 ${isCompleted ? 'line-through opacity-60' : ''}`}>
+              Preventive Maintenance
+              {assignment?.jobNumber && <span className="text-muted-foreground ml-1">#{assignment.jobNumber}</span>}
+            </div>
+            {/* Line 3: City */}
+            {client.city && (
+              <div className={`text-[9px] text-muted-foreground leading-tight ${isCompleted ? 'opacity-60' : ''}`}>
+                {client.city}
+              </div>
+            )}
+          </>
+        ) : (
+          /* Unscheduled drawer: Stacked 3-line layout */
+          <>
+            {/* Line 1: Client name + month badge */}
+            <div className="flex items-start justify-between gap-1">
+              <div className={`font-semibold text-[11px] leading-tight truncate flex-1 min-w-0 ${isPastMonth ? 'text-red-700 dark:text-red-300' : ''}`}>
+                {client.companyName}
+              </div>
+              {monthLabel && (
+                <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap flex-shrink-0 ${isPastMonth ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-muted text-muted-foreground'}`}>
+                  {monthLabel}
+                </span>
+              )}
+            </div>
+            {/* Line 2: Location info */}
+            {client.location && (
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 truncate">
+                {client.location}
+              </div>
+            )}
+            {/* Line 3: Due date info */}
+            <div className={`text-[9px] leading-tight mt-0.5 ${isPastMonth ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'}`}>
+              {isPastMonth ? 'Overdue' : 'Due'} {monthLabel}
+            </div>
+          </>
         )}
       </div>
       {inCalendar && onClick && (
@@ -1206,50 +1218,18 @@ export default function Calendar() {
     return (
       <div className="flex flex-col h-full min-h-0 max-h-full">
         <div className="grid grid-cols-8 sticky top-0 bg-background z-10 border-b flex-shrink-0">
-          <div className="p-2 text-xs font-semibold border-r">Time</div>
-          {weekDaysData.map((d) => {
-            // Calculate total parts for this day
-            const dayParts = d.dayAssignments.reduce((total: number, assignment: any) => {
-              const clientPartsList = bulkParts[assignment.clientId] || [];
-              const partCount = clientPartsList.reduce((sum: number, cp: any) => sum + (cp.quantity || 0), 0);
-              return total + partCount;
-            }, 0);
-
-            return (
-              <div key={d.dayName} className="p-2 text-center border-r text-xs font-semibold space-y-1">
-                <div>{d.dayName}</div>
-                <div className="text-muted-foreground">{d.date.getDate()}</div>
-                {dayParts > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-2 text-[10px] w-full"
-                    onClick={() => {
-                      if (isLoadingParts) {
-                        toast({
-                          title: "Loading parts data",
-                          description: "Please wait while parts are being loaded",
-                        });
-                        return;
-                      }
-                      const parts = calculateParts(d.dayAssignments);
-                      setPartsDialogTitle(`Parts for ${d.dayName}, ${d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`);
-                      setPartsDialogParts(parts);
-                      setPartsDialogOpen(true);
-                    }}
-                    data-testid={`button-parts-${d.dayName}`}
-                  >
-                    {dayParts} parts
-                  </Button>
-                )}
-              </div>
-            );
-          })}
+          <div className="px-1.5 py-1 text-[10px] font-semibold border-r flex items-center justify-center">Time</div>
+          {weekDaysData.map((d) => (
+            <div key={d.dayName} className="px-1 py-1 text-center border-r text-[10px] font-semibold">
+              <div>{d.dayName}</div>
+              <div className="text-muted-foreground">{d.date.getDate()}</div>
+            </div>
+          ))}
         </div>
 
         {/* All Day Slot - Pinned outside scrollable area */}
         <div className="grid grid-cols-8 border-b bg-primary/5 flex-shrink-0">
-          <div className="p-2 text-xs font-semibold border-r sticky left-0 z-20 bg-primary/10">
+          <div className="px-1.5 py-1 text-[10px] font-semibold border-r sticky left-0 z-20 bg-primary/10 flex items-center">
             All Day
           </div>
           {weekDaysData.map((dayData) => {
@@ -1321,7 +1301,7 @@ export default function Calendar() {
         <div ref={weeklyScrollContainerRef} className="overflow-y-scroll flex-1 min-h-0 max-h-full" style={{ scrollbarWidth: 'auto', overflowX: 'hidden' }}>
           {hours.map((h) => (
             <div key={h.hour} className="grid grid-cols-8 border-b">
-              <div className={`p-2 text-xs font-medium border-r sticky left-0 z-20 ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
+              <div className={`px-1.5 py-1 text-[10px] font-medium border-r sticky left-0 z-20 flex items-center justify-center ${h.hour === startHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
                 {h.display}
               </div>
               {weekDaysData.map((dayData) => (
@@ -1425,7 +1405,7 @@ export default function Calendar() {
           </DialogContent>
         </Dialog>
 
-        <main className={`flex flex-col flex-1 min-h-0 mx-auto px-4 sm:px-6 lg:px-8 py-4 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
+        <main className={`flex flex-col flex-1 min-h-0 w-full px-2 sm:px-3 lg:px-4 py-2 transition-all ${isUnscheduledMinimized ? 'pr-16' : ''}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Button
@@ -1479,11 +1459,12 @@ export default function Calendar() {
               </Button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {view === "weekly" && (
                 <>
                   <Select value={selectedTechnicianId || "all"} onValueChange={setSelectedTechnicianId}>
-                    <SelectTrigger className="w-40 text-xs" data-testid="select-technician-filter">
+                    <SelectTrigger className="w-36 text-xs h-8" data-testid="select-technician-filter">
+                      <Users className="h-3.5 w-3.5 mr-1.5" />
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1496,6 +1477,42 @@ export default function Calendar() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => {
+                      if (isLoadingParts) {
+                        toast({
+                          title: "Loading parts data",
+                          description: "Please wait while parts are being loaded",
+                        });
+                        return;
+                      }
+                      // Calculate parts for entire visible week
+                      const weekStart = getMondayOfWeek(currentDate);
+                      const allWeekAssignments = assignments.filter((a: any) => {
+                        for (let i = 0; i < 7; i++) {
+                          const date = new Date(weekStart);
+                          date.setDate(weekStart.getDate() + i);
+                          if (a.year === date.getFullYear() && a.month === date.getMonth() + 1 && a.day === date.getDate()) {
+                            return true;
+                          }
+                        }
+                        return false;
+                      });
+                      const parts = calculateParts(allWeekAssignments);
+                      const weekEnd = new Date(weekStart);
+                      weekEnd.setDate(weekEnd.getDate() + 6);
+                      setPartsDialogTitle(`Parts for ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`);
+                      setPartsDialogParts(parts);
+                      setPartsDialogOpen(true);
+                    }}
+                    data-testid="button-parts"
+                  >
+                    <Package className="h-3.5 w-3.5 mr-1.5" />
+                    Parts
+                  </Button>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Start:</span>
                     <Select 
@@ -1556,8 +1573,8 @@ export default function Calendar() {
 
           {/* Technician Filter Chips */}
           {technicians.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap text-xs">
-              <span className="text-muted-foreground font-medium">Technicians:</span>
+            <div className="flex items-center gap-1.5 flex-wrap text-xs mt-1.5">
+              <span className="text-muted-foreground font-medium text-[11px]">Show:</span>
               {technicians.map((tech: any, index: number) => {
                 const color = TECHNICIAN_COLORS[index % TECHNICIAN_COLORS.length];
                 const isHidden = hiddenTechnicianIds.has(tech.id);
@@ -1575,14 +1592,14 @@ export default function Calendar() {
                         return next;
                       });
                     }}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all ${
+                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full border transition-all text-[10px] ${
                       isHidden 
                         ? 'bg-muted/30 border-muted-foreground/20 opacity-50' 
                         : `${color.bg} ${color.border}`
                     }`}
                     data-testid={`chip-technician-${tech.id}`}
                   >
-                    <div className={`w-2.5 h-2.5 rounded-full ${color.dot}`} />
+                    <div className={`w-2 h-2 rounded-full ${color.dot}`} />
                     <span className={isHidden ? 'text-muted-foreground' : ''}>{tech.firstName} {tech.lastName?.[0]}.</span>
                   </button>
                 );
@@ -1599,21 +1616,21 @@ export default function Calendar() {
                     return next;
                   });
                 }}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all ${
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full border transition-all text-[10px] ${
                   hiddenTechnicianIds.has('unassigned')
                     ? 'bg-muted/30 border-muted-foreground/20 opacity-50'
                     : 'bg-muted/50 border-muted-foreground/30'
                 }`}
                 data-testid="chip-technician-unassigned"
               >
-                <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/40" />
+                <div className="w-2 h-2 rounded-full bg-muted-foreground/40" />
                 <span className={hiddenTechnicianIds.has('unassigned') ? 'text-muted-foreground' : ''}>Unassigned</span>
               </button>
             </div>
           )}
 
-          <div className={`grid gap-1.5 flex-1 min-h-0 overflow-hidden ${isUnscheduledMinimized ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-7'}`}>
-            <div className={`${isUnscheduledMinimized ? 'col-span-1' : 'lg:col-span-6'} flex flex-col h-full min-h-0 max-h-full`}>
+          <div className={`grid gap-1 flex-1 min-h-0 overflow-hidden ${isUnscheduledMinimized ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-8'}`}>
+            <div className={`${isUnscheduledMinimized ? 'col-span-1' : 'lg:col-span-7'} flex flex-col h-full min-h-0 max-h-full`}>
               <Card className="h-full flex flex-col">
                 <CardContent className="flex-1 overflow-auto p-0">
                   {view === "monthly" && (

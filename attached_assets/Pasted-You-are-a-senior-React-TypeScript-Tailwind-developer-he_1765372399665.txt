@@ -1,0 +1,210 @@
+You are a senior React + TypeScript + Tailwind developer helping me refine my Calendar UI in this HVAC PM app.
+The weekly/monthly calendar is already working (drag-and-drop, unscheduled drawer, etc.), but I need visual/layout improvements and a new way to access “parts” totals.
+
+Please carefully implement the changes below without breaking existing behavior. Do not change any business logic related to jobs, technicians, or drag-and-drop – this is mostly layout/UX.
+
+1. Fix calendar grid alignment (All Day vs time slots)
+
+Goal: The vertical grid lines for “All Day” and the hourly rows must line up perfectly. Right now you can see that the line between “All Day” and “7 AM” is offset.
+
+Requirements:
+
+Find the main calendar layout component (weekly view) – the part that renders:
+
+the “All Day” row
+
+the time column (7 AM, 8 AM, etc.)
+
+the day columns (Mon, Tue, …).
+
+Make sure the All Day row and the hourly rows use the exact same column grid:
+
+Same number of columns.
+
+Same CSS grid template or flex basis.
+
+No extra margins/padding that shift the “All Day” row horizontally.
+
+If there is a separate wrapper for the “All Day” row, refactor so that:
+
+there is a single grid parent for all rows (All Day + times),
+
+or at least they reuse the same grid-template-columns via a shared class.
+
+Visually confirm the fix: the vertical borders under “Mon / Tue / …” must be a straight continuous line from “All Day” all the way down to the bottom times.
+
+2. Use the full width between sidebar and screen edge
+
+Goal: Reduce outer white gaps and make the calendar feel fuller, more like Jobber – i.e. the calendar grid should stretch from just after the left sidebar to almost the right edge of the screen, with only minimal padding.
+
+Requirements:
+
+Find the top-level layout wrapper around the Calendar view.
+
+Reduce excessive horizontal padding/margins so that:
+
+Left edge: the calendar grid starts just after the left sidebar (a small padding is okay, but no large gutter).
+
+Right edge: the unscheduled drawer should be very close to the browser edge; no big white margin outside it.
+
+If the calendar is constrained by a max-width on a parent, relax it so it can scale toward full viewport width (e.g. use w-full and only small px-4 type padding).
+
+Make sure this still works responsively on smaller widths (the layout can scroll horizontally if needed).
+
+3. Replace “parts chips” with a Parts button + dialog
+
+Right now each day header shows a “XX parts” pill, which clutters the header row. I want to remove that per-day badge entirely and replace it with a dedicated Parts button that opens a dialog.
+
+Requirements:
+
+Remove the per-day “NN parts” pill from the calendar day headers (e.g. “27 parts”, “45 parts”, etc.).
+
+Add a new “Parts” button into the calendar toolbar (top right area is fine), near the week/month toggle or density selector:
+
+Label: Parts
+
+Secondary/ghost style button so it doesn’t compete with the main “New” button.
+
+Clicking Parts opens a modal dialog (or side-panel) with:
+
+A heading: Parts for this schedule
+
+A simple filter to choose the range:
+
+Default: This week (current view)
+
+Optional: a dropdown of the visible days (e.g. Mon 8, Tue 9, etc.) so the user can view parts for a single day.
+
+Inside the dialog, list parts grouped by day:
+
+For each day: show the date as a subheading.
+
+Under each date, show part lines aggregated from jobs on that day (reuse whatever existing parts aggregation function you already have – don’t re-invent, just reuse the logic the old header pills used).
+
+This is read-only for now; no need for inline editing.
+
+The parts functionality is optional:
+
+If a job has no pre-assigned parts (emergency calls), the day’s group can simply say “No pre-assigned parts for this day”.
+
+Close the dialog via an X icon in the top-right and a Close button at the bottom.
+
+4. Simplify job cards on the calendar (remove status badges)
+
+Right now each job card on the calendar cell has small badges like Overdue and Scheduled inside the card. This feels cluttered: if the job is on the calendar, the user already knows it’s scheduled.
+
+Requirements:
+
+For jobs rendered inside the calendar grid cells (weekly/monthly):
+
+Remove the Overdue and Scheduled text badges from inside the card.
+
+Keep the main text focus on:
+
+Job / location name (first line)
+
+Short description (second line – e.g. “Preventive Maintenance #10158”)
+
+Use a clean card style with:
+
+Slight border radius
+
+Subtle shadow
+
+Enough padding so text is readable.
+
+Keep technician-based color styling as is (or, if you see a simple way, you can give each job a subtle colored left border based on technician color – do not add heavy background colors; keep it light and readable).
+
+For overdue jobs inside the calendar, use only a small visual indicator instead of a big badge, for example:
+
+A thin red left border, or
+
+A tiny red dot icon next to the job title.
+
+Keep it subtle but noticeable; no giant “OVERDUE” text.
+
+Do not remove or change any status information in the job detail modal – this simplification is only for the calendar cells.
+
+5. Improve the Unscheduled jobs drawer
+
+The unscheduled column on the right is helpful but feels cramped. I want cards that are slightly wider/taller and more informative, without feeling noisy.
+
+Requirements:
+
+Slightly increase the width of the unscheduled drawer so job titles and key info don’t feel squished.
+
+Redesign the unscheduled job card layout to be stacked, something like:
+
+Line 1: Job / location name (bold or semibold)
+
+Line 2: Small text with client/location info (e.g. Newmarket • #10158)
+
+Line 3: Small text for the date it was supposed to be done, prefixed with Due – e.g. Due Nov 25.
+
+The small date pill (e.g. Nov 25) can be turned into inline text or a subtle badge on the right side of line 1 or line 3. Goal: less visual noise, more information density.
+
+Keep the drag-and-drop behavior exactly the same – the card styling changes, but drag handles / draggable area should still work as before.
+
+Ensure the unscheduled drawer’s scroll area extends from just under its header to just above the footer, and visually aligns to the full height of the viewport with minimal outer margin (similar to Jobber’s “Unscheduled” column hugging the right edge).
+
+6. Reduce outer gaps & tighten spacing
+
+In general, there’s too much blank space between elements.
+
+Requirements:
+
+Reduce vertical gaps between:
+
+Day header row and the first time row.
+
+Calendar rows themselves (without hurting readability).
+
+Reduce horizontal gaps:
+
+Between the left menu and the main calendar grid.
+
+Between the calendar grid and the unscheduled drawer.
+
+The goal is to make the grid feel tight and unified, not floating in a big white ocean. Think of Jobber’s schedule: the grid almost touches the left and right boundaries of the content area.
+
+Do not touch the global sidebar width; just adjust the calendar container and its internal paddings/margins.
+
+7. Where to keep the density controls (Compact / Comfortable / Expanded)
+
+Right now I have a density switch displayed as something like Compact / Comfortable / Expanded (or Dense Comfort in my current screenshot). This row feels cluttered.
+
+Requirements:
+
+Replace the three separate buttons with a single dropdown labeled Density in the top toolbar, near the Start time selector:
+
+Options: Compact, Comfortable, Expanded.
+
+Keep existing density behavior, just change the control into a dropdown with a single label showing the current selection (e.g. Density: Comfortable).
+
+Make sure it doesn’t push other key controls off the screen at smaller widths.
+
+8. General notes
+
+Keep everything in TypeScript and Tailwind (or whatever the current stack is – follow existing patterns).
+
+Reuse existing components and utility functions wherever possible.
+
+Please update any related CSS/Tailwind utility classes so that the design is consistent across:
+
+Weekly view
+
+Monthly view
+
+The unscheduled drawer.
+
+At the end, summarize in comments (or a short note in the diff description) which files you changed and how:
+
+Calendar layout/component file(s)
+
+Unscheduled drawer component
+
+Job card component
+
+Parts modal implementation
+
+Any shared layout or style utilities you touched.
