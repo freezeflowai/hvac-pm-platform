@@ -34,7 +34,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, UserCircle, Users, Shield, Clock, ChevronRight, ArrowUpDown, Mail } from "lucide-react";
+import { Search, Plus, UserCircle, Users, Shield, Clock, ChevronRight, ArrowUpDown, Mail, Settings2 } from "lucide-react";
 
 interface TeamMember {
   id: string;
@@ -313,6 +313,15 @@ export default function ManageTeam() {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        <div className="flex justify-end mb-4">
+          <Link href="/manage-roles">
+            <Button variant="outline" data-testid="link-manage-roles">
+              <Settings2 className="h-4 w-4 mr-2" />
+              Manage Roles
+            </Button>
+          </Link>
         </div>
 
         <Card>
