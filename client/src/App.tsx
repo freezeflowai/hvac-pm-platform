@@ -216,7 +216,7 @@ function AppContent() {
   );
 
   const style = {
-    "--sidebar-width": "14rem",
+    "--sidebar-width": "12rem",
     "--sidebar-width-icon": "3rem",
   };
 

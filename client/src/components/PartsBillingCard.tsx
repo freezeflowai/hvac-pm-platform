@@ -135,8 +135,8 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
       description: "",
       notes: "",
       quantity: "1",
-      unitCost: "0",
-      unitPrice: "0",
+      unitCost: "",
+      unitPrice: "",
       source: "manual",
     };
     setItems((prev) => [...prev, newItem]);
@@ -148,8 +148,8 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
         description: "",
         notes: "",
         quantity: "1",
-        unitCost: "0",
-        unitPrice: "0",
+        unitCost: "",
+        unitPrice: "",
       },
     }));
   };
@@ -583,26 +583,34 @@ function LineItemRow({
         />
       </td>
       <td className="py-2.5 px-3 align-top">
-        <Input
-          type="number"
-          min={0}
-          step="0.01"
-          className="text-xs text-right w-full"
-          value={item.unitCost}
-          onChange={(e) => onChange({ unitCost: e.target.value || "0" })}
-          data-testid={`input-cost-${item.id}`}
-        />
+        <div className="relative">
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">$</span>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            placeholder="0.00"
+            className="text-xs text-right w-full pl-5 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            value={item.unitCost || ""}
+            onChange={(e) => onChange({ unitCost: e.target.value })}
+            data-testid={`input-cost-${item.id}`}
+          />
+        </div>
       </td>
       <td className="py-2.5 px-3 align-top">
-        <Input
-          type="number"
-          min={0}
-          step="0.01"
-          className="text-xs text-right w-full"
-          value={item.unitPrice}
-          onChange={(e) => onChange({ unitPrice: e.target.value || "0" })}
-          data-testid={`input-price-${item.id}`}
-        />
+        <div className="relative">
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">$</span>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            placeholder="0.00"
+            className="text-xs text-right w-full pl-5 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            value={item.unitPrice || ""}
+            onChange={(e) => onChange({ unitPrice: e.target.value })}
+            data-testid={`input-price-${item.id}`}
+          />
+        </div>
       </td>
       <td className="py-2.5 pl-3 pr-1 align-top text-right text-xs font-semibold">{formatCurrency(lineTotal)}</td>
     </tr>
@@ -621,16 +629,16 @@ function AddProductModal({ open, initialName, onClose, onSave, isSaving }: AddPr
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState("");
   const [type, setType] = useState<string>("product");
-  const [cost, setCost] = useState("0");
-  const [price, setPrice] = useState("0");
+  const [cost, setCost] = useState("");
+  const [price, setPrice] = useState("");
 
   useEffect(() => {
     if (open) {
       setName(initialName);
       setDescription("");
       setType("product");
-      setCost("0");
-      setPrice("0");
+      setCost("");
+      setPrice("");
     }
   }, [open, initialName]);
 
@@ -690,25 +698,35 @@ function AddProductModal({ open, initialName, onClose, onSave, isSaving }: AddPr
               </div>
               <div>
                 <label className="text-xs font-medium">Unit Cost</label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={cost}
-                  onChange={(e) => setCost(e.target.value)}
-                  data-testid="input-new-product-cost"
-                />
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">$</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="0.00"
+                    className="pl-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    value={cost || ""}
+                    onChange={(e) => setCost(e.target.value)}
+                    data-testid="input-new-product-cost"
+                  />
+                </div>
               </div>
               <div>
                 <label className="text-xs font-medium">Unit Price</label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  data-testid="input-new-product-price"
-                />
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">$</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="0.00"
+                    className="pl-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    value={price || ""}
+                    onChange={(e) => setPrice(e.target.value)}
+                    data-testid="input-new-product-price"
+                  />
+                </div>
               </div>
             </div>
           </div>

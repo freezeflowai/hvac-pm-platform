@@ -524,9 +524,9 @@ export default function JobDetailPage() {
     [job.location.address, job.location.city, job.location.province, job.location.postalCode].filter(Boolean).join(", ") : "";
 
   return (
-    <div className="p-6" data-testid="job-detail-page">
+    <div className="p-4" data-testid="job-detail-page">
       {/* Breadcrumb */}
-      <nav className="mb-3 text-sm" data-testid="breadcrumb">
+      <nav className="mb-2 text-sm" data-testid="breadcrumb">
         <ol className="flex flex-wrap items-center gap-1">
           <li>
             <button
@@ -546,7 +546,7 @@ export default function JobDetailPage() {
       </nav>
 
       {/* HEADER */}
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
+      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         {/* LEFT: job identity */}
         <div>
           <h1 className="text-2xl font-semibold" data-testid="text-job-title">
@@ -554,7 +554,6 @@ export default function JobDetailPage() {
           </h1>
 
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-            <span className="font-medium" data-testid="text-job-number">Job #{job.jobNumber}</span>
             <Badge variant="secondary" className="text-xs capitalize" data-testid="badge-job-type">
               {job.jobType}
             </Badge>
@@ -592,9 +591,6 @@ export default function JobDetailPage() {
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="font-medium">Status</span>
             <div className="flex items-center gap-2">
-              <Badge variant={statusInfo.variant} className="text-[11px]">
-                {statusInfo.label}
-              </Badge>
               {statusInfo.isOverdue && (
                 <Badge variant="destructive" className="text-[11px]" data-testid="badge-overdue">
                   Overdue
@@ -605,7 +601,7 @@ export default function JobDetailPage() {
                 onValueChange={handleStatusChange}
                 disabled={updateStatusMutation.isPending}
               >
-                <SelectTrigger className="h-6 w-auto min-w-[90px] text-[11px]" data-testid="select-status">
+                <SelectTrigger className="h-6 w-auto min-w-[100px] text-[11px]" data-testid="select-status">
                   <SelectValue placeholder="Change" />
                 </SelectTrigger>
                 <SelectContent>
@@ -640,9 +636,9 @@ export default function JobDetailPage() {
       </header>
 
       {/* MAIN 2-COLUMN LAYOUT */}
-      <div className="grid gap-4 lg:grid-cols-[7fr,3fr]">
+      <div className="grid gap-3 lg:grid-cols-[7fr,3fr]">
         {/* LEFT COLUMN: Parts & Billing + Labour + Expenses */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Parts & Billing / Line Items */}
           <PartsBillingCard jobId={jobId!} />
 
@@ -704,7 +700,7 @@ export default function JobDetailPage() {
         </div>
 
         {/* RIGHT COLUMN: Techs, Notes, Invoices, Visits, Equipment, Activity, Metadata */}
-        <div className="space-y-4">
+        <div className="space-y-2">
           {/* Assigned Technicians – collapsible */}
           <Collapsible open={techsOpen} onOpenChange={setTechsOpen}>
             <Card data-testid="card-technicians">

@@ -1,0 +1,109 @@
+Please apply the following UI/UX changes to the app (React + Tailwind). Keep existing patterns and components; just adjust.
+
+1. Sidebar (make it smaller, remove company name)
+
+Reduce sidebar width further:
+
+Make the left navigation column noticeably narrower than it is now.
+
+Keep icons + labels, but adjust Tailwind width / padding so it takes up less horizontal space (more room for the main content).
+
+Remove the company name from the top-left corner:
+
+In the sidebar header where “Samcor Mechanical Inc.” (or any company name) is rendered, remove that text completely.
+
+If there is a logo element, you can keep a small logo or icon, but no long text brand name there.
+
+Keep the Settings and Admin items exactly as they are now in terms of order and behaviour (just narrower sidebar overall).
+
+2. Global spacing / gaps between content and sidebar
+
+On the Job page (and ideally across main layouts):
+
+Reduce the horizontal gap between:
+
+The sidebar border and the main content column.
+
+The left main column and the right column of cards.
+
+Reduce vertical gaps between cards in the right column:
+
+Notes, Invoices, Visits, Equipment, Activity, Metadata, etc., should have a smaller space-y-* / margin between them.
+
+Leave a small gap so cards don’t touch, but make the column feel tighter and more unified than it is now.
+
+Keep internal card padding as-is (so content still feels roomy), but cut down the space between cards and between columns.
+
+3. Cost & Price fields in Parts & Billing
+
+In the Parts & Billing table on the Job page:
+
+For the Cost and Price inputs:
+
+Remove the default value 0 / 0.00 from the actual field value.
+
+When empty, the inputs should be blank.
+
+Remove the browser’s number stepper arrows (up/down arrows) so users can’t increment with tiny arrows; they will just type values.
+
+Use a currency-style placeholder:
+
+Placeholder text should be a faded 0.00.
+
+Prepend a $ visually (either via CSS, pseudo-element, or input group pattern) so both fields clearly look like dollar amounts.
+
+Keep these inputs numeric on the backend/validation, but visually they should look like “money fields” with a subtle placeholder and no stepper arrows.
+
+4. Status widget cleanup (top-right of Job page)
+
+In the top-right “Status / Priority / Scheduled” card on the Job page:
+
+Currently status shows something like:
+Status scheduled [Scheduled ▼]
+This is redundant.
+
+Change it so:
+
+Only one representation of the status is shown, using the existing dropdown.
+
+For example, show:
+Status [Scheduled ▼]
+(No extra status pill or duplicate label next to it.)
+
+Keep Priority and Scheduled date/time as they are, just ensure Status isn’t duplicated.
+
+5. Header job ID duplication
+
+Near the top of the Job page you currently have:
+
+In the breadcrumb: Jobs / #10134
+
+Then just below: Job #10134 again.
+
+We only need the job number once.
+
+Keep the breadcrumb as: Jobs / #10134 (so the user can click “Jobs” to go back).
+
+Remove the separate “Job #10134” text line below the breadcrumb.
+
+Keep the actual job title (e.g., “remove ladder from mud room 222222”) as the main title.
+
+6. Any other minor cleanups (use judgment)
+
+If, while doing this, you see any obviously inconsistent padding/margins or font sizes on this page (vs the client/location pages we already aligned), you can lightly normalize them so:
+
+Job page header fonts match the style used on the Client and Location pages.
+
+Main title, breadcrumb, and right-side status card line up visually.
+
+Please summarize at the end which files/components you changed (e.g. Job layout, Parts & Billing row component, Sidebar layout, Status card component), and briefly mention how you handled:
+
+Sidebar width + removal of company name.
+
+Cost/Price input behaviour (no default 0, no stepper, currency placeholder).
+
+Gaps between sidebar/main and between cards.
+
+Status duplication removal.
+
+Job ID duplication removal.

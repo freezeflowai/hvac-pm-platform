@@ -181,11 +181,7 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b px-3 py-3">
-        <div className="font-semibold text-sm truncate">
-          {companySettings?.companyName || "HVAC/R Scheduler"}
-        </div>
-      </SidebarHeader>
+      <SidebarHeader className="border-b px-2 py-2 h-10" />
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
