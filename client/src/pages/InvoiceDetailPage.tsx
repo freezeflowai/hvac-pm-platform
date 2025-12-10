@@ -168,6 +168,26 @@ export default function InvoiceDetailPage() {
     onError: () => toast({ title: "Failed to record payment", variant: "destructive" }),
   });
 
+  const activityEvents = useMemo(() => {
+    if (!details) return [];
+    const { invoice } = details;
+    const items: { date: Date; title: string; subtitle?: string; color: string }[] = [
+      { date: new Date(invoice.createdAt), title: "Invoice created", color: "bg-primary" },
+    ];
+    if (invoice.sentAt) {
+      items.push({ date: new Date(invoice.sentAt), title: "Invoice sent", color: "bg-blue-500" });
+    }
+    payments.forEach((payment) => {
+      items.push({
+        date: new Date(payment.receivedAt),
+        title: `Payment received: ${formatCurrency(payment.amount)}`,
+        subtitle: payment.method ? `via ${payment.method}` : undefined,
+        color: "bg-green-500",
+      });
+    });
+    return items.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [details, payments]);
+
   if (!invoiceId) {
     return <div className="p-6">Invoice not found</div>;
   }
@@ -204,24 +224,6 @@ export default function InvoiceDetailPage() {
       notes: paymentNotes || undefined,
     });
   };
-
-  const activityEvents = useMemo(() => {
-    const items: { date: Date; title: string; subtitle?: string; color: string }[] = [
-      { date: new Date(invoice.createdAt), title: "Invoice created", color: "bg-primary" },
-    ];
-    if (invoice.sentAt) {
-      items.push({ date: new Date(invoice.sentAt), title: "Invoice sent", color: "bg-blue-500" });
-    }
-    payments.forEach((payment) => {
-      items.push({
-        date: new Date(payment.receivedAt),
-        title: `Payment received: ${formatCurrency(payment.amount)}`,
-        subtitle: payment.method ? `via ${payment.method}` : undefined,
-        color: "bg-green-500",
-      });
-    });
-    return items.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [invoice, payments]);
 
   return (
     <div className="flex flex-col h-full">
