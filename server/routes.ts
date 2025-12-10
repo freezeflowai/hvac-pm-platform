@@ -2770,7 +2770,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/invoices/from-job/:jobId", isAuthenticated, async (req, res) => {
     try {
       const { jobId } = req.params;
-      const { includeLineItems = true, includeNotes = true } = req.body;
+      const { includeLineItems = true, includeNotes = true, markJobCompleted = false } = req.body;
+      
+      // Optionally mark job as completed first
+      if (markJobCompleted) {
+        await storage.updateJob(req.user!.companyId, jobId, { status: "completed" });
+      }
+      
       const invoice = await storage.createInvoiceFromJob(req.user!.companyId, jobId, {
         includeLineItems,
         includeNotes,
@@ -2779,6 +2785,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Create invoice from job error:', error);
       res.status(500).json({ error: error.message || "Failed to create invoice from job" });
+    }
+  });
+
+  // Refresh invoice line items from linked job (only for draft invoices)
+  app.post("/api/invoices/:id/refresh-from-job", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const invoice = await storage.getInvoice(req.user!.companyId, id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      if (invoice.status !== "draft") {
+        return res.status(400).json({ error: "Can only refresh draft invoices" });
+      }
+      if (!invoice.jobId) {
+        return res.status(400).json({ error: "Invoice has no linked job" });
+      }
+      
+      const updatedInvoice = await storage.refreshInvoiceFromJob(req.user!.companyId, id, invoice.jobId);
+      res.json(updatedInvoice);
+    } catch (error: any) {
+      console.error('Refresh invoice from job error:', error);
+      res.status(500).json({ error: error.message || "Failed to refresh invoice from job" });
     }
   });
 

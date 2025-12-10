@@ -486,16 +486,18 @@ export default function JobDetailPage() {
   });
 
   const createInvoiceMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (markJobCompleted: boolean = false) => {
       const response = await apiRequest("POST", `/api/invoices/from-job/${jobId}`, {
         includeLineItems: true,
         includeNotes: true,
+        markJobCompleted,
       });
       return response.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices/list"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId] });
       toast({
         title: "Invoice Created",
         description: "Invoice has been created from this job.",
@@ -521,8 +523,8 @@ export default function JobDetailPage() {
     setShowDeleteConfirm(false);
   };
 
-  const handleCreateInvoice = () => {
-    createInvoiceMutation.mutate();
+  const handleCreateInvoice = (closeJob: boolean = false) => {
+    createInvoiceMutation.mutate(closeJob);
   };
 
 
@@ -1058,7 +1060,7 @@ export default function JobDetailPage() {
           <DialogHeader>
             <DialogTitle>Create Invoice from Job</DialogTitle>
             <DialogDescription>
-              This will create a new invoice with line items from this job's parts and billing.
+              This will create a new draft invoice with line items from this job's parts and billing.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -1069,12 +1071,22 @@ export default function JobDetailPage() {
               Client: {job.parentCompany?.name || job.location?.companyName || "Unknown"}
             </p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setShowCreateInvoiceDialog(false)}>
               Cancel
             </Button>
+            {job.status !== "completed" && (
+              <Button 
+                variant="outline"
+                onClick={() => handleCreateInvoice(true)}
+                disabled={createInvoiceMutation.isPending}
+                data-testid="button-close-job-create-invoice"
+              >
+                {createInvoiceMutation.isPending ? "Creating..." : "Close Job & Create Invoice"}
+              </Button>
+            )}
             <Button 
-              onClick={handleCreateInvoice}
+              onClick={() => handleCreateInvoice(false)}
               disabled={createInvoiceMutation.isPending}
               data-testid="button-confirm-create-invoice"
             >

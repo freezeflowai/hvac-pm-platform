@@ -2210,8 +2210,10 @@ export class MemStorage implements IStorage {
       id,
       jobId,
       productId: data.productId ?? null,
+      equipmentId: data.equipmentId ?? null,
       description: data.description,
       quantity: data.quantity,
+      unitCost: data.unitCost ?? null,
       unitPrice: data.unitPrice ?? null,
       source: data.source ?? 'manual',
       equipmentLabel: data.equipmentLabel ?? null,
@@ -4612,6 +4614,57 @@ export class DbStorage implements IStorage {
     
     // Return updated invoice
     return (await this.getInvoice(companyId, invoice.id))!;
+  }
+
+  // Refresh invoice line items from linked job (for draft invoices only)
+  async refreshInvoiceFromJob(companyId: string, invoiceId: string, jobId: string): Promise<Invoice> {
+    const invoice = await this.getInvoice(companyId, invoiceId);
+    if (!invoice) throw new Error("Invoice not found");
+    if (invoice.status !== "draft") throw new Error("Can only refresh draft invoices");
+    
+    // Delete existing line items
+    const existingLines = await this.getInvoiceLines(invoiceId);
+    for (const line of existingLines) {
+      await this.deleteInvoiceLine(line.id);
+    }
+    
+    // Copy fresh job parts as invoice line items
+    const jobParts = await this.getJobParts(jobId);
+    let lineNumber = 1;
+    let subtotal = 0;
+    
+    for (const part of jobParts) {
+      const qty = parseFloat(part.quantity);
+      const price = parseFloat(part.unitPrice || "0");
+      const lineTotal = qty * price;
+      subtotal += lineTotal;
+      
+      await this.createInvoiceLine({
+        invoiceId: invoiceId,
+        lineNumber: lineNumber++,
+        lineItemType: "material",
+        description: part.description,
+        quantity: part.quantity,
+        unitPrice: part.unitPrice || "0",
+        taxRate: "0.13",
+        lineSubtotal: lineTotal.toFixed(2),
+        jobLineItemId: part.id,
+      });
+    }
+    
+    // Update invoice totals
+    const taxTotal = subtotal * 0.13;
+    const total = subtotal + taxTotal;
+    const amountPaid = parseFloat(invoice.amountPaid || "0");
+    
+    await this.updateInvoice(companyId, invoiceId, {
+      subtotal: subtotal.toFixed(2),
+      taxTotal: taxTotal.toFixed(2),
+      total: total.toFixed(2),
+      balance: (total - amountPaid).toFixed(2),
+    });
+    
+    return (await this.getInvoice(companyId, invoiceId))!;
   }
 
   // Send invoice

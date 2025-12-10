@@ -94,7 +94,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
     if (!jobParts || editingRowId) return;
     
     const catalogKey = catalogParts.map(p => p.id + p.cost + p.unitPrice).join(",");
-    const partsKey = JSON.stringify(jobParts.map(jp => jp.id + jp.quantity + jp.unitPrice + jp.productId)) + "|" + catalogKey;
+    const partsKey = JSON.stringify(jobParts.map(jp => jp.id + jp.quantity + jp.unitCost + jp.unitPrice + jp.productId)) + "|" + catalogKey;
     if (partsKey === lastSyncedPartsRef.current) return;
     
     const mappedItems = jobParts.map((jp) => {
@@ -108,7 +108,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
         description: productName || jp.description,
         notes: productName ? jp.description : "",
         quantity: jp.quantity,
-        unitCost: catalogItem?.cost || "0",
+        unitCost: jp.unitCost || catalogItem?.cost || "0",
         unitPrice: jp.unitPrice || "0",
         source: jp.source,
       };
@@ -233,10 +233,13 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
       const price = String(parseFloat(item.unitPrice) || 0);
       const desc = item.notes?.trim() || item.description || "Unnamed item";
         
+      const cost = String(parseFloat(item.unitCost) || 0);
+      
       if (item.isNew) {
         await apiRequest("POST", `/api/jobs/${jobId}/parts`, {
           description: desc,
           quantity: qty,
+          unitCost: cost,
           unitPrice: price,
           productId: item.productId || null,
           source: item.source || "manual",
@@ -245,6 +248,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
         await apiRequest("PUT", `/api/jobs/${jobId}/parts/${item.id}`, {
           description: desc,
           quantity: qty,
+          unitCost: cost,
           unitPrice: price,
           productId: item.productId || null,
           source: item.source,

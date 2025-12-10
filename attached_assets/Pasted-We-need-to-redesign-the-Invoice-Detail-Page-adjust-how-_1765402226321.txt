@@ -1,0 +1,199 @@
+We need to redesign the Invoice Detail Page, adjust how jobs convert into invoices, and fix the Parts & Billing cost bug.
+
+Below are the required changes. Please implement exactly as described.
+
+1️⃣ BUG FIX — Job Parts “Cost” Field Always Resets to 0
+
+Problem:
+On the Job page → Parts & Billing section:
+When entering a Cost value for a part, the cost resets to 0.00 after saving.
+
+Fix Requirements:
+
+Verify the cost input is properly bound to the correct field (e.g., part.cost).
+
+Ensure the cost value is parsed numerically (e.g., parseFloat) before saving.
+
+Ensure backend validation is not overwriting the value with zero.
+
+Confirm the cost is saved and correctly displayed after refreshing the page.
+
+2️⃣ JOB → INVOICE BEHAVIOR (Snapshot Model)
+
+When a job is converted into an invoice, the invoice should receive a one-time snapshot of:
+
+All job parts
+
+All job labor
+
+Technician notes
+
+Client + property info
+
+After conversion:
+
+Invoices should NOT auto-update when job parts change.
+
+Invoices are financial documents and must remain stable.
+
+Add a “Refresh from Job” button (only when invoice is in Draft state)
+
+This button should:
+
+Re-pull all parts & labor from the job
+
+Overwrite the current invoice line items
+
+Do nothing if invoice is already sent or paid
+
+Add button on Job page:
+
+“Close Job & Create Invoice”
+
+This button should:
+
+Mark job as Completed
+
+Create a new Draft invoice
+
+Copy job parts, labor, technician notes
+
+Correctly link job and invoice both ways:
+
+Invoice shows: Job #EXTERNAL_JOB_ID
+
+Job shows: Invoice #INV_XXXX
+
+IMPORTANT:
+Use the external/job number, not the UUID, in UI.
+
+3️⃣ INVOICE PAGE REDESIGN (Major Layout Update)
+
+We want a 2-column layout, similar to the Jobs UI.
+
+⭐ Column Structure
+LEFT COLUMN (70% width)
+
+This is the main working area.
+
+Contains:
+
+A. Header Block
+
+Move these to the top left:
+
+Client Name (big, clickable → client page)
+
+Billing address
+
+Contact email/phone
+
+remove the “View Client” button — clicking the name is enough.
+
+B. Invoice Meta
+
+Place to the right of the client info:
+
+Invoice Number (INV-xxxxx)
+
+Issue Date
+
+Due Date
+
+Linked Job (display the job’s external number, not UUID)
+
+C. Products & Services (Line Items)
+
+Rename “Line Items” → “Products & Services”
+
+Columns:
+
+Description
+
+Qty
+
+Rate
+
+Tax
+
+Total
+
+Below the table show totals:
+
+Subtotal
+
+Tax
+
+Paid
+
+Balance Due (highlighted)
+
+Remove the separate “Invoice Info” card — totals should only appear here.
+
+4️⃣ RIGHT COLUMN (30% width)
+
+This is for reference/notes, similar to Job layout.
+
+A. Technician Notes (auto-imported from job)
+
+Read-only
+
+Always visible
+
+Scrollable small panel
+
+Should display all tech notes and attachments tied to the job
+
+B. Public Notes / Internal Notes (Collapsible Tabs)
+
+Public Notes → visible to client
+
+Internal Notes → internal only
+
+Both should be collapsible or tabbed
+
+C. Activity
+
+Place this at the bottom.
+Can be collapsible.
+
+5️⃣ ADDITIONAL UI REQUIREMENTS
+
+Widen the line-items area; shrink the notes column.
+
+Line items section should not be labeled "Line Items"; use “Products & Services”.
+
+Client / invoice headers should visually resemble Job headers.
+
+Keep the invoice top bar actions (Collect Payment, Send, etc.) as-is.
+
+6️⃣ SUMMARY OF DELIVERABLES
+Fixes
+
+Correct job part cost field bug
+
+Ensure invoice links show EXTERNAL job numbers
+
+Functional
+
+Implement snapshot model for job → invoice
+
+Add “Refresh from Job” for Draft invoices
+
+Add “Close Job & Create Invoice” button
+
+UI / UX
+
+Fully redesign invoice page to 2-column layout
+
+Promote client info & invoice meta to header
+
+Expand Products & Services section
+
+Add Technician Notes panel
+
+Add collapsible Public + Internal notes
+
+Consolidate totals below line items
+
+If you need wireframe guidance, I can generate a mockup next.

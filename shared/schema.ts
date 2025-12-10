@@ -1017,6 +1017,7 @@ export const jobParts = pgTable("job_parts", {
   equipmentId: varchar("equipment_id").references(() => locationEquipment.id, { onDelete: "set null" }), // Optional link to equipment
   description: text("description").notNull(),
   quantity: text("quantity").notNull(), // Stored as text for decimal precision
+  unitCost: text("unit_cost"), // Cost per unit (for profit margin calc)
   unitPrice: text("unit_price"), // Stored as text for decimal precision
   source: text("source").notNull().default("manual"), // pm_template, added_by_tech, quoted, manual
   equipmentLabel: text("equipment_label"), // Legacy: Copied from PM template or added by tech
@@ -1031,6 +1032,8 @@ export const insertJobPartSchema = createInsertSchema(jobParts).omit({
   updatedAt: true,
 }).extend({
   source: z.enum(jobPartSourceEnum).default("manual"),
+  unitCost: z.string().nullable().optional(),
+  equipmentId: z.string().nullable().optional(),
 });
 
 export const updateJobPartSchema = z.object({
@@ -1038,6 +1041,7 @@ export const updateJobPartSchema = z.object({
   equipmentId: z.string().nullable().optional(),
   description: z.string().optional(),
   quantity: z.string().optional(),
+  unitCost: z.string().nullable().optional(),
   unitPrice: z.string().nullable().optional(),
   source: z.enum(jobPartSourceEnum).optional(),
   equipmentLabel: z.string().nullable().optional(),
