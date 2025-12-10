@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, Send, MoreHorizontal, Plus, Trash2, DollarSign, 
   FileText, GripVertical, Check, X, RefreshCw, Phone, Mail, MapPin,
-  MessageSquare, User, Clock
+  MessageSquare, User, Clock, Edit
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -255,6 +255,16 @@ export default function InvoiceDetailPage() {
               </div>
               
               <div className="flex items-center gap-2 flex-wrap">
+                {canEdit && (
+                  <Button 
+                    variant="outline"
+                    onClick={() => setIsEditing(!isEditing)}
+                    data-testid="button-edit-invoice"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    {isEditing ? "Done Editing" : "Edit"}
+                  </Button>
+                )}
                 <Button 
                   onClick={() => setShowPaymentDialog(true)}
                   disabled={!canEdit || parseFloat(invoice.balance) <= 0}
