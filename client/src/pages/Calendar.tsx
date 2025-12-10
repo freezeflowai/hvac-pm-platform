@@ -735,7 +735,13 @@ export default function Calendar() {
     "July", "August", "September", "October", "November", "December"];
 
   const previousMonth = () => {
-    if (view === "weekly") {
+    if (view === "daily") {
+      // Navigate to previous day
+      const newDate = new Date(currentDate);
+      newDate.setDate(newDate.getDate() - 1);
+      setCurrentDate(newDate);
+      scrollDoneRef.current = false;
+    } else if (view === "weekly") {
       // Navigate to previous week
       const newDate = new Date(currentDate);
       newDate.setDate(newDate.getDate() - 7);
@@ -748,7 +754,13 @@ export default function Calendar() {
   };
 
   const nextMonth = () => {
-    if (view === "weekly") {
+    if (view === "daily") {
+      // Navigate to next day
+      const newDate = new Date(currentDate);
+      newDate.setDate(newDate.getDate() + 1);
+      setCurrentDate(newDate);
+      scrollDoneRef.current = false;
+    } else if (view === "weekly") {
       // Navigate to next week
       const newDate = new Date(currentDate);
       newDate.setDate(newDate.getDate() + 7);
@@ -850,8 +862,10 @@ export default function Calendar() {
       const technicianId = parts[0];
       const hour = parseInt(parts[1]);
       const targetDay = parseInt(parts[2]);
-      const targetMonthIdx = parseInt(parts[3]);
+      const targetMonthIdx = parseInt(parts[3]); // 0-based month from Date.getMonth()
       const targetYr = parseInt(parts[4]);
+      // Convert 0-based month to 1-based for API
+      const targetMo = targetMonthIdx + 1;
       
       if (isExistingCalendarAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
@@ -859,7 +873,9 @@ export default function Calendar() {
           updateAssignment.mutate({ 
             id: activeId, 
             day: targetDay, 
-            scheduledHour: hour
+            scheduledHour: hour,
+            targetMonth: targetMo,
+            targetYear: targetYr
           });
           // Also assign technician if dropping on a technician column (not unassigned)
           if (technicianId !== 'unassigned') {
@@ -871,14 +887,16 @@ export default function Calendar() {
           id: unscheduledItem.assignmentId, 
           day: targetDay, 
           scheduledHour: hour, 
-          targetMonth: targetMonthIdx + 1, // API expects 1-indexed month
+          targetMonth: targetMo,
           targetYear: targetYr
         });
       } else if (unscheduledItem) {
         createAssignment.mutate({ 
           clientId: unscheduledItem.clientId, 
           day: targetDay, 
-          scheduledHour: hour
+          scheduledHour: hour,
+          targetMonth: targetMo,
+          targetYear: targetYr
         });
       }
     } else if (overId === 'unscheduled-panel') {
