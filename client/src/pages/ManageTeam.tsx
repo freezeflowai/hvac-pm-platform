@@ -5,8 +5,10 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -22,8 +24,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, UserCircle, Users, Shield, Clock, ChevronRight } from "lucide-react";
+import { Search, Plus, UserCircle, Users, Shield, Clock, ChevronRight, ArrowUpDown, Mail } from "lucide-react";
 
 interface TeamMember {
   id: string;
@@ -46,11 +57,21 @@ interface Role {
   hierarchy: number;
 }
 
+type SortOption = "name-asc" | "name-desc" | "login-newest" | "login-oldest" | "role";
+
 export default function ManageTeam() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<SortOption>("name-asc");
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState({
+    fullName: "",
+    email: "",
+    roleId: "",
+    notes: "",
+  });
 
   const { data: teamMembers = [], isLoading } = useQuery<TeamMember[]>({
     queryKey: ["/api/team"],
@@ -60,25 +81,51 @@ export default function ManageTeam() {
     queryKey: ["/api/roles"],
   });
 
-  const filteredMembers = teamMembers.filter((member) => {
-    const matchesSearch = 
-      (member.firstName?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-      (member.lastName?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-      (member.email?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-      (member.fullName?.toLowerCase() || "").includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || member.status === statusFilter;
-    const matchesRole = roleFilter === "all" || member.role === roleFilter;
-    
-    return matchesSearch && matchesStatus && matchesRole;
-  });
+  const filteredMembers = teamMembers
+    .filter((member) => {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = 
+        (member.firstName?.toLowerCase() || "").includes(searchLower) ||
+        (member.lastName?.toLowerCase() || "").includes(searchLower) ||
+        (member.email?.toLowerCase() || "").includes(searchLower) ||
+        (member.fullName?.toLowerCase() || "").includes(searchLower) ||
+        (member.role?.toLowerCase() || "").includes(searchLower) ||
+        (member.phone?.toLowerCase() || "").includes(searchLower);
+      
+      const matchesStatus = statusFilter === "all" || member.status === statusFilter;
+      const matchesRole = roleFilter === "all" || member.role === roleFilter;
+      
+      return matchesSearch && matchesStatus && matchesRole;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "name-asc":
+          return getDisplayName(a).localeCompare(getDisplayName(b));
+        case "name-desc":
+          return getDisplayName(b).localeCompare(getDisplayName(a));
+        case "login-newest":
+          if (!a.lastLoginAt && !b.lastLoginAt) return 0;
+          if (!a.lastLoginAt) return 1;
+          if (!b.lastLoginAt) return -1;
+          return new Date(b.lastLoginAt).getTime() - new Date(a.lastLoginAt).getTime();
+        case "login-oldest":
+          if (!a.lastLoginAt && !b.lastLoginAt) return 0;
+          if (!a.lastLoginAt) return 1;
+          if (!b.lastLoginAt) return -1;
+          return new Date(a.lastLoginAt).getTime() - new Date(b.lastLoginAt).getTime();
+        case "role":
+          return a.role.localeCompare(b.role);
+        default:
+          return 0;
+      }
+    });
 
-  const getDisplayName = (member: TeamMember) => {
+  function getDisplayName(member: TeamMember) {
     if (member.firstName && member.lastName) {
       return `${member.firstName} ${member.lastName}`;
     }
     return member.fullName || member.email;
-  };
+  }
 
   const getInitials = (member: TeamMember) => {
     if (member.firstName && member.lastName) {
@@ -92,7 +139,7 @@ export default function ManageTeam() {
       case "active":
         return <Badge variant="default" className="bg-green-600">Active</Badge>;
       case "deactivated":
-        return <Badge variant="secondary">Deactivated</Badge>;
+        return <Badge variant="secondary">Disabled</Badge>;
       case "pending":
         return <Badge variant="outline">Pending</Badge>;
       default:
@@ -112,8 +159,18 @@ export default function ManageTeam() {
     return <Badge className={colorClass}>{role}</Badge>;
   };
 
+  const handleInviteSubmit = () => {
+    toast({
+      title: "Invite sent",
+      description: `An invitation has been sent to ${inviteForm.email}`,
+    });
+    setInviteDialogOpen(false);
+    setInviteForm({ fullName: "", email: "", roleId: "", notes: "" });
+  };
+
   const activeCount = teamMembers.filter(m => m.status === "active").length;
   const totalCount = teamMembers.length;
+  const pendingCount = teamMembers.filter(m => m.status === "pending").length;
 
   return (
     <div className="min-h-screen bg-background p-4">
@@ -123,10 +180,84 @@ export default function ManageTeam() {
             <h1 className="text-3xl font-bold" data-testid="text-team-management-title">Team Management</h1>
             <p className="text-muted-foreground mt-1">Manage your team members, roles, and permissions</p>
           </div>
-          <Button size="default" data-testid="button-invite-member" disabled>
-            <Plus className="h-4 w-4 mr-2" />
-            Invite Member
-          </Button>
+          <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="default" data-testid="button-invite-member">
+                <Plus className="h-4 w-4 mr-2" />
+                Invite Member
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Invite Team Member</DialogTitle>
+                <DialogDescription>
+                  Send an invitation to add a new member to your team.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="invite-name">Full Name</Label>
+                  <Input
+                    id="invite-name"
+                    value={inviteForm.fullName}
+                    onChange={(e) => setInviteForm(prev => ({ ...prev, fullName: e.target.value }))}
+                    placeholder="John Doe"
+                    data-testid="input-invite-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="invite-email">Email</Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    value={inviteForm.email}
+                    onChange={(e) => setInviteForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="john@example.com"
+                    data-testid="input-invite-email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="invite-role">Role</Label>
+                  <Select
+                    value={inviteForm.roleId}
+                    onValueChange={(value) => setInviteForm(prev => ({ ...prev, roleId: value }))}
+                  >
+                    <SelectTrigger data-testid="select-invite-role">
+                      <SelectValue placeholder="Select a role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map((role) => (
+                        <SelectItem key={role.id} value={role.id}>{role.displayName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="invite-notes">Notes (optional)</Label>
+                  <Textarea
+                    id="invite-notes"
+                    value={inviteForm.notes}
+                    onChange={(e) => setInviteForm(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="Any additional notes for this team member..."
+                    data-testid="input-invite-notes"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleInviteSubmit}
+                  disabled={!inviteForm.email || !inviteForm.fullName}
+                  data-testid="button-send-invite"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Invite
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -176,9 +307,7 @@ export default function ManageTeam() {
                   <Clock className="h-5 w-5 text-amber-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold" data-testid="text-pending-count">
-                    {teamMembers.filter(m => m.status === "pending").length}
-                  </p>
+                  <p className="text-2xl font-bold" data-testid="text-pending-count">{pendingCount}</p>
                   <p className="text-xs text-muted-foreground">Pending Invites</p>
                 </div>
               </div>
@@ -192,14 +321,14 @@ export default function ManageTeam() {
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name or email..."
+                  placeholder="Search by name, email, role, or phone..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9"
                   data-testid="input-search-team"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
                     <SelectValue placeholder="Status" />
@@ -207,7 +336,7 @@ export default function ManageTeam() {
                   <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="deactivated">Deactivated</SelectItem>
+                    <SelectItem value="deactivated">Disabled</SelectItem>
                     <SelectItem value="pending">Pending</SelectItem>
                   </SelectContent>
                 </Select>
@@ -220,6 +349,19 @@ export default function ManageTeam() {
                     {roles.map((role) => (
                       <SelectItem key={role.id} value={role.name}>{role.displayName}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                  <SelectTrigger className="w-[150px]" data-testid="select-sort">
+                    <ArrowUpDown className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name-asc">Name A-Z</SelectItem>
+                    <SelectItem value="name-desc">Name Z-A</SelectItem>
+                    <SelectItem value="login-newest">Last Login (Newest)</SelectItem>
+                    <SelectItem value="login-oldest">Last Login (Oldest)</SelectItem>
+                    <SelectItem value="role">Role</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -17,8 +18,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, UserCircle, Clock, Shield, DollarSign, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Save, UserCircle, Clock, Shield, DollarSign, AlertTriangle, Copy, Plus, Check, X, Info } from "lucide-react";
 
 interface TeamMemberWithDetails {
   id: string;
@@ -90,6 +109,8 @@ const DEFAULT_HOURS = DAYS_OF_WEEK.map((day) => ({
   isWorking: day.value >= 1 && day.value <= 5,
 }));
 
+const BILLABLE_ROLES = ["technician", "installer", "service_tech"];
+
 export default function TeamMemberDetail() {
   const { toast } = useToast();
   const [, params] = useRoute("/manage-team/:userId");
@@ -111,6 +132,12 @@ export default function TeamMemberDetail() {
 
   const [workingHours, setWorkingHours] = useState(DEFAULT_HOURS);
   const [useCustomSchedule, setUseCustomSchedule] = useState(false);
+  const [overridePermissions, setOverridePermissions] = useState(false);
+  const [permissionOverrides, setPermissionOverrides] = useState<Record<string, "grant" | "revoke" | null>>({});
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  const [showActivateDialog, setShowActivateDialog] = useState(false);
+  const [showCreateRoleDialog, setShowCreateRoleDialog] = useState(false);
+  const [newRole, setNewRole] = useState({ name: "", description: "" });
 
   const { data: member, isLoading } = useQuery<TeamMemberWithDetails>({
     queryKey: ["/api/team", userId],
@@ -128,6 +155,11 @@ export default function TeamMemberDetail() {
   const { data: effectivePermissions = [] } = useQuery<string[]>({
     queryKey: ["/api/team", userId, "effective-permissions"],
     enabled: !!userId,
+  });
+
+  const { data: rolePermissions = [] } = useQuery<string[]>({
+    queryKey: ["/api/roles", member?.roleId, "permissions"],
+    enabled: !!member?.roleId,
   });
 
   useEffect(() => {
@@ -160,6 +192,15 @@ export default function TeamMemberDetail() {
             isWorking: existing?.isWorking ?? false,
           };
         }));
+      }
+
+      if (member.permissionOverrides && member.permissionOverrides.length > 0) {
+        setOverridePermissions(true);
+        const overrides: Record<string, "grant" | "revoke"> = {};
+        member.permissionOverrides.forEach(o => {
+          overrides[o.permissionId] = o.override as "grant" | "revoke";
+        });
+        setPermissionOverrides(overrides);
       }
     }
   }, [member]);
@@ -206,12 +247,41 @@ export default function TeamMemberDetail() {
     },
   });
 
+  const updatePermissionsMutation = useMutation({
+    mutationFn: async (overrides: Array<{ permissionId: string; override: "grant" | "revoke" }>) => {
+      return await apiRequest("PUT", `/api/team/${userId}/permissions`, { overrides });
+    },
+    onSuccess: () => {
+      toast({ title: "Permissions updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/team", userId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/team", userId, "effective-permissions"] });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+  });
+
   const deactivateMutation = useMutation({
     mutationFn: async () => {
       return await apiRequest("POST", `/api/team/${userId}/deactivate`, {});
     },
     onSuccess: () => {
       toast({ title: "Member deactivated" });
+      setShowDeactivateDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/team"] });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+  });
+
+  const activateMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/team/${userId}/activate`, {});
+    },
+    onSuccess: () => {
+      toast({ title: "Member activated" });
+      setShowActivateDialog(false);
       queryClient.invalidateQueries({ queryKey: ["/api/team"] });
     },
     onError: (error: any) => {
@@ -223,6 +293,55 @@ export default function TeamMemberDetail() {
     setWorkingHours(prev => prev.map(h => 
       h.dayOfWeek === dayOfWeek ? { ...h, [field]: value } : h
     ));
+  };
+
+  const copyMondayToWeekdays = () => {
+    const monday = workingHours.find(h => h.dayOfWeek === 1);
+    if (monday) {
+      setWorkingHours(prev => prev.map(h => {
+        if (h.dayOfWeek >= 1 && h.dayOfWeek <= 5) {
+          return {
+            ...h,
+            startTime: monday.startTime,
+            endTime: monday.endTime,
+            isWorking: monday.isWorking,
+          };
+        }
+        return h;
+      }));
+      toast({ title: "Copied Monday's hours to all weekdays" });
+    }
+  };
+
+  const handlePermissionToggle = (permId: string) => {
+    setPermissionOverrides(prev => {
+      const current = prev[permId];
+      const hasFromRole = rolePermissions.includes(permissions.find(p => p.id === permId)?.name || "");
+      
+      if (current === null || current === undefined) {
+        return { ...prev, [permId]: hasFromRole ? "revoke" : "grant" };
+      } else if (current === "grant") {
+        return { ...prev, [permId]: "revoke" };
+      } else {
+        const { [permId]: _, ...rest } = prev;
+        return rest;
+      }
+    });
+  };
+
+  const savePermissions = () => {
+    const overrides = Object.entries(permissionOverrides)
+      .filter(([_, value]) => value !== null)
+      .map(([permissionId, override]) => ({
+        permissionId,
+        override: override as "grant" | "revoke",
+      }));
+    updatePermissionsMutation.mutate(overrides);
+  };
+
+  const clearAllOverrides = () => {
+    setPermissionOverrides({});
+    updatePermissionsMutation.mutate([]);
   };
 
   if (isLoading) {
@@ -261,6 +380,9 @@ export default function TeamMemberDetail() {
     return acc;
   }, {} as Record<string, Permission[]>);
 
+  const isBillableRole = BILLABLE_ROLES.includes(member.role.toLowerCase());
+  const currentRole = roles.find(r => r.id === basicInfo.roleId);
+
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-4xl mx-auto">
@@ -283,8 +405,8 @@ export default function TeamMemberDetail() {
               <p className="text-muted-foreground">{member.email}</p>
             </div>
           </div>
-          <Badge className={member.status === "active" ? "bg-green-600" : ""}>
-            {member.status}
+          <Badge className={member.status === "active" ? "bg-green-600" : "bg-gray-500"}>
+            {member.status === "active" ? "Active" : "Disabled"}
           </Badge>
         </div>
 
@@ -336,6 +458,17 @@ export default function TeamMemberDetail() {
                   </div>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    value={member.email}
+                    disabled
+                    className="bg-muted"
+                    data-testid="input-email"
+                  />
+                  <p className="text-xs text-muted-foreground">Email cannot be changed as it is used for login</p>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
@@ -347,24 +480,61 @@ export default function TeamMemberDetail() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">Role</Label>
-                  <Select
-                    value={basicInfo.roleId}
-                    onValueChange={(value) => setBasicInfo(prev => ({ ...prev, roleId: value }))}
-                  >
-                    <SelectTrigger data-testid="select-role">
-                      <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map((role) => (
-                        <SelectItem key={role.id} value={role.id}>{role.displayName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select
+                      value={basicInfo.roleId}
+                      onValueChange={(value) => setBasicInfo(prev => ({ ...prev, roleId: value }))}
+                    >
+                      <SelectTrigger className="flex-1" data-testid="select-role">
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roles.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>{role.displayName}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      onClick={() => setShowCreateRoleDialog(true)}
+                      data-testid="button-create-role"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <div>
+                    <p className="font-medium">Status</p>
+                    <p className="text-sm text-muted-foreground">
+                      {member.status === "active" 
+                        ? "This member can access the system" 
+                        : "This member cannot access the system"}
+                    </p>
+                  </div>
+                  {member.status === "active" ? (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowDeactivateDialog(true)}
+                      data-testid="button-toggle-status"
+                    >
+                      Disable Account
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="default" 
+                      onClick={() => setShowActivateDialog(true)}
+                      data-testid="button-toggle-status"
+                    >
+                      Enable Account
+                    </Button>
+                  )}
                 </div>
                 <div className="flex items-center justify-between pt-4 border-t">
                   <div>
                     <p className="font-medium">Use Custom Schedule</p>
-                    <p className="text-sm text-muted-foreground">Override default company working hours</p>
+                    <p className="text-sm text-muted-foreground">Override default company working hours for this member</p>
                   </div>
                   <Switch
                     checked={useCustomSchedule}
@@ -372,16 +542,7 @@ export default function TeamMemberDetail() {
                     data-testid="switch-custom-schedule"
                   />
                 </div>
-                <div className="flex justify-between pt-4">
-                  <Button
-                    variant="destructive"
-                    onClick={() => deactivateMutation.mutate()}
-                    disabled={deactivateMutation.isPending}
-                    data-testid="button-deactivate"
-                  >
-                    <AlertTriangle className="h-4 w-4 mr-2" />
-                    Deactivate Member
-                  </Button>
+                <div className="flex justify-end pt-4">
                   <Button
                     onClick={() => updateBasicMutation.mutate({ ...basicInfo, useCustomSchedule })}
                     disabled={updateBasicMutation.isPending}
@@ -398,14 +559,30 @@ export default function TeamMemberDetail() {
           <TabsContent value="schedule">
             <Card>
               <CardHeader>
-                <CardTitle>Working Hours</CardTitle>
-                <CardDescription>Set the team member's regular working schedule</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Working Hours</CardTitle>
+                    <CardDescription>Set the team member's regular working schedule</CardDescription>
+                  </div>
+                  {useCustomSchedule && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={copyMondayToWeekdays}
+                      data-testid="button-copy-monday"
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Monday to Weekdays
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {!useCustomSchedule && (
-                  <div className="p-4 bg-muted rounded-lg mb-4">
+                  <div className="p-4 bg-muted rounded-lg mb-4 flex items-start gap-3">
+                    <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <p className="text-sm text-muted-foreground">
-                      This member is using the default company schedule. Enable "Use Custom Schedule" in Basic Info to customize their hours.
+                      This member is using the default company schedule. Enable "Use Custom Schedule" on the Basic Info tab to customize their hours.
                     </p>
                   </div>
                 )}
@@ -475,6 +652,14 @@ export default function TeamMemberDetail() {
                 <CardDescription>Configure labor costs and billing rates for this team member</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {!isBillableRole && (
+                  <div className="p-4 bg-muted rounded-lg mb-4 flex items-start gap-3">
+                    <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <p className="text-sm text-muted-foreground">
+                      These fields are optional for non-field roles. They are mainly used for technicians and other billable staff.
+                    </p>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="laborCost">Labor Cost (per hour)</Label>
@@ -513,7 +698,7 @@ export default function TeamMemberDetail() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="color">Calendar Color</Label>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <Input
                       id="color"
                       type="color"
@@ -522,16 +707,21 @@ export default function TeamMemberDetail() {
                       className="w-16 h-9 p-1"
                       data-testid="input-color"
                     />
+                    <div 
+                      className="h-9 w-24 rounded-md border"
+                      style={{ backgroundColor: profile.color }}
+                    />
                     <span className="text-sm text-muted-foreground">Used to identify this technician on the calendar</span>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="note">Notes</Label>
-                  <Input
+                  <Label htmlFor="note">Internal Notes</Label>
+                  <Textarea
                     id="note"
                     value={profile.note}
                     onChange={(e) => setProfile(prev => ({ ...prev, note: e.target.value }))}
-                    placeholder="Internal notes about this team member"
+                    placeholder="Internal notes about this team member..."
+                    rows={4}
                     data-testid="input-note"
                   />
                 </div>
@@ -558,6 +748,29 @@ export default function TeamMemberDetail() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="p-4 bg-muted rounded-lg mb-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Role: {currentRole?.displayName || member.role}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        This member inherits permissions from their role. You can optionally override specific permissions below.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mb-6 pb-4 border-b">
+                  <div>
+                    <p className="font-medium">Override Role Permissions</p>
+                    <p className="text-sm text-muted-foreground">Enable to grant or revoke specific permissions for this member</p>
+                  </div>
+                  <Switch
+                    checked={overridePermissions}
+                    onCheckedChange={setOverridePermissions}
+                    data-testid="switch-override-permissions"
+                  />
+                </div>
+
                 <div className="space-y-6">
                   {Object.entries(permissionsByCategory).map(([category, categoryPerms]) => (
                     <div key={category}>
@@ -566,28 +779,59 @@ export default function TeamMemberDetail() {
                       </h3>
                       <div className="space-y-2">
                         {categoryPerms.map((perm) => {
-                          const hasPermission = effectivePermissions.includes(perm.name);
-                          const override = member.permissionOverrides.find(o => o.permissionId === perm.id);
+                          const hasFromRole = rolePermissions.includes(perm.name);
+                          const override = permissionOverrides[perm.id];
+                          const hasPermission = override === "grant" 
+                            ? true 
+                            : override === "revoke" 
+                              ? false 
+                              : effectivePermissions.includes(perm.name);
+
                           return (
                             <div
                               key={perm.id}
                               className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/50"
                             >
-                              <div>
+                              <div className="flex-1">
                                 <p className="font-medium text-sm">{perm.displayName}</p>
                                 {perm.description && (
                                   <p className="text-xs text-muted-foreground">{perm.description}</p>
                                 )}
                               </div>
                               <div className="flex items-center gap-2">
-                                {override && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {override.override === "grant" ? "Granted" : "Revoked"}
-                                  </Badge>
+                                {!overridePermissions ? (
+                                  <>
+                                    <Badge variant="outline" className="text-xs">
+                                      Inherited
+                                    </Badge>
+                                    <Badge variant={hasPermission ? "default" : "secondary"}>
+                                      {hasPermission ? "Yes" : "No"}
+                                    </Badge>
+                                  </>
+                                ) : (
+                                  <>
+                                    {override && (
+                                      <Badge 
+                                        variant={override === "grant" ? "default" : "destructive"} 
+                                        className="text-xs"
+                                      >
+                                        {override === "grant" ? "Granted" : "Revoked"}
+                                      </Badge>
+                                    )}
+                                    <Button
+                                      variant={hasPermission ? "default" : "outline"}
+                                      size="sm"
+                                      onClick={() => handlePermissionToggle(perm.id)}
+                                      data-testid={`button-toggle-perm-${perm.id}`}
+                                    >
+                                      {hasPermission ? (
+                                        <Check className="h-4 w-4" />
+                                      ) : (
+                                        <X className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  </>
                                 )}
-                                <Badge variant={hasPermission ? "default" : "secondary"}>
-                                  {hasPermission ? "Yes" : "No"}
-                                </Badge>
                               </div>
                             </div>
                           );
@@ -596,16 +840,117 @@ export default function TeamMemberDetail() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-6 p-4 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    Permission overrides can be configured by admins. Contact your administrator to modify individual permissions.
-                  </p>
-                </div>
+
+                {overridePermissions && (
+                  <div className="flex justify-between pt-6 mt-6 border-t">
+                    <Button
+                      variant="outline"
+                      onClick={clearAllOverrides}
+                      data-testid="button-clear-overrides"
+                    >
+                      Clear All Overrides
+                    </Button>
+                    <Button
+                      onClick={savePermissions}
+                      disabled={updatePermissionsMutation.isPending}
+                      data-testid="button-save-permissions"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Permissions
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
+
+      <AlertDialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable Team Member</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will prevent {member.firstName || member.email} from accessing the system. They will not be able to log in until re-enabled.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deactivateMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Disable Account
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showActivateDialog} onOpenChange={setShowActivateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Enable Team Member</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will allow {member.firstName || member.email} to access the system again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => activateMutation.mutate()}>
+              Enable Account
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={showCreateRoleDialog} onOpenChange={setShowCreateRoleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Role</DialogTitle>
+            <DialogDescription>
+              Define a new role with a name and description. Permissions can be configured after creation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="role-name">Role Name</Label>
+              <Input
+                id="role-name"
+                value={newRole.name}
+                onChange={(e) => setNewRole(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g., Senior Technician"
+                data-testid="input-role-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role-description">Description</Label>
+              <Textarea
+                id="role-description"
+                value={newRole.description}
+                onChange={(e) => setNewRole(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe this role's responsibilities..."
+                data-testid="input-role-description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateRoleDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                toast({ title: "Role created", description: `${newRole.name} has been created` });
+                setShowCreateRoleDialog(false);
+                setNewRole({ name: "", description: "" });
+              }}
+              disabled={!newRole.name}
+              data-testid="button-create-role-submit"
+            >
+              Create Role
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

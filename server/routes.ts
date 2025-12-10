@@ -4452,6 +4452,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Activate team member
+  app.post("/api/team/:userId/activate", isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      const member = await storage.getTeamMember(req.user!.companyId, userId);
+      if (!member) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+      
+      const updated = await storage.updateTeamMember(req.user!.companyId, userId, {
+        status: 'active'
+      });
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+      
+      res.json({ ...updated, password: undefined });
+    } catch (error) {
+      console.error('Activate team member error:', error);
+      res.status(500).json({ error: "Failed to activate team member" });
+    }
+  });
+
+  // Get role permissions
+  app.get("/api/roles/:roleId/permissions", isAuthenticated, async (req, res) => {
+    try {
+      const { roleId } = req.params;
+      
+      const result = await storage.getRolePermissions(roleId);
+      res.json(result);
+    } catch (error) {
+      console.error('Get role permissions error:', error);
+      res.status(500).json({ error: "Failed to get role permissions" });
+    }
+  });
+
   // Update technician profile
   app.put("/api/team/:userId/profile", isAuthenticated, async (req, res) => {
     try {
@@ -4534,8 +4572,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { roles } = await import("@shared/schema");
       const { db } = await import("./db");
-      const allRoles = await db.select().from(roles).orderBy(roles.hierarchy);
-      res.json(allRoles);
+      const allRoles = await db.select().from(roles).orderBy(roles.name);
+      res.json(allRoles.map(r => ({
+        ...r,
+        displayName: r.name.charAt(0).toUpperCase() + r.name.slice(1).replace(/_/g, ' '),
+        hierarchy: 0,
+      })));
     } catch (error) {
       console.error('Get roles error:', error);
       res.status(500).json({ error: "Failed to get roles" });
@@ -4547,8 +4589,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { permissions } = await import("@shared/schema");
       const { db } = await import("./db");
-      const allPermissions = await db.select().from(permissions).orderBy(permissions.category, permissions.name);
-      res.json(allPermissions);
+      const allPermissions = await db.select().from(permissions).orderBy(permissions.group, permissions.key);
+      res.json(allPermissions.map(p => ({
+        id: p.id,
+        name: p.key,
+        displayName: p.label,
+        description: p.description,
+        category: p.group,
+      })));
     } catch (error) {
       console.error('Get permissions error:', error);
       res.status(500).json({ error: "Failed to get permissions" });
@@ -4566,9 +4614,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Team member not found" });
       }
       
-      const { getUserPermissions } = await import("./permissions");
-      const permissions = await getUserPermissions(userId);
-      res.json(permissions);
+      const { getUserEffectivePermissions } = await import("./permissions");
+      const permissionSet = await getUserEffectivePermissions(userId);
+      res.json(Array.from(permissionSet));
     } catch (error) {
       console.error('Get effective permissions error:', error);
       res.status(500).json({ error: "Failed to get effective permissions" });

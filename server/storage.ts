@@ -4993,6 +4993,18 @@ export class DbStorage implements IStorage {
         })));
     }
   }
+
+  // Get role permissions
+  async getRolePermissions(roleId: string): Promise<string[]> {
+    const result = await db.select({
+      permissionKey: permissions.key,
+    })
+      .from(rolePermissions)
+      .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
+      .where(eq(rolePermissions.roleId, roleId));
+    
+    return result.map(r => r.permissionKey);
+  }
 }
 
 export const storage = new DbStorage();

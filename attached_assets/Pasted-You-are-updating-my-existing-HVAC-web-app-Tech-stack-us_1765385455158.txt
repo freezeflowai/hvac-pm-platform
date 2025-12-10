@@ -1,0 +1,531 @@
+You are updating my existing HVAC web app.
+Tech stack: use the same tech, styles, and layout system already in the project (same main layout, sidebar, typography, and button components). Do not redesign the global shell; we are only improving the Team Management module under Settings → Team.
+
+1. Goals
+
+Replace the current basic “Team Management” and member pages with a full, future-proof team / technician management system:
+
+Clean list view (Team Management)
+
+Detailed member profile with tabs
+
+Role & permission architecture that can grow
+
+Technician working hours and billing info
+
+Make it easy to:
+
+See who’s on the team at a glance
+
+Manage roles & permissions cleanly
+
+Configure working hours and calendar colors
+
+Extend later with skills, vehicles, certifications, etc.
+
+2. Team Management List Page (Settings → Team)
+
+We already have a basic “Team Management” screen. Keep the overall header cards (Total Members, Active Members, Roles Defined, Pending Invites) but refine and extend as below.
+
+2.1 List Layout & Hierarchy
+
+Update the member rows to use this hierarchy (very important):
+
+Left to right:
+
+Avatar with initials (circle, same style as other avatars)
+
+Full name (primary, bold)
+
+Role badge (pill, small, coloured)
+
+Email (secondary, muted text)
+
+Status badge (Active / Disabled)
+
+Last login (date or “Never”)
+
+Row actions (⋮ menu or chevron to open profile)
+
+Example row:
+
+Avatar: “NS”
+
+“Nadeem Samaha” (bold)
+
+[owner] badge (purple)
+
+service@samcor.ca
+ (muted)
+
+[Active] (green badge)
+
+Last login: Dec 10, 2025
+
+Chevron / ⋮ to open member details
+
+Right now the list shows email as primary; change it to name first, email second.
+
+2.2 Filters, Sorting, and Search
+
+At the top of the list add:
+
+Search input: Search by name, email, role, or phone
+
+Backend/filter should match on:
+
+first_name, last_name, email
+
+role name
+
+phone (optional for now)
+
+Dropdown filter: Status:
+
+All Statuses, Active, Disabled, Pending
+
+Dropdown filter: Role:
+
+All Roles, plus each defined role
+
+Optional sort dropdown:
+
+A–Z, Z–A
+
+Last login (newest, oldest)
+
+Role
+
+Use the existing filter dropdown styling from other pages (e.g., jobs/clients).
+
+2.3 Invite Member Button
+
+Keep the existing “Invite Member” button top-right but ensure it opens whatever invite flow already exists. If no flow yet, stub a modal:
+
+Fields: Full name, email, role, notes
+
+“Send Invite” (non-functional for now is OK, but wire UI so it’s ready).
+
+3. Member Detail Page (Profile)
+
+When clicking a member row, navigate to a Member Detail page with tabs:
+
+Tabs at top (like currently):
+
+Basic Info
+
+Schedule
+
+Billing
+
+Permissions
+
+Keep the styling consistent with the current implementation; we’re just improving content & structure.
+
+3.1 Basic Info Tab
+
+Fields (some already exist; just align, rename, or add as needed):
+
+Full name:
+
+First Name
+
+Last Name
+
+Email (read-only if email is also the login identifier)
+
+Phone
+
+Role (select)
+
+Dropdown listing roles (Owner, Technician, Dispatcher, Admin, etc.)
+
+Add a “+ Create Role” inline action that opens a small modal to define a new role (name, description, base type). For now, the modal can just create a new Role record with name + description.
+
+Status:
+
+Badge: Active / Disabled
+
+Toggle button or switch:
+
+Active → click → confirm → Disabled
+
+Disabled → click → confirm → Active
+
+“Use Custom Schedule” toggle
+
+Text: “Override default company working hours for this member”
+
+If OFF → Schedule tab shows a notice that company defaults are used
+
+If ON → Schedule tab allows editing hours
+
+Buttons at bottom:
+
+“Save Changes” (primary)
+
+“Deactivate Member” (danger secondary, if not already disabled)
+
+3.2 Schedule Tab (Working Hours)
+
+This tab already exists but refine:
+
+If “Use Custom Schedule” is OFF in Basic Info:
+
+Show info banner:
+
+“This member currently uses the default company schedule. Enable ‘Use Custom Schedule’ on the Basic Info tab to customize their hours.”
+
+Show fields as disabled.
+
+If “Use Custom Schedule” is ON:
+
+Editable weekly schedule table similar to current:
+
+For each day (Sunday–Saturday):
+
+Toggle ON/OFF
+
+Start time (time picker)
+
+End time (time picker)
+
+Validation:
+
+If day is ON, require start < end.
+
+“Copy Mon–Fri to all enabled days” quick action (optional but nice):
+
+Small text button near top like “Copy Monday’s hours to all weekdays”.
+
+“Save Schedule” button at bottom.
+
+This schedule data will be important for calendar “Find a Time” style logic later, so store it cleanly (see schema below).
+
+3.3 Billing Tab (Labour & Costs)
+
+Billing is mostly relevant for technicians and other billable roles.
+
+Fields:
+
+Labour Cost (per hour)
+
+Placeholder: “Internal cost of this technician’s time”
+
+Billable Rate (per hour)
+
+Placeholder: “Rate charged to customers”
+
+Calendar Color
+
+Colour picker (we already use this for calendar colour):
+
+This colour is used for job cards when this technician is assigned (border or strip).
+
+Internal Notes
+
+Multiline textarea: “Internal notes about this team member”.
+
+Behaviour:
+
+If user has a non-field role (e.g. office admin), these fields remain editable but annotate them with a hint:
+
+“Optional – mainly used for technicians and billable staff.”
+
+One important rule: calendar colour is required for any member that can appear on the schedule (Technician, Installer, etc.).
+
+3.4 Permissions Tab
+
+We want a future-proof permission system that is clear to the user, and driven by role, with optional overrides.
+
+Structure on the page:
+
+Role information at top:
+
+“Role: Technician”
+
+“This member inherits permissions from their role. You can optionally override specific permissions below.”
+
+Toggle:
+
+Override role permissions for this member: ON/OFF
+
+If OFF:
+
+Show grouped, read-only view of permissions with labels like “Inherited from role”.
+
+If ON:
+
+Allow editing of individual permissions.
+
+Group permissions visually into sections:
+
+Schedule
+
+Jobs
+
+Quotes
+
+Invoices
+
+Clients & Properties
+
+Notes
+
+Expenses
+
+Reports
+
+Admin / Settings
+
+Each permission has a label + control. Examples (no need to implement every possible variant, just enough structure so we can extend):
+
+Schedule permissions (examples):
+
+View their own schedule:
+
+Options: Off / On
+
+Edit their own schedule:
+
+Options: Off / On
+
+View everyone’s schedule:
+
+Options: Off / On
+
+Edit everyone’s schedule:
+
+Options: Off / On
+
+Jobs permissions (examples):
+
+Jobs:
+
+None
+
+View only
+
+View + create + edit own
+
+View + create + edit all
+
+View + create + edit + delete all
+
+We do not need to wire all these to authorization logic yet, but:
+
+Build the UI fully, backed by a generic permissions schema.
+
+Store the data in DB (see schema).
+
+Add placeholders for later integration into auth guards.
+
+4. Roles Management Architecture
+
+The UI for Roles can be added later, but the schema needs to support it now.
+
+4.1 Data Models (Conceptual)
+
+Implement or update models (naming can match project conventions):
+
+Users / Members
+
+id
+
+first_name
+
+last_name
+
+email
+
+phone
+
+status (enum: active, disabled, pending)
+
+calendar_color (string / hex)
+
+labour_cost_hourly (decimal)
+
+billable_rate_hourly (decimal)
+
+use_custom_schedule (boolean)
+
+created_at, updated_at
+
+Roles
+
+id
+
+name (e.g. Owner, Technician, Dispatcher)
+
+slug (e.g. owner, technician, dispatcher)
+
+description
+
+is_system (boolean; true for Owner/Admin defaults)
+
+created_at, updated_at
+
+UserRoles (if multiple roles allowed; if not, a single role_id on User is enough)
+
+id
+
+user_id
+
+role_id
+
+Permissions
+
+id
+
+key (e.g. schedule.view_own, jobs.manage_all)
+
+label (user-facing text)
+
+group (e.g. “Schedule”, “Jobs”)
+
+description (optional tooltip)
+
+levels (enum or config – see below)
+
+RolePermissions
+
+id
+
+role_id
+
+permission_id
+
+level (enum string, e.g. “none”, “view”, “edit_own”, “edit_all”, “manage”)
+
+UserPermissionOverrides
+
+id
+
+user_id
+
+permission_id
+
+level (same enum as RolePermissions; when null, inherit from role)
+
+WorkingHours
+
+id
+
+user_id
+
+day_of_week (0–6 or string, Sunday–Saturday)
+
+enabled (boolean)
+
+start_time (time)
+
+end_time (time)
+
+CompanyDefaultWorkingHours (if not already present)
+
+id
+
+day_of_week
+
+enabled
+
+start_time
+
+end_time
+
+4.2 Config-Driven Permissions
+
+Create a central permission config in the backend or shared module, e.g.:
+
+// PSEUDOCODE / CONFIG IDEA, DO NOT HARDCODE TYPES IF PROJECT USES DIFFERENT SETUP
+const PERMISSION_DEFINITIONS = [
+  {
+    key: 'schedule.view_own',
+    group: 'Schedule',
+    label: 'View their own schedule',
+    levels: ['off', 'on'],
+  },
+  {
+    key: 'schedule.edit_own',
+    group: 'Schedule',
+    label: 'Edit their own schedule',
+    levels: ['off', 'on'],
+  },
+  {
+    key: 'jobs.access',
+    group: 'Jobs',
+    label: 'Jobs',
+    levels: ['none', 'view_only', 'edit_own', 'edit_all', 'manage'],
+  },
+  // etc…
+];
+
+
+Use this config to:
+
+Seed permissions table (if needed).
+
+Build the UI in the Permissions tab:
+
+Group by group
+
+Render each permission row with appropriate input (radio group or select).
+
+5. Calendar Integration Touchpoints (Future-Proofing)
+
+We already have a calendar where technician colours and overdue dots matter. Make sure:
+
+The calendar colour stored on the member is what the calendar uses for:
+
+left border or top strip of job cards
+
+colour of unscheduled job tags assigned to that technician (later)
+
+Working hours structure is clean enough to support:
+
+“Find a Time” feature
+
+Availability hints
+
+You do not need to modify the calendar now, but the data model must support these use cases.
+
+6. UX & Visual Details
+
+Use the existing design system (buttons, badges, inputs, typographic scale).
+
+Keep spacing consistent with other Settings pages.
+
+Use subtle section headings (e.g. “Basic Information”, “Working Hours”, “Billing & Costs”, “Permissions”) inside tabs.
+
+Use helper text under fields where helpful (e.g. under labour cost and billable rate).
+
+Ensure all forms show validation errors inline and show a success toast/banner after save.
+
+7. Implementation Checklist
+
+ Update Team Management list page:
+
+Change row layout to name-first hierarchy
+
+Add search, filters, sorting
+
+ Implement or refine Member Detail page with 4 tabs:
+
+Basic Info (including Use Custom Schedule)
+
+Schedule (per-day working hours, uses the toggle)
+
+Billing (labour, billable, colour, notes)
+
+Permissions (role + overrides)
+
+ Implement Roles, Permissions, RolePermissions, UserPermissionOverrides, WorkingHours schema and necessary backend endpoints or services.
+
+ Wire Permissions tab to use config-driven group + permission + level structure.
+
+ Ensure no breaking changes to existing authentication; permission data can initially be stored without enforcing it everywhere.
+
+ Keep UI responsive and visually aligned with existing pages.
+
+Implement all of the above in the existing project, using its current stack and conventions. Do not remove any existing global navigation or header components; only enhance the Team / Member functionality and visuals as described.
