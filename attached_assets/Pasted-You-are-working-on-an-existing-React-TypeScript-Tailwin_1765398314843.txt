@@ -1,0 +1,115 @@
+You are working on an existing React + TypeScript + Tailwind app. There is already an “Invoice Detail” page that looks like this:
+
+Top bar: back arrow, “Invoice INV-####”, status chip, “Collect Payment”, “Edit”, “⋯”.
+
+Body: two columns with separate cards for Client, Invoice Details, Summary, Activity on the left, and Line Items, Public Notes, Internal Notes on the right.
+
+Please refactor this page into a better layout and UX based on this spec:
+
+High-level goals
+
+Money and status (total + balance due) must be visible at a glance in the top bar.
+
+Client & invoice meta should be grouped, not scattered over 3 cards.
+
+Line items must have more vertical space and be easy to edit.
+
+Notes should be secondary and not visually compete with line items.
+
+New Layout
+
+Top bar
+
+Left: Back arrow, title Invoice INV-{number}, status chip, and a small line of text under the title: Client: {clientName} • Job: #{jobNumber} (if job exists).
+
+Right:
+
+Show Balance Due as a bold amount (colored: green when 0, red when overdue, amber when partial).
+
+Buttons: Collect Payment (primary), Send or Edit depending on status, and a ⋯ dropdown for extra actions.
+
+Body layout: two columns
+
+Left column ~35% width, right column ~65% width on desktop.
+
+Left column cards
+
+Client card:
+
+Show client name, billing address, property address, phone, and email.
+
+Add a small View Client link/button.
+
+Invoice Info card:
+
+Combine existing “Invoice Details” and “Summary”.
+
+Inside this card, use a two-column layout:
+
+Left: Issue Date, Due Date, Linked Job (with “View Job” link).
+
+Right: Subtotal, Tax, Total, Amount Paid, Balance Due (colored, bold).
+
+Activity card:
+
+Keep the activity list but style it as a vertical timeline: dot + event title + timestamp.
+
+Right column cards
+
+Line Items card (full height, main focus):
+
+Card header: “Line Items” title + + Add line item button on the right.
+
+A table with columns: Description, Qty, Rate, Tax (or Taxable), Line Total, and an icon column for delete / drag handle.
+
+In view mode: show plain text.
+
+In edit mode: cells become inputs (text input/textarea for description, numeric inputs for qty and rate, dropdown or checkbox for tax).
+
+At the bottom of the card, after a divider, show totals aligned to the right: Subtotal, Tax, Total (bold).
+
+Below the line items card, a Notes card that uses tabs:
+
+Two tabs: Public Notes and Internal Notes.
+
+Public Notes: text that appears on the client’s invoice.
+
+Internal Notes: office-only notes. You can also leave a placeholder area for attachments here.
+
+Behaviour
+
+Keep the current Edit button but change the page to have a clear edit mode:
+
+When in edit mode, relevant fields (dates, line items, notes) become editable.
+
+Show a Save / Cancel area (e.g., sticky footer or buttons in the top bar).
+
+If invoice status is paid or voided, restrict what can be edited (for now, it’s okay to just disable editing and leave a TODO comment).
+
+Add a helper that derives isOverdue = dueDate < today && balance > 0. When overdue:
+
+Status chip can read “Past due”.
+
+Balance due text should be red.
+
+Keep all existing data fetching and API calls; only refactor layout and the React component structure/styling. Don’t change the backend contract.
+
+Use Tailwind utility classes to implement the new layout; favour flexbox and grid for the 2-column card layouts.
+
+Please:
+
+Update the existing Invoice Detail React component(s) to match this layout.
+
+Refactor into smaller components where it makes sense (e.g., InvoiceOverviewPanel, InvoiceLineItemsCard, InvoiceNotesCard, InvoiceActivityTimeline), but keep everything in the same route folder.
+
+Ensure the design is responsive: on small screens stack the columns vertically (overview first, then line items, then notes and activity).
+
+After implementing, double-check that:
+
+All totals still calculate correctly.
+
+Buttons still trigger their existing handlers (collect payment, edit, etc.).
+
+There are no TypeScript errors.
+
+Focus on clean, readable code and a polished layout.
