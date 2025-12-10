@@ -22,6 +22,10 @@ import TechnicianManagementPage from "@/pages/TechnicianManagementPage";
 import Technician from "@/pages/Technician";
 import DailyParts from "@/pages/DailyParts";
 import SettingsPage from "@/pages/SettingsPage";
+import CustomFieldsPage from "@/pages/CustomFieldsPage";
+import TaxBillingRulesPage from "@/pages/TaxBillingRulesPage";
+import IntegrationsPage from "@/pages/IntegrationsPage";
+import CategoryManagementPage from "@/pages/CategoryManagementPage";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import RequestReset from "@/pages/RequestReset";
@@ -101,6 +105,36 @@ function Router() {
       <Route path="/settings">
         <ProtectedRoute requireAdmin>
           <SettingsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings/products">
+        <ProtectedRoute requireAdmin>
+          <PartsManagementPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings/team">
+        <ProtectedRoute requireAdmin>
+          <TechnicianManagementPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings/custom-fields">
+        <ProtectedRoute requireAdmin>
+          <CustomFieldsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings/tax-billing">
+        <ProtectedRoute requireAdmin>
+          <TaxBillingRulesPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings/integrations">
+        <ProtectedRoute requireAdmin>
+          <IntegrationsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings/categories">
+        <ProtectedRoute requireAdmin>
+          <CategoryManagementPage />
         </ProtectedRoute>
       </Route>
       <Route path="/company-settings">

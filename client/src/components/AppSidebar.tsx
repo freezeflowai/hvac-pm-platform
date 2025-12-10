@@ -93,7 +93,7 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       testId: "nav-daily-parts"
     });
   } else {
-    // Admin menu
+    // Admin menu - ordered: Dashboard, Jobs, Clients, Calendar, Reports, divider, Settings, Admin
     menuItems.push({
       title: "Dashboard",
       icon: LayoutDashboard,
@@ -108,27 +108,27 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       testId: "nav-dashboard"
     });
     menuItems.push({
-      title: "Calendar",
-      icon: CalendarIcon,
-      href: "/calendar",
-      isActive: location === "/calendar",
-      testId: "nav-calendar"
-    });
-    menuItems.push({
       title: "Jobs",
       icon: ClipboardList,
       href: "/jobs",
-      isActive: location === "/jobs",
+      isActive: location === "/jobs" || location.startsWith("/jobs/"),
       testId: "nav-jobs"
     });
     menuItems.push({
       title: "Clients",
       icon: Users,
-      isActive: isClientsTab,
+      isActive: isClientsTab || location.startsWith("/clients/"),
       onClick: () => {
         setLocation('/?tab=clients');
       },
       testId: "nav-clients"
+    });
+    menuItems.push({
+      title: "Calendar",
+      icon: CalendarIcon,
+      href: "/calendar",
+      isActive: location === "/calendar",
+      testId: "nav-calendar"
     });
     menuItems.push({
       title: "Reports",
@@ -137,23 +137,15 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       isActive: location === "/reports",
       testId: "nav-reports"
     });
-
-    if (user?.role === "owner") {
-      menuItems.push({
-        title: "Manage Team",
-        icon: UserCheck,
-        href: "/manage-technicians",
-        isActive: location === "/manage-technicians",
-        testId: "nav-manage-technicians"
-      });
-    }
     
+    // Divider marker - Settings section
     menuItems.push({
       title: "Settings",
       icon: Settings,
       href: "/settings",
-      isActive: location === "/settings" || location === "/products",
-      testId: "nav-settings"
+      isActive: location === "/settings" || location.startsWith("/settings/") || location === "/products" || location === "/manage-technicians",
+      testId: "nav-settings",
+      isDivider: true
     });
     
     // Platform admin gets the Support Console
@@ -188,6 +180,9 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
+                  {(item as any).isDivider && (
+                    <div className="my-2 mx-2 border-t border-border" />
+                  )}
                   {item.href ? (
                     <SidebarMenuButton 
                       asChild 

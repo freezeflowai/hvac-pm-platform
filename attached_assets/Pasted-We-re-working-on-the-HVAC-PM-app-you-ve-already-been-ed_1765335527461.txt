@@ -1,0 +1,310 @@
+We’re working on the HVAC PM app you’ve already been editing. I need you to refactor and enhance the Products & Services area and adjust the left navigation / Settings structure.
+
+Please read this carefully and implement everything below without breaking existing data or other pages.
+
+1. Left Navigation & Settings Structure
+
+Goal: Clean up the left sidebar, move non-daily stuff into Settings, and keep Admin untouched.
+
+1.1 Sidebar layout
+
+Update the left sidebar to something like this (order matters):
+
+Dashboard
+
+Jobs
+
+Clients
+
+Invoices (if it already exists; otherwise ignore)
+
+Schedule / Calendar
+
+Reports
+
+Divider
+
+Settings
+
+Admin (existing Admin section stays as is; don’t modify its internal behavior)
+
+1.2 Settings children
+
+When the user clicks Settings, they should land on a Settings section that includes at least:
+
+Products & Services
+
+Team Management (this is the current "Manage Team" section moved under Settings)
+
+Custom Fields (stub page is fine for now – just a heading and placeholder text)
+
+Tax & Billing Rules (stub page: heading + placeholder)
+
+Integrations (stub page: heading + placeholder)
+
+Do not remove Admin.
+Do not change Admin’s behavior.
+Just add Settings as its own section above Admin and move the Manage Team experience into the Team Management sub-page under Settings.
+
+2. Products & Services Page – Table Layout & UX
+
+We already have a Products & Services page under Settings. Currently it uses card-style rows. Please convert this to a table layout optimized for large lists (hundreds of items).
+
+2.1 Table structure
+
+Replace the existing layout with a responsive table with these columns:
+
+Checkbox (for bulk selection)
+
+Name
+
+Description
+
+Type (Product or Service)
+
+Category (e.g., Belts, Electrical, Filters, Labour, etc.)
+
+Cost (what we pay)
+
+Price (what we charge)
+
+Actions (e.g., Edit, Archive, etc.)
+
+Notes:
+
+Keep styling consistent with the rest of the app (light background, subtle card/table container, soft borders).
+
+Ensure header row is sticky when scrolling vertically (if it’s easy).
+
+Make columns sortable by clicking the header for: Name, Type, Category, Cost, Price (ascending/descending).
+
+2.2 Search + Filters
+
+At the top of the table, add a search bar + multi-filters:
+
+Search: text input that searches over Name, Description, SKU (if we have one), Category.
+
+Filters (can be dropdowns or pills):
+
+Type: All / Product / Service
+
+Category: list of categories (Belts, Filters, Electrical, etc.)
+
+Status: All / Active / Archived
+
+These filters should combine (e.g., Type = Product + Category = Belts + “3L” in search).
+
+2.3 Bulk actions
+
+When the user selects one or more rows via checkbox:
+
+Show a bulk action bar (either above the table or as a sticky footer) with:
+
+“X selected”
+
+Bulk actions:
+
+Edit Category (opens a small dialog to apply a new category to all selected)
+
+Export (download selected rows to CSV)
+
+Archive (mark items as archived instead of truly deleting)
+
+Delete (optional, but if you keep it, make sure it requires confirmation)
+
+Use "Archive" instead of deletion wherever possible. Archived items should:
+
+Not appear in default “Active” views
+
+Still be selectable via Status filter = Archived
+
+Not break historical jobs/invoices that reference them
+
+2.4 Inline editing
+
+Allow inline editing in the table for quick changes:
+
+Click on Name, Description, Category, Cost, or Price → turns into an input.
+
+Press Enter or blur → save changes.
+
+If possible, show a tiny “saving…” state and handle errors gracefully.
+
+Big changes (like converting from Product to Service) can still use a full modal if that’s easier, but simple edits should be inline.
+
+3. Product Add/Edit Experience
+
+We currently have an “Add New” product flow. Enhance it as follows:
+
+3.1 New / Edit modal structure
+
+When adding or editing a Product/Service, use a modal or side-panel with fields:
+
+Name (required)
+
+Type: Product / Service (required)
+
+Category (dropdown, required)
+
+Description (multiline)
+
+Cost (number, optional)
+
+Price (number, optional)
+
+Tax code (optional, if our data model supports it)
+
+Active / Archived toggle (defaults to Active)
+
+Validation:
+
+Name cannot be empty.
+
+Type cannot be empty.
+
+Category required.
+
+Cost and Price should be numeric, non-negative.
+
+3.2 Duplicate detection
+
+When the user types a Name or SKU (if we have SKU):
+
+If an item with the same name or SKU already exists, show a subtle warning:
+“Item with a similar name already exists: [link to that item]. Are you sure you want to create another?”
+
+This is to prevent catalog duplication.
+
+4. Import / Export Enhancements
+
+We already have import/export controls on Products & Services. Make them smarter:
+
+4.1 Import (CSV)
+
+Keep the current Import button, but when a file is uploaded:
+
+Show a mapping screen where the user maps CSV columns to our fields:
+
+Name
+
+Description
+
+Type
+
+Category
+
+Cost
+
+Price
+
+Show a preview of the first few rows with the mapped fields.
+
+Allow the user to confirm before final import.
+
+If a row is missing Name or Type, mark it with a warning in the preview and either:
+
+Skip that row, or
+
+Ask the user to fix it (whichever is easier to implement cleanly).
+
+4.2 Export
+
+Ensure export includes at least: Name, Description, Type, Category, Cost, Price, Status (Active/Archived).
+
+Respect filters: if the user is filtering to Belts only, exports should contain only those filtered rows.
+
+5. Versioning / Change Log (Lightweight)
+
+Implement a simple change log mechanism for Products & Services:
+
+When a product’s Name, Category, Cost, or Price changes, log:
+
+Item ID
+
+Field changed
+
+Old value → new value
+
+Timestamp
+
+User who made the change (if our auth/session has that info; otherwise just store unknown or leave nullable)
+
+Expose this in a minimal way:
+
+In the product edit modal, add a “Change history” section/tab that shows the last ~10 changes for that item in a simple list.
+
+This does not need to be a full diff UI; just human-readable history lines like:
+
+Feb 10, 2025 – Price: $8.50 → $11.00 – updated by Nad
+
+Persist these in a suitable table/collection in our existing backend (follow current patterns).
+
+6. Category Management
+
+Within Settings, under Products & Services, add a small Category Management UI:
+
+Either as a tab on the same page or as a link/button “Manage Categories”.
+
+Allow:
+
+Creating new categories
+
+Renaming categories
+
+Deactivating/archiving categories (so they aren’t selectable for new items but don’t break old data)
+
+When a category is renamed, all items using that category should show the new name (migrate the underlying value appropriately).
+
+7. Integration with Job Line Items
+
+The Products & Services catalog needs to work tightly with the job line item UI you’ve already built.
+
+7.1 Product picker behavior
+
+When adding a job line item:
+
+The Product / Service input should:
+
+Allow free text typing.
+
+Show autocomplete suggestions from Products & Services (Name + Category).
+
+Filter as the user types (e.g., typing “3L19” shows matching belts).
+
+7.2 “Add new product” when not found
+
+If the user types a name that doesn’t match any existing product:
+
+Show a small inline prompt like:
+
+“No existing item found. [Add new product/service]”
+
+Clicking “Add new product/service” opens the same Add Product modal described above, pre-filled with the typed name.
+
+After saving the new product, automatically populate that line item with the new product and allow quantity/cost/price to be filled in.
+
+8. Things to NOT Change Right Now
+
+Do NOT modify anything related to the “seed standard parts / seed standard industry parts” feature or button. Leave that as it currently behaves.
+
+Do NOT alter the Admin section’s behavior; only the visual position of Settings vs Admin and moving Manage Team into Team Management under Settings.
+
+Keep overall color scheme, spacing, and typography consistent with the rest of the updated app.
+
+Please implement these changes end-to-end:
+
+Frontend React components (Products & Services table, filters, modals, inline editing, category management).
+
+Any required backend endpoints or schema tweaks for:
+
+Archived flag
+
+Category field
+
+Change log entries
+
+Wiring up the job line item product picker to use the updated catalog behavior.
+
+If any part of the existing codebase already partially implements something similar, refactor it cleanly rather than duplicating functionality.
+
+That’s everything. Let me know in comments in the code where you’ve added major new components or data structures so I can review later.

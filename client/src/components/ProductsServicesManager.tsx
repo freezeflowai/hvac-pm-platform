@@ -3,9 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,11 +23,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, Search, Loader2, Package, Wrench, Download, Upload, FileText } from "lucide-react";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { 
+  Trash2, Plus, Search, Loader2, Download, Upload, FileText, 
+  ChevronUp, ChevronDown, MoreHorizontal, Pencil, Archive, 
+  ArrowLeft, FolderOpen
+} from "lucide-react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 interface Part {
   id: string;
@@ -70,9 +80,9 @@ const defaultFormData: ProductFormData = {
   name: "",
   sku: "",
   description: "",
-  cost: "0.00",
+  cost: "",
   markupPercent: "",
-  unitPrice: "0.00",
+  unitPrice: "",
   isTaxable: true,
   taxCode: "",
   category: "",
@@ -87,31 +97,54 @@ interface PartsResponse {
   hasMore: boolean;
 }
 
-const ITEMS_PER_PAGE = 50;
+type SortField = "name" | "type" | "category" | "cost" | "unitPrice";
+type SortDirection = "asc" | "desc";
+type StatusFilter = "all" | "active" | "archived";
+type TypeFilter = "all" | "product" | "service";
 
-type TabCategory = "products" | "services";
+const DEFAULT_CATEGORY_OPTIONS = [
+  "Belts",
+  "Electrical",
+  "Filters",
+  "Labour",
+  "HVAC Parts",
+  "Refrigeration",
+  "Plumbing",
+  "Controls",
+  "Sheet Metal",
+  "Other",
+];
 
 export default function ProductsServicesManager() {
   const { toast } = useToast();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [bulkCategoryDialogOpen, setBulkCategoryDialogOpen] = useState(false);
+  const [bulkCategoryValue, setBulkCategoryValue] = useState("");
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Part | null>(null);
   const [formData, setFormData] = useState<ProductFormData>(defaultFormData);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Part | null>(null);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [productToArchive, setProductToArchive] = useState<Part | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<TabCategory>("products");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importFileContent, setImportFileContent] = useState("");
   const [importFileName, setImportFileName] = useState("");
   const [importUpdateExisting, setImportUpdateExisting] = useState(false);
-  const productsLoaderRef = useRef<HTMLDivElement>(null);
-  const servicesLoaderRef = useRef<HTMLDivElement>(null);
+  const [inlineEditId, setInlineEditId] = useState<string | null>(null);
+  const [inlineEditField, setInlineEditField] = useState<string | null>(null);
+  const [inlineEditValue, setInlineEditValue] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const loaderRef = useRef<HTMLDivElement>(null);
 
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
@@ -119,64 +152,88 @@ export default function ProductsServicesManager() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Clear selection when tab changes
-  useEffect(() => {
-    setSelectedIds(new Set());
-  }, [activeTab]);
-
-  // Products query
-  const productsQuery = useInfiniteQuery<PartsResponse>({
-    queryKey: ["/api/parts", "products", debouncedSearch],
-    queryFn: async ({ pageParam = 0 }) => {
-      const params = new URLSearchParams({
-        limit: String(ITEMS_PER_PAGE),
-        offset: String(pageParam),
-        search: debouncedSearch,
-        category: "products",
-      });
-      const res = await fetch(`/api/parts?${params}`, { credentials: 'include' });
-      if (!res.ok) throw new Error("Failed to fetch products");
+  const { data: partsData, isLoading } = useQuery<PartsResponse>({
+    queryKey: ["/api/parts", { limit: 1000 }],
+    queryFn: async () => {
+      const res = await fetch("/api/parts?limit=1000", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch parts");
       return res.json();
     },
-    getNextPageParam: (lastPage) => {
-      if (lastPage.hasMore) {
-        return lastPage.offset + lastPage.limit;
-      }
-      return undefined;
-    },
-    initialPageParam: 0,
   });
 
-  // Services query
-  const servicesQuery = useInfiniteQuery<PartsResponse>({
-    queryKey: ["/api/parts", "services", debouncedSearch],
-    queryFn: async ({ pageParam = 0 }) => {
-      const params = new URLSearchParams({
-        limit: String(ITEMS_PER_PAGE),
-        offset: String(pageParam),
-        search: debouncedSearch,
-        category: "services",
+  const allParts = partsData?.items ?? [];
+
+  const filteredAndSortedParts = useMemo(() => {
+    let filtered = [...allParts];
+
+    if (debouncedSearch.trim()) {
+      const query = debouncedSearch.toLowerCase();
+      filtered = filtered.filter((p) => {
+        const name = (p.name || "").toLowerCase();
+        const description = (p.description || "").toLowerCase();
+        const sku = (p.sku || "").toLowerCase();
+        const category = (p.category || "").toLowerCase();
+        return name.includes(query) || description.includes(query) || sku.includes(query) || category.includes(query);
       });
-      const res = await fetch(`/api/parts?${params}`, { credentials: 'include' });
-      if (!res.ok) throw new Error("Failed to fetch services");
-      return res.json();
-    },
-    getNextPageParam: (lastPage) => {
-      if (lastPage.hasMore) {
-        return lastPage.offset + lastPage.limit;
+    }
+
+    if (typeFilter !== "all") {
+      filtered = filtered.filter((p) => p.type === typeFilter);
+    }
+
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter((p) => (p.category || "").toLowerCase() === categoryFilter.toLowerCase());
+    }
+
+    if (statusFilter === "active") {
+      filtered = filtered.filter((p) => p.isActive !== false);
+    } else if (statusFilter === "archived") {
+      filtered = filtered.filter((p) => p.isActive === false);
+    }
+
+    filtered.sort((a, b) => {
+      let aVal: string | number = "";
+      let bVal: string | number = "";
+
+      switch (sortField) {
+        case "name":
+          aVal = (a.name || "").toLowerCase();
+          bVal = (b.name || "").toLowerCase();
+          break;
+        case "type":
+          aVal = a.type || "";
+          bVal = b.type || "";
+          break;
+        case "category":
+          aVal = (a.category || "").toLowerCase();
+          bVal = (b.category || "").toLowerCase();
+          break;
+        case "cost":
+          aVal = parseFloat(a.cost || "0");
+          bVal = parseFloat(b.cost || "0");
+          break;
+        case "unitPrice":
+          aVal = parseFloat(a.unitPrice || "0");
+          bVal = parseFloat(b.unitPrice || "0");
+          break;
       }
-      return undefined;
-    },
-    initialPageParam: 0,
-  });
 
-  // Get current tab's data
-  const currentQuery = activeTab === "products" ? productsQuery : servicesQuery;
-  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = currentQuery;
+      if (typeof aVal === "number" && typeof bVal === "number") {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+      return sortDirection === "asc" ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal));
+    });
 
-  // Flatten pages into single array
-  const parts = data?.pages.flatMap(page => page.items) ?? [];
-  const total = data?.pages[0]?.total ?? 0;
+    return filtered;
+  }, [allParts, debouncedSearch, typeFilter, categoryFilter, statusFilter, sortField, sortDirection]);
+
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set<string>(DEFAULT_CATEGORY_OPTIONS);
+    allParts.forEach((p) => {
+      if (p.category) cats.add(p.category);
+    });
+    return Array.from(cats).sort();
+  }, [allParts]);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Part>) => {
@@ -185,18 +242,11 @@ export default function ProductsServicesManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
-      toast({
-        title: "Success",
-        description: editingProduct ? "Product/Service updated successfully." : "Product/Service created successfully.",
-      });
+      toast({ title: "Success", description: editingProduct ? "Item updated." : "Item created." });
       handleCloseDialog();
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to save product/service.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to save item.", variant: "destructive" });
     },
   });
 
@@ -207,18 +257,13 @@ export default function ProductsServicesManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
-      toast({
-        title: "Success",
-        description: "Product/Service updated successfully.",
-      });
+      toast({ title: "Success", description: "Item updated." });
       handleCloseDialog();
+      setInlineEditId(null);
+      setInlineEditField(null);
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update product/service.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to update item.", variant: "destructive" });
     },
   });
 
@@ -229,17 +274,10 @@ export default function ProductsServicesManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
-      toast({
-        title: "Deleted",
-        description: "Item deleted successfully.",
-      });
+      toast({ title: "Deleted", description: "Item deleted." });
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete item.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to delete.", variant: "destructive" });
     },
   });
 
@@ -249,159 +287,153 @@ export default function ProductsServicesManager() {
       return res.json();
     },
     onSuccess: (data) => {
-      const { deletedCount } = data;
       queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      
-      if (deletedCount > 0) {
-        toast({
-          title: "Items deleted",
-          description: `Successfully deleted ${deletedCount} item${deletedCount > 1 ? "s" : ""}.`,
-        });
-      }
-      
+      toast({ title: "Deleted", description: `Deleted ${data.deletedCount} item(s).` });
       setSelectedIds(new Set());
       setBulkDeleteDialogOpen(false);
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete items",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to delete items.", variant: "destructive" });
+    },
+  });
+
+  const bulkArchiveMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const promises = ids.map((id) => apiRequest("PUT", `/api/parts/${id}`, { isActive: false }));
+      await Promise.all(promises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
+      toast({ title: "Archived", description: `Archived ${selectedIds.size} item(s).` });
+      setSelectedIds(new Set());
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to archive items.", variant: "destructive" });
+    },
+  });
+
+  const bulkCategoryMutation = useMutation({
+    mutationFn: async ({ ids, category }: { ids: string[]; category: string }) => {
+      const promises = ids.map((id) => apiRequest("PUT", `/api/parts/${id}`, { category }));
+      await Promise.all(promises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
+      toast({ title: "Updated", description: `Updated category for ${selectedIds.size} item(s).` });
+      setSelectedIds(new Set());
+      setBulkCategoryDialogOpen(false);
+      setBulkCategoryValue("");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update category.", variant: "destructive" });
     },
   });
 
   const importMutation = useMutation({
     mutationFn: async ({ csvData, updateExisting }: { csvData: string; updateExisting: boolean }) => {
-      const res = await apiRequest("POST", "/api/parts/import", { 
-        csvData, 
-        skipDuplicates: !updateExisting,
-        updateExisting 
-      });
+      const res = await apiRequest("POST", "/api/parts/import", { csvData, skipDuplicates: !updateExisting, updateExisting });
       return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
       const { imported, skipped, updated, errors } = data;
-      
-      let description = `Imported ${imported} item${imported !== 1 ? 's' : ''}.`;
-      if (updated > 0) {
-        description += ` Updated ${updated} existing.`;
-      }
-      if (skipped > 0) {
-        description += ` Skipped ${skipped} duplicate${skipped !== 1 ? 's' : ''}.`;
-      }
-      if (errors && errors.length > 0) {
-        description += ` ${errors.length} error${errors.length !== 1 ? 's' : ''}.`;
-      }
-      
-      toast({
-        title: (imported > 0 || updated > 0) ? "Import Complete" : "Import Finished",
-        description,
-        variant: (imported > 0 || updated > 0) ? "default" : "destructive",
-      });
-      
+      let description = `Imported ${imported} item(s).`;
+      if (updated > 0) description += ` Updated ${updated}.`;
+      if (skipped > 0) description += ` Skipped ${skipped}.`;
+      if (errors?.length > 0) description += ` ${errors.length} error(s).`;
+      toast({ title: "Import Complete", description });
       setImportDialogOpen(false);
       setImportFileContent("");
       setImportFileName("");
       setImportUpdateExisting(false);
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to import products/services.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to import.", variant: "destructive" });
     },
   });
 
   const handleExport = async () => {
     try {
-      const category = activeTab === "products" ? "products" : "services";
-      const response = await fetch(`/api/parts/export?category=${category}`, {
-        credentials: 'include'
-      });
+      const params = new URLSearchParams();
+      if (typeFilter !== "all") params.set("category", typeFilter === "product" ? "products" : "services");
+      if (debouncedSearch) params.set("search", debouncedSearch);
       
+      const response = await fetch(`/api/parts/export?${params}`, { credentials: "include" });
       if (!response.ok) throw new Error("Export failed");
-      
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `${category}_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `products_services_${new Date().toISOString().split("T")[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
-      toast({
-        title: "Export Complete",
-        description: `${activeTab === "products" ? "Products" : "Services"} exported successfully.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to export data.",
-        variant: "destructive",
-      });
+      toast({ title: "Exported", description: "Data exported successfully." });
+    } catch {
+      toast({ title: "Error", description: "Failed to export.", variant: "destructive" });
     }
+  };
+
+  const handleExportSelected = async () => {
+    const selectedParts = filteredAndSortedParts.filter((p) => selectedIds.has(p.id));
+    const csvHeader = "name,type,sku,description,cost,unit_price,category,is_active\n";
+    const csvRows = selectedParts.map((p) => 
+      `"${p.name || ""}","${p.type}","${p.sku || ""}","${(p.description || "").replace(/"/g, '""')}","${p.cost || ""}","${p.unitPrice || ""}","${p.category || ""}","${p.isActive !== false}"`
+    ).join("\n");
+    
+    const blob = new Blob([csvHeader + csvRows], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `selected_products_${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    toast({ title: "Exported", description: `Exported ${selectedIds.size} item(s).` });
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    
-    if (!file.name.endsWith('.csv')) {
-      toast({
-        title: "Invalid File",
-        description: "Please select a CSV file.",
-        variant: "destructive",
-      });
+    if (!file.name.endsWith(".csv")) {
+      toast({ title: "Invalid File", description: "Please select a CSV file.", variant: "destructive" });
       return;
     }
-    
     const reader = new FileReader();
     reader.onload = (e) => {
-      const content = e.target?.result as string;
-      setImportFileContent(content);
+      setImportFileContent(e.target?.result as string);
       setImportFileName(file.name);
       setImportDialogOpen(true);
     };
     reader.readAsText(file);
-    
-    if (event.target) event.target.value = '';
+    if (event.target) event.target.value = "";
   };
 
-  const handleImport = () => {
-    if (!importFileContent) return;
-    importMutation.mutate({ csvData: importFileContent, updateExisting: importUpdateExisting });
-  };
-
-  const handleSelectAll = (partsToSelect: Part[]) => {
-    setSelectedIds(new Set(partsToSelect.map(p => p.id)));
-  };
-
-  const handleDeselectAll = () => {
-    setSelectedIds(new Set());
+  const handleSelectAll = () => {
+    if (selectedIds.size === filteredAndSortedParts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredAndSortedParts.map((p) => p.id)));
+    }
   };
 
   const handleSelectOne = (id: string, checked: boolean) => {
     const newSelected = new Set(selectedIds);
-    if (checked) {
-      newSelected.add(id);
-    } else {
-      newSelected.delete(id);
-    }
+    if (checked) newSelected.add(id);
+    else newSelected.delete(id);
     setSelectedIds(newSelected);
   };
 
-  const handleBulkDeleteClick = () => {
-    setBulkDeleteDialogOpen(true);
-  };
-
-  const handleBulkDeleteConfirm = () => {
-    bulkDeleteMutation.mutate(Array.from(selectedIds));
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
   };
 
   const handleOpenAddDialog = () => {
@@ -417,9 +449,9 @@ export default function ProductsServicesManager() {
       name: product.name || "",
       sku: product.sku || "",
       description: product.description || "",
-      cost: product.cost || "0.00",
+      cost: product.cost || "",
       markupPercent: product.markupPercent || "",
-      unitPrice: product.unitPrice || "0.00",
+      unitPrice: product.unitPrice || "",
       isTaxable: product.isTaxable ?? true,
       taxCode: product.taxCode || "",
       category: product.category || "",
@@ -434,12 +466,33 @@ export default function ProductsServicesManager() {
     setFormData(defaultFormData);
   };
 
+  const checkDuplicate = useMemo(() => {
+    const nameLower = formData.name.trim().toLowerCase();
+    if (!nameLower) return null;
+    
+    const duplicate = allParts.find((p) => {
+      if (editingProduct && p.id === editingProduct.id) return false;
+      return (p.name || "").toLowerCase() === nameLower;
+    });
+    
+    return duplicate;
+  }, [formData.name, allParts, editingProduct]);
+
   const handleSaveProduct = () => {
     if (!formData.name.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Name is required.",
-        variant: "destructive",
+      toast({ title: "Validation Error", description: "Name is required.", variant: "destructive" });
+      return;
+    }
+    if (!formData.category.trim()) {
+      toast({ title: "Validation Error", description: "Category is required.", variant: "destructive" });
+      return;
+    }
+
+    if (checkDuplicate) {
+      toast({ 
+        title: "Duplicate Found", 
+        description: `An item named "${checkDuplicate.name}" already exists.`, 
+        variant: "destructive" 
       });
       return;
     }
@@ -465,6 +518,19 @@ export default function ProductsServicesManager() {
     }
   };
 
+  const handleArchiveClick = (product: Part) => {
+    setProductToArchive(product);
+    setArchiveConfirmOpen(true);
+  };
+
+  const handleConfirmArchive = () => {
+    if (productToArchive) {
+      updateMutation.mutate({ id: productToArchive.id, data: { isActive: false } });
+      setArchiveConfirmOpen(false);
+      setProductToArchive(null);
+    }
+  };
+
   const handleDeleteClick = (product: Part) => {
     setProductToDelete(product);
     setDeleteConfirmOpen(true);
@@ -478,320 +544,318 @@ export default function ProductsServicesManager() {
     }
   };
 
-  // Intersection observer for infinite scroll - Products tab
-  const handleProductsObserver = useCallback((entries: IntersectionObserverEntry[]) => {
-    const target = entries[0];
-    if (target.isIntersecting && productsQuery.hasNextPage && !productsQuery.isFetchingNextPage) {
-      productsQuery.fetchNextPage();
-    }
-  }, [productsQuery.hasNextPage, productsQuery.isFetchingNextPage, productsQuery.fetchNextPage]);
-
-  useEffect(() => {
-    const option = { root: null, rootMargin: "100px", threshold: 0.1 };
-    const observer = new IntersectionObserver(handleProductsObserver, option);
-    if (productsLoaderRef.current) observer.observe(productsLoaderRef.current);
-    return () => observer.disconnect();
-  }, [handleProductsObserver]);
-
-  // Intersection observer for infinite scroll - Services tab
-  const handleServicesObserver = useCallback((entries: IntersectionObserverEntry[]) => {
-    const target = entries[0];
-    if (target.isIntersecting && servicesQuery.hasNextPage && !servicesQuery.isFetchingNextPage) {
-      servicesQuery.fetchNextPage();
-    }
-  }, [servicesQuery.hasNextPage, servicesQuery.isFetchingNextPage, servicesQuery.fetchNextPage]);
-
-  useEffect(() => {
-    const option = { root: null, rootMargin: "100px", threshold: 0.1 };
-    const observer = new IntersectionObserver(handleServicesObserver, option);
-    if (servicesLoaderRef.current) observer.observe(servicesLoaderRef.current);
-    return () => observer.disconnect();
-  }, [handleServicesObserver]);
-
-  const getPartDisplay = (part: Part) => {
-    return {
-      primary: part.name || "",
-      secondary: part.sku || "",
-      description: part.description || "",
-      category: part.category || "",
-    };
+  const handleInlineEdit = (id: string, field: string, currentValue: string) => {
+    setInlineEditId(id);
+    setInlineEditField(field);
+    setInlineEditValue(currentValue);
   };
 
-  const calculateMargin = (part: Part): string => {
-    const cost = parseFloat(part.cost || "0");
-    const unitPrice = parseFloat(part.unitPrice || "0");
-    if (cost > 0 && unitPrice > 0) {
-      const margin = ((unitPrice - cost) / cost) * 100;
-      return `${margin.toFixed(0)}%`;
-    }
-    return "";
+  const handleInlineEditSave = (id: string, field: string) => {
+    updateMutation.mutate({ id, data: { [field]: inlineEditValue } });
   };
 
-  const SelectionControls = ({ items, label }: { items: Part[]; label: string }) => (
-    <>
-      {items.length > 0 && (
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleSelectAll(items)}
-            data-testid={`button-select-all-${label}`}
-          >
-            Select All
-          </Button>
-          {selectedIds.size > 0 && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleDeselectAll}
-              data-testid="button-deselect-all"
-            >
-              Deselect All
-            </Button>
-          )}
-        </div>
-      )}
-    </>
-  );
+  const handleInlineEditCancel = () => {
+    setInlineEditId(null);
+    setInlineEditField(null);
+    setInlineEditValue("");
+  };
 
-  const BulkDeleteBar = () => (
-    <>
-      {selectedIds.size > 0 && (
-        <div className="p-3 bg-muted rounded-md flex items-center justify-between">
-          <span className="text-sm font-medium">
-            {selectedIds.size} item{selectedIds.size > 1 ? "s" : ""} selected
-          </span>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={handleBulkDeleteClick}
-            disabled={bulkDeleteMutation.isPending}
-            data-testid="button-bulk-delete"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete Selected
-          </Button>
-        </div>
-      )}
-    </>
-  );
-
-  const ItemGrid = ({ items }: { items: Part[] }) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-      {items.map((part) => {
-        const display = getPartDisplay(part);
-        const margin = calculateMargin(part);
-        const partType = part.type === 'filter' ? 'Filter' : part.type === 'belt' ? 'Belt' : part.category || '';
-        return (
-          <Card 
-            key={part.id} 
-            data-testid={`card-item-${part.id}`} 
-            className={`cursor-pointer hover-elevate ${part.isActive === false ? "opacity-50" : ""}`}
-            onClick={() => handleOpenEditDialog(part)}
-          >
-            <CardContent className="p-2.5 flex items-start justify-between gap-2">
-              <Checkbox
-                checked={selectedIds.has(part.id)}
-                onCheckedChange={(checked) => handleSelectOne(part.id, checked as boolean)}
-                onClick={(e) => e.stopPropagation()}
-                className="mt-0.5"
-                data-testid={`checkbox-select-${part.id}`}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <p className="font-medium text-sm truncate" data-testid={`text-name-${part.id}`}>{display.primary}</p>
-                  {partType && (
-                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium shrink-0" data-testid={`badge-category-${part.id}`}>
-                      {partType}
-                    </span>
-                  )}
-                </div>
-                {display.secondary && (
-                  <p className="text-xs text-muted-foreground truncate" data-testid={`text-sku-${part.id}`}>{display.secondary}</p>
-                )}
-              </div>
-              <div className="flex flex-col items-end gap-0.5 shrink-0">
-                {part.unitPrice && (
-                  <span className="text-sm font-medium" data-testid={`text-price-${part.id}`}>${part.unitPrice}</span>
-                )}
-                {part.cost && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <span data-testid={`text-cost-${part.id}`}>${part.cost}</span>
-                    {margin && <span className="text-green-600" data-testid={`text-margin-${part.id}`}>{margin}</span>}
-                  </div>
-                )}
-              </div>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 shrink-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteClick(part);
-                }}
-                data-testid={`button-delete-${part.id}`}
-                disabled={deletePartMutation.isPending}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-
-  const productsTotal = productsQuery.data?.pages[0]?.total ?? 0;
-  const servicesTotal = servicesQuery.data?.pages[0]?.total ?? 0;
-  const productsParts = productsQuery.data?.pages.flatMap(page => page.items) ?? [];
-  const servicesParts = servicesQuery.data?.pages.flatMap(page => page.items) ?? [];
-
-  const TabContent = ({ 
-    items, 
-    loaderRef, 
-    query, 
-    tabTotal, 
-    emptyLabel 
-  }: { 
-    items: Part[]; 
-    loaderRef: React.RefObject<HTMLDivElement>; 
-    query: typeof productsQuery;
-    tabTotal: number;
-    emptyLabel: string;
-  }) => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <SelectionControls items={items} label={emptyLabel} />
-        {debouncedSearch && (
-          <span className="text-sm text-muted-foreground">
-            {tabTotal} result{tabTotal !== 1 ? 's' : ''} found
-          </span>
+  const SortHeader = ({ field, label }: { field: SortField; label: string }) => (
+    <th
+      className="px-3 py-2 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none"
+      onClick={() => handleSort(field)}
+      data-testid={`sort-${field}`}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {sortField === field && (
+          sortDirection === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
         )}
       </div>
-      
-      <BulkDeleteBar />
-      
-      {query.isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : items.length > 0 ? (
-        <>
-          <ItemGrid items={items} />
-          <div ref={loaderRef} className="flex justify-center py-4">
-            {query.isFetchingNextPage && (
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            )}
-            {!query.hasNextPage && items.length > 0 && (
-              <span className="text-sm text-muted-foreground">
-                Showing all {tabTotal} items
-              </span>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="text-center py-8 text-muted-foreground">
-          {debouncedSearch ? (
-            <p>No results found for "{debouncedSearch}"</p>
-          ) : (
-            <>
-              <p>No {emptyLabel} added yet</p>
-              <p className="text-sm mt-1">Click "Add New" to create your first {emptyLabel.slice(0, -1)}</p>
-            </>
-          )}
-        </div>
-      )}
-    </div>
+    </th>
   );
 
+  const formatCurrency = (value: string | null | undefined) => {
+    if (!value) return "-";
+    const num = parseFloat(value);
+    if (isNaN(num)) return "-";
+    return `$${num.toFixed(2)}`;
+  };
+
   return (
-    <div className="space-y-6" data-testid="products-services-manager">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <h3 className="font-semibold">Products & Services</h3>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={activeTab === "products" ? "Search products, filters, belts..." : "Search services..."}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                data-testid="input-search-products"
-              />
-            </div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              accept=".csv"
-              className="hidden"
-              data-testid="input-file-import"
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              data-testid="button-import"
-              className="gap-2"
-            >
-              <Upload className="h-4 w-4" />
-              Import
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleExport}
-              data-testid="button-export"
-              className="gap-2"
-            >
-              <Download className="h-4 w-4" />
-              Export
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleOpenAddDialog}
-              data-testid="button-add-product"
-              className="gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Add New
-            </Button>
-          </div>
+    <div className="space-y-4" data-testid="products-services-manager">
+      <div className="flex items-center gap-3">
+        <Link href="/settings">
+          <Button variant="ghost" size="icon" data-testid="button-back-settings">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <div className="flex-1">
+          <h1 className="text-xl font-semibold">Products & Services</h1>
+          <p className="text-sm text-muted-foreground">Manage your product and service catalog.</p>
         </div>
-        
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabCategory)} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="products" data-testid="tab-products" className="gap-2">
-              <Package className="h-4 w-4" />
-              Products ({productsTotal})
-            </TabsTrigger>
-            <TabsTrigger value="services" data-testid="tab-services" className="gap-2">
-              <Wrench className="h-4 w-4" />
-              Services ({servicesTotal})
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="products" className="mt-4">
-            <TabContent 
-              items={productsParts} 
-              loaderRef={productsLoaderRef} 
-              query={productsQuery}
-              tabTotal={productsTotal}
-              emptyLabel="products"
-            />
-          </TabsContent>
-          
-          <TabsContent value="services" className="mt-4">
-            <TabContent 
-              items={servicesParts} 
-              loaderRef={servicesLoaderRef} 
-              query={servicesQuery}
-              tabTotal={servicesTotal}
-              emptyLabel="services"
-            />
-          </TabsContent>
-        </Tabs>
+        <div className="flex items-center gap-2">
+          <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".csv" className="hidden" />
+          <Link href="/settings/categories">
+            <Button size="sm" variant="outline" data-testid="button-manage-categories">
+              <FolderOpen className="h-4 w-4 mr-1" /> Categories
+            </Button>
+          </Link>
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-import">
+            <Upload className="h-4 w-4 mr-1" /> Import
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExport} data-testid="button-export">
+            <Download className="h-4 w-4 mr-1" /> Export
+          </Button>
+          <Button size="sm" onClick={handleOpenAddDialog} data-testid="button-add-product">
+            <Plus className="h-4 w-4 mr-1" /> Add New
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, description, SKU, category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="input-search"
+          />
+        </div>
+        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
+          <SelectTrigger className="w-[130px]" data-testid="filter-type">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="product">Product</SelectItem>
+            <SelectItem value="service">Service</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[150px]" data-testid="filter-category">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {uniqueCategories.map((cat) => (
+              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+          <SelectTrigger className="w-[120px]" data-testid="filter-status">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="text-sm text-muted-foreground">{filteredAndSortedParts.length} items</span>
+      </div>
+
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-md">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <div className="flex-1" />
+          <Button size="sm" variant="outline" onClick={() => setBulkCategoryDialogOpen(true)} data-testid="button-bulk-category">
+            <FolderOpen className="h-4 w-4 mr-1" /> Edit Category
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExportSelected} data-testid="button-bulk-export">
+            <Download className="h-4 w-4 mr-1" /> Export
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => bulkArchiveMutation.mutate(Array.from(selectedIds))} disabled={bulkArchiveMutation.isPending} data-testid="button-bulk-archive">
+            <Archive className="h-4 w-4 mr-1" /> Archive
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => setBulkDeleteDialogOpen(true)} data-testid="button-bulk-delete">
+            <Trash2 className="h-4 w-4 mr-1" /> Delete
+          </Button>
+        </div>
+      )}
+
+      <div className="border rounded-md overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 sticky top-0">
+              <tr className="border-b">
+                <th className="px-3 py-2 w-10">
+                  <Checkbox
+                    checked={selectedIds.size === filteredAndSortedParts.length && filteredAndSortedParts.length > 0}
+                    onCheckedChange={handleSelectAll}
+                    data-testid="checkbox-select-all"
+                  />
+                </th>
+                <SortHeader field="name" label="Name" />
+                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Description</th>
+                <SortHeader field="type" label="Type" />
+                <SortHeader field="category" label="Category" />
+                <SortHeader field="cost" label="Cost" />
+                <SortHeader field="unitPrice" label="Price" />
+                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground w-20">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                  </td>
+                </tr>
+              ) : filteredAndSortedParts.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                    {debouncedSearch ? `No results for "${debouncedSearch}"` : "No products or services found"}
+                  </td>
+                </tr>
+              ) : (
+                filteredAndSortedParts.map((part) => (
+                  <tr
+                    key={part.id}
+                    className={`border-b hover:bg-muted/30 ${part.isActive === false ? "opacity-50" : ""}`}
+                    data-testid={`row-${part.id}`}
+                  >
+                    <td className="px-3 py-2">
+                      <Checkbox
+                        checked={selectedIds.has(part.id)}
+                        onCheckedChange={(checked) => handleSelectOne(part.id, checked as boolean)}
+                        data-testid={`checkbox-${part.id}`}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      {inlineEditId === part.id && inlineEditField === "name" ? (
+                        <Input
+                          value={inlineEditValue}
+                          onChange={(e) => setInlineEditValue(e.target.value)}
+                          onBlur={() => handleInlineEditSave(part.id, "name")}
+                          onKeyDown={(e) => e.key === "Enter" && handleInlineEditSave(part.id, "name")}
+                          autoFocus
+                          className="h-7 text-sm"
+                        />
+                      ) : (
+                        <span
+                          className="cursor-pointer hover:underline font-medium"
+                          onClick={() => handleInlineEdit(part.id, "name", part.name || "")}
+                          data-testid={`text-name-${part.id}`}
+                        >
+                          {part.name || "-"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 max-w-[200px]">
+                      {inlineEditId === part.id && inlineEditField === "description" ? (
+                        <Input
+                          value={inlineEditValue}
+                          onChange={(e) => setInlineEditValue(e.target.value)}
+                          onBlur={() => handleInlineEditSave(part.id, "description")}
+                          onKeyDown={(e) => e.key === "Enter" && handleInlineEditSave(part.id, "description")}
+                          autoFocus
+                          className="h-7 text-sm"
+                        />
+                      ) : (
+                        <span
+                          className="cursor-pointer hover:underline text-muted-foreground truncate block"
+                          onClick={() => handleInlineEdit(part.id, "description", part.description || "")}
+                        >
+                          {part.description || "-"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge variant="secondary" className="text-xs capitalize">
+                        {part.type}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2">
+                      {inlineEditId === part.id && inlineEditField === "category" ? (
+                        <Input
+                          value={inlineEditValue}
+                          onChange={(e) => setInlineEditValue(e.target.value)}
+                          onBlur={() => handleInlineEditSave(part.id, "category")}
+                          onKeyDown={(e) => e.key === "Enter" && handleInlineEditSave(part.id, "category")}
+                          autoFocus
+                          className="h-7 text-sm"
+                        />
+                      ) : (
+                        <span
+                          className="cursor-pointer hover:underline"
+                          onClick={() => handleInlineEdit(part.id, "category", part.category || "")}
+                        >
+                          {part.category || "-"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {inlineEditId === part.id && inlineEditField === "cost" ? (
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={inlineEditValue}
+                          onChange={(e) => setInlineEditValue(e.target.value)}
+                          onBlur={() => handleInlineEditSave(part.id, "cost")}
+                          onKeyDown={(e) => e.key === "Enter" && handleInlineEditSave(part.id, "cost")}
+                          autoFocus
+                          className="h-7 text-sm w-24"
+                        />
+                      ) : (
+                        <span
+                          className="cursor-pointer hover:underline"
+                          onClick={() => handleInlineEdit(part.id, "cost", part.cost || "")}
+                        >
+                          {formatCurrency(part.cost)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {inlineEditId === part.id && inlineEditField === "unitPrice" ? (
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={inlineEditValue}
+                          onChange={(e) => setInlineEditValue(e.target.value)}
+                          onBlur={() => handleInlineEditSave(part.id, "unitPrice")}
+                          onKeyDown={(e) => e.key === "Enter" && handleInlineEditSave(part.id, "unitPrice")}
+                          autoFocus
+                          className="h-7 text-sm w-24"
+                        />
+                      ) : (
+                        <span
+                          className="cursor-pointer hover:underline font-medium"
+                          onClick={() => handleInlineEdit(part.id, "unitPrice", part.unitPrice || "")}
+                        >
+                          {formatCurrency(part.unitPrice)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" data-testid={`menu-${part.id}`}>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenEditDialog(part)}>
+                            <Pencil className="h-4 w-4 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleArchiveClick(part)}>
+                            <Archive className="h-4 w-4 mr-2" /> {part.isActive === false ? "Restore" : "Archive"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteClick(part)} className="text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>
@@ -799,21 +863,16 @@ export default function ProductsServicesManager() {
           <DialogHeader>
             <DialogTitle>{editingProduct ? "Edit Item" : "Add New Item"}</DialogTitle>
             <DialogDescription>
-              {editingProduct ? "Update the item details below." : "Fill in the details to create a new product or service."}
+              {editingProduct ? "Update the item details." : "Create a new product or service."}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="item-type">Type</Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value: "service" | "product") => 
-                    setFormData(prev => ({ ...prev, type: value }))
-                  }
-                >
-                  <SelectTrigger id="item-type" data-testid="select-item-type">
+                <Label>Type *</Label>
+                <Select value={formData.type} onValueChange={(v: "service" | "product") => setFormData((prev) => ({ ...prev, type: v }))}>
+                  <SelectTrigger data-testid="select-type">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -822,159 +881,87 @@ export default function ProductsServicesManager() {
                   </SelectContent>
                 </Select>
               </div>
-              
               <div className="space-y-2">
-                <Label htmlFor="sku">SKU</Label>
-                <Input
-                  id="sku"
-                  value={formData.sku}
-                  onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))}
-                  placeholder="e.g. HVAC-001"
-                  data-testid="input-sku"
-                />
+                <Label>SKU</Label>
+                <Input value={formData.sku} onChange={(e) => setFormData((prev) => ({ ...prev, sku: e.target.value }))} placeholder="e.g. HVAC-001" data-testid="input-sku" />
               </div>
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter item name"
+              <Label>Name *</Label>
+              <Input 
+                value={formData.name} 
+                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))} 
+                placeholder="Enter name" 
                 data-testid="input-name"
+                className={checkDuplicate ? "border-destructive" : ""}
               />
+              {checkDuplicate && (
+                <p className="text-xs text-destructive">An item named "{checkDuplicate.name}" already exists</p>
+              )}
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Enter description"
-                rows={2}
-                data-testid="input-description"
-              />
+              <Label>Description</Label>
+              <Textarea value={formData.description} onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))} rows={2} data-testid="input-description" />
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Input
-                id="category"
-                value={formData.category}
-                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                placeholder="e.g. HVAC Parts, Labor"
-                data-testid="input-category"
-              />
+              <Label>Category *</Label>
+              <div className="relative">
+                <Input
+                  value={formData.category}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
+                  placeholder="Type or select a category"
+                  list="category-options"
+                  data-testid="input-category"
+                />
+                <datalist id="category-options">
+                  {uniqueCategories.map((cat) => (
+                    <option key={cat} value={cat} />
+                  ))}
+                </datalist>
+              </div>
+              <p className="text-xs text-muted-foreground">Type a new category or select from suggestions</p>
             </div>
-            
-            <div className="border-t pt-3 mt-3">
+
+            <div className="border-t pt-3">
               <p className="text-sm font-medium mb-3">Pricing</p>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="cost">Cost ($)</Label>
-                  <Input
-                    id="cost"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.cost}
-                    onChange={(e) => setFormData(prev => ({ ...prev, cost: e.target.value }))}
-                    placeholder="0.00"
-                    data-testid="input-cost"
-                  />
+                  <Label>Cost ($)</Label>
+                  <Input type="number" step="0.01" min="0" value={formData.cost} onChange={(e) => setFormData((prev) => ({ ...prev, cost: e.target.value }))} placeholder="0.00" data-testid="input-cost" />
                 </div>
-                
                 <div className="space-y-2">
-                  <Label htmlFor="markup-percent">Markup (%)</Label>
-                  <Input
-                    id="markup-percent"
-                    type="number"
-                    step="1"
-                    min="0"
-                    value={formData.markupPercent}
-                    onChange={(e) => setFormData(prev => ({ ...prev, markupPercent: e.target.value }))}
-                    placeholder="e.g. 50"
-                    data-testid="input-markup-percent"
-                  />
-                  <p className="text-[10px] text-muted-foreground">If set, calculates unit price</p>
+                  <Label>Markup (%)</Label>
+                  <Input type="number" step="1" min="0" value={formData.markupPercent} onChange={(e) => setFormData((prev) => ({ ...prev, markupPercent: e.target.value }))} placeholder="50" data-testid="input-markup" />
                 </div>
-                
                 <div className="space-y-2">
-                  <Label htmlFor="unit-price">Unit Price ($)</Label>
-                  <Input
-                    id="unit-price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.unitPrice}
-                    onChange={(e) => setFormData(prev => ({ ...prev, unitPrice: e.target.value }))}
-                    placeholder="0.00"
-                    data-testid="input-unit-price"
-                  />
+                  <Label>Price ($)</Label>
+                  <Input type="number" step="0.01" min="0" value={formData.unitPrice} onChange={(e) => setFormData((prev) => ({ ...prev, unitPrice: e.target.value }))} placeholder="0.00" data-testid="input-price" />
                 </div>
               </div>
             </div>
-            
-            <div className="border-t pt-3 mt-3">
-              <p className="text-sm font-medium mb-3">Tax Settings</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="is-taxable"
-                    checked={formData.isTaxable}
-                    onCheckedChange={(checked) => 
-                      setFormData(prev => ({ ...prev, isTaxable: checked as boolean }))
-                    }
-                    data-testid="checkbox-is-taxable"
-                  />
-                  <Label htmlFor="is-taxable" className="text-sm font-normal cursor-pointer">
-                    Taxable
-                  </Label>
+
+            <div className="border-t pt-3">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Checkbox id="taxable" checked={formData.isTaxable} onCheckedChange={(c) => setFormData((prev) => ({ ...prev, isTaxable: c as boolean }))} />
+                  <Label htmlFor="taxable" className="font-normal cursor-pointer">Taxable</Label>
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="tax-code">Tax Code</Label>
-                  <Input
-                    id="tax-code"
-                    value={formData.taxCode}
-                    onChange={(e) => setFormData(prev => ({ ...prev, taxCode: e.target.value }))}
-                    placeholder="e.g. TAX"
-                    data-testid="input-tax-code"
-                    disabled={!formData.isTaxable}
-                  />
+                <div className="flex items-center gap-2">
+                  <Checkbox id="active" checked={formData.isActive} onCheckedChange={(c) => setFormData((prev) => ({ ...prev, isActive: c as boolean }))} />
+                  <Label htmlFor="active" className="font-normal cursor-pointer">Active</Label>
                 </div>
-              </div>
-            </div>
-            
-            <div className="border-t pt-3 mt-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="is-active"
-                  checked={formData.isActive}
-                  onCheckedChange={(checked) => 
-                    setFormData(prev => ({ ...prev, isActive: checked as boolean }))
-                  }
-                  data-testid="checkbox-is-active"
-                />
-                <Label htmlFor="is-active" className="text-sm font-normal cursor-pointer">
-                  Active (visible in item lists)
-                </Label>
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
-            <Button variant="outline" onClick={handleCloseDialog} data-testid="button-cancel">
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSaveProduct} 
-              disabled={createMutation.isPending || updateMutation.isPending}
-              data-testid="button-create"
-            >
-              {editingProduct ? "Save Changes" : "Create"}
+            <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
+            <Button onClick={handleSaveProduct} disabled={createMutation.isPending || updateMutation.isPending || !!checkDuplicate} data-testid="button-save">
+              {createMutation.isPending || updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              {editingProduct ? "Save" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -983,117 +970,106 @@ export default function ProductsServicesManager() {
       <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Selected Items</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {selectedIds.size} selected item{selectedIds.size > 1 ? "s" : ""}? 
-              This action cannot be undone and will also remove these items from any client associations.
-            </AlertDialogDescription>
+            <AlertDialogTitle>Delete {selectedIds.size} Items?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone. Consider archiving instead.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-bulk-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleBulkDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-bulk-delete"
-            >
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))} className="bg-destructive text-destructive-foreground">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog open={bulkCategoryDialogOpen} onOpenChange={setBulkCategoryDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Update Category</DialogTitle>
+            <DialogDescription>Set the category for {selectedIds.size} selected item(s).</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              value={bulkCategoryValue}
+              onChange={(e) => setBulkCategoryValue(e.target.value)}
+              placeholder="Type or select a category"
+              list="bulk-category-options"
+              data-testid="input-bulk-category"
+            />
+            <datalist id="bulk-category-options">
+              {uniqueCategories.map((cat) => (
+                <option key={cat} value={cat} />
+              ))}
+            </datalist>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkCategoryDialogOpen(false)}>Cancel</Button>
+            <Button onClick={() => bulkCategoryMutation.mutate({ ids: Array.from(selectedIds), category: bulkCategoryValue })} disabled={!bulkCategoryValue || bulkCategoryMutation.isPending}>
+              Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Item</AlertDialogTitle>
+            <AlertDialogTitle>Delete Item?</AlertDialogTitle>
+            <AlertDialogDescription>Delete "{productToDelete?.name}"? This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{productToArchive?.isActive === false ? "Restore" : "Archive"} Item?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{productToDelete?.name || getPartDisplay(productToDelete || {} as Part).primary}"? 
-              This action cannot be undone.
+              {productToArchive?.isActive === false 
+                ? `Restore "${productToArchive?.name}" to active items?`
+                : `Archive "${productToArchive?.name}"? It will be hidden from active views but preserved for historical records.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete"
-            >
-              Delete
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmArchive}>
+              {productToArchive?.isActive === false ? "Restore" : "Archive"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]" data-testid="dialog-import">
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
             <DialogTitle>Import Products & Services</DialogTitle>
-            <DialogDescription>
-              Import products and services from a CSV file.
-            </DialogDescription>
+            <DialogDescription>Import from CSV file.</DialogDescription>
           </DialogHeader>
-          
           <div className="space-y-4 py-4">
             <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
               <FileText className="h-8 w-8 text-muted-foreground" />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{importFileName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {importFileContent.split('\n').length - 1} rows to import
-                </p>
+              <div>
+                <p className="font-medium text-sm">{importFileName}</p>
+                <p className="text-xs text-muted-foreground">{importFileContent.split("\n").length - 1} rows</p>
               </div>
             </div>
-            
-            <div className="flex items-center space-x-2 p-2 border rounded-md">
-              <Checkbox
-                id="update-existing"
-                checked={importUpdateExisting}
-                onCheckedChange={(checked) => setImportUpdateExisting(checked as boolean)}
-                data-testid="checkbox-update-existing"
-              />
-              <Label htmlFor="update-existing" className="text-sm font-normal cursor-pointer">
-                Update existing items (match by name)
-              </Label>
+            <div className="flex items-center gap-2">
+              <Checkbox id="update-existing" checked={importUpdateExisting} onCheckedChange={(c) => setImportUpdateExisting(c as boolean)} />
+              <Label htmlFor="update-existing" className="font-normal cursor-pointer">Update existing items (match by name)</Label>
             </div>
-            
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p className="font-medium">Expected CSV columns:</p>
-              <ul className="list-disc list-inside text-xs space-y-0.5">
-                <li><span className="font-medium">name</span> (required) - Product or service name</li>
-                <li><span className="font-medium">type</span> (required) - "product" or "service"</li>
-                <li><span className="font-medium">sku</span> - SKU / item code</li>
-                <li><span className="font-medium">description</span> - Item description</li>
-                <li><span className="font-medium">cost</span> - Your cost</li>
-                <li><span className="font-medium">markup_percent</span> - Markup percentage</li>
-                <li><span className="font-medium">unit_price</span> - Selling price</li>
-                <li><span className="font-medium">is_taxable</span> - "true" or "false"</li>
-                <li><span className="font-medium">tax_code</span> - Tax code for QBO</li>
-                <li><span className="font-medium">category</span> - Category name</li>
-                <li><span className="font-medium">is_active</span> - "true" or "false"</li>
-              </ul>
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium mb-1">Expected columns:</p>
+              <p className="text-xs">name (required), type (required), sku, description, cost, unit_price, category, is_taxable, is_active</p>
             </div>
           </div>
-          
           <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setImportDialogOpen(false);
-                setImportFileContent("");
-                setImportFileName("");
-                setImportUpdateExisting(false);
-              }}
-              data-testid="button-cancel-import"
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleImport}
-              disabled={importMutation.isPending}
-              data-testid="button-confirm-import"
-              className="gap-2"
-            >
-              {importMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Button variant="outline" onClick={() => { setImportDialogOpen(false); setImportFileContent(""); setImportFileName(""); }}>Cancel</Button>
+            <Button onClick={() => importMutation.mutate({ csvData: importFileContent, updateExisting: importUpdateExisting })} disabled={importMutation.isPending}>
+              {importMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
               Import
             </Button>
           </DialogFooter>
