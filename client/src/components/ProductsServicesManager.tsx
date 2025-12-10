@@ -859,7 +859,7 @@ export default function ProductsServicesManager() {
       </div>
 
       <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh]" data-testid="dialog-product">
+        <DialogContent className="sm:max-w-[550px] overflow-visible" data-testid="dialog-product">
           <DialogHeader>
             <DialogTitle>{editingProduct ? "Edit Item" : "Add New Item"}</DialogTitle>
             <DialogDescription>
