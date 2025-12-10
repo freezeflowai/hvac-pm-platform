@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Link } from "wouter";
@@ -34,7 +34,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, UserCircle, Users, Shield, Clock, ChevronRight, ArrowUpDown, Mail, Settings2 } from "lucide-react";
+import { Search, Plus, UserCircle, Users, Shield, Clock, ChevronRight, ArrowUpDown, Mail, Settings2, LayoutGrid, List } from "lucide-react";
+
+type ViewDensity = "comfortable" | "compact";
 
 interface TeamMember {
   id: string;
@@ -66,6 +68,7 @@ export default function ManageTeam() {
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortOption>("name-asc");
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [userDensityPreference, setUserDensityPreference] = useState<ViewDensity | null>(null);
   const [inviteForm, setInviteForm] = useState({
     fullName: "",
     email: "",
@@ -80,6 +83,11 @@ export default function ManageTeam() {
   const { data: roles = [] } = useQuery<Role[]>({
     queryKey: ["/api/roles"],
   });
+
+  // Density: auto-detect based on team size, user can override
+  const autoCompact = teamMembers.length <= 6;
+  const effectiveDensity: ViewDensity = userDensityPreference ?? (autoCompact ? "compact" : "comfortable");
+  const isCompact = effectiveDensity === "compact";
 
   const filteredMembers = teamMembers
     .filter((member) => {
@@ -260,62 +268,115 @@ export default function ManageTeam() {
           </Dialog>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Users className="h-5 w-5 text-primary" />
+        {isCompact ? (
+          <div className="flex items-center gap-4 mb-4 text-sm flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <Users className="h-4 w-4 text-primary" />
+              <span className="font-semibold" data-testid="text-total-members">{totalCount}</span>
+              <span className="text-muted-foreground">Members</span>
+            </div>
+            <span className="text-muted-foreground">|</span>
+            <div className="flex items-center gap-1.5">
+              <UserCircle className="h-4 w-4 text-green-500" />
+              <span className="font-semibold" data-testid="text-active-members">{activeCount}</span>
+              <span className="text-muted-foreground">Active</span>
+            </div>
+            <span className="text-muted-foreground">|</span>
+            <div className="flex items-center gap-1.5">
+              <Shield className="h-4 w-4 text-blue-500" />
+              <span className="font-semibold" data-testid="text-roles-count">{roles.length}</span>
+              <span className="text-muted-foreground">Roles</span>
+            </div>
+            <span className="text-muted-foreground">|</span>
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-4 w-4 text-amber-500" />
+              <span className="font-semibold" data-testid="text-pending-count">{pendingCount}</span>
+              <span className="text-muted-foreground">Pending</span>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold" data-testid="text-total-members">{totalCount}</p>
+                    <p className="text-xs text-muted-foreground">Total Members</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold" data-testid="text-total-members">{totalCount}</p>
-                  <p className="text-xs text-muted-foreground">Total Members</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-500/10 rounded-lg">
+                    <UserCircle className="h-5 w-5 text-green-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold" data-testid="text-active-members">{activeCount}</p>
+                    <p className="text-xs text-muted-foreground">Active Members</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/10 rounded-lg">
-                  <UserCircle className="h-5 w-5 text-green-500" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <Shield className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold" data-testid="text-roles-count">{roles.length}</p>
+                    <p className="text-xs text-muted-foreground">Roles Defined</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold" data-testid="text-active-members">{activeCount}</p>
-                  <p className="text-xs text-muted-foreground">Active Members</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-500/10 rounded-lg">
+                    <Clock className="h-5 w-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold" data-testid="text-pending-count">{pendingCount}</p>
+                    <p className="text-xs text-muted-foreground">Pending Invites</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/10 rounded-lg">
-                  <Shield className="h-5 w-5 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold" data-testid="text-roles-count">{roles.length}</p>
-                  <p className="text-xs text-muted-foreground">Roles Defined</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-500/10 rounded-lg">
-                  <Clock className="h-5 w-5 text-amber-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold" data-testid="text-pending-count">{pendingCount}</p>
-                  <p className="text-xs text-muted-foreground">Pending Invites</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-        <div className="flex justify-end mb-4">
+        <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">View:</span>
+            <div className="flex border rounded-md">
+              <Button
+                variant={effectiveDensity === "comfortable" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setUserDensityPreference("comfortable")}
+                className="rounded-r-none"
+                data-testid="button-view-comfortable"
+              >
+                <LayoutGrid className="h-4 w-4 mr-1" />
+                Comfortable
+              </Button>
+              <Button
+                variant={effectiveDensity === "compact" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setUserDensityPreference("compact")}
+                className="rounded-l-none"
+                data-testid="button-view-compact"
+              >
+                <List className="h-4 w-4 mr-1" />
+                Compact
+              </Button>
+            </div>
+          </div>
           <Link href="/manage-roles">
             <Button variant="outline" data-testid="link-manage-roles">
               <Settings2 className="h-4 w-4 mr-2" />
@@ -386,7 +447,7 @@ export default function ManageTeam() {
                   : "No team members found"}
               </div>
             ) : (
-              <Table>
+              <Table className={isCompact ? "text-sm" : ""}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>
@@ -398,36 +459,44 @@ export default function ManageTeam() {
                 </TableHeader>
                 <TableBody>
                   {filteredMembers.map((member) => (
-                    <TableRow key={member.id} data-testid={`row-team-member-${member.id}`}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9">
-                            <AvatarFallback>{getInitials(member)}</AvatarFallback>
+                    <TableRow 
+                      key={member.id} 
+                      data-testid={`row-team-member-${member.id}`}
+                      className={isCompact ? "h-10" : ""}
+                    >
+                      <TableCell className={isCompact ? "py-1" : ""}>
+                        <div className={`flex items-center ${isCompact ? "gap-2" : "gap-3"}`}>
+                          <Avatar className={isCompact ? "h-6 w-6" : "h-9 w-9"}>
+                            <AvatarFallback className={isCompact ? "text-xs" : ""}>
+                              {getInitials(member)}
+                            </AvatarFallback>
                           </Avatar>
                           <div>
                             <p className="font-medium" data-testid={`text-member-name-${member.id}`}>
                               {getDisplayName(member)}
                             </p>
-                            <p className="text-sm text-muted-foreground">{member.email}</p>
+                            {!isCompact && (
+                              <p className="text-sm text-muted-foreground">{member.email}</p>
+                            )}
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={isCompact ? "py-1" : ""}>
                         {getRoleBadge(member.role)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={isCompact ? "py-1" : ""}>
                         {getStatusBadge(member.status)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={isCompact ? "py-1" : ""}>
                         {member.lastLoginAt ? (
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-muted-foreground">
                             {new Date(member.lastLoginAt).toLocaleDateString()}
                           </span>
                         ) : (
-                          <span className="text-sm text-muted-foreground">Never</span>
+                          <span className="text-muted-foreground">Never</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={isCompact ? "py-1" : ""}>
                         <Link href={`/manage-team/${member.id}`}>
                           <Button variant="ghost" size="icon" data-testid={`button-view-member-${member.id}`}>
                             <ChevronRight className="h-4 w-4" />
