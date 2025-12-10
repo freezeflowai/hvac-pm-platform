@@ -6,8 +6,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, Edit, Send, MoreHorizontal, Plus, Trash2, DollarSign, 
-  ExternalLink, Phone, Mail, MapPin, Building2, FileText, GripVertical,
-  Check, X
+  ExternalLink, FileText, GripVertical, Check, X, Calendar, Briefcase,
+  MessageSquare, User
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Invoice, InvoiceLine, Payment, Client, CustomerCompany, Job } from "@shared/schema";
+
+interface JobNote {
+  id: string;
+  text: string;
+  authorId?: string | null;
+  authorName?: string;
+  createdAt: string;
+  noteType?: string;
+}
 
 interface InvoiceDetails {
   invoice: Invoice;
@@ -93,135 +102,46 @@ function getBalanceColor(balance: string, isOverdue: boolean): string {
   return "text-amber-600";
 }
 
-interface InvoiceClientCardProps {
-  location: Client;
-  customerCompany?: CustomerCompany;
-}
-
-function InvoiceClientCard({ location, customerCompany }: InvoiceClientCardProps) {
-  const clientName = customerCompany?.name || location.companyName;
-  const locationName = customerCompany && location.companyName ? location.companyName : null;
-  
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base font-medium flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-            Client
-          </CardTitle>
-          <Link href={`/clients/${location.id}`}>
-            <Button variant="ghost" size="sm" className="h-7 text-xs" data-testid="link-view-client">
-              View Client
-              <ExternalLink className="h-3 w-3 ml-1" />
-            </Button>
-          </Link>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div>
-          <p className="font-medium" data-testid="text-client-name">{clientName}</p>
-          {locationName && (
-            <p className="text-sm text-muted-foreground">{locationName}</p>
-          )}
-        </div>
-        
-        {(location.address || location.city || location.province) && (
-          <div className="flex items-start gap-2 text-sm text-muted-foreground">
-            <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-            <div>
-              {location.address && <p>{location.address}</p>}
-              {(location.city || location.province) && (
-                <p>{[location.city, location.province, location.postalCode].filter(Boolean).join(", ")}</p>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {location.phone && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Phone className="h-4 w-4 shrink-0" />
-            <a href={`tel:${location.phone}`} className="hover:text-foreground">{location.phone}</a>
-          </div>
-        )}
-        
-        {location.email && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Mail className="h-4 w-4 shrink-0" />
-            <a href={`mailto:${location.email}`} className="hover:text-foreground">{location.email}</a>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-interface InvoiceInfoCardProps {
+interface InvoiceMetaCardProps {
   invoice: Invoice;
   isOverdue: boolean;
   job?: Job;
 }
 
-function InvoiceInfoCard({ invoice, isOverdue, job }: InvoiceInfoCardProps) {
-  const balanceColor = getBalanceColor(invoice.balance, isOverdue);
-  
+function InvoiceMetaCard({ invoice, isOverdue, job }: InvoiceMetaCardProps) {
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-medium flex items-center gap-2">
-          <FileText className="h-4 w-4 text-muted-foreground" />
-          Invoice Info
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-          <div className="space-y-3">
+      <CardContent className="p-4">
+        <div className="flex flex-wrap gap-x-8 gap-y-3">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Issue Date</p>
+              <p className="text-xs text-muted-foreground">Issue Date</p>
               <p className="text-sm font-medium">{format(new Date(invoice.issueDate), "MMM d, yyyy")}</p>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Due Date</p>
+              <p className="text-xs text-muted-foreground">Due Date</p>
               <p className={`text-sm font-medium ${isOverdue ? "text-destructive" : ""}`}>
                 {invoice.dueDate ? format(new Date(invoice.dueDate), "MMM d, yyyy") : "-"}
               </p>
             </div>
-            {invoice.jobId && (
+          </div>
+          {invoice.jobId && (
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Linked Job</p>
+                <p className="text-xs text-muted-foreground">Linked Job</p>
                 <Link href={`/jobs/${invoice.jobId}`}>
-                  <span className="text-sm font-medium text-primary hover:underline cursor-pointer" data-testid="link-view-job">
-                    #{job?.jobNumber || invoice.jobId.slice(0, 8)}
+                  <span className="text-sm font-medium text-primary hover:underline cursor-pointer" data-testid="link-meta-job">
+                    Job {job?.jobNumber || invoice.jobId.slice(0, 8)}
                   </span>
                 </Link>
               </div>
-            )}
-          </div>
-          
-          <div className="space-y-2 text-right">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Subtotal</span>
-              <span className="text-sm">{formatCurrency(invoice.subtotal)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Tax</span>
-              <span className="text-sm">{formatCurrency(invoice.taxTotal)}</span>
-            </div>
-            <div className="flex justify-between pt-2 border-t">
-              <span className="text-sm font-medium">Total</span>
-              <span className="text-sm font-medium">{formatCurrency(invoice.total)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Paid</span>
-              <span className="text-sm">{formatCurrency(invoice.amountPaid)}</span>
-            </div>
-            <div className="flex justify-between pt-2 border-t">
-              <span className="text-sm font-semibold">Balance Due</span>
-              <span className={`text-sm font-bold ${balanceColor}`}>
-                {formatCurrency(invoice.balance)}
-              </span>
-            </div>
-          </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -266,17 +186,17 @@ function InvoiceActivityTimeline({ invoice, payments }: InvoiceActivityTimelineP
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-medium">Activity</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">Activity</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0">
         <div className="relative">
           <div className="absolute left-[5px] top-2 bottom-2 w-px bg-border" />
-          <div className="space-y-4">
+          <div className="space-y-3">
             {events.map((event, index) => (
               <div key={index} className="flex items-start gap-3 relative">
                 <div className={`h-3 w-3 rounded-full ${event.color} ring-2 ring-background z-10 mt-0.5`} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{event.title}</p>
+                  <p className="text-sm">{event.title}</p>
                   <p className="text-xs text-muted-foreground">
                     {format(event.date, "MMM d, yyyy 'at' h:mm a")}
                     {event.subtitle && ` • ${event.subtitle}`}
@@ -295,11 +215,14 @@ interface InvoiceLineItemsCardProps {
   invoice: Invoice;
   lines: InvoiceLine[];
   isEditing: boolean;
+  isOverdue: boolean;
   onAddLine?: () => void;
   onDeleteLine?: (lineId: string) => void;
 }
 
-function InvoiceLineItemsCard({ invoice, lines, isEditing, onAddLine, onDeleteLine }: InvoiceLineItemsCardProps) {
+function InvoiceLineItemsCard({ invoice, lines, isEditing, isOverdue, onAddLine, onDeleteLine }: InvoiceLineItemsCardProps) {
+  const balanceColor = getBalanceColor(invoice.balance, isOverdue);
+  
   return (
     <Card className="flex flex-col">
       <CardHeader className="pb-3">
@@ -414,17 +337,27 @@ function InvoiceLineItemsCard({ invoice, lines, isEditing, onAddLine, onDeleteLi
         
         <div className="p-4 border-t bg-muted/30">
           <div className="flex flex-col items-end gap-1">
-            <div className="flex justify-between w-48">
+            <div className="flex justify-between w-52">
               <span className="text-sm text-muted-foreground">Subtotal</span>
               <span className="text-sm">{formatCurrency(invoice.subtotal)}</span>
             </div>
-            <div className="flex justify-between w-48">
-              <span className="text-sm text-muted-foreground">Tax (13%)</span>
+            <div className="flex justify-between w-52">
+              <span className="text-sm text-muted-foreground">Tax</span>
               <span className="text-sm">{formatCurrency(invoice.taxTotal)}</span>
             </div>
-            <div className="flex justify-between w-48 pt-2 border-t mt-1">
-              <span className="text-sm font-semibold">Total</span>
-              <span className="text-sm font-bold">{formatCurrency(invoice.total)}</span>
+            <div className="flex justify-between w-52 pt-2 border-t mt-1">
+              <span className="text-sm font-medium">Total</span>
+              <span className="text-sm font-medium">{formatCurrency(invoice.total)}</span>
+            </div>
+            <div className="flex justify-between w-52">
+              <span className="text-sm text-muted-foreground">Paid</span>
+              <span className="text-sm">{formatCurrency(invoice.amountPaid)}</span>
+            </div>
+            <div className="flex justify-between w-52 pt-2 border-t mt-1">
+              <span className="text-sm font-semibold">Balance Due</span>
+              <span className={`text-sm font-bold ${balanceColor}`}>
+                {formatCurrency(invoice.balance)}
+              </span>
             </div>
           </div>
         </div>
@@ -433,13 +366,71 @@ function InvoiceLineItemsCard({ invoice, lines, isEditing, onAddLine, onDeleteLi
   );
 }
 
-interface InvoiceNotesCardProps {
+interface InvoiceTechNotesCardProps {
+  jobId?: string | null;
+  jobNumber?: number | null;
+  notes: JobNote[];
+  isLoading: boolean;
+}
+
+function InvoiceTechNotesCard({ jobId, jobNumber, notes, isLoading }: InvoiceTechNotesCardProps) {
+  if (!jobId) {
+    return null;
+  }
+  
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            Technician Notes
+          </CardTitle>
+          <Link href={`/jobs/${jobId}`}>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" data-testid="link-view-job-notes">
+              View Job
+              <ExternalLink className="h-3 w-3 ml-1" />
+            </Button>
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading notes...</p>
+        ) : notes.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No technician notes for this job.</p>
+        ) : (
+          <div className="space-y-3 max-h-[200px] overflow-y-auto">
+            {notes.slice(0, 5).map((note) => (
+              <div key={note.id} className="text-sm border-l-2 border-muted pl-3 py-1">
+                <p className="text-foreground">{note.text}</p>
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  {note.authorName || "Unknown"} • {format(new Date(note.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                </p>
+              </div>
+            ))}
+            {notes.length > 5 && (
+              <Link href={`/jobs/${jobId}`}>
+                <p className="text-xs text-primary hover:underline cursor-pointer">
+                  View all {notes.length} notes
+                </p>
+              </Link>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface InvoiceNotesTabsCardProps {
   publicNotes: string | null;
   internalNotes: string | null;
   isEditing: boolean;
 }
 
-function InvoiceNotesCard({ publicNotes, internalNotes, isEditing }: InvoiceNotesCardProps) {
+function InvoiceNotesTabsCard({ publicNotes, internalNotes, isEditing }: InvoiceNotesTabsCardProps) {
   return (
     <Card>
       <CardContent className="p-0">
@@ -514,6 +505,12 @@ export default function InvoiceDetailPage() {
     enabled: !!invoiceId,
   });
 
+  const jobId = details?.job?.id;
+  const { data: jobNotes = [], isLoading: notesLoading } = useQuery<JobNote[]>({
+    queryKey: ["/api/jobs", jobId, "notes"],
+    enabled: !!jobId,
+  });
+
   const sendMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/invoices/${invoiceId}/send`),
     onSuccess: () => {
@@ -581,7 +578,6 @@ export default function InvoiceDetailPage() {
     // 1. Collect form data from line items and notes
     // 2. Call PATCH /api/invoices/:id with updated data
     // 3. Invalidate queries on success
-    // For now, exit edit mode with confirmation
     toast({ title: "Changes saved" });
     setIsEditing(false);
   };
@@ -594,7 +590,7 @@ export default function InvoiceDetailPage() {
     <div className="flex flex-col h-full">
       <div className="sticky top-0 bg-background z-10 border-b">
         <div className="p-4 max-w-[1600px] mx-auto">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex items-start gap-3">
               <Link href="/invoices">
                 <Button variant="ghost" size="icon" className="mt-0.5" data-testid="button-back-invoices">
@@ -602,20 +598,34 @@ export default function InvoiceDetailPage() {
                 </Button>
               </Link>
               <div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <h1 className="text-xl font-semibold">
                     Invoice {invoice.invoiceNumber || `INV-${invoice.id.slice(0, 6).toUpperCase()}`}
                   </h1>
                   <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Client: {clientName}
-                  {job && ` • Job: #${job.jobNumber}`}
+                  Client:{" "}
+                  <Link href={`/clients/${location.id}`}>
+                    <span className="text-primary hover:underline cursor-pointer" data-testid="link-header-client">
+                      {clientName}
+                    </span>
+                  </Link>
+                  {job && (
+                    <>
+                      {" • Job: "}
+                      <Link href={`/jobs/${job.id}`}>
+                        <span className="text-primary hover:underline cursor-pointer" data-testid="link-header-job">
+                          {job.jobNumber}
+                        </span>
+                      </Link>
+                    </>
+                  )}
                 </p>
               </div>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <div className="text-right hidden sm:block">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Balance Due</p>
                 <p className={`text-xl font-bold ${balanceColor}`} data-testid="text-balance-due">
@@ -623,7 +633,7 @@ export default function InvoiceDetailPage() {
                 </p>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {!isEditing ? (
                   <>
                     <Button 
@@ -702,29 +712,18 @@ export default function InvoiceDetailPage() {
       <div className="flex-1 overflow-auto">
         <div className="p-6 max-w-[1600px] mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-4 xl:col-span-4 space-y-4">
-              <InvoiceClientCard 
-                location={location} 
-                customerCompany={customerCompany} 
-              />
-              
-              <InvoiceInfoCard 
+            <div className="lg:col-span-7 xl:col-span-7 space-y-4 order-1">
+              <InvoiceMetaCard 
                 invoice={invoice} 
                 isOverdue={isOverdue}
                 job={job}
               />
               
-              <InvoiceActivityTimeline 
-                invoice={invoice} 
-                payments={payments} 
-              />
-            </div>
-
-            <div className="lg:col-span-8 xl:col-span-8 space-y-4">
               <InvoiceLineItemsCard
                 invoice={invoice}
                 lines={lines}
                 isEditing={isEditing}
+                isOverdue={isOverdue}
                 onAddLine={() => {
                   // TODO: Implement add line
                   toast({ title: "Add line item (coming soon)" });
@@ -734,11 +733,25 @@ export default function InvoiceDetailPage() {
                   toast({ title: `Delete line ${lineId} (coming soon)` });
                 }}
               />
+            </div>
+
+            <div className="lg:col-span-5 xl:col-span-5 space-y-4 order-2">
+              <InvoiceTechNotesCard
+                jobId={job?.id}
+                jobNumber={job?.jobNumber}
+                notes={jobNotes}
+                isLoading={notesLoading}
+              />
               
-              <InvoiceNotesCard
+              <InvoiceNotesTabsCard
                 publicNotes={invoice.notesCustomer}
                 internalNotes={invoice.notesInternal}
                 isEditing={isEditing}
+              />
+              
+              <InvoiceActivityTimeline 
+                invoice={invoice} 
+                payments={payments} 
               />
             </div>
           </div>

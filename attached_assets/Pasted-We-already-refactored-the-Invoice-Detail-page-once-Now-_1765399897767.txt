@@ -1,0 +1,105 @@
+We already refactored the Invoice Detail page once. Now we need a second iteration to align it better with how the team works.
+
+Current issues
+
+Line items and internal/tech notes are competing for space; line items must be the main focus.
+
+Totals are duplicated in an “Invoice Info/Summary” card and in the line items card.
+
+Client and job info feel redundant and spread out.
+
+The linked job shows an internal id hash instead of the human job number (e.g., #b8fa1b26 instead of 10133).
+
+New layout requirements
+
+Overall layout
+
+Use a 2-column layout on desktop:
+
+Left column ~60%: invoice meta + line items + totals.
+
+Right column ~40%: technician notes, public/internal notes, and optionally activity.
+
+Top header
+
+Keep the top bar but:
+
+Show Invoice INV-{number} as title plus a status chip.
+
+Under the title, show Client: {clientName} • Job: {jobNumber}.
+
+Make the client name clickable to the client page.
+
+Make the job number clickable to the job details route.
+
+Right side remains: “Balance Due” amount, Collect Payment, Send and ⋯ menu.
+
+Left column
+
+Add a slim InvoiceMeta card at the top with:
+
+Issue Date, Due Date, Linked Job.
+
+No totals in this card.
+
+Below it, a LineItemsCard that:
+
+Has a header with the title and + Add line item button.
+
+Shows the line items table as it does now.
+
+At the bottom of this card, under a divider, shows the totals:
+
+Subtotal, Tax, Paid, Balance Due (Balance Due in bold and colored).
+
+Remove the separate “Invoice Info/Summary” totals card; keep all monetary totals only here.
+
+Right column
+
+Top card: Technician notes
+
+Pull notes from the linked job (we already have this in the Job page).
+
+Display them in read-only form (author, timestamp, text).
+
+Add a View job or View all job notes link at the bottom.
+
+Below that, a Notes card with tabs:
+
+Public notes tab: editable textarea for notes that go on the customer’s invoice.
+
+Internal notes tab: editable textarea for office-only notes (you can reuse our existing internal notes field).
+
+Activity timeline can stay in whichever column is more convenient, but it should be lower priority and visually lighter.
+
+Job number vs id
+
+When rendering the linked job:
+
+Use job.jobNumber (or equivalent public field) as the visible text (e.g., Job 10133).
+
+Use the internal id only in the link URL (e.g., /jobs/{job.id}).
+
+Styling & responsiveness
+
+Line items should be the visually dominant element on the page.
+
+On mobile / small screens, stack sections vertically with:
+
+Invoice meta,
+
+Line items + totals,
+
+Tech notes,
+
+Notes tabs,
+
+Activity.
+
+Please update the existing Invoice Detail React components to match this layout while preserving all current data fetching and API contracts. Refactor into child components (InvoiceMeta, InvoiceLineItemsCard, InvoiceTechNotes, InvoiceNotesTabs) only where it improves clarity. Ensure TypeScript compiles cleanly.
+
+When you’re done, line item editing and tech note reading should be possible side-by-side on desktop.
+
+If you want, next step after this we can:
+
+Mirror the same notes + line items layout into the “Convert job → invoice” flow, so when you close a job and create an invoice, the tech notes and line items are already in the same positions the office will see later.
