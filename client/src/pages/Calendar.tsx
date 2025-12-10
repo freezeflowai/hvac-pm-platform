@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DndContext, DragOverlay, closestCenter, DragEndEvent, DragStartEvent, useDroppable, pointerWithin, CollisionDetection, useDraggable, PointerSensor, useSensor, useSensors, rectIntersection } from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -387,7 +388,7 @@ function DroppableDay({ day, year, month, assignments, clients, onRemove, onClie
 
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<"monthly" | "weekly">("weekly");
+  const [view, setView] = useState<"monthly" | "weekly" | "daily">("weekly");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
@@ -778,7 +779,7 @@ export default function Calendar() {
     const activeId = active.id as string;
 
     // If dropping on the same container it started in (or no drop zone specified), it's just a click
-    if (active.data?.current?.sortable?.index === over?.data?.current?.sortable?.index && !overId.startsWith('day-') && !overId.startsWith('allday-') && !overId.startsWith('weekly-') && overId !== 'unscheduled-panel') {
+    if (active.data?.current?.sortable?.index === over?.data?.current?.sortable?.index && !overId.startsWith('day-') && !overId.startsWith('allday-') && !overId.startsWith('weekly-') && !overId.startsWith('daily-') && overId !== 'unscheduled-panel') {
       return;
     }
 
@@ -842,6 +843,43 @@ export default function Calendar() {
       } else if (unscheduledItem) {
         // Create new assignment from unscheduled client - use current view month
         createAssignment.mutate({ clientId: unscheduledItem.clientId, day: targetDay, scheduledHour: hour });
+      }
+    } else if (overId.startsWith('daily-')) {
+      // Dropped on hourly slot in daily view (daily-{technicianId}-{hour}-{day}-{month}-{year})
+      const parts = overId.replace('daily-', '').split('-');
+      const technicianId = parts[0];
+      const hour = parseInt(parts[1]);
+      const targetDay = parseInt(parts[2]);
+      const targetMonthIdx = parseInt(parts[3]);
+      const targetYr = parseInt(parts[4]);
+      
+      if (isExistingCalendarAssignment) {
+        const currentAssignment = assignments.find((a: any) => a.id === activeId);
+        if (currentAssignment) {
+          updateAssignment.mutate({ 
+            id: activeId, 
+            day: targetDay, 
+            scheduledHour: hour
+          });
+          // Also assign technician if dropping on a technician column (not unassigned)
+          if (technicianId !== 'unassigned') {
+            assignTechnicians.mutate({ assignmentId: activeId, technicianIds: [technicianId] });
+          }
+        }
+      } else if (unscheduledItem && hasExistingAssignment) {
+        updateAssignment.mutate({ 
+          id: unscheduledItem.assignmentId, 
+          day: targetDay, 
+          scheduledHour: hour, 
+          targetMonth: targetMonthIdx + 1, // API expects 1-indexed month
+          targetYear: targetYr
+        });
+      } else if (unscheduledItem) {
+        createAssignment.mutate({ 
+          clientId: unscheduledItem.clientId, 
+          day: targetDay, 
+          scheduledHour: hour
+        });
       }
     } else if (overId === 'unscheduled-panel') {
       // Dropped on unscheduled panel - remove from calendar
@@ -1038,7 +1076,7 @@ export default function Calendar() {
     const dropZoneContainers = args.droppableContainers.filter(
       (container) => {
         const id = container.id as string;
-        return id.startsWith('day-') || id.startsWith('allday-') || id.startsWith('weekly-') || id === 'unscheduled-panel';
+        return id.startsWith('day-') || id.startsWith('allday-') || id.startsWith('weekly-') || id.startsWith('daily-') || id === 'unscheduled-panel';
       }
     );
 
@@ -1236,7 +1274,7 @@ export default function Calendar() {
         </div>
 
         {/* All Day Slot - Sticky below header */}
-        <div className={`grid ${gridCols} sticky top-[41px] bg-primary/5 z-20 border-b`}>
+        <div className={`grid ${gridCols} sticky top-[41px] bg-background z-20 border-b`}>
           <div className="px-1.5 py-1 text-[10px] font-semibold border-r bg-primary/10 flex items-center">
             All Day
           </div>
@@ -1313,6 +1351,222 @@ export default function Calendar() {
             {weekDaysData.map((dayData) => (
               <HourlyDropZone key={`${dayData.dayName}-${h.hour}`} dayName={dayData.dayName} hour={h.hour} dayNumber={dayData.dayNumber} dayAssignments={dayData.dayAssignments} />
             ))}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Daily View Drop Zone Component
+  const DailyDropZone = ({ technicianId, hour, children }: { technicianId: string; hour: number; children?: React.ReactNode }) => {
+    const { setNodeRef, isOver } = useDroppable({
+      id: `daily-${technicianId}-${hour}-${currentDate.getDate()}-${currentDate.getMonth()}-${currentDate.getFullYear()}`,
+    });
+    return (
+      <div
+        ref={setNodeRef}
+        className={`min-h-[60px] border-b border-r relative ${isOver ? 'bg-primary/10' : ''}`}
+      >
+        {children}
+      </div>
+    );
+  };
+
+  const renderDailyView = () => {
+    // Get technicians to show as columns (filter by visibility)
+    const visibleTechnicians = technicians.filter((t: any) => !hiddenTechnicianIds.has(t.id));
+    const showUnassigned = !hiddenTechnicianIds.has('unassigned');
+    
+    // Get assignments for current date
+    const currentDateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+    const dayAssignments = assignments.filter((a: any) => a.scheduledDate === currentDateStr && !a.completed);
+    
+    // Generate hours (6 AM to 6 PM by default, but use startHour from settings)
+    const dailyStartHour = companySettings?.calendarStartHour ?? 7;
+    const hours = Array.from({ length: 24 }, (_, i) => {
+      const h = i;
+      const ampm = h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
+      return { hour: i, display: ampm };
+    });
+
+    // Calculate current time position
+    const now = new Date();
+    const isToday = now.toDateString() === currentDate.toDateString();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTimePosition = currentHour + currentMinute / 60;
+
+    // Build columns: Time + Technicians + Unassigned
+    const columnCount = visibleTechnicians.length + (showUnassigned ? 1 : 0) + 1; // +1 for time column
+    const gridCols = `grid-cols-[3.5rem_repeat(${columnCount - 1},minmax(0,1fr))]`;
+
+    // Get assignments by technician and hour
+    const getAssignmentsForSlot = (techId: string | null, hour: number) => {
+      return dayAssignments.filter((a: any) => {
+        const matchesTech = techId === null 
+          ? (!a.assignedTechnicianIds || a.assignedTechnicianIds.length === 0)
+          : (a.assignedTechnicianIds && a.assignedTechnicianIds.includes(techId));
+        const matchesHour = a.scheduledHour === hour;
+        return matchesTech && matchesHour;
+      });
+    };
+
+    // Get all-day assignments
+    const getAllDayAssignments = (techId: string | null) => {
+      return dayAssignments.filter((a: any) => {
+        const matchesTech = techId === null 
+          ? (!a.assignedTechnicianIds || a.assignedTechnicianIds.length === 0)
+          : (a.assignedTechnicianIds && a.assignedTechnicianIds.includes(techId));
+        const isAllDay = a.scheduledHour === null || a.scheduledHour === undefined;
+        return matchesTech && isAllDay;
+      });
+    };
+
+    return (
+      <div className="overflow-y-auto flex-1 min-h-0 max-h-full relative">
+        {/* Current time indicator */}
+        {isToday && currentTimePosition >= 0 && currentTimePosition < 24 && (
+          <div 
+            className="absolute left-0 right-0 z-40 pointer-events-none"
+            style={{ top: `calc(41px + 28px + ${currentTimePosition * 60}px)` }}
+          >
+            <div className="flex items-center">
+              <div className="w-2 h-2 rounded-full bg-red-500 -ml-1" />
+              <div className="flex-1 h-[2px] bg-red-500" />
+            </div>
+          </div>
+        )}
+
+        {/* Header Row - Technician names */}
+        <div className={`grid ${gridCols} sticky top-0 bg-background z-30 border-b`}>
+          <div className="px-1.5 py-2 border-r flex items-center justify-center text-xs font-medium text-muted-foreground">
+            {format(currentDate, 'EEE d')}
+          </div>
+          {visibleTechnicians.map((tech: any, index: number) => {
+            const color = TECHNICIAN_COLORS[technicians.findIndex((t: any) => t.id === tech.id) % TECHNICIAN_COLORS.length];
+            return (
+              <div key={tech.id} className="px-2 py-2 text-center border-r">
+                <div className="flex items-center justify-center gap-1.5">
+                  <div className={`w-2 h-2 rounded-full ${color.dot}`} />
+                  <span className="text-sm font-medium truncate">{tech.firstName} {tech.lastName?.[0]}.</span>
+                </div>
+              </div>
+            );
+          })}
+          {showUnassigned && (
+            <div className="px-2 py-2 text-center border-r">
+              <span className="text-sm font-medium text-muted-foreground">Unassigned</span>
+            </div>
+          )}
+        </div>
+
+        {/* All Day Row */}
+        <div className={`grid ${gridCols} sticky top-[41px] bg-background z-20 border-b`}>
+          <div className="px-1.5 py-1 text-[10px] font-semibold border-r bg-primary/10 flex items-center">
+            All Day
+          </div>
+          {visibleTechnicians.map((tech: any) => {
+            const techAllDay = getAllDayAssignments(tech.id);
+            return (
+              <div key={`allday-${tech.id}`} className="p-1 border-r min-h-[28px]">
+                {techAllDay.map((assignment: any) => {
+                  const client = clients.find((c: any) => c.id === assignment.clientId);
+                  return client ? (
+                    <DraggableClient
+                      key={assignment.id}
+                      id={assignment.id}
+                      client={client}
+                      inCalendar
+                      onClick={() => handleClientClick(client, assignment)}
+                      isCompleted={assignment.completed}
+                      isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
+                      assignment={assignment}
+                      technicianColor={getTechnicianColor(assignment)}
+                      densityStyle={DENSITY_STYLES[density].card}
+                    />
+                  ) : null;
+                })}
+              </div>
+            );
+          })}
+          {showUnassigned && (
+            <div className="p-1 border-r min-h-[28px]">
+              {getAllDayAssignments(null).map((assignment: any) => {
+                const client = clients.find((c: any) => c.id === assignment.clientId);
+                return client ? (
+                  <DraggableClient
+                    key={assignment.id}
+                    id={assignment.id}
+                    client={client}
+                    inCalendar
+                    onClick={() => handleClientClick(client, assignment)}
+                    isCompleted={assignment.completed}
+                    isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
+                    assignment={assignment}
+                    technicianColor={getTechnicianColor(assignment)}
+                    densityStyle={DENSITY_STYLES[density].card}
+                  />
+                ) : null;
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Hourly Slots */}
+        {hours.map((h) => (
+          <div key={h.hour} className={`grid ${gridCols}`}>
+            <div className={`px-1.5 py-1 text-[10px] font-medium border-r border-b flex items-center justify-center ${h.hour === dailyStartHour ? 'bg-primary/30 font-bold' : 'bg-muted/20'}`}>
+              {h.display}
+            </div>
+            {visibleTechnicians.map((tech: any) => {
+              const slotAssignments = getAssignmentsForSlot(tech.id, h.hour);
+              return (
+                <DailyDropZone key={`daily-${tech.id}-${h.hour}`} technicianId={tech.id} hour={h.hour}>
+                  <div className="p-0.5">
+                    {slotAssignments.map((assignment: any) => {
+                      const client = clients.find((c: any) => c.id === assignment.clientId);
+                      return client ? (
+                        <DraggableClient
+                          key={assignment.id}
+                          id={assignment.id}
+                          client={client}
+                          inCalendar
+                          onClick={() => handleClientClick(client, assignment)}
+                          isCompleted={assignment.completed}
+                          isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
+                          assignment={assignment}
+                          technicianColor={getTechnicianColor(assignment)}
+                          densityStyle={DENSITY_STYLES[density].card}
+                        />
+                      ) : null;
+                    })}
+                  </div>
+                </DailyDropZone>
+              );
+            })}
+            {showUnassigned && (
+              <DailyDropZone technicianId="unassigned" hour={h.hour}>
+                <div className="p-0.5">
+                  {getAssignmentsForSlot(null, h.hour).map((assignment: any) => {
+                    const client = clients.find((c: any) => c.id === assignment.clientId);
+                    return client ? (
+                      <DraggableClient
+                        key={assignment.id}
+                        id={assignment.id}
+                        client={client}
+                        inCalendar
+                        onClick={() => handleClientClick(client, assignment)}
+                        isCompleted={assignment.completed}
+                        isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
+                        assignment={assignment}
+                        technicianColor={getTechnicianColor(assignment)}
+                        densityStyle={DENSITY_STYLES[density].card}
+                      />
+                    ) : null;
+                  })}
+                </div>
+              </DailyDropZone>
+            )}
           </div>
         ))}
       </div>
@@ -1584,6 +1838,15 @@ export default function Calendar() {
                 >
                   Weekly
                 </Button>
+                <Button
+                  variant={view === "daily" ? "default" : "ghost"}
+                  size="sm"
+                  className={`rounded-full ${view === "daily" ? "" : "hover:bg-background/60"}`}
+                  onClick={() => setView("daily")}
+                  data-testid="button-daily-view"
+                >
+                  Day
+                </Button>
               </div>
             </div>
           </div>
@@ -1667,6 +1930,11 @@ export default function Calendar() {
                   {view === "weekly" && (
                     <div className="h-full flex flex-col min-h-0 max-h-full">
                       {renderWeeklyView()}
+                    </div>
+                  )}
+                  {view === "daily" && (
+                    <div className="h-full flex flex-col min-h-0 max-h-full">
+                      {renderDailyView()}
                     </div>
                   )}
                 </CardContent>
