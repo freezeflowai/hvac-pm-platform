@@ -33,15 +33,22 @@ export const insertCompanySchema = createInsertSchema(companies).omit({
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type Company = typeof companies.$inferSelect;
 
+export const userStatusEnum = ["active", "invited", "deactivated"] as const;
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("technician"), // "platform_admin", "owner", "admin", "technician"
+  role: text("role").notNull().default("technician"), // Legacy field: "platform_admin", "owner", "admin", "technician"
+  roleId: varchar("role_id"), // FK to roles table (will be populated by migration)
   fullName: text("full_name"),
   firstName: text("first_name"),
   lastName: text("last_name"),
+  phone: text("phone"),
+  status: text("status").notNull().default("active"), // active, invited, deactivated
+  useCustomSchedule: boolean("use_custom_schedule").notNull().default(false), // If false, use company default
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -1004,3 +1011,138 @@ export const updateJobEquipmentSchema = z.object({
 export type InsertJobEquipment = z.infer<typeof insertJobEquipmentSchema>;
 export type UpdateJobEquipment = z.infer<typeof updateJobEquipmentSchema>;
 export type JobEquipment = typeof jobEquipment.$inferSelect;
+
+// ============================================================================
+// ROLES & PERMISSIONS (RBAC) SYSTEM
+// ============================================================================
+
+// Roles - system-defined roles for access control
+export const roleNameEnum = ["technician", "lead_technician", "dispatcher", "manager", "admin"] as const;
+
+export const roles = pgTable("roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(), // technician, lead_technician, dispatcher, manager, admin
+  description: text("description"),
+  isSystemRole: boolean("is_system_role").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertRoleSchema = createInsertSchema(roles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertRole = z.infer<typeof insertRoleSchema>;
+export type Role = typeof roles.$inferSelect;
+
+// Permissions - granular permission keys
+export const permissionGroupEnum = ["schedule", "jobs", "clients", "pricing", "billing", "timesheets", "reports", "admin"] as const;
+
+export const permissions = pgTable("permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(), // e.g. "schedule.view_own", "jobs.create"
+  group: text("group").notNull(), // schedule, jobs, clients, pricing, billing, timesheets, reports, admin
+  label: text("label").notNull(), // Human-readable label
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertPermissionSchema = createInsertSchema(permissions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPermission = z.infer<typeof insertPermissionSchema>;
+export type Permission = typeof permissions.$inferSelect;
+
+// Role-Permission mapping (many-to-many)
+export const rolePermissions = pgTable("role_permissions", {
+  roleId: varchar("role_id").notNull().references(() => roles.id, { onDelete: "cascade" }),
+  permissionId: varchar("permission_id").notNull().references(() => permissions.id, { onDelete: "cascade" }),
+});
+
+export const insertRolePermissionSchema = createInsertSchema(rolePermissions);
+
+export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
+export type RolePermission = typeof rolePermissions.$inferSelect;
+
+// User Permission Overrides - per-user grants/revokes on top of role
+export const overrideTypeEnum = ["grant", "revoke"] as const;
+
+export const userPermissionOverrides = pgTable("user_permission_overrides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  permissionId: varchar("permission_id").notNull().references(() => permissions.id, { onDelete: "cascade" }),
+  override: text("override").notNull(), // "grant" or "revoke"
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertUserPermissionOverrideSchema = createInsertSchema(userPermissionOverrides).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  override: z.enum(overrideTypeEnum),
+});
+
+export type InsertUserPermissionOverride = z.infer<typeof insertUserPermissionOverrideSchema>;
+export type UserPermissionOverride = typeof userPermissionOverrides.$inferSelect;
+
+// Technician Profiles - cost and billing information for technicians
+export const technicianProfiles = pgTable("technician_profiles", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  laborCostPerHour: text("labor_cost_per_hour"), // Stored as text for decimal precision
+  billableRatePerHour: text("billable_rate_per_hour"), // Optional
+  color: text("color"), // Calendar color for this technician
+  phone: text("phone"),
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertTechnicianProfileSchema = createInsertSchema(technicianProfiles).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateTechnicianProfileSchema = z.object({
+  laborCostPerHour: z.string().nullable().optional(),
+  billableRatePerHour: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+});
+
+export type InsertTechnicianProfile = z.infer<typeof insertTechnicianProfileSchema>;
+export type UpdateTechnicianProfile = z.infer<typeof updateTechnicianProfileSchema>;
+export type TechnicianProfile = typeof technicianProfiles.$inferSelect;
+
+// Working Hours - weekly schedule for each user
+export const workingHours = pgTable("working_hours", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  dayOfWeek: integer("day_of_week").notNull(), // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  startTime: text("start_time"), // e.g. "08:00"
+  endTime: text("end_time"), // e.g. "17:00"
+  isWorking: boolean("is_working").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertWorkingHoursSchema = createInsertSchema(workingHours).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateWorkingHoursSchema = z.object({
+  dayOfWeek: z.number().min(0).max(6).optional(),
+  startTime: z.string().nullable().optional(),
+  endTime: z.string().nullable().optional(),
+  isWorking: z.boolean().optional(),
+});
+
+export type InsertWorkingHours = z.infer<typeof insertWorkingHoursSchema>;
+export type UpdateWorkingHours = z.infer<typeof updateWorkingHoursSchema>;
+export type WorkingHours = typeof workingHours.$inferSelect;

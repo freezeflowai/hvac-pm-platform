@@ -1,0 +1,316 @@
+We’re building the “Team / Technician management + permissions” feature for an HVAC web app.
+Stack: React + TypeScript + Tailwind on the frontend, Node/Express with a relational DB (Prisma/Postgres or equivalent) on the backend.
+
+GOAL
+
+Implement:
+
+A Team list page (/manage-team)
+
+A Team member detail page (/manage-team/:id) with profile, working hours, costs, and permissions
+
+A role-based access control (RBAC) backend model with roles and permissions, including role defaults and per-user overrides
+
+API endpoints and middleware to enforce permissions in the backend.
+
+Please:
+
+Follow existing coding style, component structure, routing, and Tailwind conventions already in the project.
+
+Do not break existing pages (Dashboard, Jobs, Calendar, Settings, Products & Services).
+
+Keep UX clean and readable; assume users may have weaker eyesight (slightly larger font, good contrast).
+
+1. Data Model (Backend)
+
+Implement the following tables/entities via migrations (Prisma models or equivalent):
+
+roles:
+
+id (PK)
+
+name (enum-like string: technician, lead_technician, dispatcher, manager, admin)
+
+description
+
+is_system_role (boolean)
+
+timestamps
+
+permissions:
+
+id (PK)
+
+key (unique string, e.g. schedule.view_own, jobs.view_assigned, clients.edit, pricing.view, invoices.create, users.manage, etc.)
+
+group (string: schedule, jobs, clients, pricing, billing, timesheets, reports, admin, etc.)
+
+label and description for UI
+
+role_permissions: many-to-many join between roles and permissions
+
+composite PK (role_id, permission_id)
+
+user_permission_overrides:
+
+id
+
+user_id (FK → existing users table)
+
+permission_id
+
+override enum (grant or revoke)
+
+technician_profiles:
+
+user_id (PK, FK → users.id)
+
+labor_cost_per_hour (decimal)
+
+billable_rate_per_hour (decimal, nullable)
+
+color (string, used by the calendar for tech color)
+
+note (text, optional)
+
+working_hours:
+
+id
+
+user_id (FK → users.id)
+
+day_of_week (0–6 or 1–7, be consistent)
+
+start_time, end_time (time)
+
+is_working (boolean)
+
+Also add a role_id column to the existing users table, FK to roles.id.
+
+Seeding
+
+Seed default roles with sensible permission sets:
+
+technician
+
+lead_technician
+
+dispatcher
+
+manager
+
+admin
+
+Also seed a set of permissions grouped by area:
+
+schedule: schedule.view_own, schedule.edit_own, schedule.edit_team
+
+jobs: jobs.view_assigned, jobs.view_all, jobs.create, jobs.edit, jobs.delete
+
+clients: clients.view_basic, clients.edit, clients.delete
+
+pricing: pricing.view, pricing.edit, profitability.view
+
+quotes/invoices: quotes.create, quotes.approve, invoices.create, invoices.record_payment
+
+time / reports / admin: timesheets.track_own, timesheets.approve_team, reports.view_basic, reports.view_financial, users.manage, settings.manage
+
+Map each role to a subset of these permissions consistent with:
+
+Technician: minimal access (own jobs, own schedule, own time)
+
+Lead tech: tech + limited scheduling for small team
+
+Dispatcher: scheduling, clients, jobs, limited pricing
+
+Manager: almost everything except user/billing admin
+
+Admin: everything
+
+Store these mappings in role_permissions when seeding.
+
+2. Permission Logic & Middleware
+
+Implement a reusable helper and middleware:
+
+getUserEffectivePermissions(userId)
+
+Loads role permissions and applies overrides (grant / revoke) for that user.
+
+Returns a Set<string> of permission keys.
+
+Cache per request if possible.
+
+requirePermission(permissionKey: string) Express middleware
+
+Reads the current user from auth context
+
+Checks getUserEffectivePermissions
+
+If missing, return 403 JSON error with a clear message.
+
+Use requirePermission on key backend endpoints, for example:
+
+Editing another user’s schedule → schedule.edit_team
+
+Creating/editing invoices → invoices.create
+
+Managing team members → users.manage
+
+Viewing financial reports → reports.view_financial
+
+Also add helper userHasPermission(userId, key) for any custom logic.
+
+3. API Endpoints
+
+Create/extend REST endpoints:
+
+GET /api/roles
+
+Returns roles with a summary of their permissions (grouped by group for UI use).
+
+GET /api/permissions
+
+Returns flat list of permissions, grouped for UI.
+
+GET /api/users/:id
+
+Returns: base user data, technician_profile, working_hours, role, and effective permissions.
+
+PUT /api/users/:id
+
+Updates: role_id, permission overrides, technician profile fields, working hours, and basic contact info.
+
+Should validate the caller has users.manage or appropriate admin permission.
+
+GET /api/users/:id/permissions
+
+Returns effective permissions for debugging/administration.
+
+Make sure responses are typed (TS interfaces) and consistent with existing API style.
+
+4. Frontend – Manage Team List (/manage-team)
+
+Build a React page (or update current one) that:
+
+Uses an existing layout shell (sidebar/header) so it looks consistent with the rest of the app.
+
+Shows a header with title “Team” and a + Add team member button.
+
+Fetches users with their role and last login.
+
+Displays table columns:
+
+Name (with avatar initials icon) + role chip
+
+Email
+
+Status (Active / Invited / Deactivated)
+
+Last login
+
+Schedule summary (e.g. “Mon–Fri 8–4” or “Custom”)
+
+Actions (3-dot menu)
+
+Actions menu: View profile, Edit, Deactivate.
+
+Clicking a row or “View profile” navigates to /manage-team/:id.
+
+Add simple filters above the table:
+
+Role dropdown (All / Technician / Lead / Dispatcher / Manager / Admin).
+
+Toggle to show only active users.
+
+Use Tailwind for styling; ensure the table is responsive.
+
+5. Frontend – Team Member Detail (/manage-team/:id)
+
+Build a detail page with vertically stacked cards (use existing card components if present).
+
+Card 1 – Profile
+
+Avatar, name, email, phone.
+
+Editable fields with form inputs.
+
+Save changes via PUT /api/users/:id.
+
+Card 2 – Role & Access
+
+Role selection (radio buttons): Technician, Lead Technician, Dispatcher, Manager, Admin.
+
+Under the selected role, show a short description (static text).
+
+Below, a set of permission “packs” as toggles:
+
+Pricing access
+
+Quotes & invoices
+
+Time & timesheets
+
+Reports & analytics
+
+User & settings management
+
+Toggling these should set/clear appropriate permission overrides, on top of the base role.
+
+Link/button “View role matrix” opens a modal showing a simple table: rows = capabilities (e.g. view schedule, edit team schedule, create invoices), columns = each role with checkmarks. This is read-only, derived from roles + role_permissions.
+
+Card 3 – Working Hours
+
+Radio: Same as company default vs Custom schedule.
+
+When Custom schedule is selected, show a weekly grid: for each day (Sun–Sat): toggle + time range inputs (start_time, end_time).
+
+Bind this to the working_hours table via API.
+
+Note: this will be used by the Calendar to decide availability (for now just store; hook-in can be done later).
+
+Card 4 – Cost & Pay
+
+Inputs: Labor cost per hour, Billable rate per hour (optional).
+
+Stored in technician_profiles.
+
+Card 5 – Detailed Permissions (Advanced)
+
+Collapsible card (closed by default).
+
+Inside, grouped permission toggles bound to user_permission_overrides.
+
+Groups: Schedule, Jobs & Notes, Clients, Pricing, Quotes & Invoices, Time & Reports, Admin.
+
+Each toggle should update overrides relative to the user’s base role.
+
+Show a small text banner explaining: “Base role: X. These switches fine-tune this user’s access on top of the role.”
+
+Page Footer
+
+Deactivate user button (danger outline) on left.
+
+Cancel and Save changes buttons on right.
+
+Use form handling with proper loading / success / error states. Consider reusing existing components for buttons, inputs, and cards.
+
+6. General UX Notes
+
+Ensure fonts and spacing are slightly on the generous side for readability.
+
+Use consistent iconography with the rest of the app.
+
+Do not expose low-level permission keys directly to typical users; show readable labels.
+
+It should be easy to configure a typical technician in under 10 seconds by picking a role and maybe one or two toggles.
+
+When you’re done, summarize the changes, including:
+
+New/updated DB models and migrations
+
+New API routes & middleware
+
+New React pages/components
+
+How to seed roles/permissions and how to test a user with different roles.
