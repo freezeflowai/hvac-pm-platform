@@ -57,6 +57,9 @@ import {
   type JobEquipment,
   type InsertJobEquipment,
   type UpdateJobEquipment,
+  type TechnicianProfile,
+  type WorkingHours,
+  type UserPermissionOverride,
   customerCompanies,
   invoices,
   invoiceLines,
@@ -68,7 +71,13 @@ import {
   jobParts,
   locationEquipment,
   jobEquipment,
-  parts
+  parts,
+  technicianProfiles,
+  workingHours,
+  userPermissionOverrides,
+  roles,
+  permissions,
+  rolePermissions
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { STANDARD_BELTS, STANDARD_FILTERS } from "./seed-data";
@@ -307,6 +316,46 @@ export interface IStorage {
   
   // Equipment service history
   getEquipmentServiceHistory(equipmentId: string): Promise<Job[]>;
+  
+  // Team Management methods
+  getTeamMembers(companyId: string): Promise<User[]>;
+  getTeamMember(companyId: string, userId: string): Promise<User | undefined>;
+  updateTeamMember(companyId: string, userId: string, updates: {
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
+    phone?: string;
+    roleId?: string;
+    status?: string;
+    useCustomSchedule?: boolean;
+  }): Promise<User | undefined>;
+  deactivateTeamMember(companyId: string, userId: string): Promise<User | undefined>;
+  
+  // Technician Profile methods
+  getTechnicianProfile(userId: string): Promise<TechnicianProfile | undefined>;
+  upsertTechnicianProfile(userId: string, data: {
+    laborCostPerHour?: string | null;
+    billableRatePerHour?: string | null;
+    color?: string | null;
+    phone?: string | null;
+    note?: string | null;
+  }): Promise<TechnicianProfile>;
+  
+  // Working Hours methods
+  getWorkingHours(userId: string): Promise<WorkingHours[]>;
+  setWorkingHours(userId: string, hours: Array<{
+    dayOfWeek: number;
+    startTime?: string | null;
+    endTime?: string | null;
+    isWorking: boolean;
+  }>): Promise<WorkingHours[]>;
+  
+  // User Permission Overrides methods
+  getUserPermissionOverrides(userId: string): Promise<UserPermissionOverride[]>;
+  setUserPermissionOverrides(userId: string, overrides: Array<{
+    permissionId: string;
+    override: 'grant' | 'revoke';
+  }>): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -4808,6 +4857,141 @@ export class DbStorage implements IStorage {
       .from(jobs)
       .where(inArray(jobs.id, jobIds.map(j => j.jobId)))
       .orderBy(desc(jobs.scheduledStart));
+  }
+
+  // Team Management methods
+  async getTeamMembers(companyId: string): Promise<User[]> {
+    return db.select()
+      .from(users)
+      .where(eq(users.companyId, companyId))
+      .orderBy(users.firstName, users.lastName);
+  }
+
+  async getTeamMember(companyId: string, userId: string): Promise<User | undefined> {
+    const [user] = await db.select()
+      .from(users)
+      .where(and(eq(users.id, userId), eq(users.companyId, companyId)));
+    return user;
+  }
+
+  async updateTeamMember(companyId: string, userId: string, updates: {
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
+    phone?: string;
+    roleId?: string;
+    status?: string;
+    useCustomSchedule?: boolean;
+  }): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set(updates)
+      .where(and(eq(users.id, userId), eq(users.companyId, companyId)))
+      .returning();
+    return updated;
+  }
+
+  async deactivateTeamMember(companyId: string, userId: string): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ status: 'deactivated' })
+      .where(and(eq(users.id, userId), eq(users.companyId, companyId)))
+      .returning();
+    return updated;
+  }
+
+  // Technician Profile methods
+  async getTechnicianProfile(userId: string): Promise<TechnicianProfile | undefined> {
+    const [profile] = await db.select()
+      .from(technicianProfiles)
+      .where(eq(technicianProfiles.userId, userId));
+    return profile;
+  }
+
+  async upsertTechnicianProfile(userId: string, data: {
+    laborCostPerHour?: string | null;
+    billableRatePerHour?: string | null;
+    color?: string | null;
+    phone?: string | null;
+    note?: string | null;
+  }): Promise<TechnicianProfile> {
+    // Try to update first
+    const existing = await this.getTechnicianProfile(userId);
+    if (existing) {
+      const [updated] = await db.update(technicianProfiles)
+        .set({
+          ...data,
+          updatedAt: new Date(),
+        })
+        .where(eq(technicianProfiles.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(technicianProfiles)
+        .values({
+          userId,
+          ...data,
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  // Working Hours methods
+  async getWorkingHours(userId: string): Promise<WorkingHours[]> {
+    return db.select()
+      .from(workingHours)
+      .where(eq(workingHours.userId, userId))
+      .orderBy(workingHours.dayOfWeek);
+  }
+
+  async setWorkingHours(userId: string, hours: Array<{
+    dayOfWeek: number;
+    startTime?: string | null;
+    endTime?: string | null;
+    isWorking: boolean;
+  }>): Promise<WorkingHours[]> {
+    // Delete existing hours
+    await db.delete(workingHours)
+      .where(eq(workingHours.userId, userId));
+    
+    // Insert new hours
+    if (hours.length > 0) {
+      await db.insert(workingHours)
+        .values(hours.map(h => ({
+          userId,
+          dayOfWeek: h.dayOfWeek,
+          startTime: h.startTime,
+          endTime: h.endTime,
+          isWorking: h.isWorking,
+        })));
+    }
+    
+    return this.getWorkingHours(userId);
+  }
+
+  // User Permission Overrides methods
+  async getUserPermissionOverrides(userId: string): Promise<UserPermissionOverride[]> {
+    return db.select()
+      .from(userPermissionOverrides)
+      .where(eq(userPermissionOverrides.userId, userId));
+  }
+
+  async setUserPermissionOverrides(userId: string, overrides: Array<{
+    permissionId: string;
+    override: 'grant' | 'revoke';
+  }>): Promise<void> {
+    // Delete existing overrides
+    await db.delete(userPermissionOverrides)
+      .where(eq(userPermissionOverrides.userId, userId));
+    
+    // Insert new overrides
+    if (overrides.length > 0) {
+      await db.insert(userPermissionOverrides)
+        .values(overrides.map(o => ({
+          userId,
+          permissionId: o.permissionId,
+          override: o.override,
+        })));
+    }
   }
 }
 
