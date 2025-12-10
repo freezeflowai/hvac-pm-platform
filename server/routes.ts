@@ -2735,6 +2735,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Invoice stats for dashboard (must be before :id routes)
+  app.get("/api/invoices/stats", isAuthenticated, async (req, res) => {
+    try {
+      const stats = await storage.getInvoiceSummaryStats(req.user!.companyId);
+      res.json(stats);
+    } catch (error) {
+      console.error('Get invoice stats error:', error);
+      res.status(500).json({ error: "Failed to get invoice stats" });
+    }
+  });
+
+  // Invoice with filters (for list page - must be before :id routes)
+  app.get("/api/invoices/list", isAuthenticated, async (req, res) => {
+    try {
+      const { status, clientId, search, from, to } = req.query;
+      const invoices = await storage.getInvoicesWithStats(req.user!.companyId, {
+        status: status as string | undefined,
+        clientId: clientId as string | undefined,
+        search: search as string | undefined,
+        from: from as string | undefined,
+        to: to as string | undefined,
+      });
+      res.json(invoices);
+    } catch (error) {
+      console.error('Get invoices list error:', error);
+      res.status(500).json({ error: "Failed to get invoices list" });
+    }
+  });
+
+  // Create invoice from job (must be before :id routes)
+  app.post("/api/invoices/from-job/:jobId", isAuthenticated, async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const { includeLineItems = true, includeNotes = true } = req.body;
+      const invoice = await storage.createInvoiceFromJob(req.user!.companyId, jobId, {
+        includeLineItems,
+        includeNotes,
+      });
+      res.status(201).json(invoice);
+    } catch (error: any) {
+      console.error('Create invoice from job error:', error);
+      res.status(500).json({ error: error.message || "Failed to create invoice from job" });
+    }
+  });
+
   app.get("/api/invoices/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
@@ -2829,51 +2874,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Send invoice error:', error);
       res.status(500).json({ error: "Failed to send invoice" });
-    }
-  });
-
-  // Create invoice from job
-  app.post("/api/invoices/from-job/:jobId", isAuthenticated, async (req, res) => {
-    try {
-      const { jobId } = req.params;
-      const { includeLineItems = true, includeNotes = true } = req.body;
-      const invoice = await storage.createInvoiceFromJob(req.user!.companyId, jobId, {
-        includeLineItems,
-        includeNotes,
-      });
-      res.status(201).json(invoice);
-    } catch (error: any) {
-      console.error('Create invoice from job error:', error);
-      res.status(500).json({ error: error.message || "Failed to create invoice from job" });
-    }
-  });
-
-  // Invoice stats for dashboard
-  app.get("/api/invoices/stats", isAuthenticated, async (req, res) => {
-    try {
-      const stats = await storage.getInvoiceSummaryStats(req.user!.companyId);
-      res.json(stats);
-    } catch (error) {
-      console.error('Get invoice stats error:', error);
-      res.status(500).json({ error: "Failed to get invoice stats" });
-    }
-  });
-
-  // Invoice with filters (for list page)
-  app.get("/api/invoices/list", isAuthenticated, async (req, res) => {
-    try {
-      const { status, clientId, search, from, to } = req.query;
-      const invoices = await storage.getInvoicesWithStats(req.user!.companyId, {
-        status: status as string | undefined,
-        clientId: clientId as string | undefined,
-        search: search as string | undefined,
-        from: from as string | undefined,
-        to: to as string | undefined,
-      });
-      res.json(invoices);
-    } catch (error) {
-      console.error('Get invoices list error:', error);
-      res.status(500).json({ error: "Failed to get invoices list" });
     }
   });
 
