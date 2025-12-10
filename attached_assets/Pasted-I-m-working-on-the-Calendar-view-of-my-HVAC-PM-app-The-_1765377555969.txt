@@ -1,0 +1,96 @@
+I’m working on the Calendar view of my HVAC PM app. The UI is very close, but there are some layout bugs and UX issues I’d like you to fix. Please carefully read all of these requirements and then update the React/TSX + CSS so the calendar behaves exactly as described.
+
+Files to look at
+
+The main calendar page component (weekly/monthly view) – whatever we’re currently using (e.g. CalendarPage.tsx, CalendarWeeklyView.tsx or similar).
+
+Any layout / style files used by that page, for example:
+
+CalendarPage.module.css / calendar.css / layout.css (whatever exists)
+
+Styles for the unscheduled jobs drawer
+
+The parts dialog component that opens when I click the “Parts” button.
+
+If names differ, please search the repo for the calendar and parts dialog components and work on those.
+
+A. Fix calendar width, padding & alignment
+
+Current problems:
+
+There is too much horizontal padding/gutter on both sides of the calendar grid.
+
+The calendar grid doesn’t visually reach from just after the left sidebar to just before the unscheduled drawer.
+
+The “All Day” row and the time rows (7 AM, 8 AM, etc.) aren’t perfectly aligned. There is a subtle gap/offset between the all-day row and the rest of the grid.
+
+The calendar doesn’t feel anchored; there’s extra whitespace around it.
+
+Target behavior / layout:
+
+The main calendar area should be a two-column flex layout:
+
+Left: calendar grid container
+
+flex: 1; min-width: 0;
+
+This should occupy all remaining horizontal space between the left sidebar and the unscheduled drawer.
+
+Right: unscheduled drawer
+
+Fixed width (around 320px–360px), not flexing.
+
+Use a wrapper like:
+
+<div className="calendar-layout">
+  <div className="calendar-grid-container">...</div>
+  <aside className="calendar-unscheduled">...</aside>
+</div>
+
+
+And in CSS something like:
+
+.calendar-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.calendar-grid-container {
+  flex: 1;
+  min-width: 0;
+}
+
+.calendar-unscheduled {
+  width: 340px; /* adjust if needed */
+  flex: 0 0 340px;
+}
+
+
+Remove or greatly reduce outer padding/margins around the calendar:
+
+The calendar grid’s parent container should not use a large max-width or big margin: 0 auto.
+
+Keep a small padding (e.g. 16px or 20px) between:
+
+Left sidebar and calendar grid.
+
+Calendar grid and unscheduled drawer.
+
+No extra “mystery” whitespace on the far left or right.
+
+Align the All-Day row with the time grid:
+
+All rows (All Day + time slots) must share the same vertical grid lines.
+
+Make sure the all-day row is rendered inside the same column grid as the time rows (same grid-template-columns).
+
+Remove any extra margin-top, padding-top, or border-top that only applies to the all-day row and causes a visible offset.
+
+The cell under “All Day” in the time column can be just an empty cell; do not treat it as a header with extra styling.
+
+Remove the “Time” column header.
+
+The leftmost column currently shows “Time” as a header. Remove that label. Just show the hour labels (7 AM, 8 AM, etc.) in that column.
+
+Make sure the vertical and horizontal lines look clean and continuous.
