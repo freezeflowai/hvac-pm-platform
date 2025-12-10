@@ -813,12 +813,17 @@ export default function Calendar() {
           updateAssignment.mutate({ id: activeId, day });
         }
       } else if (unscheduledItem && hasExistingAssignment) {
-        // Update existing unscheduled assignment (may be from different month) to current view's month/day
+        // Update existing unscheduled assignment to current view's month/day
         updateAssignment.mutate({ id: unscheduledItem.assignmentId, day, targetMonth: month, targetYear: year });
       } else if (unscheduledItem) {
         // Create new assignment from unscheduled client (no existing assignment - "missing" status)
-        // Use the current view's month/year - user is rescheduling work to the visible calendar
-        createAssignment.mutate({ clientId: unscheduledItem.clientId, day });
+        // Use the ITEM's original month/year so it's scheduled for the correct PM month
+        createAssignment.mutate({ 
+          clientId: unscheduledItem.clientId, 
+          day,
+          targetMonth: unscheduledItem.month,
+          targetYear: unscheduledItem.year
+        });
       }
     } else if (overId.startsWith('allday-')) {
       // Dropped on all-day slot in weekly view (allday-{dayName}-{dayNumber})
@@ -835,8 +840,13 @@ export default function Calendar() {
         // Update existing unscheduled assignment to current view's month/day
         updateAssignment.mutate({ id: unscheduledItem.assignmentId, day: targetDay, scheduledHour: null, targetMonth: month, targetYear: year });
       } else if (unscheduledItem) {
-        // Create new assignment from unscheduled client - use current view month
-        createAssignment.mutate({ clientId: unscheduledItem.clientId, day: targetDay });
+        // Create new assignment from unscheduled client - use ITEM's original month/year
+        createAssignment.mutate({ 
+          clientId: unscheduledItem.clientId, 
+          day: targetDay,
+          targetMonth: unscheduledItem.month,
+          targetYear: unscheduledItem.year
+        });
       }
     } else if (overId.startsWith('weekly-')) {
       // Dropped on hourly slot in weekly view (weekly-{dayName}-{hour}-{dayNumber})
@@ -853,8 +863,14 @@ export default function Calendar() {
         // Update existing unscheduled assignment to current view's month/day/hour
         updateAssignment.mutate({ id: unscheduledItem.assignmentId, day: targetDay, scheduledHour: hour, targetMonth: month, targetYear: year });
       } else if (unscheduledItem) {
-        // Create new assignment from unscheduled client - use current view month
-        createAssignment.mutate({ clientId: unscheduledItem.clientId, day: targetDay, scheduledHour: hour });
+        // Create new assignment from unscheduled client - use ITEM's original month/year
+        createAssignment.mutate({ 
+          clientId: unscheduledItem.clientId, 
+          day: targetDay, 
+          scheduledHour: hour,
+          targetMonth: unscheduledItem.month,
+          targetYear: unscheduledItem.year
+        });
       }
     } else if (overId.startsWith('daily-')) {
       // Dropped on hourly slot in daily view (daily-{technicianId}-{hour}-{day}-{month}-{year})
@@ -891,12 +907,13 @@ export default function Calendar() {
           targetYear: targetYr
         });
       } else if (unscheduledItem) {
+        // Create new assignment from unscheduled client - use ITEM's original month/year
         createAssignment.mutate({ 
           clientId: unscheduledItem.clientId, 
           day: targetDay, 
           scheduledHour: hour,
-          targetMonth: targetMo,
-          targetYear: targetYr
+          targetMonth: unscheduledItem.month,
+          targetYear: unscheduledItem.year
         });
       }
     } else if (overId === 'unscheduled-panel') {
