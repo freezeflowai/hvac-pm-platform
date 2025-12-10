@@ -1219,7 +1219,7 @@ export default function Calendar() {
     return (
       <div className="flex flex-col h-full min-h-0 max-h-full">
         <div className="grid grid-cols-8 sticky top-0 bg-background z-10 border-b flex-shrink-0">
-          <div className="px-1.5 py-1 text-[10px] font-semibold border-r flex items-center justify-center">Time</div>
+          <div className="px-1.5 py-1 text-[10px] border-r flex items-center justify-center"></div>
           {weekDaysData.map((d) => (
             <div key={d.dayName} className="px-1 py-1 text-center border-r text-[10px] font-semibold">
               <div>{d.dayName}</div>
@@ -1642,8 +1642,8 @@ export default function Calendar() {
             </div>
           )}
 
-          <div className={`grid gap-1 flex-1 min-h-0 overflow-hidden ${isUnscheduledMinimized ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-8'}`}>
-            <div className={`${isUnscheduledMinimized ? 'col-span-1' : 'lg:col-span-7'} flex flex-col h-full min-h-0 max-h-full`}>
+          <div className={`flex gap-2 flex-1 min-h-0 overflow-hidden`}>
+            <div className="flex-1 min-w-0 flex flex-col h-full">
               <Card className="h-full flex flex-col">
                 <CardContent className="flex-1 overflow-auto p-0">
                   {view === "monthly" && (
@@ -1670,7 +1670,7 @@ export default function Calendar() {
             </div>
 
             {!isUnscheduledMinimized && (
-              <div className="h-full overflow-hidden lg:col-span-1">
+              <aside className="w-80 flex-shrink-0 h-full overflow-hidden">
                 <UnscheduledPanel 
                   clients={unscheduledClients} 
                   onClientClick={setReportDialogClientId}
@@ -1679,7 +1679,7 @@ export default function Calendar() {
                   currentMonth={month}
                   currentYear={year}
                 />
-              </div>
+              </aside>
             )}
           </div>
 
