@@ -3,14 +3,15 @@ import {
   Calendar as CalendarIcon, 
   ClipboardList,
   Users, 
-  Package, 
   FileText, 
   Shield, 
   LogOut,
   Smartphone,
   MessageCircle,
   UserCheck,
-  ShieldAlert
+  ShieldAlert,
+  Settings,
+  Package
 } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -130,13 +131,6 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
       testId: "nav-clients"
     });
     menuItems.push({
-      title: "Products & Services",
-      icon: Package,
-      href: "/products",
-      isActive: location === "/products",
-      testId: "nav-products"
-    });
-    menuItems.push({
       title: "Reports",
       icon: FileText,
       href: "/reports",
@@ -153,6 +147,14 @@ export function AppSidebar({ onDashboardClick }: AppSidebarProps) {
         testId: "nav-manage-technicians"
       });
     }
+    
+    menuItems.push({
+      title: "Settings",
+      icon: Settings,
+      href: "/settings",
+      isActive: location === "/settings" || location === "/products",
+      testId: "nav-settings"
+    });
     
     // Platform admin gets the Support Console
     if (user?.role === "platform_admin") {

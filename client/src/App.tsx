@@ -21,6 +21,7 @@ import TechnicianDashboard from "@/pages/TechnicianDashboard";
 import TechnicianManagementPage from "@/pages/TechnicianManagementPage";
 import Technician from "@/pages/Technician";
 import DailyParts from "@/pages/DailyParts";
+import SettingsPage from "@/pages/SettingsPage";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import RequestReset from "@/pages/RequestReset";
@@ -33,7 +34,13 @@ import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Search, Plus, Settings, AlertTriangle, X, ChevronRight } from "lucide-react";
+import { Search, Plus, Settings, AlertTriangle, X, ChevronRight, ClipboardList, Users, FileText, Receipt } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useTextScale } from "@/hooks/useTextScale";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -89,6 +96,11 @@ function Router() {
       <Route path="/products">
         <ProtectedRoute requireAdmin>
           <PartsManagementPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings">
+        <ProtectedRoute requireAdmin>
+          <SettingsPage />
         </ProtectedRoute>
       </Route>
       <Route path="/company-settings">
@@ -204,7 +216,7 @@ function AppContent() {
   );
 
   const style = {
-    "--sidebar-width": "16rem",
+    "--sidebar-width": "14rem",
     "--sidebar-width-icon": "3rem",
   };
 
@@ -262,7 +274,7 @@ function AppContent() {
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                   <input
                     type="text"
-                    placeholder="Search clients..."
+                    placeholder="Search..."
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
@@ -305,10 +317,32 @@ function AppContent() {
                     </div>
                   )}
                 </div>
-                <Button variant="default" size="default" onClick={handleAddClient} data-testid="button-add-client" className="gap-1.5">
-                  <Plus className="h-4 w-4" />
-                  <span>Add Client</span>
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="default" size="default" data-testid="button-create-new" className="gap-1.5">
+                      <Plus className="h-4 w-4" />
+                      <span>New</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={() => setLocation('/jobs?create=true')} data-testid="menu-new-job">
+                      <ClipboardList className="h-4 w-4 mr-2" />
+                      New Job
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleAddClient} data-testid="menu-new-client">
+                      <Users className="h-4 w-4 mr-2" />
+                      New Client
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLocation('/quotes?create=true')} data-testid="menu-new-quote">
+                      <FileText className="h-4 w-4 mr-2" />
+                      New Quote
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLocation('/invoices?create=true')} data-testid="menu-new-invoice">
+                      <Receipt className="h-4 w-4 mr-2" />
+                      New Invoice
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <TextScaleToggle />
                 <Button variant="ghost" size="icon" asChild data-testid="button-settings">
                   <Link href="/company-settings">

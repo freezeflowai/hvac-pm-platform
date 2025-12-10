@@ -1,0 +1,199 @@
+I need you to make a set of UI/UX changes across the app. It’s a React + Tailwind business app (clients, jobs, etc). Please follow these instructions carefully and keep the code consistent with the existing patterns.
+
+1. Sidebar navigation changes (Settings + move Products & Services)
+
+Do NOT modify the existing “Admin” section at the bottom of the sidebar. Leave Admin exactly as it is.
+
+In the left sidebar:
+
+Remove the “Products & Services” item from the main navigation.
+
+Add a new top-level nav item called “Settings” (with an appropriate icon) somewhere above Admin (for example under “Manage Team” or wherever fits best).
+
+When the user clicks Settings:
+
+Route them to a new Settings page (e.g. /settings).
+
+On this page, add a simple layout with:
+
+A page title “Settings”.
+
+A section or card called “Products & Services” that links to or embeds the existing Products & Services management UI (the one that was previously accessible from the sidebar).
+
+The goal is: all “Products & Services” management should now live under Settings, not as a standalone nav item.
+
+Sidebar width:
+
+Reduce the sidebar width slightly so it isn’t as wide (more screen space for the main content).
+
+Keep icons + labels as they are; no need to implement a collapsible sidebar for now.
+
+2. Header changes (global create button + search)
+
+Replace the “Add Client” button in the top-right header with a more generic “+ New” or “+ Create” button.
+
+When the user clicks this button, show a small dropdown menu with options such as:
+
+“New Job”
+
+“New Client”
+
+“New Quote” (if applicable)
+
+“New Invoice”
+
+Each option should route to the appropriate “create” flow already used elsewhere in the app.
+
+Update the search bar:
+
+Change the placeholder from “Search clients…” to simply “Search…”.
+
+Where possible, make search global instead of clients-only:
+
+Try to search across Clients, Jobs, Locations, maybe Invoices/Equipment if the backend supports it.
+
+In the UI, at least prepare for global search (even if the backend initially still only returns clients).
+
+3. Job page layout: widen main content, shrink right column
+
+On the Job details page (the one with Parts & Billing, Labour, Expenses, etc):
+
+Change the main content layout to a two-column grid:
+
+Main column (left): ~70% width (this should contain Parts & Billing, Labour, Expenses).
+
+Side column (right): ~30% width (Assigned Technicians, Notes, Invoices, Visits, Equipment, Activity, Metadata).
+
+Ensure the main column has more horizontal room for the Parts & Billing table.
+
+In the right column:
+
+Keep all current cards: Assigned Technicians, Notes, Invoices, Visits, Equipment, Activity, Metadata.
+
+Make them collapsible:
+
+Notes should be expanded by default.
+
+All other cards can be collapsed by default, with a chevron to toggle.
+
+When Notes has many entries, allow scrolling within the Notes card so the right column doesn’t push the entire page excessively.
+
+4. Line items (Parts & Billing) behaviour and UX
+
+We want safer, clearer line-item editing. Right now, selecting a product auto-saves the line. We want a “draft per line with its own save” approach.
+
+General goals:
+
+Each line item should have its own Save / Cancel controls.
+
+Selecting a product should not immediately save the line.
+
+If the user enters multiple items and navigates away, each line they saved should already be persisted.
+
+4.1. Adding a line item
+
+When the user clicks “Add Line Item”:
+
+Insert a new draft row at the bottom of the Parts & Billing table.
+
+This draft row should have:
+
+Product / Service selector (with typeahead search).
+
+Description / notes input.
+
+Qty, Cost, Price fields.
+
+Calculated Total field (Qty * Price).
+
+Visually indicate the row is “unsaved” (e.g. slightly tinted background and/or subtle “Unsaved” label).
+
+Product selection:
+
+As the user types in the Product field, show a typeahead dropdown of existing products/services.
+
+If there’s no match, show a clear option like:
+
+“Create new product: {search term}”
+
+When that option is chosen:
+
+Open the existing “Add Product / Service” flow (modal or new page, whichever pattern you already use).
+
+After creating the product, return to the Job page with the new product selected on that line (if possible).
+
+Do NOT automatically save the line item just because the user chose a product.
+
+The row stays in “draft” until saved.
+
+4.2. Saving and editing a line item
+
+Within each line row (especially for draft rows), add inline controls:
+
+Save line (primary button, e.g. small blue button at the end or bottom of the row).
+
+Cancel (a subtle text link, e.g. under the description).
+
+On Save line:
+
+Validate required fields (Product at minimum; optionally Qty, Price).
+
+Call the existing API / mutation to persist this line item.
+
+On success:
+
+Show a small toast/snackbar: “Line item saved”.
+
+Remove the tinted background / unsaved marker.
+
+On Cancel:
+
+If this is a brand new draft row, remove it entirely.
+
+If this is an existing saved row being edited, revert the fields to their last saved values.
+
+For existing saved lines:
+
+Clicking anywhere on that row should put it into edit mode:
+
+Inputs become editable.
+
+Save line / Cancel appear again for that row.
+
+The global bottom “Save changes” button (if present) should remain for job-level properties, not individual line items.
+
+5. Typography and readability (especially for line items and notes)
+
+To make the UI easier to read (especially for users with glasses), please adjust font sizes and line heights slightly:
+
+Increase the base font size for the app by one step (for example, from 14px → 15px or 16px), while keeping overall scale consistent.
+
+Within the Parts & Billing table:
+
+Column headers (Total Price, Total Cost, Profit Margin, Product / Service, Qty, Cost, Price, Total) should be at least the same or slightly larger than body text and medium weight.
+
+Product name, Qty, Cost, Price, and Total values should not be smaller than the general UI text.
+
+Description/notes text can be one step smaller but still high-contrast and readable.
+
+Ensure greys used for important content (like description text and “No labour entries yet”) have enough contrast against the background. Prefer a darker grey token rather than very light grey for body text.
+
+6. General cleanup
+
+Keep using the existing design system (colors, spacing, buttons) where possible.
+
+Ensure all new features are responsive enough to work at common desktop widths.
+
+Don’t change any Admin-specific logic or routes; only add the new Settings section and move Products & Services there.
+
+Please implement all of the above changes in the codebase, updating components, routes, and styles as needed. When you’re done, briefly summarize which files you changed and how you wired up:
+
+The new Settings page and nav item.
+
+The new global “+ New” header button and dropdown.
+
+The updated Job layout (70/30).
+
+The new per-line Save/Cancel behaviour for Parts & Billing.
+
+The typography / font-size / contrast adjustments.

@@ -418,7 +418,8 @@ export default function JobDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssignTech, setShowAssignTech] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(false);
+  const [techsOpen, setTechsOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(true);
   const [invoicesOpen, setInvoicesOpen] = useState(false);
   const [visitsOpen, setVisitsOpen] = useState(false);
   const [equipmentOpen, setEquipmentOpen] = useState(false);
@@ -639,7 +640,7 @@ export default function JobDetailPage() {
       </header>
 
       {/* MAIN 2-COLUMN LAYOUT */}
-      <div className="grid gap-4 lg:grid-cols-[3fr,2fr]">
+      <div className="grid gap-4 lg:grid-cols-[7fr,3fr]">
         {/* LEFT COLUMN: Parts & Billing + Labour + Expenses */}
         <div className="space-y-4">
           {/* Parts & Billing / Line Items */}
@@ -704,41 +705,53 @@ export default function JobDetailPage() {
 
         {/* RIGHT COLUMN: Techs, Notes, Invoices, Visits, Equipment, Activity, Metadata */}
         <div className="space-y-4">
-          {/* Assigned Technicians – always open */}
-          <Card data-testid="card-technicians">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-              <CardTitle className="text-sm font-semibold">Assigned Technicians</CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-xs h-auto p-0 text-primary"
-                onClick={() => setShowAssignTech(true)}
-                data-testid="button-assign-technician"
-              >
-                Assign
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {job.technicians && job.technicians.length > 0 ? (
-                <ul className="space-y-1 text-sm">
-                  {job.technicians.map(tech => (
-                    <li key={tech.id} className="flex items-center gap-2" data-testid={`text-technician-${tech.id}`}>
-                      <span>
-                        {tech.firstName && tech.lastName 
-                          ? `${tech.firstName} ${tech.lastName}`
-                          : tech.email}
-                      </span>
-                      {tech.id === job.primaryTechnicianId && (
-                        <Badge variant="secondary" className="text-xs">Primary</Badge>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-muted-foreground">No technicians assigned yet.</p>
-              )}
-            </CardContent>
-          </Card>
+          {/* Assigned Technicians – collapsible */}
+          <Collapsible open={techsOpen} onOpenChange={setTechsOpen}>
+            <Card data-testid="card-technicians">
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-technicians">
+                  <span className="text-sm font-semibold">Assigned Technicians</span>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs h-auto p-0 text-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAssignTech(true);
+                      }}
+                      data-testid="button-assign-technician"
+                    >
+                      Assign
+                    </Button>
+                    {techsOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t px-4 pb-4 pt-3">
+                  {job.technicians && job.technicians.length > 0 ? (
+                    <ul className="space-y-1 text-sm">
+                      {job.technicians.map(tech => (
+                        <li key={tech.id} className="flex items-center gap-2" data-testid={`text-technician-${tech.id}`}>
+                          <span>
+                            {tech.firstName && tech.lastName 
+                              ? `${tech.firstName} ${tech.lastName}`
+                              : tech.email}
+                          </span>
+                          {tech.id === job.primaryTechnicianId && (
+                            <Badge variant="secondary" className="text-xs">Primary</Badge>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No technicians assigned yet.</p>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
           {/* Notes – collapsible */}
           <Collapsible open={notesOpen} onOpenChange={setNotesOpen}>

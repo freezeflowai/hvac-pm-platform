@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Plus, Trash2, Loader2, Check, X } from "lucide-react";
 import type { JobPart, Part } from "@shared/schema";
 
 interface PartsBillingCardProps {
@@ -31,6 +31,7 @@ interface PartsBillingCardProps {
 interface LocalLineItem {
   id: string;
   isNew?: boolean;
+  isDraft?: boolean;
   productId?: string | null;
   description: string;
   notes: string;
@@ -38,6 +39,15 @@ interface LocalLineItem {
   unitCost: string;
   unitPrice: string;
   source: string;
+}
+
+interface OriginalItemState {
+  productId?: string | null;
+  description: string;
+  notes: string;
+  quantity: string;
+  unitCost: string;
+  unitPrice: string;
 }
 
 function formatCurrency(value: number): string {
@@ -52,13 +62,14 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
   const { toast } = useToast();
   const [items, setItems] = useState<LocalLineItem[]>([]);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
-  const [hasChanges, setHasChanges] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [savingRowId, setSavingRowId] = useState<string | null>(null);
+  const [originalItems, setOriginalItems] = useState<Record<string, OriginalItemState>>({});
   const [productModalState, setProductModalState] = useState<{
     open: boolean;
     seedName: string;
     lineItemId: string | null;
   }>({ open: false, seedName: "", lineItemId: null });
+  const lastSyncedPartsRef = useRef<string>("");
 
   const { data: jobParts = [], isLoading: partsLoading } = useQuery<JobPart[]>({
     queryKey: ["/api/jobs", jobId, "parts"],
@@ -75,26 +86,31 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
   const catalogParts = useMemo(() => catalogData?.items || [], [catalogData]);
 
   useEffect(() => {
-    if (jobParts && jobParts.length >= 0 && !hasChanges) {
-      setItems(
-        jobParts.map((jp) => {
-          const catalogItem = catalogParts.find((p) => p.id === jp.productId);
-          const productName = catalogItem?.name || catalogItem?.description || "";
-          return {
-            id: jp.id,
-            isNew: false,
-            productId: jp.productId,
-            description: productName || jp.description,
-            notes: productName ? jp.description : "",
-            quantity: jp.quantity,
-            unitCost: catalogItem?.cost || "0",
-            unitPrice: jp.unitPrice || "0",
-            source: jp.source,
-          };
-        })
-      );
-    }
-  }, [jobParts, catalogParts, hasChanges]);
+    if (!jobParts || editingRowId) return;
+    
+    const catalogKey = catalogParts.map(p => p.id + p.cost + p.unitPrice).join(",");
+    const partsKey = JSON.stringify(jobParts.map(jp => jp.id + jp.quantity + jp.unitPrice + jp.productId)) + "|" + catalogKey;
+    if (partsKey === lastSyncedPartsRef.current) return;
+    
+    const mappedItems = jobParts.map((jp) => {
+      const catalogItem = catalogParts.find((p) => p.id === jp.productId);
+      const productName = catalogItem?.name || catalogItem?.description || "";
+      return {
+        id: jp.id,
+        isNew: false,
+        isDraft: false,
+        productId: jp.productId,
+        description: productName || jp.description,
+        notes: productName ? jp.description : "",
+        quantity: jp.quantity,
+        unitCost: catalogItem?.cost || "0",
+        unitPrice: jp.unitPrice || "0",
+        source: jp.source,
+      };
+    });
+    lastSyncedPartsRef.current = partsKey;
+    setItems(mappedItems);
+  }, [jobParts, catalogParts, editingRowId]);
 
   const { totalPrice, totalCost, profit, margin } = useMemo(() => {
     const totalPrice = items.reduce(
@@ -115,6 +131,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
     const newItem: LocalLineItem = {
       id,
       isNew: true,
+      isDraft: true,
       description: "",
       notes: "",
       quantity: "1",
@@ -124,67 +141,118 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
     };
     setItems((prev) => [...prev, newItem]);
     setEditingRowId(id);
-    setHasChanges(true);
+    setOriginalItems((prev) => ({
+      ...prev,
+      [id]: {
+        productId: null,
+        description: "",
+        notes: "",
+        quantity: "1",
+        unitCost: "0",
+        unitPrice: "0",
+      },
+    }));
+  };
+
+  const handleEnterEdit = (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (item) {
+      setOriginalItems((prev) => ({
+        ...prev,
+        [id]: {
+          productId: item.productId,
+          description: item.description,
+          notes: item.notes,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+          unitPrice: item.unitPrice,
+        },
+      }));
+    }
+    setEditingRowId(id);
   };
 
   const handleRowChange = (id: string, patch: Partial<LocalLineItem>) => {
     setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...patch } : item))
+      prev.map((item) => (item.id === id ? { ...item, ...patch, isDraft: true } : item))
     );
-    setHasChanges(true);
   };
 
-  const handleRowDelete = (id: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
-    if (editingRowId === id) setEditingRowId(null);
-    setHasChanges(true);
+  const handleRowCancel = (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (item?.isNew) {
+      setItems((prev) => prev.filter((i) => i.id !== id));
+    } else {
+      const orig = originalItems[id];
+      if (orig) {
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === id
+              ? { ...i, ...orig, isDraft: false }
+              : i
+          )
+        );
+      }
+    }
+    setEditingRowId(null);
   };
 
-  const handleSave = async () => {
+  const handleRowDelete = async (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (item?.isNew) {
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      if (editingRowId === id) setEditingRowId(null);
+      return;
+    }
+    
     try {
-      setIsSaving(true);
-
-      for (const item of items) {
-        const qty = String(parseFloat(item.quantity) || 1);
-        const price = String(parseFloat(item.unitPrice) || 0);
-        const desc = item.notes?.trim() || item.description || "Unnamed item";
-        
-        if (item.isNew) {
-          await apiRequest("POST", `/api/jobs/${jobId}/parts`, {
-            description: desc,
-            quantity: qty,
-            unitPrice: price,
-            productId: item.productId || null,
-            source: item.source || "manual",
-          });
-        } else {
-          await apiRequest("PUT", `/api/jobs/${jobId}/parts/${item.id}`, {
-            description: desc,
-            quantity: qty,
-            unitPrice: price,
-            productId: item.productId || null,
-            source: item.source,
-          });
-        }
-      }
-
-      const currentIds = items.filter((i) => !i.isNew).map((i) => i.id);
-      const originalIds = jobParts.map((jp) => jp.id);
-      const deletedIds = originalIds.filter((id) => !currentIds.includes(id));
-      for (const id of deletedIds) {
-        await apiRequest("DELETE", `/api/jobs/${jobId}/parts/${id}`);
-      }
-
-      await Promise.all([
-        queryClient.refetchQueries({ queryKey: ["/api/jobs", jobId, "parts"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/parts"] }),
-      ]);
-      setHasChanges(false);
-      toast({ title: "Saved", description: "Line items saved successfully." });
+      setSavingRowId(id);
+      await apiRequest("DELETE", `/api/jobs/${jobId}/parts/${id}`);
+      await queryClient.refetchQueries({ queryKey: ["/api/jobs", jobId, "parts"] });
+      if (editingRowId === id) setEditingRowId(null);
+      toast({ title: "Deleted", description: "Line item removed." });
     } catch (error) {
-      toast({ title: "Error", description: "Failed to save line items.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to delete line item.", variant: "destructive" });
     } finally {
-      setIsSaving(false);
+      setSavingRowId(null);
+    }
+  };
+
+  const handleRowSave = async (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+
+    try {
+      setSavingRowId(id);
+      const qty = String(parseFloat(item.quantity) || 1);
+      const price = String(parseFloat(item.unitPrice) || 0);
+      const desc = item.notes?.trim() || item.description || "Unnamed item";
+        
+      if (item.isNew) {
+        await apiRequest("POST", `/api/jobs/${jobId}/parts`, {
+          description: desc,
+          quantity: qty,
+          unitPrice: price,
+          productId: item.productId || null,
+          source: item.source || "manual",
+        });
+      } else {
+        await apiRequest("PUT", `/api/jobs/${jobId}/parts/${item.id}`, {
+          description: desc,
+          quantity: qty,
+          unitPrice: price,
+          productId: item.productId || null,
+          source: item.source,
+        });
+      }
+
+      await queryClient.refetchQueries({ queryKey: ["/api/jobs", jobId, "parts"] });
+      setEditingRowId(null);
+      toast({ title: "Saved", description: "Line item saved." });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to save line item.", variant: "destructive" });
+    } finally {
+      setSavingRowId(null);
     }
   };
 
@@ -196,7 +264,6 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
       unitCost: product.cost || "0",
       unitPrice: product.unitPrice || "0",
     });
-    setEditingRowId(null);
   };
 
   const createProductMutation = useMutation({
@@ -292,8 +359,11 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
                     item={item}
                     catalog={catalogParts.filter((p) => p.isActive !== false)}
                     isEditing={editingRowId === item.id}
-                    onEnterEdit={() => setEditingRowId(item.id)}
+                    isSaving={savingRowId === item.id}
+                    onEnterEdit={() => handleEnterEdit(item.id)}
                     onChange={(patch) => handleRowChange(item.id, patch)}
+                    onSave={() => handleRowSave(item.id)}
+                    onCancel={() => handleRowCancel(item.id)}
                     onDelete={() => handleRowDelete(item.id)}
                     onSelectProduct={(product) => handleSelectProduct(item.id, product)}
                     onRequestAddProduct={(name) =>
@@ -305,7 +375,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
             </table>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center">
             <Button
               variant="outline"
               size="sm"
@@ -315,24 +385,6 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
               <Plus className="h-3 w-3 mr-1" />
               Add Line Item
             </Button>
-            <div className="flex items-center gap-3">
-              {hasChanges && <span className="text-[11px] text-muted-foreground">Unsaved changes</span>}
-              <Button
-                size="sm"
-                onClick={handleSave}
-                disabled={!hasChanges || isSaving}
-                data-testid="button-save-parts"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Save changes"
-                )}
-              </Button>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -352,8 +404,11 @@ interface LineItemRowProps {
   item: LocalLineItem;
   catalog: Part[];
   isEditing: boolean;
+  isSaving: boolean;
   onEnterEdit: () => void;
   onChange: (patch: Partial<LocalLineItem>) => void;
+  onSave: () => void;
+  onCancel: () => void;
   onDelete: () => void;
   onSelectProduct: (product: Part) => void;
   onRequestAddProduct: (name: string) => void;
@@ -363,8 +418,11 @@ function LineItemRow({
   item,
   catalog,
   isEditing,
+  isSaving,
   onEnterEdit,
   onChange,
+  onSave,
+  onCancel,
   onDelete,
   onSelectProduct,
   onRequestAddProduct,
@@ -389,13 +447,20 @@ function LineItemRow({
   if (!isEditing) {
     return (
       <tr
-        className="border-b border-border/50 hover:bg-muted/50 cursor-pointer"
+        className={`border-b border-border/50 hover:bg-muted/50 cursor-pointer ${item.isDraft ? 'bg-amber-50 dark:bg-amber-950/20 border-l-2 border-l-amber-400' : ''}`}
         onClick={onEnterEdit}
         data-testid={`row-line-item-${item.id}`}
       >
         <td className="py-3 pr-3 align-top">
-          <div className="text-xs font-medium">
-            {item.description || <span className="italic text-muted-foreground">No product</span>}
+          <div className="flex items-center gap-2">
+            <div className="text-xs font-medium">
+              {item.description || <span className="italic text-muted-foreground">No product</span>}
+            </div>
+            {item.isDraft && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">
+                Draft
+              </span>
+            )}
           </div>
           {item.notes && (
             <div className="mt-0.5 text-[11px] text-muted-foreground">{item.notes}</div>
@@ -463,17 +528,49 @@ function LineItemRow({
           onChange={(e) => onChange({ notes: e.target.value })}
           data-testid={`input-notes-${item.id}`}
         />
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          className="mt-1.5 h-auto p-0 text-[11px] text-destructive hover:text-destructive"
-          data-testid={`button-delete-line-${item.id}`}
-        >
-          <Trash2 className="h-3 w-3 mr-1" />
-          Remove line
-        </Button>
+        <div className="flex items-center gap-2 mt-2">
+          <Button
+            type="button"
+            size="sm"
+            onClick={onSave}
+            disabled={isSaving}
+            data-testid={`button-save-line-${item.id}`}
+            className="h-7 text-xs"
+          >
+            {isSaving ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <>
+                <Check className="h-3 w-3 mr-1" />
+                Save
+              </>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onCancel}
+            disabled={isSaving}
+            data-testid={`button-cancel-line-${item.id}`}
+            className="h-7 text-xs"
+          >
+            <X className="h-3 w-3 mr-1" />
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onDelete}
+            disabled={isSaving}
+            className="h-7 text-xs text-destructive hover:text-destructive"
+            data-testid={`button-delete-line-${item.id}`}
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            Delete
+          </Button>
+        </div>
       </td>
       <td className="py-2.5 px-3 align-top">
         <Input
