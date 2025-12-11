@@ -225,7 +225,7 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
           ? {
               ...item,
               productId,
-              unitPriceOverride: item.unitPriceOverride || (product?.unitPrice ? "" : ""),
+              unitPriceOverride: item.unitPriceOverride || (product?.unitPrice?.toString() ?? ""),
               productSearchOpen: false,
             }
           : item
@@ -334,13 +334,16 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
 
                 <div className="space-y-2">
                   <Label htmlFor="jobType">Job Type</Label>
-                  <Select value={jobType} onValueChange={setJobType}>
+                  <Select
+                    value={jobType || "none"}
+                    onValueChange={(val) => setJobType(val === "none" ? "" : val)}
+                  >
                     <SelectTrigger data-testid="select-job-type">
                       <SelectValue placeholder="Select type..." />
                     </SelectTrigger>
                     <SelectContent>
                       {JOB_TYPE_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value || "none"}>
+                        <SelectItem key={opt.value || "none"} value={opt.value || "none"}>
                           {opt.label}
                         </SelectItem>
                       ))}
