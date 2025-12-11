@@ -51,7 +51,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTextScale } from "@/hooks/useTextScale";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -205,27 +204,6 @@ function Router() {
       </Route>
       <Route component={NotFound} />
     </Switch>
-  );
-}
-
-function TextScaleToggle() {
-  const { scale, toggleScale } = useTextScale();
-  
-  return (
-    <button
-      type="button"
-      onClick={toggleScale}
-      className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted h-9"
-      aria-pressed={scale === "large"}
-      aria-label={scale === "large" ? "Switch to normal text size" : "Switch to large text size"}
-      data-testid="button-text-scale"
-    >
-      <span className="text-sm">A</span>
-      <span className="text-lg font-semibold">A</span>
-      {scale === "large" && (
-        <span className="ml-1 text-[11px] text-muted-foreground">Large</span>
-      )}
-    </button>
   );
 }
 
@@ -413,7 +391,6 @@ function AppContent() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <TextScaleToggle />
                 <Button variant="ghost" size="icon" asChild data-testid="button-settings">
                   <Link href="/company-settings">
                     <Settings className="h-4 w-4" />

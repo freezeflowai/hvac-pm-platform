@@ -1,0 +1,106 @@
+You are helping me refine the **Job Detail** header layout in my HVAC app.
+
+Please apply the following UI changes specifically to the **Job Detail** page (and shared layout components where applicable).
+
+Current situation (see screenshot in the workspace):
+
+- Top-left header shows: `Jobs / #10165` (Jobs is a link, #10165 is the job number).
+- Below that, the client name “Juju” is shown in a medium-size font.
+- Under the client name is the job title/summary “Makeuup install”.
+- On the top-right there is a status card with:
+  - Status, Priority, Scheduled date.
+- In the global header bar (top-right) there is still an “A A Large” font-size toggle button, but we already removed its functionality. The button should not be visible anymore.
+
+I want the following changes.
+
+------------------------------------------------
+1) MOVE JOB NUMBER INTO STATUS CARD (RIGHT SIDE)
+------------------------------------------------
+
+1. Remove the `Jobs / #xxxx` text from the Job Detail header area completely.
+
+   - That means:
+     - Do NOT show the `Jobs` link there.
+     - Do NOT show the job number (`#10165`) in that left header line.
+
+   The breadcrumb-like text circled in the screenshot should be gone on the Job page.
+
+2. In the **status card on the right** (where Status / Priority / Scheduled are shown), add the job number.
+
+   - Add a new row at the top of that card, above Status:
+
+     - Label: `Job`
+     - Value: `#<jobNumber>` (e.g. `#10165`)
+
+   - This job number in the status card does **not** need to be a link; it can be static text.
+
+   - Keep styling consistent with the existing rows (Status, Priority, Scheduled).
+
+------------------------------------------------
+2) CLIENT NAME AS MAIN TITLE + CLICKABLE LINK
+------------------------------------------------
+
+The main big text in the Job header should now be the **client name**, and it should link back to the client detail page.
+
+1. Make the **client name / company name** the main large header title on the Job Detail page.
+
+   - Use the same font size and weight that was previously used for the job title (the big “Makeuup install” text).
+   - Example:
+     - Main title: `Juju` (client name)
+
+2. Directly underneath the client name, show the **job title / summary**.
+
+   - Example:
+     - Line 1 (big): `Juju`
+     - Line 2 (smaller but still readable): `Makeuup install` (the job’s summary/name)
+
+3. Make the **client name clickable**:
+
+   - Clicking on the client name should navigate back to that client’s detail page.
+   - Use the existing routing (e.g. `/clients/:id`) and style it as a link only on hover (so it still looks like a title but is clickable).
+
+4. The address row (home icon + location + address) can stay where it is for now, just ensure it lines up visually under the job title area. No major change needed there besides keeping it readable.
+
+------------------------------------------------
+3) REMOVE FONT-SIZE TOGGLE BUTTON
+------------------------------------------------
+
+In the global header bar (top-right) there is still a font-size toggle (“A A Large”). The functionality was removed earlier, but the button is still visible.
+
+1. Remove this control entirely from the layout:
+
+   - Remove the icon/button from the header.
+   - Remove any dangling state, props, or context related to font size if they are no longer used.
+   - The app should just use the **large font scale** we standardized on previously.
+
+------------------------------------------------
+4) GENERAL NOTES
+------------------------------------------------
+
+- Be careful not to break breadcrumb behavior globally:
+  - If other pages use a shared `Breadcrumb` component that renders `Jobs / #id`, adjust it so that:
+    - On the Job Detail page specifically, we **do not** render that breadcrumb line at all.
+    - Other pages (e.g., Clients, Reports) can keep their breadcrumbs as-is.
+
+- Keep styling consistent with the existing design system:
+  - Main title: large, bold.
+  - Secondary line (job summary): slightly smaller.
+  - Status card: same spacing and fonts, just with a new “Job #” row at the top.
+
+Summary of the final desired header on Job Detail:
+
+- Left side:
+  - Big clickable client name (navigates to client detail).
+  - Under it, the job summary/title.
+  - Under that, the location/address row.
+
+- Right side card:
+  - Job: `#10165`
+  - Status: …
+  - Priority: …
+  - Scheduled: …
+
+- Global header:
+  - No “A A Large” font-size toggle present.
+
+Please update the relevant React components / layout files and any necessary routes to match this behavior.

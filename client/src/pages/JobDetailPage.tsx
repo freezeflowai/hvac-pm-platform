@@ -687,33 +687,20 @@ export default function JobDetailPage() {
 
   return (
     <div className="p-4" data-testid="job-detail-page">
-      {/* Breadcrumb */}
-      <nav className="mb-2 text-sm" data-testid="breadcrumb">
-        <ol className="flex flex-wrap items-center gap-1">
-          <li>
-            <button
-              type="button"
-              className="font-medium text-primary hover:text-primary/80 hover:underline transition-colors"
-              onClick={() => setLocation("/jobs")}
-              data-testid="breadcrumb-jobs"
-            >
-              Jobs
-            </button>
-          </li>
-          <li className="flex items-center">
-            <span className="mx-1 text-muted-foreground">/</span>
-            <span className="font-medium text-foreground">#{job.jobNumber}</span>
-          </li>
-        </ol>
-      </nav>
-
       {/* HEADER */}
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         {/* LEFT: job identity - client focused */}
         <div>
-          <h1 className="text-2xl font-semibold" data-testid="text-client-title">
-            {clientName}
-          </h1>
+          <button
+            type="button"
+            onClick={() => setLocation(`/clients/${job.locationId}`)}
+            className="text-left"
+            data-testid="link-client-title"
+          >
+            <h1 className="text-2xl font-semibold hover:text-primary transition-colors" data-testid="text-client-title">
+              {clientName}
+            </h1>
+          </button>
 
           {job.summary && (
             <p className="mt-0.5 text-base text-muted-foreground" data-testid="text-job-summary">
@@ -767,6 +754,12 @@ export default function JobDetailPage() {
 
         {/* RIGHT: status / priority panel */}
         <div className="rounded-2xl border bg-card px-4 py-3 text-xs shadow-sm min-w-[220px]">
+          {/* Job number row */}
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="font-medium">Job</span>
+            <span className="font-semibold text-foreground" data-testid="text-job-number">#{job.jobNumber}</span>
+          </div>
+
           {/* Status row */}
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="font-medium">Status</span>
