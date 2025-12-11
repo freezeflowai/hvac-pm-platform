@@ -1236,6 +1236,7 @@ export const jobTemplates = pgTable("job_templates", {
 
 export const insertJobTemplateSchema = createInsertSchema(jobTemplates).omit({
   id: true,
+  companyId: true,
   createdAt: true,
   updatedAt: true,
 }).extend({
