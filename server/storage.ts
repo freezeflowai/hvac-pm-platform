@@ -1919,13 +1919,20 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const jobNumber = await this.getNextJobNumber(companyId);
     const now = new Date();
+    
+    // If primaryTechnicianId is set but assignedTechnicianIds is not, include primary in assigned list
+    let assignedTechnicianIds = data.assignedTechnicianIds || null;
+    if (data.primaryTechnicianId && (!assignedTechnicianIds || assignedTechnicianIds.length === 0)) {
+      assignedTechnicianIds = [data.primaryTechnicianId];
+    }
+    
     const newJob: Job = {
       id,
       companyId,
       jobNumber,
       locationId: data.locationId,
       primaryTechnicianId: data.primaryTechnicianId || null,
-      assignedTechnicianIds: data.assignedTechnicianIds || null,
+      assignedTechnicianIds,
       status: data.status || 'draft',
       priority: data.priority || 'medium',
       jobType: data.jobType || 'maintenance',
@@ -4797,12 +4804,19 @@ export class DbStorage implements IStorage {
 
   async createJob(companyId: string, data: InsertJob): Promise<Job> {
     const jobNumber = await this.getNextJobNumber(companyId);
+    
+    // If primaryTechnicianId is set but assignedTechnicianIds is not, include primary in assigned list
+    let assignedTechnicianIds = data.assignedTechnicianIds || null;
+    if (data.primaryTechnicianId && (!assignedTechnicianIds || assignedTechnicianIds.length === 0)) {
+      assignedTechnicianIds = [data.primaryTechnicianId];
+    }
+    
     const result = await db.insert(jobs).values({
       companyId,
       jobNumber,
       locationId: data.locationId,
       primaryTechnicianId: data.primaryTechnicianId || null,
-      assignedTechnicianIds: data.assignedTechnicianIds || null,
+      assignedTechnicianIds,
       status: data.status || 'draft',
       priority: data.priority || 'medium',
       jobType: data.jobType || 'maintenance',
