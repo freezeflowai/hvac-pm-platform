@@ -1,0 +1,261 @@
+You are helping me add **Job Templates** to my HVAC dispatch app so that certain jobs (service calls, PMs, installs) automatically get default line items like labor, truck charge, PM fee, etc.
+
+Important existing pieces:
+
+- Items (products & services) with pricing:
+  - Each item has id, name, type, unitPrice, etc.
+- Jobs:
+  - Job entity with jobType (e.g. "service_call", "pm", "install", "repair").
+  - JobParts (or equivalent) for line items on a job (linking to Item + quantity + price).
+- PM system:
+  - LocationPMPartTemplate: per-location parts that should be added to PM jobs.
+- Parts & Billing card on Job Detail:
+  - Shows parts count and invoice status, with an “Add Parts” button.
+
+Use the existing stack (TypeScript, Express, Zod, storage.ts, etc.). Do NOT add new frameworks.
+
+The goal:
+
+1. Introduce **JobTemplate** and **JobTemplateLineItem** models.
+2. Add API + storage for job templates.
+3. Add UI so that on a job we can **apply a template** via dropdown.
+4. Wire PM job generation so PM templates + location PM parts auto-populate job parts.
+
+------------------------------------------------
+A) DATA MODEL – JOB TEMPLATES
+------------------------------------------------
+
+Create two new entities:
+
+### 1) JobTemplate
+
+Fields:
+
+- id (PK)
+- name (string, required)            // e.g. "Service Call - Standard"
+- jobType (string | nullable)        // optional: "service_call", "pm", etc. for filtering/suggesting
+- description (string | nullable)
+- isDefaultForJobType (boolean, default false)  // if true, this is the default template for that jobType
+- isActive (boolean, default true)
+- createdAt, updatedAt
+
+Constraints / behavior:
+
+- For a given jobType, at most ONE template should have isDefaultForJobType = true.
+  - Enforce either in DB or in validation logic (e.g., when setting a template as default, unset others for that jobType).
+
+### 2) JobTemplateLineItem
+
+Represents one line item included in this template.
+
+Fields:
+
+- id (PK)
+- templateId (FK → JobTemplate.id)
+- itemId (FK → Item.id)    // references products/services table
+- descriptionOverride (string | nullable)
+- quantity (decimal, required; default 1)
+- unitPriceOverride (decimal | nullable) // if null, use Item.unitPrice
+- sortOrder (int, default 0)             // to control ordering on job
+
+On application:
+
+- For each line, we will create a JobPart.
+
+------------------------------------------------
+B) STORAGE LAYER – JOB TEMPLATES
+------------------------------------------------
+
+In `storage.ts`, add:
+
+- `jobTemplates` namespace with methods:
+  - `list(filter?: { jobType?: string; activeOnly?: boolean })`
+  - `getById(id: string)`
+  - `createTemplate(input: JobTemplateCreateInput, lines: JobTemplateLineItemInput[])`
+  - `updateTemplate(id: string, input: JobTemplateUpdateInput, lines?: JobTemplateLineItemInput[])`
+  - `setDefaultForJobType(id: string, jobType: string)`  // ensures only one default per jobType
+  - `listLinesForTemplate(templateId: string)`
+
+- `jobs.applyTemplateToJob(jobId: string, templateId: string)`:
+  - Fetch template + lines.
+  - Fetch job.
+  - Verify job exists.
+  - For each template line:
+    - Resolve item from Items table.
+    - Compute unitPrice:
+      - `unitPrice = line.unitPriceOverride ?? item.unitPrice`
+    - Create JobPart:
+      - jobId
+      - itemId
+      - description = line.descriptionOverride ?? item.description ?? item.name
+      - quantity = line.quantity
+      - unitPrice
+  - To keep it simple, if there are already JobParts for this job, still allow applying the template; but add comments that we may want to block duplicate template applications later.
+
+Export all relevant types.
+
+------------------------------------------------
+C) API – JOB TEMPLATES & APPLYING TEMPLATE
+------------------------------------------------
+
+1. Create routes in `routes/jobTemplates.ts` (or under /api/admin/job-templates, whatever matches your pattern).
+
+Endpoints:
+
+- `GET /api/job-templates`
+  - Query params:
+    - jobType (optional)
+    - activeOnly (optional)
+  - Returns list of JobTemplates with basic info (id, name, jobType, isDefaultForJobType, isActive).
+
+- `GET /api/job-templates/:id`
+  - Returns template info + its line items.
+
+- `POST /api/job-templates`
+  - Create new template + its line items.
+  - Payload:
+
+    {
+      name: string,
+      jobType?: string,
+      description?: string,
+      isDefaultForJobType?: boolean,
+      isActive?: boolean,
+      lines: Array<{
+        itemId: string,
+        descriptionOverride?: string,
+        quantity: number,
+        unitPriceOverride?: number,
+        sortOrder?: number
+      }>
+    }
+
+  - If isDefaultForJobType is true and jobType is provided, call `setDefaultForJobType`.
+
+- `PUT /api/job-templates/:id`
+  - Update template metadata and optionally replace line items (simple approach: delete existing lines and re-insert from payload).
+  - Same payload shape as POST.
+
+- `PATCH /api/job-templates/:id/default`
+  - Sets this template as default for a given jobType (payload `{ jobType: string }`).
+
+2. Create route for applying template to an existing job:
+
+- `POST /api/jobs/:jobId/apply-template`
+  - Payload: `{ templateId: string }`
+  - Flow:
+    - Validate payload with Zod.
+    - Load job.
+    - Call `jobTemplates.applyTemplateToJob(jobId, templateId)`.
+    - Return updated job or updated job parts (decide based on current API patterns).
+
+------------------------------------------------
+D) UI – APPLY TEMPLATE ON JOB PAGE
+------------------------------------------------
+
+On the **Job Detail** page, within the **Parts & Billing** card:
+
+- Add a section at the top:
+
+  Label: “Job Template”
+  Control: dropdown/select with:
+
+  - Placeholder: “Apply template…”
+  - Options:
+    - If jobType is set:
+      - List default template for that jobType first (if one exists), and other templates with that jobType.
+      - Then “Other templates” group with templates whose jobType is null or different.
+    - If jobType is not set:
+      - List all active templates.
+
+- When user selects a template and confirms:
+  - Call `POST /api/jobs/:jobId/apply-template`.
+  - After success:
+    - Refresh the JobParts/Parts & Billing section.
+    - Optionally show a toast: “Template ‘Service Call – Standard’ applied.”
+
+- To avoid accidental duplicates:
+  - In the first iteration, we can either:
+    - Allow multiple applications and trust the user, OR
+    - If there are *zero* JobParts, apply silently; if there are existing parts, show a confirmation “This will add more line items. Continue?”.
+
+Job Create flow:
+
+- If there is a default JobTemplate for that jobType:
+  - After job creation, automatically call apply-template for that default template IF:
+    - No JobParts exist yet for that job.
+  - This can be done in backend when creating the job, or in frontend after the create call.
+  - Add comments in code to make the behavior clear.
+
+------------------------------------------------
+E) PM JOB GENERATION INTEGRATION
+------------------------------------------------
+
+Update the PM job generation logic (where we already use `LocationPMPlan` and `LocationPMPartTemplate`) as follows:
+
+1. When generating a PM job for a location:
+
+   - Determine jobType: e.g. "pm".
+   - If there is a default JobTemplate for jobType "pm":
+     - Call `applyTemplateToJob(jobId, pmTemplateId)` to add the PM service charge line items.
+
+2. Then, for that location, use `LocationPMPartTemplate`:
+
+   - For each PM part template row:
+     - Create JobPart with:
+       - jobId
+       - itemId = template.productId
+       - quantity = template.quantityPerVisit
+       - description = template.descriptionOverride or item.description
+       - unitPrice = item.unitPrice (or an override if you have that logic)
+       - equipmentId = template.equipmentId (if present)
+
+So PM jobs will end up with:
+
+- PM service line item(s) from the JobTemplate.
+- All location-specific parts from LocationPMPartTemplate.
+
+------------------------------------------------
+F) ZOD SCHEMAS & TYPES
+------------------------------------------------
+
+Use Zod to define the new payloads:
+
+- `jobTemplateCreateSchema`
+- `jobTemplateUpdateSchema`
+- `jobTemplateApplySchema` (for `{ templateId }`)
+
+Include basic validation:
+
+- name: non-empty string
+- lines: at least one line
+- quantity: positive number
+- unitPriceOverride: non-negative number if present
+
+Use numeric coercion for quantity and unitPriceOverride so form fields that send strings are parsed correctly.
+
+------------------------------------------------
+WHAT TO DELIVER
+------------------------------------------------
+
+1. DB/ORM models/migrations for:
+   - JobTemplate
+   - JobTemplateLineItem
+
+2. Storage layer additions:
+   - jobTemplates namespace with CRUD + applyTemplateToJob.
+   - Any changes needed in jobs PM generation function to call templates + LocationPMPartTemplate.
+
+3. API endpoints:
+   - /api/job-templates (GET, POST)
+   - /api/job-templates/:id (GET, PUT)
+   - /api/job-templates/:id/default (PATCH)
+   - /api/jobs/:jobId/apply-template (POST)
+
+4. UI changes:
+   - Job Detail → Parts & Billing card:
+     - Add “Apply template…” dropdown.
+     - Wire to /api/job-templates (list) and /api/jobs/:jobId/apply-template (apply).
+   - Optionally, a simple Job Templates management screen under Admin.
+
+Make sure naming, error handling, and styling remain consistent with the rest of the codebase.

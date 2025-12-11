@@ -1215,3 +1215,102 @@ export const updateWorkingHoursSchema = z.object({
 export type InsertWorkingHours = z.infer<typeof insertWorkingHoursSchema>;
 export type UpdateWorkingHours = z.infer<typeof updateWorkingHoursSchema>;
 export type WorkingHours = typeof workingHours.$inferSelect;
+
+// ============================================================================
+// JOB TEMPLATES - Reusable templates for populating job line items
+// ============================================================================
+// Allows defining default line items for different job types (service call, PM, install, etc.)
+// When a job template is applied, its line items are copied to JobParts.
+
+export const jobTemplates = pgTable("job_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  jobType: text("job_type"), // Optional: "service_call", "pm", "install", "repair", etc.
+  description: text("description"),
+  isDefaultForJobType: boolean("is_default_for_job_type").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertJobTemplateSchema = createInsertSchema(jobTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  name: z.string().min(1, "Name is required"),
+});
+
+export const updateJobTemplateSchema = z.object({
+  name: z.string().min(1).optional(),
+  jobType: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  isDefaultForJobType: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type InsertJobTemplate = z.infer<typeof insertJobTemplateSchema>;
+export type UpdateJobTemplate = z.infer<typeof updateJobTemplateSchema>;
+export type JobTemplate = typeof jobTemplates.$inferSelect;
+
+// Job Template Line Items - individual line items within a template
+export const jobTemplateLineItems = pgTable("job_template_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").notNull().references(() => jobTemplates.id, { onDelete: "cascade" }),
+  productId: varchar("product_id").notNull().references(() => parts.id, { onDelete: "cascade" }),
+  descriptionOverride: text("description_override"),
+  quantity: text("quantity").notNull().default("1"), // Stored as text for decimal precision
+  unitPriceOverride: text("unit_price_override"), // If null, use product.unitPrice
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertJobTemplateLineItemSchema = createInsertSchema(jobTemplateLineItems).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  quantity: z.union([z.string(), z.number()]).transform(val => String(val)),
+  unitPriceOverride: z.union([z.string(), z.number(), z.null()]).optional().transform(val => 
+    val === null || val === undefined ? null : String(val)
+  ),
+  sortOrder: z.union([z.string(), z.number()]).optional().transform(val => 
+    val === undefined ? 0 : Number(val)
+  ),
+});
+
+export const updateJobTemplateLineItemSchema = z.object({
+  productId: z.string().optional(),
+  descriptionOverride: z.string().nullable().optional(),
+  quantity: z.union([z.string(), z.number()]).optional().transform(val => 
+    val === undefined ? undefined : String(val)
+  ),
+  unitPriceOverride: z.union([z.string(), z.number(), z.null()]).optional().transform(val => 
+    val === null ? null : val === undefined ? undefined : String(val)
+  ),
+  sortOrder: z.union([z.string(), z.number()]).optional().transform(val => 
+    val === undefined ? undefined : Number(val)
+  ),
+});
+
+export type InsertJobTemplateLineItem = z.infer<typeof insertJobTemplateLineItemSchema>;
+export type UpdateJobTemplateLineItem = z.infer<typeof updateJobTemplateLineItemSchema>;
+export type JobTemplateLineItem = typeof jobTemplateLineItems.$inferSelect;
+
+// Schema for creating a template with its line items in one call
+export const jobTemplateWithLinesSchema = insertJobTemplateSchema.extend({
+  lines: z.array(z.object({
+    productId: z.string(),
+    descriptionOverride: z.string().nullable().optional(),
+    quantity: z.union([z.string(), z.number()]).default("1"),
+    unitPriceOverride: z.union([z.string(), z.number(), z.null()]).optional(),
+    sortOrder: z.number().optional().default(0),
+  })).min(1, "At least one line item is required"),
+});
+
+export type JobTemplateWithLines = z.infer<typeof jobTemplateWithLinesSchema>;
+
+// Schema for applying a template to a job
+export const applyJobTemplateSchema = z.object({
+  templateId: z.string().min(1, "Template ID is required"),
+});
