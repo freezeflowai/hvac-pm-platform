@@ -1,0 +1,235 @@
+You are helping me refine the **Job Templates** feature in my HVAC dispatch app.
+
+Context (current state):
+
+- There is a Settings → Job Templates screen that:
+  - Shows an empty state when no templates exist.
+  - Has a job type filter dropdown with values: All Types, Service Call, PM, Install, Repair, Inspection.
+  - Has a “New Template” button that opens a “New Job Template” modal.
+
+- The “New Job Template” modal includes:
+  - Fields:
+    - Name (required)
+    - Description
+    - Job Type dropdown with: None, Service Call, PM, Install, Repair, Inspection
+    - Active checkbox
+  - A line items table with columns:
+    - Product / Service (dropdown)
+    - Description Override
+    - Qty
+    - Unit Price
+    - Delete row
+  - A drag handle column on the left for row reordering.
+
+- On the backend we have:
+  - JobTemplate and JobTemplateLineItem entities as previously defined.
+  - Items (products/services) API for populating the Product / Service dropdown.
+  - JobTemplates API for create/update/list/deactivate, etc. (or at least basic CRUD already wired up).
+
+I want you to refine both the **UI and behavior** with the following improvements.
+
+------------------------------------------------
+1) JOB TYPE – ADD “OTHER”
+------------------------------------------------
+
+Update the job type enum / options used in:
+
+- The job type filter on the Job Templates list page.
+- The Job Type dropdown inside the “New / Edit Job Template” modal.
+
+Changes:
+
+1. Append an **“Other”** option to the predefined types.
+
+So the options should be:
+
+- For filter:
+  - All Types
+  - Service Call
+  - PM
+  - Install
+  - Repair
+  - Inspection
+  - Other
+
+- For template Job Type selection:
+  - None
+  - Service Call
+  - PM
+  - Install
+  - Repair
+  - Inspection
+  - Other
+
+On the backend, store jobType as a string (e.g. "service_call", "pm", "install", "repair", "inspection", "other") or keep whatever mapping you currently use, but make sure “Other” is supported end-to-end.
+
+------------------------------------------------
+2) TEMPLATE LIST – ACTIONS & ACTIVE STATUS
+------------------------------------------------
+
+On the Job Templates main list:
+
+- For each template row/card, add:
+  - A **Status** indicator: “Active” or “Inactive” (pill or subtle label).
+  - An **Actions** menu (3-dot or icon row) with:
+    - Edit
+    - Activate / Deactivate (toggle based on current isActive)
+    - Duplicate (Clone)
+    - Delete (optional hard delete; show confirm modal)
+
+Behavior:
+
+- **Activate / Deactivate**
+  - Calls the existing update endpoint (e.g. PUT /api/job-templates/:id) with `isActive` toggled.
+  - The “Show inactive” toggle in the header should:
+    - When off: hide inactive templates.
+    - When on: show both active and inactive.
+
+- **Delete**
+  - If hard delete exists:
+    - Show a confirm dialog: “Delete this template permanently? This cannot be undone.”
+    - On confirm, call DELETE /api/job-templates/:id (or equivalent).
+  - If only soft-delete is supported, you can omit hard delete or simply wire Delete to set isActive = false with appropriate wording (“Deactivate”).
+
+- **Duplicate**
+  - Calls a new API or reuses existing one to clone:
+    - JobTemplate fields (except id and timestamps).
+    - All JobTemplateLineItems.
+  - Suggested behavior:
+    - Name: original name + " (Copy)" by default.
+    - New template is created as Active.
+  - After cloning:
+    - Either:
+      - Open the cloned template in the edit modal, OR
+      - Leave user on the list and show a toast “Template duplicated.”
+  - Implement the clone either:
+    - Via a dedicated endpoint (e.g. POST /api/job-templates/:id/clone), OR
+    - In the frontend by fetching the template and posting a new one (your choice, just keep it consistent with the rest of the app).
+
+------------------------------------------------
+3) LINE ITEMS – SEARCHABLE PRODUCT / SERVICE SELECT
+------------------------------------------------
+
+Currently, the “Product / Service” field is a simple dropdown. Change it into a **searchable combobox** with type-ahead and keyboard support.
+
+Requirements:
+
+- User should be able to **type** into the input to filter products/services.
+- For large item catalogs:
+  - Only load or show options after the user has typed at least 2 characters.
+  - Use server-side filtering via the existing `/api/items` endpoint, e.g. `/api/items?search=...`.
+- Show results with:
+  - Item name
+  - Optionally SKU in muted text
+- Support:
+  - Arrow key navigation
+  - Enter to select
+
+When an item is selected:
+
+- The row should store the `itemId`.
+- If Unit Price is currently empty:
+  - Prefill Unit Price with the item’s default unitPrice.
+- Optionally, store the item’s default description so we can use it if the description field is left blank.
+
+Make sure the component still integrates cleanly into the line items table and works with row add/remove/reorder.
+
+------------------------------------------------
+4) LINE ITEMS – DESCRIPTION FIELD LABEL & HINT
+------------------------------------------------
+
+The column currently labeled **“Description Override”** is confusing.
+
+Change:
+
+- Column header text to **“Description”**.
+- Under the field (or via tooltip), show a hint:
+
+  - “If left blank, the product’s default description will be used.”
+
+Backend logic:
+
+- Keep the field name as `descriptionOverride` internally if that’s already in the model.
+- On application of a template to a job:
+  - If descriptionOverride is non-empty, use that.
+  - Else, use item.description or item.name.
+
+So the UI reads as a normal “Description” field, but still behaves as an override.
+
+------------------------------------------------
+5) TEMPLATE DETAILS – DEFAULT FOR JOB TYPE (OPTIONAL BUT RECOMMENDED)
+------------------------------------------------
+
+Add a checkbox in the Template Details section:
+
+- Label: **“Use as default template for this job type”**
+- Only enable it when a specific Job Type (not None) is selected.
+
+Behavior:
+
+- When checked and template is saved:
+  - Backend should ensure this template becomes the **only** default for that jobType.
+  - This can be done by:
+    - A dedicated endpoint (PATCH /api/job-templates/:id/default) or
+    - Logic inside POST/PUT to clear isDefaultForJobType on other templates with same jobType.
+
+- On the Job Templates list:
+  - Show a small “Default” tag/pill next to templates that are default for their jobType.
+
+Note: if there is already logic for defaults, just wire this checkbox into it.
+
+------------------------------------------------
+6) LINE ITEM QUALITY-OF-LIFE
+------------------------------------------------
+
+Make these small adjustments for better UX:
+
+- When the user clicks **Add Line Item**:
+  - Create a new row with:
+    - Qty = 1 by default.
+    - Product / Service = empty.
+    - Description = empty.
+    - Unit Price = empty (but should be populated when an item is selected).
+
+- Ensure drag-and-drop reordering of rows updates the underlying `sortOrder` (or equivalent). The final order in the editor should match the order applied to jobs and invoices.
+
+------------------------------------------------
+7) VALIDATION & WIRING
+------------------------------------------------
+
+- Ensure creating/updating templates:
+  - Validates that Name is not empty.
+  - Validates that there is at least **one line item**, and that each line item has:
+    - itemId
+    - quantity > 0
+- Ensure that:
+  - The list respects the job type filter.
+  - “Show inactive” toggle works and default is to show only active templates.
+
+------------------------------------------------
+WHAT TO DELIVER
+------------------------------------------------
+
+1. Updated Job Template list page:
+   - Shows status (Active/Inactive).
+   - Has actions: Edit, Activate/Deactivate, Duplicate, Delete (if supported).
+   - Supports filter by jobType including an “Other” option.
+   - “Show inactive” toggle works.
+
+2. Updated New/Edit Job Template modal:
+   - Job Type includes “Other”.
+   - Optional “Default for this job type” checkbox wired to default logic.
+   - Line Items table:
+     - Product / Service is a searchable combobox that queries the Items API.
+     - Description column is renamed from “Description Override” and has a hint that blank uses the product’s default description.
+     - Qty defaults to 1 for new rows.
+     - Unit Price auto-fills from the selected product when empty.
+
+3. Any necessary backend changes:
+   - Endpoints or service methods to:
+     - Toggle isActive.
+     - Clone a template.
+     - Mark a template as default for its jobType (and unset others).
+   - Ensure descriptionOverride and unitPriceOverride still behave correctly when applying templates to jobs.
+
+Keep all code and styling consistent with the existing project conventions.

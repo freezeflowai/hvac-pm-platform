@@ -27,7 +27,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Pencil, Star, Power, Loader2, ArrowLeft, FileText } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Star, Power, Loader2, ArrowLeft, FileText, Copy, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import type { JobTemplate } from "@shared/schema";
@@ -40,6 +50,7 @@ const JOB_TYPE_OPTIONS = [
   { value: "install", label: "Install" },
   { value: "repair", label: "Repair" },
   { value: "inspection", label: "Inspection" },
+  { value: "other", label: "Other" },
 ];
 
 function getJobTypeLabel(jobType: string | null): string {
@@ -54,6 +65,8 @@ export default function JobTemplatesPage() {
   const [showInactive, setShowInactive] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<JobTemplate | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<JobTemplate | null>(null);
 
   const { data: templates = [], isLoading } = useQuery<JobTemplate[]>({
     queryKey: ["/api/job-templates", { jobType: jobTypeFilter, activeOnly: !showInactive }],
@@ -121,6 +134,63 @@ export default function JobTemplatesPage() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const cloneMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/job-templates/${id}/clone`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || "Failed to duplicate template");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/job-templates"] });
+      toast({ title: "Template duplicated", description: "A copy of the template has been created." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/job-templates/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || "Failed to delete template");
+      }
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/job-templates"] });
+      toast({ title: "Template deleted", description: "The template has been permanently removed." });
+      setDeleteConfirmOpen(false);
+      setTemplateToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleDeleteClick = (template: JobTemplate, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTemplateToDelete(template);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (templateToDelete) {
+      deleteMutation.mutate(templateToDelete.id);
+    }
+  };
 
   const handleEdit = (template: JobTemplate) => {
     setEditingTemplate(template);
@@ -291,6 +361,24 @@ export default function JobTemplatesPage() {
                             <Power className="h-4 w-4 mr-2" />
                             {template.isActive ? "Deactivate" : "Activate"}
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              cloneMutation.mutate(template.id);
+                            }}
+                            data-testid={`action-duplicate-${template.id}`}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Duplicate
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => handleDeleteClick(template, e)}
+                            className="text-destructive focus:text-destructive"
+                            data-testid={`action-delete-${template.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -307,6 +395,30 @@ export default function JobTemplatesPage() {
         onClose={handleModalClose}
         template={editingTemplate}
       />
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Template</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete "{templateToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

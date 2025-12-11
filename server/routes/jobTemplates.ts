@@ -187,4 +187,24 @@ router.get('/default/:jobType', async (req, res) => {
   }
 });
 
+router.post('/:id/clone', async (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (!user?.companyId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const clonedTemplate = await storage.cloneJobTemplate(user.companyId, req.params.id);
+    if (!clonedTemplate) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    const lines = await storage.getJobTemplateLineItems(clonedTemplate.id);
+    return res.status(201).json({ ...clonedTemplate, lines });
+  } catch (error: any) {
+    console.error('Error cloning job template:', error);
+    return res.status(500).json({ error: error.message || 'Failed to clone job template' });
+  }
+});
+
 export default router;

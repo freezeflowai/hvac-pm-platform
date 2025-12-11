@@ -378,6 +378,7 @@ export interface IStorage {
   setJobTemplateAsDefault(companyId: string, id: string, jobType: string): Promise<JobTemplate | undefined>;
   getDefaultJobTemplateForJobType(companyId: string, jobType: string): Promise<JobTemplate | undefined>;
   applyJobTemplateToJob(companyId: string, jobId: string, templateId: string): Promise<JobPart[]>;
+  cloneJobTemplate(companyId: string, id: string): Promise<JobTemplate | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -5682,6 +5683,31 @@ export class DbStorage implements IStorage {
     }
 
     return createdParts;
+  }
+
+  async cloneJobTemplate(companyId: string, id: string): Promise<JobTemplate | undefined> {
+    const original = await this.getJobTemplate(companyId, id);
+    if (!original) return undefined;
+
+    const lines = await this.getJobTemplateLineItems(id);
+
+    const clonedData = {
+      name: `${original.name} (Copy)`,
+      jobType: original.jobType ?? null,
+      description: original.description ?? null,
+      isDefaultForJobType: false,
+      isActive: true,
+    };
+
+    const clonedLines = lines.map((line, index) => ({
+      productId: line.productId,
+      descriptionOverride: line.descriptionOverride ?? null,
+      quantity: line.quantity ?? '1',
+      unitPriceOverride: line.unitPriceOverride ?? null,
+      sortOrder: line.sortOrder ?? index,
+    }));
+
+    return this.createJobTemplate(companyId, clonedData, clonedLines);
   }
 }
 

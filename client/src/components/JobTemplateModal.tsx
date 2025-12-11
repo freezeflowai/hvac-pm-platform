@@ -54,6 +54,7 @@ const JOB_TYPE_OPTIONS = [
   { value: "install", label: "Install" },
   { value: "repair", label: "Repair" },
   { value: "inspection", label: "Inspection" },
+  { value: "other", label: "Other" },
 ];
 
 export function JobTemplateModal({ open, onClose, template }: JobTemplateModalProps) {
