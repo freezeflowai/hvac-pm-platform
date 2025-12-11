@@ -1,0 +1,199 @@
+You are helping me refine the Jobs and Invoices flows in my HVAC web app.
+
+Please implement the following changes affecting BOTH the Job Detail page and the Invoice Detail page.
+
+================================================
+1) JOB DETAIL: MOVE INVOICE INFO INTO HEADER CARD
+================================================
+
+Current state:
+
+- On the Job Detail page, there is a right-hand sidebar card labeled “Invoices” that shows invoices linked to this job.
+- The main header card at the top shows:
+  - Job (job number)
+  - Status
+  - Priority
+  - Scheduled
+
+Change:
+
+1. In the Job header card (the top-right meta section that currently shows Job/Status/Priority/Scheduled):
+
+   - Directly under the “Job” row (job number), add a new row:
+
+     - Label: `Invoice`
+     - Value:
+       - If the job has an associated invoice:
+         - Show the invoice number, e.g. `INV-11164`
+         - This value should be a **clickable link** that navigates to the Invoice Detail page.
+       - If the job has no invoice:
+         - Show text such as `Not invoiced yet` or `N/A`.
+
+2. Remove the **Invoices card** from the right-hand side of the Job page (the sidebar card that currently lists invoices). Once the invoice info is in the header, that sidebar card is no longer needed.
+
+================================================
+2) INVOICE DETAIL: LINK BACK TO JOB + CLEAN HEADER
+================================================
+
+Current state:
+
+- Invoice Detail page has a “Back to Invoices” button at the top.
+- The invoice header shows the invoice number and status, and somewhere else there is a Job link (or none at all).
+
+Changes:
+
+1. Remove the “Back to Invoices” button at the top of the Invoice Detail page. We will rely on sidebar navigation or browser back instead.
+
+2. Under the invoice number in the header (e.g. `INV-11164`), add a row for the related job:
+
+   - Label: `Job`
+   - Value: `#<jobNumber>` (e.g. `#10165`)
+   - The job number should be a **clickable link** that navigates back to the Job Detail page.
+
+   Implementation notes:
+   - If an invoice is not associated with any job, show `N/A` or omit the row.
+
+================================================
+3) JOB DESCRIPTION → INVOICE DESCRIPTION
+================================================
+
+Goal: The full Job Description (work performed) should carry over to the invoice.
+
+1. When an invoice is created from a job (either via the Job page “Create Invoice” or the Close Job flow):
+
+   - Copy the **Job Description** field from the job into the invoice as its description / work performed.
+   - If the invoice model already has a `description` or `workDescription` field, use that.
+   - Ensure the full text (multi-line) is preserved.
+
+2. The invoice’s description should be visible on the Invoice Detail page where appropriate (e.g., in a “Work Performed” / “Description” section) and should be included when rendering the invoice for PDF/print.
+
+================================================
+4) JOB STATUS WHEN INVOICE IS COMPLETED
+================================================
+
+Current issue:
+
+- When we finish an invoice and close it, the associated job remains only as “Completed” instead of “Closed & Invoiced”.
+
+Change:
+
+1. When an invoice transitions to a “final” state (e.g., status changes to `Sent`, `Completed`, or `Paid`, depending on the existing model):
+
+   - Update the related job’s status to a combination meaning it is finished and invoiced.
+   - For example, use a status key like `closed_invoiced` or re-use an existing “Invoiced” terminal status.
+
+2. This logic should only run if the invoice is linked to a job.
+
+3. Make sure the Job Detail page reflects this updated status in its Status dropdown / badge.
+
+================================================
+5) REORDERABLE LINE ITEMS ON INVOICE PAGE
+================================================
+
+Current state:
+
+- On the Job Detail page, Parts & Billing line items can be rearranged via drag-and-drop.
+- On the Invoice Detail page, line items currently appear in fixed order.
+
+Change:
+
+1. Implement **drag-and-drop reordering** for invoice line items, similar to Jobs:
+
+   - Add a drag handle column to each invoice line item row.
+   - Use the same drag-and-drop mechanism as for Job line items (same library and patterns).
+
+2. Ensure invoice line items have a persistent `sortOrder` (or similar) field stored in the database:
+
+   - On drop, update the `sortOrder` for each line item via a reorder endpoint.
+   - Always fetch and render invoice line items ordered by `sortOrder`.
+
+3. The printed/PDF version of the invoice should reflect this new order.
+
+================================================
+6) NOTES: SHARED INTERNAL NOTES BETWEEN JOB & INVOICE
+================================================
+
+Current state:
+
+- Job Detail has a Notes card on the right-hand side.
+- Invoice Detail has a Public Notes / Internal Notes section on the right.
+- Notes do not currently sync/carry over.
+
+Desired behavior:
+
+1. Treat these as **internal notes**, not visible to clients.
+
+2. Implement a shared internal notes model between a job and its invoice:
+
+   - If an invoice is linked to a job:
+     - The Internal Notes displayed on the Invoice page should be the same notes as the Job’s internal notes.
+     - Updating notes from either page should update the same underlying record.
+
+3. UI changes:
+
+   - On both Job and Invoice pages, label these appropriately as **Internal Notes** (if not already).
+   - Make it clear that these are not shown on customer-facing PDFs/emails.
+
+   Implementation options:
+   - EITHER store notes on the job only and have the invoice view read/write job.notes when linked.
+   - OR have a shared notes entity keyed by jobId and invoiceId and always fetch/update the same one.
+
+================================================
+7) INVOICE PAGE: CLIENT MESSAGE SECTION (CLIENT-FACING)
+================================================
+
+Goal: Add a place to write a message specifically for the client on the invoice, separate from internal notes and job description.
+
+1. On the Invoice Detail page, add a **“Client Message”** section near the bottom (below the line items and totals).
+
+   - This is a multiline text field, stored on the invoice (e.g. `clientMessage`).
+   - This text is **visible to the client**:
+     - It should appear on the invoice PDF and any customer-facing emails.
+
+2. Make sure this “Client Message” is clearly separate from internal notes and from the job description.
+
+================================================
+8) JOB DESCRIPTION CARD SHOULD BE MINIMIZABLE
+================================================
+
+Current state:
+
+- Job Detail page has a Job Description card with potentially long text and an Edit button.
+- It is always fully expanded.
+
+Change:
+
+1. Make the Job Description card **collapsible**:
+
+   - Header row with:
+     - Chevron icon (down/up).
+     - Label: “Job Description”.
+   - Clicking the header toggles collapsed/expanded state.
+
+2. When collapsed:
+
+   - Hide the body text contents.
+   - Keep the header visible with the collapse/expand icon.
+
+3. Remember the collapsed/expanded state per session (optionally in local state; persistence across sessions is optional).
+
+================================================
+SUMMARY OF WHAT TO DELIVER
+================================================
+
+1. Job Detail:
+   - Header card includes `Invoice` row with clickable invoice number or “Not invoiced yet”.
+   - Invoices sidebar card removed.
+   - Job Description card collapsible.
+   - Notes card represents internal notes shared with linked invoice.
+   - When invoice is finalized, job status updated to a “closed/invoiced” state.
+
+2. Invoice Detail:
+   - Remove “Back to Invoices” button.
+   - Under invoice number, show `Job #xxxx` row with a clickable link to the Job Detail page.
+   - Job Description from the job is copied over when invoice is created and displayed appropriately.
+   - Invoice line items are reorderable with drag-and-drop and persist sortOrder.
+   - Internal Notes section is synced with the associated job’s notes when linked.
+   - Add a “Client Message” section at the bottom; visible in PDF/customer-facing outputs.
+
+3. Keep styling consistent with existing cards, tables, and typography.

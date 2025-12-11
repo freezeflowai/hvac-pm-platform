@@ -557,6 +557,10 @@ export const invoices = pgTable("invoices", {
   // Notes
   notesInternal: text("notes_internal"), // Not sent to QBO
   notesCustomer: text("notes_customer"), // Maps to QBO CustomerMemo
+  // Work description (copied from job description when invoice created from job)
+  workDescription: text("work_description"), // Full job description / work performed
+  // Client message (customer-facing message for invoice PDF/email)
+  clientMessage: text("client_message"), // Customer-facing message
   // QBO sync fields
   qboInvoiceId: text("qbo_invoice_id"), // QBO Invoice.Id
   qboSyncToken: text("qbo_sync_token"), // QBO Invoice.SyncToken (required for updates)
@@ -597,6 +601,8 @@ export const updateInvoiceSchema = z.object({
   viewedAt: z.date().nullable().optional(),
   notesInternal: z.string().nullable().optional(),
   notesCustomer: z.string().nullable().optional(),
+  workDescription: z.string().nullable().optional(),
+  clientMessage: z.string().nullable().optional(),
   qboInvoiceId: z.string().nullable().optional(),
   qboSyncToken: z.string().nullable().optional(),
   qboLastSyncedAt: z.date().nullable().optional(),
