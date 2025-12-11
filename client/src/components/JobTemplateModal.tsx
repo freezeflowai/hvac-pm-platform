@@ -93,31 +93,41 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
     enabled: open && !!template?.id,
   });
 
+  const [isFormReady, setIsFormReady] = useState(false);
+
   useEffect(() => {
     if (open) {
-      if (template && templateDetails) {
-        setName(templateDetails.name);
-        setJobType(templateDetails.jobType || "");
-        setDescription(templateDetails.description || "");
-        setIsDefaultForJobType(templateDetails.isDefaultForJobType);
-        setIsActive(templateDetails.isActive);
-        setLineItems(
-          (templateDetails.lines || []).map((line: any, index: number) => ({
-            id: line.id || `line_${index}`,
-            productId: line.productId || "",
-            descriptionOverride: line.descriptionOverride || "",
-            quantity: String(line.quantity || "1"),
-            unitPriceOverride: line.unitPriceOverride || "",
-          }))
-        );
-      } else if (!template) {
+      if (template) {
+        if (templateDetails) {
+          setName(templateDetails.name);
+          setJobType(templateDetails.jobType || "");
+          setDescription(templateDetails.description || "");
+          setIsDefaultForJobType(templateDetails.isDefaultForJobType);
+          setIsActive(templateDetails.isActive);
+          setLineItems(
+            (templateDetails.lines || []).map((line: any, index: number) => ({
+              id: line.id || `line_${index}`,
+              productId: line.productId || "",
+              descriptionOverride: line.descriptionOverride || "",
+              quantity: String(line.quantity || "1"),
+              unitPriceOverride: line.unitPriceOverride || "",
+            }))
+          );
+          setIsFormReady(true);
+        } else {
+          setIsFormReady(false);
+        }
+      } else {
         setName("");
         setJobType("");
         setDescription("");
         setIsDefaultForJobType(false);
         setIsActive(true);
         setLineItems([]);
+        setIsFormReady(true);
       }
+    } else {
+      setIsFormReady(false);
     }
   }, [open, template, templateDetails]);
 
@@ -271,7 +281,7 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
           </DialogDescription>
         </DialogHeader>
 
-        {isEditing && isLoadingDetails ? (
+        {!isFormReady || (isEditing && isLoadingDetails) ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
