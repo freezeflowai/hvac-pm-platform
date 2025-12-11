@@ -1,0 +1,248 @@
+You are helping me refine both the Job Detail and Invoice Detail pages in my HVAC dispatch app.
+
+I’ve just uploaded screenshots showing:
+
+- Job Detail page with new layout and profit summary.
+- Invoice Detail page that still looks different.
+- A Jobber screenshot with a “More Actions” menu (Close Job, Create Similar Job, Create Invoice, Collect Signature, Download PDF, Print).
+
+Please implement the following changes.
+
+================================================
+1) JOB HEADER: WRAP LEFT + RIGHT INTO ONE CARD
+================================================
+
+Goal: The client / job info at the top of the Job page currently feels like it’s “floating”. Wrap it into a single structured card.
+
+Current Job header (approx):
+
+- Client name (big) – e.g., “Juju”
+- Job title / summary – e.g., “Makeuup install”
+- Address row with icon
+- Separate right-side status card with:
+  - Job #
+  - Status
+  - Priority
+  - Scheduled
+
+Change:
+
+1. Create a **JobHeaderCard** component used on the Job Detail page.
+
+   Layout inside this card:
+
+   - Left side (flex-start):
+     - Big clickable client name (link to client detail).
+     - Below: job title / summary.
+     - Below that: address row (location icon + address).
+   - Right side (flex-end):
+     - “Job” row with job number (e.g., “Job  #10165”).
+     - Status row (dropdown or chip as currently implemented).
+     - Priority row.
+     - Scheduled date row.
+
+2. This **single card** should span full width of the main content column and sit directly under the global page bar (and above “Job Description”).
+
+3. Remove any old header code that duplicated this info so that the only visible header is the new JobHeaderCard.
+
+Keep the visual style consistent with existing cards (border, radius, padding). The right-side meta rows should line up vertically like the previous status card.
+
+================================================
+2) JOB ACTIONS: “MORE ACTIONS” MENU + CLOSE JOB FLOW
+================================================
+
+Add a “More Actions” menu to the Job Detail page similar to Jobber’s.
+
+A) More Actions menu
+
+1. In the Job Detail header area (top-right, near Edit/Delete buttons), add a **“More Actions”** button with a dropdown menu.
+
+2. Menu items:
+
+   - Close Job
+   - Create Similar Job
+   - Create Invoice
+   - Collect Signature
+   - Download PDF
+   - Print
+
+   (Delete Job can remain as its own red button, or be included here too, but keep it clearly dangerous.)
+
+3. Behavior for items:
+
+   - **Create Similar Job**:
+     - Opens a new Job creation flow pre-populated with:
+       - Same client / location.
+       - Optionally same title / description and parts (if that’s easy), but at minimum re-use client and location.
+   - **Create Invoice**:
+     - If no invoice exists for this job:
+       - Creates a new invoice linked to this job and navigates to Invoice Detail.
+     - If an invoice already exists:
+       - Either disable this option or take the user to the existing invoice.
+   - **Collect Signature**, **Download PDF**, **Print**:
+       - Implement stubs or hook into existing behaviors if they already exist.
+       - For now, at minimum:
+         - Download PDF: generate/download a job PDF (even a basic version).
+         - Print: open print dialog for the job summary/line items.
+         - Collect Signature: can be a placeholder modal if we don’t yet have signature support.
+
+B) Close Job flow
+
+4. When user chooses **Close Job** from the menu, open a modal:
+
+   - Title: “Close Job”
+   - Body: explain that closing a job will stop scheduling activity and may optionally create an invoice.
+
+5. Provide three choices (buttons or radio + Confirm):
+
+   - **Close & create invoice now**
+     - Creates an invoice linked to this job.
+     - Sets job status to something like `Invoiced` or `Closed`.
+     - Navigates to the new invoice.
+
+   - **Close & invoice later**
+     - Sets job status to something like `Completed` or `Closed - Pending Invoice`.
+     - Do not create an invoice yet.
+
+   - **Close & archive (no invoice)**
+     - Sets job status to `Archived` or `Closed - No Invoice`.
+     - Show a strong warning in the modal:
+       - “No invoice will be created for this job. You can still view it in history, but it will not appear in open work or billing queues.”
+
+6. Implement job status changes in the backend, making sure status enum / allowed values include the new ones you use.
+
+================================================
+3) CUSTOMIZABLE JOB STATUSES (EN ROUTE, ON SITE, NEEDS PARTS)
+================================================
+
+Goal: Allow more granular, technician-driven statuses similar to ServiceFusion: En Route, On Site, Needs Parts, etc.
+
+A) Settings for job statuses
+
+1. Create a **Settings → Job Statuses** page (or similar) where an admin can manage statuses.
+
+   Each status should have:
+
+   - `id` (internal)
+   - `label` (e.g., “En Route”, “On Site”, “Needs Parts”, “Action Required”)
+   - `key` (slug, e.g., `en_route`, `on_site`, `needs_parts`, `action_required`)
+   - `category` or `phase` (optional): e.g., `Open`, `In Progress`, `Closed`
+   - `color` (optional) for badge styling.
+
+2. Seed some default statuses:
+
+   - Draft (system)
+   - Scheduled (system)
+   - En Route
+   - On Site
+   - In Progress (system)
+   - Needs Parts
+   - Completed
+   - Invoiced
+   - Cancelled
+
+   System statuses can be non-deletable, but custom ones like En Route, On Site, Needs Parts should be editable.
+
+B) Using statuses on the Job page
+
+3. On the Job Detail page, the **Status** dropdown should be populated from this configured list of statuses.
+
+   - Display the label.
+   - Apply consistent badge colors.
+
+4. Ensure the mobile/technician UI (if present) uses the same status keys so techs can tap En Route, On Site, Needs Parts, etc.
+
+================================================
+4) INVOICE HEADER: UNIFY LAYOUT WITH JOB HEADER
+================================================
+
+Goal: Make the Invoice Detail page look and feel like the Job Detail page, and connect it back to the job.
+
+A) Invoice header card
+
+1. Create an **InvoiceHeaderCard** component, similar in structure to JobHeaderCard, and use it on the Invoice Detail page.
+
+Layout:
+
+- Left side:
+  - Big clickable client name (link to client detail).
+  - Below: primary invoice title line, e.g., “Invoice INV-11164” or simply show the invoice number as a badge.
+  - Below: client contact information:
+    - Address
+    - Email
+    - Phone
+
+- Right side:
+  - Invoice #
+  - Status (Draft, Sent, Paid, etc.)
+  - Issue Date
+  - Due Date
+  - Balance Due (highlighted, e.g., green for $0, red if overdue).
+
+2. Include a **Job link** in the right side meta:
+
+   - Row: `Job: #10165` (if the invoice was created from a job).
+   - The job number should be clickable, navigating back to the Job Detail page.
+
+3. Remove any old floating header content so only this card is visible at the top of the Invoice Detail page under the global bar.
+
+================================================
+5) INVOICE ACTIONS + DELETE INVOICE
+================================================
+
+Add a consistent actions menu to the Invoice Detail page.
+
+A) More Actions menu for Invoice
+
+1. Either reuse the existing actions area or add a **“More Actions”** button on the Invoice Detail page that contains:
+
+   - Print
+   - Download PDF
+   - Collect Signature
+   - Delete Invoice
+
+   (Plus any existing actions like Send, Send Reminder, etc., either here or as separate buttons – but keep things consistent with Job.)
+
+2. **Print** and **Download PDF** should operate on the invoice layout (what the customer sees).
+
+3. **Collect Signature**:
+   - If there is an existing signature workflow, hook into it.
+   - If not, show a placeholder or TODO for now.
+
+B) Delete Invoice
+
+4. Implement a way to **delete an invoice**:
+
+   - Show a “Delete Invoice” option in the More Actions menu.
+   - Only allow delete for certain statuses (e.g., Draft or maybe Unpaid) if there are business rules; otherwise allow but confirm.
+
+5. When selected:
+
+   - Show a confirmation dialog:
+     - “Delete this invoice permanently? This cannot be undone.”
+   - On confirm:
+     - Call DELETE /api/invoices/:id (or set a soft-delete flag).
+     - Redirect back to the Invoice list or the originating Job.
+
+================================================
+6) CONSISTENCY + EXISTING LOGIC
+================================================
+
+- **Client names** on both Job and Invoice headers should:
+  - Use the same large title style.
+  - Be clickable links to the Client Detail page.
+
+- Keep the **profit/cost/price summary** on the Job’s Parts & Billing card as implemented previously (highlighted strip at the top). For invoices, if not yet implemented, add a similar summary strip (optional but preferred).
+
+- Do NOT remove existing functionality like “Collect Payment” or “Send” on invoices; just integrate them with the new header and actions layout cleanly.
+
+================================================
+WHAT TO DELIVER
+================================================
+
+1. New JobHeaderCard and InvoiceHeaderCard components, used on their respective pages, unifying header structure.
+2. “More Actions” menus on Job and Invoice pages with the actions described.
+3. Close Job modal with three options and corresponding status / invoice behavior.
+4. Settings-supported custom Job Statuses (including En Route, On Site, Needs Parts) and integration into the Job Status dropdown.
+5. Working Delete Invoice action with confirmation.
+6. Layout and styling consistent with existing design system (cards, spacing, typography, button styles).

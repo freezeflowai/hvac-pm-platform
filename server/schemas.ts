@@ -6,10 +6,16 @@ export const optionalMoneyNumber = moneyNumber.nullable().optional();
 export const jobStatusEnum = z.enum([
   "draft",
   "scheduled", 
+  "dispatched",
+  "en_route",
+  "on_site",
   "in_progress",
+  "needs_parts",
+  "on_hold",
   "completed",
   "invoiced",
-  "on_hold",
+  "closed",
+  "archived",
   "cancelled"
 ]);
 

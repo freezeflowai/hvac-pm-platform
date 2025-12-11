@@ -1,12 +1,18 @@
 import type { JobStatus, InvoiceStatus } from "./schemas";
 
 export const jobTransitions: Record<JobStatus, JobStatus[]> = {
-  draft: ["scheduled", "cancelled"],
-  scheduled: ["in_progress", "on_hold", "cancelled"],
-  in_progress: ["completed", "on_hold", "cancelled"],
-  on_hold: ["in_progress", "scheduled", "cancelled"],
-  completed: ["invoiced"],
-  invoiced: [],
+  draft: ["scheduled", "dispatched", "cancelled"],
+  scheduled: ["dispatched", "en_route", "in_progress", "on_hold", "cancelled"],
+  dispatched: ["en_route", "on_site", "in_progress", "on_hold", "cancelled"],
+  en_route: ["on_site", "in_progress", "on_hold", "cancelled"],
+  on_site: ["in_progress", "needs_parts", "completed", "on_hold", "cancelled"],
+  in_progress: ["needs_parts", "completed", "on_hold", "cancelled"],
+  needs_parts: ["in_progress", "on_site", "on_hold", "cancelled"],
+  on_hold: ["scheduled", "dispatched", "in_progress", "cancelled"],
+  completed: ["invoiced", "closed", "archived"],
+  invoiced: ["closed", "archived"],
+  closed: ["archived"],
+  archived: [],
   cancelled: [],
 };
 

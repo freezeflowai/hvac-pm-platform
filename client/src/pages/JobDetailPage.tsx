@@ -39,6 +39,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import JobEquipmentSection from "@/components/JobEquipmentSection";
 import { PartsBillingCard } from "@/components/PartsBillingCard";
 import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
+import { JobHeaderCard } from "@/components/JobHeaderCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -677,136 +678,17 @@ export default function JobDetailPage() {
     );
   }
 
-  const statusInfo = getJobStatusDisplay(job.status, job.scheduledStart);
-  const priorityInfo = getPriorityDisplay(job.priority);
-
-  const locationName = job.location?.location || job.location?.companyName || "Location";
-  const clientName = job.parentCompany?.name || job.location?.companyName || "Client";
-  const fullAddress = job.location ? 
-    [job.location.address, job.location.city, job.location.province, job.location.postalCode].filter(Boolean).join(", ") : "";
-
   return (
     <div className="p-4" data-testid="job-detail-page">
-      {/* HEADER */}
-      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        {/* LEFT: job identity - client focused */}
-        <div>
-          <button
-            type="button"
-            onClick={() => setLocation(`/clients/${job.locationId}`)}
-            className="text-left"
-            data-testid="link-client-title"
-          >
-            <h1 className="text-2xl font-semibold hover:text-primary transition-colors" data-testid="text-client-title">
-              {clientName}
-            </h1>
-          </button>
-
-          {job.summary && (
-            <p className="mt-0.5 text-base text-muted-foreground" data-testid="text-job-summary">
-              {job.summary}
-            </p>
-          )}
-
-          <div className="mt-2 flex items-center gap-1.5 text-sm" data-testid="text-location-info">
-            <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <span className="font-medium">{locationName}</span>
-            {fullAddress && (
-              <>
-                <span className="text-muted-foreground">•</span>
-                <span>{fullAddress}</span>
-              </>
-            )}
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowEditDialog(true)}
-              data-testid="button-edit"
-            >
-              Edit Job
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={deleteJobMutation.isPending}
-              className="text-destructive border-destructive/50 hover:bg-destructive/10"
-              data-testid="button-delete"
-            >
-              Delete
-            </Button>
-            {job.status === "completed" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowCreateInvoiceDialog(true)}
-                data-testid="button-create-invoice"
-              >
-                <Receipt className="h-4 w-4 mr-1" />
-                Create Invoice
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* RIGHT: status / priority panel */}
-        <div className="rounded-2xl border bg-card px-4 py-3 text-xs shadow-sm min-w-[220px]">
-          {/* Job number row */}
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="font-medium">Job</span>
-            <span className="font-semibold text-foreground" data-testid="text-job-number">#{job.jobNumber}</span>
-          </div>
-
-          {/* Status row */}
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="font-medium">Status</span>
-            <div className="flex items-center gap-2">
-              {statusInfo.isOverdue && (
-                <Badge variant="destructive" className="text-[11px]" data-testid="badge-overdue">
-                  Overdue
-                </Badge>
-              )}
-              <Select
-                value={job.status}
-                onValueChange={handleStatusChange}
-                disabled={updateStatusMutation.isPending}
-              >
-                <SelectTrigger className="h-6 w-auto min-w-[100px] text-[11px]" data-testid="select-status">
-                  <SelectValue placeholder="Change" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="on_hold">On Hold</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="invoiced">Invoiced</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Priority */}
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="font-medium">Priority</span>
-            <Badge variant={priorityInfo.variant} className="text-[11px]">
-              {priorityInfo.label}
-            </Badge>
-          </div>
-
-          {/* Scheduled */}
-          <div className="flex items-start justify-between gap-2">
-            <span className="font-medium">Scheduled</span>
-            <span className="text-right text-[11px] text-muted-foreground">
-              {job.scheduledStart ? format(new Date(job.scheduledStart), "MMM d, yyyy h:mm a") : "Not set"}
-            </span>
-          </div>
-        </div>
-      </header>
+      {/* JOB HEADER CARD */}
+      <JobHeaderCard
+        job={job}
+        jobInvoices={jobInvoices}
+        onEdit={() => setShowEditDialog(true)}
+        onDelete={() => deleteJobMutation.mutate()}
+        onStatusChange={handleStatusChange}
+        statusChangePending={updateStatusMutation.isPending}
+      />
 
       {/* JOB DESCRIPTION CARD - Full Width Above Main Layout */}
       <JobDescriptionCard 

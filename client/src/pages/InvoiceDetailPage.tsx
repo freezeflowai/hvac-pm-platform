@@ -49,6 +49,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Invoice, InvoiceLine, Payment, Client, CustomerCompany, Job } from "@shared/schema";
+import { InvoiceHeaderCard } from "@/components/InvoiceHeaderCard";
 
 interface JobNote {
   id: string;
@@ -244,164 +245,36 @@ export default function InvoiceDetailPage() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Minimal sticky nav bar */}
       <div className="sticky top-0 bg-background z-10 border-b">
-        <div className="p-4 max-w-[1600px] mx-auto">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="flex items-start gap-3">
-              <Link href="/invoices">
-                <Button variant="ghost" size="icon" className="mt-0.5" data-testid="button-back-invoices">
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-              </Link>
-              <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-xl font-semibold">
-                    {invoice.invoiceNumber || `INV-${invoice.id.slice(0, 6).toUpperCase()}`}
-                  </h1>
-                  <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="text-right hidden sm:block">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Balance Due</p>
-                <p className={`text-xl font-bold ${balanceColor}`} data-testid="text-balance-due">
-                  {formatCurrency(invoice.balance)}
-                </p>
-              </div>
-              
-              <div className="flex items-center gap-2 flex-wrap">
-                {canEdit && (
-                  <Button 
-                    variant="outline"
-                    onClick={() => setIsEditing(!isEditing)}
-                    data-testid="button-edit-invoice"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    {isEditing ? "Done Editing" : "Edit"}
-                  </Button>
-                )}
-                <Button 
-                  onClick={() => setShowPaymentDialog(true)}
-                  disabled={!canEdit || parseFloat(invoice.balance) <= 0}
-                  data-testid="button-collect-payment"
-                >
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Collect Payment
-                </Button>
-                {isDraft && (
-                  <Button
-                    variant="outline"
-                    onClick={() => sendMutation.mutate()}
-                    disabled={sendMutation.isPending}
-                    data-testid="button-send-invoice"
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    Send
-                  </Button>
-                )}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" data-testid="button-invoice-more">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {isDraft && invoice.jobId && (
-                      <DropdownMenuItem 
-                        onClick={() => refreshFromJobMutation.mutate()}
-                        disabled={refreshFromJobMutation.isPending}
-                      >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Refresh from Job
-                      </DropdownMenuItem>
-                    )}
-                    {isDraft && (
-                      <DropdownMenuItem 
-                        onClick={() => sendMutation.mutate()}
-                        disabled={sendMutation.isPending}
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        Send Invoice
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem>
-                      <FileText className="h-4 w-4 mr-2" />
-                      Download PDF
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>Duplicate Invoice</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive">Void Invoice</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          </div>
+        <div className="p-2 max-w-[1600px] mx-auto flex items-center gap-2">
+          <Link href="/invoices">
+            <Button variant="ghost" size="icon" data-testid="button-back-invoices">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <span className="text-sm text-muted-foreground">Back to Invoices</span>
         </div>
       </div>
 
       <div className="flex-1 overflow-auto">
-        <div className="p-6 max-w-[1600px] mx-auto">
+        <div className="p-4 max-w-[1600px] mx-auto">
+          {/* Invoice Header Card */}
+          <InvoiceHeaderCard
+            invoice={invoice}
+            location={location}
+            customerCompany={customerCompany}
+            job={job}
+            onEdit={() => setIsEditing(!isEditing)}
+            onSend={() => sendMutation.mutate()}
+            onCollectPayment={() => setShowPaymentDialog(true)}
+            canEdit={canEdit}
+            isDraft={isDraft}
+            sendPending={sendMutation.isPending}
+          />
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-8 xl:col-span-8 space-y-6 order-1">
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
-                <div>
-                  <Link href={`/clients/${location.id}`}>
-                    <h2 className="text-lg font-semibold text-primary hover:underline cursor-pointer" data-testid="link-client-name">
-                      {clientName}
-                    </h2>
-                  </Link>
-                  {(location.address || location.city || location.province) && (
-                    <div className="flex items-start gap-2 text-sm text-muted-foreground mt-1">
-                      <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-                      <div>
-                        {location.address && <span>{location.address}</span>}
-                        {(location.city || location.province) && (
-                          <span>{location.address ? ", " : ""}{[location.city, location.province, location.postalCode].filter(Boolean).join(", ")}</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex flex-wrap gap-4 mt-2">
-                    {location.email && (
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Mail className="h-3.5 w-3.5" />
-                        <a href={`mailto:${location.email}`} className="hover:text-foreground">{location.email}</a>
-                      </div>
-                    )}
-                    {location.phone && (
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Phone className="h-3.5 w-3.5" />
-                        <a href={`tel:${location.phone}`} className="hover:text-foreground">{location.phone}</a>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Issue Date</p>
-                    <p className="font-medium">{format(new Date(invoice.issueDate), "MMM d, yyyy")}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Due Date</p>
-                    <p className={`font-medium ${isOverdue ? "text-destructive" : ""}`}>
-                      {invoice.dueDate ? format(new Date(invoice.dueDate), "MMM d, yyyy") : "-"}
-                    </p>
-                  </div>
-                  {invoice.jobId && job && (
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Linked Job</p>
-                      <Link href={`/jobs/${invoice.jobId}`}>
-                        <span className="font-medium text-primary hover:underline cursor-pointer" data-testid="link-job-number">
-                          Job #{job.jobNumber}
-                        </span>
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
 
               <Card>
                 <CardHeader className="pb-3">

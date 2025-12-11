@@ -708,8 +708,13 @@ export const jobStatusEnum = [
   "dispatched",
   "en_route",
   "on_site",
+  "in_progress",
+  "needs_parts",
+  "on_hold",
   "completed",
   "invoiced",
+  "closed",
+  "archived",
   "cancelled"
 ] as const;
 export type JobStatus = typeof jobStatusEnum[number];
