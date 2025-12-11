@@ -188,6 +188,23 @@ export default function InvoiceDetailPage() {
     return items.sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [details, payments]);
 
+  // Calculate profit summary from invoice lines (must be before early returns)
+  const profitSummary = useMemo(() => {
+    const lines = details?.lines || [];
+    let totalPrice = 0;
+    let totalCost = 0;
+    for (const line of lines) {
+      const qty = parseFloat(line.quantity) || 0;
+      const price = parseFloat(line.unitPrice) || 0;
+      const cost = parseFloat(line.unitCost || "0") || 0;
+      totalPrice += qty * price;
+      totalCost += qty * cost;
+    }
+    const profit = totalPrice - totalCost;
+    const margin = totalPrice > 0 ? (profit / totalPrice) * 100 : 0;
+    return { totalPrice, totalCost, profit, margin };
+  }, [details?.lines]);
+
   if (!invoiceId) {
     return <div className="p-6">Invoice not found</div>;
   }
@@ -211,22 +228,6 @@ export default function InvoiceDetailPage() {
   const clientName = customerCompany?.name || location.companyName;
   const canEdit = invoice.status !== "paid" && invoice.status !== "voided";
   const isDraft = invoice.status === "draft";
-
-  // Calculate profit summary from invoice lines
-  const profitSummary = useMemo(() => {
-    let totalPrice = 0;
-    let totalCost = 0;
-    for (const line of lines) {
-      const qty = parseFloat(line.quantity) || 0;
-      const price = parseFloat(line.unitPrice) || 0;
-      const cost = parseFloat(line.unitCost || "0") || 0;
-      totalPrice += qty * price;
-      totalCost += qty * cost;
-    }
-    const profit = totalPrice - totalCost;
-    const margin = totalPrice > 0 ? (profit / totalPrice) * 100 : 0;
-    return { totalPrice, totalCost, profit, margin };
-  }, [lines]);
 
   const handleRecordPayment = () => {
     if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
