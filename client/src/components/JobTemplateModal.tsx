@@ -174,7 +174,7 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
   const quickAddPartMutation = useMutation({
     mutationFn: async (data: QuickAddPartData) => {
       const priceStr = data.unitPrice.trim();
-      const unitPrice = priceStr === "" ? null : Number(priceStr);
+      const unitPrice = priceStr === "" ? null : priceStr;
       
       const res = await apiRequest("POST", "/api/parts", {
         type: data.type,
