@@ -538,13 +538,8 @@ export default function JobDetailPage() {
   const [showCreateInvoiceDialog, setShowCreateInvoiceDialog] = useState(false);
   const [showAssignTech, setShowAssignTech] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [techsOpen, setTechsOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(true);
-  const [invoicesOpen, setInvoicesOpen] = useState(false);
-  const [visitsOpen, setVisitsOpen] = useState(false);
-  const [equipmentOpen, setEquipmentOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [metadataOpen, setMetadataOpen] = useState(false);
   const jobId = params?.id;
 
   const { data: job, isLoading, error } = useQuery<JobDetailResponse>({
@@ -690,6 +685,81 @@ export default function JobDetailPage() {
         statusChangePending={updateStatusMutation.isPending}
       />
 
+      {/* ASSIGNED TECHNICIANS & VISITS - Header Mini-Card */}
+      <Card className="mb-4" data-testid="card-techs-visits-header">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-6">
+            {/* Assigned Technicians Section */}
+            <div className="flex-1 min-w-[200px]">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  Assigned Technicians
+                </h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-xs h-auto p-0 text-primary"
+                  onClick={() => setShowAssignTech(true)}
+                  data-testid="button-assign-tech-header"
+                >
+                  <UserPlus className="h-3 w-3 mr-1" />
+                  Assign
+                </Button>
+              </div>
+              {job.technicians && job.technicians.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {job.technicians.map(tech => (
+                    <div 
+                      key={tech.id} 
+                      className="flex items-center gap-1.5 text-sm"
+                      data-testid={`badge-tech-${tech.id}`}
+                    >
+                      <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-xs font-medium text-primary">
+                          {(tech.firstName?.[0] || tech.email[0]).toUpperCase()}
+                        </span>
+                      </div>
+                      <span>
+                        {tech.firstName && tech.lastName 
+                          ? `${tech.firstName} ${tech.lastName}`
+                          : tech.email}
+                      </span>
+                      {tech.id === job.primaryTechnicianId && (
+                        <Badge variant="secondary" className="text-[10px]">Primary</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No technicians assigned yet.</p>
+              )}
+            </div>
+
+            {/* Visits Section */}
+            <div className="flex-1 min-w-[200px]">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  Visits
+                </h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-xs h-auto p-0 text-primary"
+                  onClick={() => toast({ title: "Coming Soon", description: "Visit scheduling coming soon." })}
+                  data-testid="button-new-visit-header"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  New Visit
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">No visits scheduled yet.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* JOB DESCRIPTION CARD - Full Width Above Main Layout */}
       <JobDescriptionCard 
         jobId={jobId!} 
@@ -763,56 +833,8 @@ export default function JobDetailPage() {
           )}
         </div>
 
-        {/* RIGHT COLUMN: Techs, Notes, Invoices, Visits, Equipment, Activity, Metadata */}
+        {/* RIGHT COLUMN: Notes, Equipment, Activity */}
         <div className="space-y-2">
-          {/* Assigned Technicians – collapsible */}
-          <Collapsible open={techsOpen} onOpenChange={setTechsOpen}>
-            <Card data-testid="card-technicians">
-              <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-technicians">
-                  <span className="text-sm font-semibold">Assigned Technicians</span>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-xs h-auto p-0 text-primary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowAssignTech(true);
-                      }}
-                      data-testid="button-assign-technician"
-                    >
-                      Assign
-                    </Button>
-                    {techsOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                  </div>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="border-t px-4 pb-4 pt-3">
-                  {job.technicians && job.technicians.length > 0 ? (
-                    <ul className="space-y-1 text-sm">
-                      {job.technicians.map(tech => (
-                        <li key={tech.id} className="flex items-center gap-2" data-testid={`text-technician-${tech.id}`}>
-                          <span>
-                            {tech.firstName && tech.lastName 
-                              ? `${tech.firstName} ${tech.lastName}`
-                              : tech.email}
-                          </span>
-                          {tech.id === job.primaryTechnicianId && (
-                            <Badge variant="secondary" className="text-xs">Primary</Badge>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">No technicians assigned yet.</p>
-                  )}
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
           {/* Notes – collapsible */}
           <Collapsible open={notesOpen} onOpenChange={setNotesOpen}>
             <Card>
@@ -840,39 +862,6 @@ export default function JobDetailPage() {
                 <div className="border-t px-4 pb-4 pt-3">
                   <p className="text-xs text-muted-foreground">
                     No notes yet. Add notes to track job details and communication.
-                  </p>
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
-          {/* Visits – collapsed by default */}
-          <Collapsible open={visitsOpen} onOpenChange={setVisitsOpen}>
-            <Card>
-              <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-visits">
-                  <span className="text-sm font-semibold">Visits</span>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-xs h-auto p-0 text-primary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toast({ title: "Coming Soon", description: "Visit scheduling coming soon." });
-                      }}
-                      data-testid="button-new-visit"
-                    >
-                      New Visit
-                    </Button>
-                    {visitsOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                  </div>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="border-t px-4 pb-4 pt-3">
-                  <p className="text-xs text-muted-foreground">
-                    No visits scheduled yet. Use visits to track on-site appointments for this job.
                   </p>
                 </div>
               </CollapsibleContent>
@@ -934,35 +923,6 @@ export default function JobDetailPage() {
             </Card>
           </Collapsible>
 
-          {/* Metadata - Collapsible, closed by default */}
-          <Collapsible open={metadataOpen} onOpenChange={setMetadataOpen}>
-            <Card>
-              <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-metadata">
-                  <span className="text-sm font-semibold">Metadata</span>
-                  {metadataOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="border-t px-4 pb-4 pt-3 space-y-1 text-xs">
-                  <div>
-                    <span className="font-medium">Created:</span>{" "}
-                    <span data-testid="text-created-at">{format(new Date(job.createdAt), "PP")}</span>
-                  </div>
-                  {job.updatedAt && (
-                    <div>
-                      <span className="font-medium">Updated:</span>{" "}
-                      <span data-testid="text-updated-at">{format(new Date(job.updatedAt), "PP")}</span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="font-medium">Job ID:</span>{" "}
-                    <span className="font-mono" data-testid="text-job-id">{job.id.slice(0, 8)}</span>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
         </div>
       </div>
 

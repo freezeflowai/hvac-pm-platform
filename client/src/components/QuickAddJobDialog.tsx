@@ -395,6 +395,7 @@ export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId, e
               <Input
                 id="scheduledStart"
                 type="datetime-local"
+                step="900"
                 value={formData.scheduledStart}
                 onChange={(e) => setFormData(prev => ({ ...prev, scheduledStart: e.target.value }))}
                 data-testid="input-scheduled-start"
@@ -406,6 +407,7 @@ export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId, e
               <Input
                 id="scheduledEnd"
                 type="datetime-local"
+                step="900"
                 value={formData.scheduledEnd}
                 onChange={(e) => setFormData(prev => ({ ...prev, scheduledEnd: e.target.value }))}
                 data-testid="input-scheduled-end"
