@@ -173,12 +173,15 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
 
   const quickAddPartMutation = useMutation({
     mutationFn: async (data: QuickAddPartData) => {
+      const priceStr = data.unitPrice.trim();
+      const unitPrice = priceStr === "" ? null : Number(priceStr);
+      
       const res = await apiRequest("POST", "/api/parts", {
         type: data.type,
         name: data.name,
         sku: data.sku || null,
         description: data.description || null,
-        unitPrice: data.unitPrice || null,
+        unitPrice,
         isActive: true,
       });
       return res.json();
@@ -188,7 +191,19 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
       toast({ title: "Part created", description: `"${newPart.name}" has been added to your catalog.` });
       
       if (quickAddForLineId) {
-        handleProductSelect(quickAddForLineId, newPart.id);
+        setLineItems((prev) =>
+          prev.map((item) =>
+            item.id === quickAddForLineId
+              ? {
+                  ...item,
+                  productId: newPart.id,
+                  unitPriceOverride: newPart.unitPrice?.toString() || "",
+                  productSearchOpen: false,
+                  searchValue: "",
+                }
+              : item
+          )
+        );
       }
       
       setQuickAddOpen(false);
