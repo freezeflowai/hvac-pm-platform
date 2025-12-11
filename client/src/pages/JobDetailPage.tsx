@@ -80,6 +80,7 @@ function JobDescriptionCard({ jobId, description, onDescriptionChange }: {
 }) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [editValue, setEditValue] = useState(description || "");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -110,73 +111,82 @@ function JobDescriptionCard({ jobId, description, onDescriptionChange }: {
   const hasDescription = description && description.trim() !== "";
 
   return (
-    <Card data-testid="card-job-description" className="mb-3">
-      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-        <CardTitle className="text-sm font-semibold">Job Description</CardTitle>
-        {hasDescription && !isEditing && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-xs h-auto p-0 text-primary"
-            onClick={() => setIsEditing(true)}
-            data-testid="button-edit-description"
-          >
-            <Pencil className="h-3 w-3 mr-1" />
-            Edit
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent>
-        {isEditing ? (
-          <div className="space-y-3">
-            <Textarea
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              placeholder="Describe the work to be performed..."
-              className="min-h-[100px] text-sm"
-              data-testid="textarea-job-description"
-            />
-            <div className="flex items-center gap-2">
-              <Button 
-                size="sm" 
-                onClick={handleSave} 
-                disabled={isSaving}
-                data-testid="button-save-description"
-              >
-                {isSaving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                Save
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={handleCancel}
-                disabled={isSaving}
-                data-testid="button-cancel-description"
-              >
-                Cancel
-              </Button>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card data-testid="card-job-description" className="mb-3">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+          <CollapsibleTrigger asChild>
+            <div className="flex items-center gap-2 cursor-pointer">
+              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <CardTitle className="text-sm font-semibold">Job Description</CardTitle>
             </div>
-          </div>
-        ) : hasDescription ? (
-          <p className="text-sm whitespace-pre-wrap" data-testid="text-job-description">
-            {description}
-          </p>
-        ) : (
-          <div className="text-center py-4">
-            <p className="text-sm text-muted-foreground mb-2">No job description added yet.</p>
+          </CollapsibleTrigger>
+          {hasDescription && !isEditing && (
             <Button 
-              variant="outline" 
+              variant="ghost" 
               size="sm" 
+              className="text-xs h-auto p-0 text-primary"
               onClick={() => setIsEditing(true)}
-              data-testid="button-add-description"
+              data-testid="button-edit-description"
             >
-              <Plus className="h-3 w-3 mr-1" />
-              Add Description
+              <Pencil className="h-3 w-3 mr-1" />
+              Edit
             </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent>
+            {isEditing ? (
+              <div className="space-y-3">
+                <Textarea
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  placeholder="Describe the work to be performed..."
+                  className="min-h-[100px] text-sm"
+                  data-testid="textarea-job-description"
+                />
+                <div className="flex items-center gap-2">
+                  <Button 
+                    size="sm" 
+                    onClick={handleSave} 
+                    disabled={isSaving}
+                    data-testid="button-save-description"
+                  >
+                    {isSaving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                    Save
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={handleCancel}
+                    disabled={isSaving}
+                    data-testid="button-cancel-description"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : hasDescription ? (
+              <p className="text-sm whitespace-pre-wrap" data-testid="text-job-description">
+                {description}
+              </p>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground mb-2">No job description added yet.</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setIsEditing(true)}
+                  data-testid="button-add-description"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Description
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }
 

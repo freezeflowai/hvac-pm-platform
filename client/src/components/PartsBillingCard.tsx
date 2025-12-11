@@ -123,6 +123,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "parts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId] });
       toast({ title: "Template applied", description: "Parts from the template have been added to this job." });
     },
     onError: (error: Error) => {
