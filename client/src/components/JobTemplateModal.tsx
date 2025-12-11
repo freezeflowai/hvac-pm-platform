@@ -48,9 +48,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Plus, Trash2, Loader2, GripVertical, Check, ChevronsUpDown, HelpCircle } from "lucide-react";
+import { Plus, Trash2, Loader2, GripVertical, Check, ChevronsUpDown, HelpCircle, PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JobTemplate, Part } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 interface JobTemplateModalProps {
   open: boolean;
@@ -65,6 +66,15 @@ interface LineItemDraft {
   quantity: string;
   unitPriceOverride: string;
   productSearchOpen?: boolean;
+  searchValue?: string;
+}
+
+interface QuickAddPartData {
+  name: string;
+  type: "product" | "service";
+  sku: string;
+  description: string;
+  unitPrice: string;
 }
 
 const JOB_TYPE_OPTIONS = [
@@ -88,6 +98,15 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
   const [isActive, setIsActive] = useState(true);
   const [lineItems, setLineItems] = useState<LineItemDraft[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddForLineId, setQuickAddForLineId] = useState<string | null>(null);
+  const [quickAddData, setQuickAddData] = useState<QuickAddPartData>({
+    name: "",
+    type: "product",
+    sku: "",
+    description: "",
+    unitPrice: "",
+  });
 
   const { data: catalogData } = useQuery<{ items: Part[] }>({
     queryKey: ["/api/parts", { limit: 1000 }],
@@ -151,6 +170,48 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
       setIsFormReady(false);
     }
   }, [open, template, templateDetails]);
+
+  const quickAddPartMutation = useMutation({
+    mutationFn: async (data: QuickAddPartData) => {
+      const res = await apiRequest("POST", "/api/parts", {
+        type: data.type,
+        name: data.name,
+        sku: data.sku || null,
+        description: data.description || null,
+        unitPrice: data.unitPrice || null,
+        isActive: true,
+      });
+      return res.json();
+    },
+    onSuccess: (newPart) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parts"] });
+      toast({ title: "Part created", description: `"${newPart.name}" has been added to your catalog.` });
+      
+      if (quickAddForLineId) {
+        handleProductSelect(quickAddForLineId, newPart.id);
+      }
+      
+      setQuickAddOpen(false);
+      setQuickAddForLineId(null);
+      setQuickAddData({ name: "", type: "product", sku: "", description: "", unitPrice: "" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to create part.", variant: "destructive" });
+    },
+  });
+
+  const openQuickAddDialog = (lineItemId: string, searchValue: string) => {
+    setQuickAddForLineId(lineItemId);
+    setQuickAddData({
+      name: searchValue,
+      type: "product",
+      sku: "",
+      description: "",
+      unitPrice: "",
+    });
+    toggleProductSearch(lineItemId, false);
+    setQuickAddOpen(true);
+  };
 
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -469,9 +530,41 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[300px] p-0" align="start">
                                   <Command>
-                                    <CommandInput placeholder="Search products..." />
+                                    <CommandInput
+                                      placeholder="Search products..."
+                                      value={item.searchValue || ""}
+                                      onValueChange={(val) =>
+                                        setLineItems((prev) =>
+                                          prev.map((li) =>
+                                            li.id === item.id
+                                              ? { ...li, searchValue: val }
+                                              : li
+                                          )
+                                        )
+                                      }
+                                    />
                                     <CommandList>
-                                      <CommandEmpty>No products found.</CommandEmpty>
+                                      <CommandEmpty>
+                                        <div className="py-2 text-center">
+                                          <p className="text-sm text-muted-foreground mb-2">
+                                            No products found.
+                                          </p>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                              openQuickAddDialog(
+                                                item.id,
+                                                item.searchValue || ""
+                                              )
+                                            }
+                                            data-testid={`button-add-part-${index}`}
+                                          >
+                                            <PlusCircle className="h-4 w-4 mr-1" />
+                                            Add "{item.searchValue || "new part"}"
+                                          </Button>
+                                        </div>
+                                      </CommandEmpty>
                                       <CommandGroup>
                                         {catalogParts.map((p) => (
                                           <CommandItem
@@ -597,6 +690,126 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Quick Add Part Dialog */}
+      <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add New Product/Service</DialogTitle>
+            <DialogDescription>
+              Create a new item to add to your catalog and this template.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Type *</Label>
+                <Select
+                  value={quickAddData.type}
+                  onValueChange={(v: "product" | "service") =>
+                    setQuickAddData((prev) => ({ ...prev, type: v }))
+                  }
+                >
+                  <SelectTrigger data-testid="quick-add-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="product">Product</SelectItem>
+                    <SelectItem value="service">Service</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>SKU</Label>
+                <Input
+                  value={quickAddData.sku}
+                  onChange={(e) =>
+                    setQuickAddData((prev) => ({ ...prev, sku: e.target.value }))
+                  }
+                  placeholder="Optional"
+                  data-testid="quick-add-sku"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Name *</Label>
+              <Input
+                value={quickAddData.name}
+                onChange={(e) =>
+                  setQuickAddData((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder="Product or service name"
+                data-testid="quick-add-name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input
+                value={quickAddData.description}
+                onChange={(e) =>
+                  setQuickAddData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                placeholder="Optional description"
+                data-testid="quick-add-description"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Unit Price</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={quickAddData.unitPrice}
+                onChange={(e) =>
+                  setQuickAddData((prev) => ({
+                    ...prev,
+                    unitPrice: e.target.value,
+                  }))
+                }
+                placeholder="0.00"
+                data-testid="quick-add-price"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setQuickAddOpen(false)}
+              data-testid="quick-add-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!quickAddData.name.trim()) {
+                  toast({
+                    title: "Validation error",
+                    description: "Name is required.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                quickAddPartMutation.mutate(quickAddData);
+              }}
+              disabled={quickAddPartMutation.isPending}
+              data-testid="quick-add-save"
+            >
+              {quickAddPartMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              )}
+              Add to Catalog
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
