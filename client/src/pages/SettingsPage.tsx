@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, ChevronRight, Users, FormInput, Receipt, Plug } from "lucide-react";
+import { Package, ChevronRight, Users, FormInput, Receipt, Plug, FileText } from "lucide-react";
 
 interface SettingsCardProps {
   href: string;
@@ -78,6 +78,14 @@ export default function SettingsPage() {
       description: "Connect third-party services",
       detail: "Connect with QuickBooks, payment processors, and other business tools.",
       testId: "card-integrations-settings",
+    },
+    {
+      href: "/settings/job-templates",
+      icon: FileText,
+      title: "Job Templates",
+      description: "Manage reusable templates",
+      detail: "Create and manage templates with predefined line items for service calls, PMs, and more.",
+      testId: "card-job-templates-settings",
     },
   ];
 

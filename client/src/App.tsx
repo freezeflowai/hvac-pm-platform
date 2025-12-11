@@ -31,6 +31,7 @@ import CustomFieldsPage from "@/pages/CustomFieldsPage";
 import TaxBillingRulesPage from "@/pages/TaxBillingRulesPage";
 import IntegrationsPage from "@/pages/IntegrationsPage";
 import CategoryManagementPage from "@/pages/CategoryManagementPage";
+import JobTemplatesPage from "@/pages/JobTemplatesPage";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import RequestReset from "@/pages/RequestReset";
@@ -150,6 +151,11 @@ function Router() {
       <Route path="/settings/categories">
         <ProtectedRoute requireAdmin>
           <CategoryManagementPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings/job-templates">
+        <ProtectedRoute requireAdmin>
+          <JobTemplatesPage />
         </ProtectedRoute>
       </Route>
       <Route path="/company-settings">
