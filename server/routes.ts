@@ -3062,6 +3062,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reorder invoice lines (update lineNumber for each line)
+  app.patch("/api/invoices/:invoiceId/lines/reorder", isAuthenticated, async (req, res) => {
+    try {
+      const { invoiceId } = req.params;
+      const invoice = await storage.getInvoice(req.user!.companyId, invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const orderData = z.array(z.object({ id: z.string(), lineNumber: z.number().int() })).parse(req.body);
+      // Update each line's lineNumber
+      for (const { id, lineNumber } of orderData) {
+        await storage.updateInvoiceLine(invoiceId, id, { lineNumber });
+      }
+      const lines = await storage.getInvoiceLines(invoiceId);
+      res.json(lines);
+    } catch (error) {
+      console.error('Reorder invoice lines error:', error);
+      res.status(500).json({ error: "Failed to reorder invoice lines" });
+    }
+  });
+
   // Client notes routes
   app.get("/api/client-notes/:clientId", isAuthenticated, async (req, res) => {
     try {

@@ -9,6 +9,23 @@ import {
   FileText, GripVertical, Check, X, RefreshCw, Phone, Mail, MapPin,
   MessageSquare, User, Clock, Edit
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -101,6 +118,65 @@ function getBalanceColor(balance: string, isOverdue: boolean): string {
   return "text-amber-600";
 }
 
+// Sortable line item row component
+function SortableLineRow({ line, isEditing }: { line: InvoiceLine; isEditing: boolean }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: line.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <TableRow 
+      ref={setNodeRef} 
+      style={style} 
+      data-testid={`row-line-item-${line.id}`}
+      className={isDragging ? "bg-muted" : ""}
+    >
+      {isEditing && (
+        <TableCell className="w-[40px] px-2">
+          <button
+            type="button"
+            className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+            {...attributes}
+            {...listeners}
+            data-testid={`drag-handle-${line.id}`}
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </TableCell>
+      )}
+      <TableCell>
+        <div>
+          <p className="font-medium">{line.description}</p>
+          {line.date && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {format(new Date(line.date), "MMM d, yyyy")}
+            </p>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="text-center">{line.quantity}</TableCell>
+      <TableCell className="text-right">{formatCurrency(line.unitPrice)}</TableCell>
+      <TableCell className="text-center">
+        <span className="text-xs text-muted-foreground">
+          {parseFloat(line.taxRate) > 0 ? "Yes" : "No"}
+        </span>
+      </TableCell>
+      <TableCell className="text-right font-medium">{formatCurrency(line.lineSubtotal)}</TableCell>
+    </TableRow>
+  );
+}
+
 export default function InvoiceDetailPage() {
   const [, params] = useRoute("/invoices/:id");
   const [, setLocation] = useLocation();
@@ -168,6 +244,21 @@ export default function InvoiceDetailPage() {
     },
     onError: () => toast({ title: "Failed to record payment", variant: "destructive" }),
   });
+
+  const reorderLinesMutation = useMutation({
+    mutationFn: (orderData: { id: string; lineNumber: number }[]) =>
+      apiRequest("PATCH", `/api/invoices/${invoiceId}/lines/reorder`, orderData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices", invoiceId] });
+    },
+    onError: () => toast({ title: "Failed to reorder items", variant: "destructive" }),
+  });
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const activityEvents = useMemo(() => {
     if (!details) return [];
@@ -298,49 +389,52 @@ export default function InvoiceDetailPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[45%]">Description</TableHead>
-                        <TableHead className="text-center w-[80px]">Qty</TableHead>
-                        <TableHead className="text-right w-[100px]">Rate</TableHead>
-                        <TableHead className="text-center w-[60px]">Tax</TableHead>
-                        <TableHead className="text-right w-[100px]">Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {lines.length === 0 ? (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={(event: DragEndEvent) => {
+                      const { active, over } = event;
+                      if (over && active.id !== over.id) {
+                        const sortedLines = [...lines].sort((a, b) => a.lineNumber - b.lineNumber);
+                        const oldIndex = sortedLines.findIndex((l) => l.id === active.id);
+                        const newIndex = sortedLines.findIndex((l) => l.id === over.id);
+                        const reordered = arrayMove(sortedLines, oldIndex, newIndex);
+                        const orderData = reordered.map((line, i) => ({ id: line.id, lineNumber: i + 1 }));
+                        reorderLinesMutation.mutate(orderData);
+                      }
+                    }}
+                  >
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
-                            No line items yet.
-                          </TableCell>
+                          {isEditing && <TableHead className="w-[40px]"></TableHead>}
+                          <TableHead className={isEditing ? "w-[42%]" : "w-[45%]"}>Description</TableHead>
+                          <TableHead className="text-center w-[80px]">Qty</TableHead>
+                          <TableHead className="text-right w-[100px]">Rate</TableHead>
+                          <TableHead className="text-center w-[60px]">Tax</TableHead>
+                          <TableHead className="text-right w-[100px]">Total</TableHead>
                         </TableRow>
-                      ) : (
-                        lines.map((line) => (
-                          <TableRow key={line.id} data-testid={`row-line-item-${line.id}`}>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium">{line.description}</p>
-                                {line.date && (
-                                  <p className="text-xs text-muted-foreground mt-0.5">
-                                    {format(new Date(line.date), "MMM d, yyyy")}
-                                  </p>
-                                )}
-                              </div>
+                      </TableHeader>
+                      <TableBody>
+                        {lines.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={isEditing ? 6 : 5} className="text-center py-12 text-muted-foreground">
+                              No line items yet.
                             </TableCell>
-                            <TableCell className="text-center">{line.quantity}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(line.unitPrice)}</TableCell>
-                            <TableCell className="text-center">
-                              <span className="text-xs text-muted-foreground">
-                                {parseFloat(line.taxRate) > 0 ? "Yes" : "No"}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(line.lineSubtotal)}</TableCell>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                        ) : (
+                          <SortableContext 
+                            items={[...lines].sort((a, b) => a.lineNumber - b.lineNumber).map(l => l.id)} 
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {[...lines].sort((a, b) => a.lineNumber - b.lineNumber).map((line) => (
+                              <SortableLineRow key={line.id} line={line} isEditing={isEditing} />
+                            ))}
+                          </SortableContext>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </DndContext>
                   
                   <div className="p-4 border-t bg-muted/30">
                     <div className="flex flex-col items-end gap-1">
@@ -410,6 +504,56 @@ export default function InvoiceDetailPage() {
                 </Card>
               )}
               
+              {/* Client Message - customer-facing message on invoice */}
+              {(invoice.clientMessage || isEditing) && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                        Client Message
+                      </CardTitle>
+                      {isEditing && (
+                        <span className="text-xs text-muted-foreground">Visible on invoice</span>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    {isEditing ? (
+                      <Textarea 
+                        placeholder="Add a message to the client (e.g., thank you, special instructions, payment terms)..."
+                        defaultValue={invoice.clientMessage || ""}
+                        className="min-h-[80px] text-sm"
+                        data-testid="textarea-client-message"
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap min-h-[40px]">
+                        {invoice.clientMessage || "No client message."}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Work Description - from job */}
+              {invoice.workDescription && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        Work Performed
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {invoice.workDescription}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
               <Card>
                 <CardContent className="p-0">
                   <Tabs defaultValue="public" className="w-full">
