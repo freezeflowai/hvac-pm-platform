@@ -35,6 +35,9 @@ The application features a Material Design-inspired typography with the Inter fo
 - **Jobs System**: A comprehensive dispatching system supporting various job statuses, priority levels, job types, technician assignment, and recurring job series. It includes atomic job number sequences and date/location-based filtering.
 - **Equipment Tracking System**: Manages location-level equipment assets, links equipment to jobs for service history tracking, and integrates with PM templates for automatic job generation.
 - **Job Templates System**: Provides reusable templates for job parts and billing configurations, allowing for creation, editing, and application of default templates per job type.
+- **Enhanced Job/Invoice Workflow**: Unified header cards with clickable client names, automatic "Invoiced" status on jobs when linked, "Sent/Not Sent" invoice status labels, 15-minute time picker increments, and Assigned Technicians & Visits displayed as header mini-cards.
+- **Invoice Client Visibility Controls**: Per-invoice toggles to control what clients see (line items, quantities, unit prices, line totals, account balance), with collapsible Job Description section for client-facing work performed summaries.
+- **Company Tax Settings**: Configurable tax name and default rate per company, displayed dynamically on invoice totals (e.g., "HST (13%)").
 
 ## External Dependencies
 
