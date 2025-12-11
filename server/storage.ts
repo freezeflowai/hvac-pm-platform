@@ -372,8 +372,8 @@ export interface IStorage {
   getJobTemplates(companyId: string, filter?: { jobType?: string; activeOnly?: boolean }): Promise<JobTemplate[]>;
   getJobTemplate(companyId: string, id: string): Promise<JobTemplate | undefined>;
   getJobTemplateLineItems(templateId: string): Promise<JobTemplateLineItem[]>;
-  createJobTemplate(companyId: string, data: InsertJobTemplate, lines: InsertJobTemplateLineItem[]): Promise<JobTemplate>;
-  updateJobTemplate(companyId: string, id: string, data: UpdateJobTemplate, lines?: InsertJobTemplateLineItem[]): Promise<JobTemplate | undefined>;
+  createJobTemplate(companyId: string, data: InsertJobTemplate, lines: Omit<InsertJobTemplateLineItem, 'templateId'>[]): Promise<JobTemplate>;
+  updateJobTemplate(companyId: string, id: string, data: UpdateJobTemplate, lines?: Omit<InsertJobTemplateLineItem, 'templateId'>[]): Promise<JobTemplate | undefined>;
   deleteJobTemplate(companyId: string, id: string): Promise<boolean>;
   setJobTemplateAsDefault(companyId: string, id: string, jobType: string): Promise<JobTemplate | undefined>;
   getDefaultJobTemplateForJobType(companyId: string, jobType: string): Promise<JobTemplate | undefined>;
@@ -2461,10 +2461,10 @@ export class MemStorage implements IStorage {
   async getJobTemplateLineItems(_templateId: string): Promise<JobTemplateLineItem[]> {
     return [];
   }
-  async createJobTemplate(_companyId: string, _data: InsertJobTemplate, _lines: InsertJobTemplateLineItem[]): Promise<JobTemplate> {
+  async createJobTemplate(_companyId: string, _data: InsertJobTemplate, _lines: Omit<InsertJobTemplateLineItem, 'templateId'>[]): Promise<JobTemplate> {
     throw new Error("Job templates not implemented in MemStorage");
   }
-  async updateJobTemplate(_companyId: string, _id: string, _data: UpdateJobTemplate, _lines?: InsertJobTemplateLineItem[]): Promise<JobTemplate | undefined> {
+  async updateJobTemplate(_companyId: string, _id: string, _data: UpdateJobTemplate, _lines?: Omit<InsertJobTemplateLineItem, 'templateId'>[]): Promise<JobTemplate | undefined> {
     return undefined;
   }
   async deleteJobTemplate(_companyId: string, _id: string): Promise<boolean> {
@@ -5489,7 +5489,7 @@ export class DbStorage implements IStorage {
       .orderBy(jobTemplateLineItems.sortOrder);
   }
 
-  async createJobTemplate(companyId: string, data: InsertJobTemplate, lines: InsertJobTemplateLineItem[]): Promise<JobTemplate> {
+  async createJobTemplate(companyId: string, data: InsertJobTemplate, lines: Omit<InsertJobTemplateLineItem, 'templateId'>[]): Promise<JobTemplate> {
     // If setting as default for a job type, first unset any existing default
     if (data.isDefaultForJobType && data.jobType) {
       await db.update(jobTemplates)
@@ -5524,7 +5524,7 @@ export class DbStorage implements IStorage {
     return template;
   }
 
-  async updateJobTemplate(companyId: string, id: string, data: UpdateJobTemplate, lines?: InsertJobTemplateLineItem[]): Promise<JobTemplate | undefined> {
+  async updateJobTemplate(companyId: string, id: string, data: UpdateJobTemplate, lines?: Omit<InsertJobTemplateLineItem, 'templateId'>[]): Promise<JobTemplate | undefined> {
     // Verify template belongs to company
     const existing = await this.getJobTemplate(companyId, id);
     if (!existing) return undefined;

@@ -9,6 +9,7 @@ import { sendInvitationEmail } from "./emailService";
 import { impersonationService } from "./impersonationService";
 import { auditService } from "./auditService";
 import { requirePlatformAdmin, blockImpersonation } from "./impersonationMiddleware";
+import jobTemplatesRouter from "./routes/jobTemplates";
 import { insertClientSchema, insertPartSchema, insertClientPartSchema, insertUserSchema, insertEquipmentSchema, insertCompanySettingsSchema, insertCalendarAssignmentSchema, updateCalendarAssignmentSchema, insertFeedbackSchema, insertJobNoteSchema, updateJobNoteSchema, insertClientNoteSchema, updateClientNoteSchema, insertCustomerCompanySchema, updateCustomerCompanySchema, insertInvoiceSchema, updateInvoiceSchema, insertInvoiceLineSchema, updateInvoiceLineSchema, insertPaymentSchema, insertJobSchema, updateJobSchema, insertRecurringJobSeriesSchema, insertRecurringJobPhaseSchema, jobStatusEnum, type Client, type Part, type User, type AuthenticatedUser, calendarAssignments, clients, companies } from "@shared/schema";
 import { passport, isAdmin, requireAdmin } from "./auth";
 import { z } from "zod";
@@ -34,6 +35,9 @@ function isAuthenticated(req: Request, res: Response, next: NextFunction) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // Job Templates API (modular routes)
+  app.use('/api/job-templates', isAuthenticated, jobTemplatesRouter);
   
   // Authentication routes
   app.post("/api/auth/signup", async (req, res) => {
