@@ -1,0 +1,262 @@
+You are helping me refine both the Job Detail and Invoice Detail experiences in my HVAC app.
+
+I’ve uploaded screenshots of:
+
+- Job Detail (with Parts & Billing, header card, assigned techs/visits/notes on the side).
+- Invoice Detail (with Products & Services, Internal/Public notes on the side).
+  
+Please implement ALL of the following changes.
+
+================================================
+1) JOB DETAIL: HEADER / META TWEAKS
+================================================
+
+A) Invoice number styling in Job header
+
+1. In the Job header card (top-right meta where Job/Invoice/Status/Scheduled are shown):
+
+   - Increase the font size of the **Invoice number** so it matches the visual weight of the Job number.
+   - Right now the invoice number is small; make it the same size and weight as the Job number row (or very close).
+
+B) Status when invoiced
+
+2. For jobs that have been invoiced:
+
+   - The **Job Status** value in the header card should be something like `Invoiced` (or `Closed - Invoiced` depending on your enum).
+   - Ensure that when an invoice linked to a job reaches its “final” state (Created/Saved), the associated job’s status is updated from `Completed` to `Invoiced` (or similar terminal status).
+
+C) Remove Priority from Job header
+
+3. In the Job header card, remove the **Priority** row entirely. We no longer want to track or display priority here.
+
+D) Scheduled time increments – 15 minutes
+
+4. Wherever a job’s scheduled date/time is selected (Job creation/edit forms, calendar UI, etc.):
+
+   - Restrict the **time picker** to 15-minute increments only:
+     - e.g. 8:00, 8:15, 8:30, 8:45, 9:00, etc.
+   - Do not allow arbitrary minutes (like 8:04). If needed, round existing times to the nearest 15 minutes on display.
+
+================================================
+2) JOB DETAIL: ASSIGNED TECHS & VISITS UP TOP
+================================================
+
+Current state:
+
+- “Assigned Technicians” and “Visits” appear as separate cards in the right-hand sidebar.
+
+Goal:
+
+- Move these into the header area to better utilize the top space and make them more prominent.
+
+Changes:
+
+1. In the top section where we have the Job header card:
+
+   - Add a new **box/mini-card** for “Assigned Technicians and Visits” to the left of the existing Job meta card, if space allows.
+   - Layout example (within this new box):
+
+     - Title: `Assigned Technicians`
+       - Show the names/avatars of currently assigned techs.
+       - Provide an “Assign” button to open the existing assignment UI.
+
+     - Below that (or in a second mini-section): `Visits`
+       - Show a button/link: `New Visit` (re-using existing behavior).
+       - Optionally list upcoming visits or count.
+
+2. Once this new header-level box exists:
+
+   - Remove the **Assigned Technicians** and **Visits** cards from the right sidebar.
+   - Keep the **Activity** and **Equipment** cards in the sidebar.
+   - Remove the **Metadata** card entirely.
+
+Make sure the top header area does not look cluttered; use consistent card styling and spacing.
+
+================================================
+3) INVOICE DETAIL: HEADER CLEANUP + JOB LINK
+================================================
+
+A) Job number under Invoice number
+
+1. In the Invoice header card (top-right meta where Invoice # / Status / Dates / Balance Due are shown):
+
+   - Under the Invoice number row, add a `Job` row:
+
+     - Label: `Job`
+     - Value: `#<jobNumber>` (e.g. `#10165`)
+     - If the invoice is linked to a job:
+       - This job number should be a **clickable link** that navigates to the Job Detail page.
+     - If there is no job, display `N/A`.
+
+B) Remove duplicate Draft/Invoice number under client name
+
+2. Under the client name on the left side of the Invoice header (where it currently shows `Draft 1001`):
+
+   - Remove this `Draft 1001` chip/label combination.
+   - The invoice number is already prominently shown in the right meta card; we don’t need it repeated here.
+
+C) Invoice “sent” status
+
+3. Use a clearer notion of sent/not sent instead of draft:
+
+   - If the invoice has never been sent via email:
+     - Show status text in the header meta as `Not Sent`.
+   - Once the invoice is emailed to the client:
+     - Update that status to `Sent`.
+
+   (Internally you can still track a “Draft” state, but the user-facing label in the header should reflect whether the invoice has been sent.)
+
+================================================
+4) JOB DESCRIPTION & INTERNAL NOTES BEHAVIOR
+================================================
+
+A) Job Description for client vs internal notes
+
+Current issue:
+
+- Job Description content from the Job is appearing under Internal Notes on the Invoice.
+
+Correct behavior:
+
+1. **Job Description (for client)**
+
+   - On the Job Detail page:
+     - Keep the Job Description card as-is (it’s already collapsible).
+     - This description represents work performed and may be included on customer-facing PDF/Invoice.
+
+   - On the Invoice Detail page:
+     - Show the **Job Description** as a client-facing section just below the client header, similar to how it is shown on the Job page.
+     - This description should be collapsible (same pattern as Job page: chevron to expand/collapse).
+     - The Job Description here is visible to the client (in PDF/email).
+
+2. **Internal Notes (tech / office only)**
+
+   - Internal notes are **not** the same as job description.
+   - Keep Internal Notes as a separate card on the right side of both Job and Invoice pages.
+   - Internal Notes should:
+     - Be shared between Job and Invoice (when linked).
+     - Not appear on client-facing documents.
+
+Implementation detail:
+
+- When creating an invoice from a job:
+  - Copy the **Job Description** into an invoice field like `invoice.workDescription` (client-visible).
+  - Internal notes remain independent: they are read/written from a shared notes field (job.notes or a shared entity), but do not auto-populate from Job Description.
+
+================================================
+5) INVOICE DETAIL: CLIENT MESSAGE SECTION (BOTTOM)
+================================================
+
+1. Near the bottom of the Invoice Detail page (below the Products & Services and totals area), add a **“Client Message”** section.
+
+   - This is a multi-line text area stored on the invoice as e.g. `clientMessage`.
+   - This text is **visible to the client**:
+     - It should be included on the invoice PDF and in invoice emails, in a section labeled something like “Message” or “Notes to Client”.
+
+   - Typical usage: “More work may be required…”, “Thank you for your business,” etc.
+
+================================================
+6) INVOICE LINE ITEMS: REORDERING + VISIBILITY CONTROL
+================================================
+
+A) Drag-and-drop reordering of invoice items
+
+1. Implement drag-and-drop reordering for **invoice line items**, similar to what we already have for Job Parts & Billing:
+
+   - Add a drag handle icon column to each invoice line item.
+   - Use the same drag-and-drop implementation as Jobs.
+   - Persist order via a `sortOrder` field on invoice line items and a reorder endpoint.
+   - Ensure PDF/print uses this order.
+
+B) Per-invoice visibility controls for client
+
+2. Each invoice should allow controlling what the client sees on the invoice.
+
+   Implementation suggestion:
+
+   - At the invoice level (e.g. in a settings panel or sidebar on the Invoice Detail page), add a “Client Visibility” section with toggle switches:
+
+     - Show quantities
+     - Show unit prices
+     - Show line item totals
+     - Show overall account balance / remaining balance
+     - Show line item breakdown (if turned OFF, the client only sees a single subtotal/total without the detailed line list).
+
+   - Store these as boolean flags on the invoice, e.g.:
+
+     - `showQuantity`
+     - `showUnitPrice`
+     - `showLineTotals`
+     - `showLineItems`
+     - `showBalance`
+
+   - When rendering the invoice for client view, PDF, or email:
+     - Respect these flags and hide columns/sections accordingly.
+
+================================================
+7) TAX HANDLING & DISPLAY
+================================================
+
+Current behavior:
+
+- Invoice line items have a `Tax` column that says `Yes` or `No`.
+
+Desired behavior:
+
+1. Tax configuration in settings:
+
+   - In account/company settings, create a **Tax Settings** section:
+
+     Fields:
+     - Tax name (e.g., `HST`)
+     - Tax rate (e.g., `13` for 13%)
+     - Possibly region if needed later (but at minimum, name + rate).
+
+   - Default values:
+     - Name: `HST`
+     - Rate: `13` (%)
+
+2. Line items:
+
+   - For each line item, instead of displaying `Tax: Yes/No`, internally store a boolean `isTaxable`.
+
+   - In the Invoice line items table:
+     - You may keep a simple `Taxable` indicator (e.g., a checkbox or icon), or hide the column entirely.
+     - We don’t need to show the rate per line; the rate comes from settings.
+
+3. Totals area:
+
+   - At the bottom of the invoice (totals section), calculate:
+
+     - **Subtotal**: sum of line item totals before tax (both taxable and non-taxable).
+     - **Tax amount**: apply the configured tax rate only to `isTaxable` items.
+     - **Tax row label**: use the configured tax name and show the rate, e.g.:
+
+       - `HST (13%)   $xxx.xx`
+
+     - **Total**: subtotal + tax.
+
+   - Remove the per-line `Yes` value from the main UI; focus on the summary showing the aggregated tax.
+
+================================================
+8) SUMMARY OF WHAT TO DELIVER
+================================================
+
+1. Job Detail:
+   - Invoice number in header bigger (same scale as job number).
+   - Job status updates to “Invoiced” (or similar) when an invoice is finalized.
+   - Priority removed from header.
+   - Scheduled times restricted to 15-minute increments.
+   - New header mini-card for Assigned Technicians + Visits; remove their sidebar cards; remove Metadata card.
+
+2. Invoice Detail:
+   - Header meta includes clickable Job # under Invoice #.
+   - Remove duplicate `Draft 1001` under client name; use `Not Sent` / `Sent` label based on email status.
+   - Job Description appears as a collapsible client-facing section under the header (separate from Internal Notes).
+   - Internal Notes remain right-side and are shared with Job, but separate from Job Description.
+   - New bottom section “Client Message” visible on PDF/email.
+   - Invoice line items reorderable via drag-and-drop with persisted sortOrder.
+   - Client visibility toggles (quantities, unit prices, line totals, line breakdown, balance).
+   - New tax settings (name + rate), tax applied only to taxable items, and totals area shows subtotal, tax name+rate+amount, and total.
+
+Keep styling consistent with existing cards, tables, and typography. Reuse existing components and patterns wherever possible.

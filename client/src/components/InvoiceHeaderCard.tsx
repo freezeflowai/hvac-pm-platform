@@ -63,13 +63,13 @@ function getIsOverdue(dueDate: string | null, balance: string, status: string): 
   return !!(dueDate && new Date(dueDate) < new Date() && balanceNum > 0 && status !== "paid" && status !== "voided");
 }
 
-function getStatusBadge(status: string, isOverdue: boolean): { 
+function getStatusBadge(status: string, isOverdue: boolean, sentAt: string | null): { 
   label: string; 
   variant: "default" | "destructive" | "secondary" | "outline";
 } {
   if (isOverdue) return { label: "Past Due", variant: "destructive" };
   switch (status) {
-    case "draft": return { label: "Draft", variant: "outline" };
+    case "draft": return { label: sentAt ? "Sent" : "Not Sent", variant: sentAt ? "default" : "outline" };
     case "sent": return { label: "Sent", variant: "default" };
     case "viewed": return { label: "Viewed", variant: "secondary" };
     case "partial_paid": return { label: "Partial", variant: "secondary" };
@@ -103,7 +103,7 @@ export function InvoiceHeaderCard({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isOverdue = getIsOverdue(invoice.dueDate, invoice.balance, invoice.status);
-  const statusInfo = getStatusBadge(invoice.status, isOverdue);
+  const statusInfo = getStatusBadge(invoice.status, isOverdue, invoice.sentAt ? String(invoice.sentAt) : null);
   const balanceColor = getBalanceColor(invoice.balance, isOverdue);
   const clientName = customerCompany?.name || location.companyName;
   
@@ -163,12 +163,6 @@ export function InvoiceHeaderCard({
                 </h1>
               </button>
 
-              <div className="mt-1 flex items-center gap-2">
-                <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-                <span className="text-sm font-medium text-muted-foreground">
-                  {invoice.invoiceNumber || `INV-${invoice.id.slice(0, 6).toUpperCase()}`}
-                </span>
-              </div>
 
               {/* Contact info */}
               <div className="mt-3 space-y-1 text-sm">

@@ -343,10 +343,9 @@ export function JobHeaderCard({
                   <button
                     type="button"
                     onClick={() => setLocation(`/invoices/${existingInvoice.id}`)}
-                    className="text-[11px] text-primary hover:underline font-medium"
+                    className="font-semibold text-primary hover:underline"
                     data-testid="link-invoice"
                   >
-                    <FileText className="h-3 w-3 inline-block mr-1" />
                     {existingInvoice.invoiceNumber || `INV-${existingInvoice.id.slice(0, 6).toUpperCase()}`}
                   </button>
                 ) : (
@@ -388,14 +387,6 @@ export function JobHeaderCard({
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              {/* Priority */}
-              <div className="mb-2 flex items-center justify-between gap-4">
-                <span className="font-medium text-muted-foreground">Priority</span>
-                <Badge variant={priorityInfo.variant} className="text-[11px]">
-                  {priorityInfo.label}
-                </Badge>
               </div>
 
               {/* Scheduled */}
