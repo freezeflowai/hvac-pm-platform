@@ -687,75 +687,73 @@ export default function JobDetailPage() {
 
       {/* ASSIGNED TECHNICIANS & VISITS - Header Mini-Card */}
       <Card className="mb-4" data-testid="card-techs-visits-header">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-6">
-            {/* Assigned Technicians Section */}
-            <div className="flex-1 min-w-[200px]">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  Assigned Technicians
-                </h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="text-xs h-auto p-0 text-primary"
-                  onClick={() => setShowAssignTech(true)}
-                  data-testid="button-assign-tech-header"
-                >
-                  <UserPlus className="h-3 w-3 mr-1" />
-                  Assign
-                </Button>
-              </div>
-              {job.technicians && job.technicians.length > 0 ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  {job.technicians.map(tech => (
-                    <div 
-                      key={tech.id} 
-                      className="flex items-center gap-1.5 text-sm"
-                      data-testid={`badge-tech-${tech.id}`}
-                    >
-                      <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-xs font-medium text-primary">
-                          {(tech.firstName?.[0] || tech.email[0]).toUpperCase()}
-                        </span>
-                      </div>
-                      <span>
-                        {tech.firstName && tech.lastName 
-                          ? `${tech.firstName} ${tech.lastName}`
-                          : tech.email}
+        <CardContent className="p-4 space-y-4">
+          {/* Assigned Technicians Section */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-medium flex items-center gap-2 text-muted-foreground">
+                <User className="h-3.5 w-3.5" />
+                Assigned Technicians
+              </h3>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs h-auto p-0 text-primary"
+                onClick={() => setShowAssignTech(true)}
+                data-testid="button-assign-tech-header"
+              >
+                <UserPlus className="h-3 w-3 mr-1" />
+                Assign
+              </Button>
+            </div>
+            {job.technicians && job.technicians.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {job.technicians.map(tech => (
+                  <div 
+                    key={tech.id} 
+                    className="flex items-center gap-1.5 text-sm"
+                    data-testid={`badge-tech-${tech.id}`}
+                  >
+                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-xs font-medium text-primary">
+                        {(tech.firstName?.[0] || tech.email[0]).toUpperCase()}
                       </span>
-                      {tech.id === job.primaryTechnicianId && (
-                        <Badge variant="secondary" className="text-[10px]">Primary</Badge>
-                      )}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">No technicians assigned yet.</p>
-              )}
-            </div>
-
-            {/* Visits Section */}
-            <div className="flex-1 min-w-[200px]">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  Visits
-                </h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="text-xs h-auto p-0 text-primary"
-                  onClick={() => toast({ title: "Coming Soon", description: "Visit scheduling coming soon." })}
-                  data-testid="button-new-visit-header"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  New Visit
-                </Button>
+                    <span>
+                      {tech.firstName && tech.lastName 
+                        ? `${tech.firstName} ${tech.lastName}`
+                        : tech.email}
+                    </span>
+                    {tech.id === job.primaryTechnicianId && (
+                      <Badge variant="secondary" className="text-[10px]">Primary</Badge>
+                    )}
+                  </div>
+                ))}
               </div>
-              <p className="text-xs text-muted-foreground">No visits scheduled yet.</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">No technicians assigned yet.</p>
+            )}
+          </div>
+
+          {/* Visits Section */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-medium flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-3.5 w-3.5" />
+                Visits
+              </h3>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs h-auto p-0 text-primary"
+                onClick={() => toast({ title: "Coming Soon", description: "Visit scheduling coming soon." })}
+                data-testid="button-new-visit-header"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                New Visit
+              </Button>
             </div>
+            <p className="text-xs text-muted-foreground">No visits scheduled yet.</p>
           </div>
         </CardContent>
       </Card>
@@ -775,27 +773,6 @@ export default function JobDetailPage() {
         <div className="space-y-3">
           {/* Parts & Billing / Line Items */}
           <PartsBillingCard jobId={jobId!} />
-
-          {/* Labour */}
-          <Card data-testid="card-labour">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-              <CardTitle className="text-sm font-semibold">Labour</CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-xs h-auto p-0 text-primary"
-                onClick={() => toast({ title: "Coming Soon", description: "Time tracking coming soon." })}
-                data-testid="button-new-time-entry"
-              >
-                New Time Entry
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                No labour entries yet. Track time against this job here.
-              </p>
-            </CardContent>
-          </Card>
 
           {/* Expenses */}
           <Card data-testid="card-expenses">
@@ -867,6 +844,27 @@ export default function JobDetailPage() {
               </CollapsibleContent>
             </Card>
           </Collapsible>
+
+          {/* Labour */}
+          <Card data-testid="card-labour">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+              <CardTitle className="text-sm font-semibold">Labour</CardTitle>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs h-auto p-0 text-primary"
+                onClick={() => toast({ title: "Coming Soon", description: "Time tracking coming soon." })}
+                data-testid="button-new-time-entry"
+              >
+                New Time Entry
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                No labour entries yet. Track time against this job here.
+              </p>
+            </CardContent>
+          </Card>
 
           {/* Equipment - collapsed by default */}
           <JobEquipmentSection jobId={job.id} locationId={job.locationId} />
