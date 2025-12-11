@@ -448,22 +448,24 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
     <>
       <Card data-testid="card-parts-billing">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-4">
-            <CardTitle className="text-sm font-semibold">Parts & Billing</CardTitle>
-            <div className="flex items-center gap-6 text-xs">
-              <div className="text-right">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-4">
+              <CardTitle className="text-sm font-semibold">Parts & Billing</CardTitle>
+            </div>
+            <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg bg-muted/50 border">
+              <div className="text-center">
                 <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Price</div>
-                <div className="font-semibold">{formatCurrency(totalPrice)}</div>
+                <div className="text-base font-bold">{formatCurrency(totalPrice)}</div>
               </div>
-              <div className="text-right">
+              <div className="text-center">
                 <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Cost</div>
-                <div className="font-semibold">{formatCurrency(totalCost)}</div>
+                <div className="text-base font-bold">{formatCurrency(totalCost)}</div>
               </div>
-              <div className="text-right">
-                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Profit Margin</div>
-                <div className="font-semibold">
-                  {formatCurrency(profit)}{" "}
-                  <span className="text-[11px] text-muted-foreground">• {margin.toFixed(1)}%</span>
+              <div className="text-center">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Profit</div>
+                <div className={`text-base font-bold ${profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {formatCurrency(profit)}
+                  <span className="ml-1 text-xs font-medium text-muted-foreground">({margin.toFixed(1)}%)</span>
                 </div>
               </div>
             </div>

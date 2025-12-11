@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Hash, Loader2 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +15,11 @@ import { insertCompanySettingsSchema, type CompanySettings } from "@shared/schem
 import type { z } from "zod";
 import NewAddClientDialog from "@/components/NewAddClientDialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+interface NumberingSettings {
+  nextJobNumber: number;
+  nextInvoiceNumber: number;
+}
 
 type CompanySettingsFormData = z.infer<typeof insertCompanySettingsSchema>;
 
@@ -91,6 +96,58 @@ export default function CompanySettingsPage() {
   const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
   });
+
+  const { data: numberingSettings, isLoading: numberingLoading } = useQuery<NumberingSettings>({
+    queryKey: ["/api/settings/numbering"],
+    enabled: Boolean(user?.id),
+  });
+
+  const [nextJobNumber, setNextJobNumber] = useState<string>("");
+  const [nextInvoiceNumber, setNextInvoiceNumber] = useState<string>("");
+
+  useEffect(() => {
+    if (numberingSettings) {
+      setNextJobNumber(numberingSettings.nextJobNumber.toString());
+      setNextInvoiceNumber(numberingSettings.nextInvoiceNumber.toString());
+    }
+  }, [numberingSettings]);
+
+  const updateNumberingMutation = useMutation({
+    mutationFn: async (data: { nextJobNumber?: number; nextInvoiceNumber?: number }) => {
+      const res = await apiRequest("PATCH", "/api/settings/numbering", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/numbering"] });
+      toast({
+        title: "Numbering updated",
+        description: "Your numbering settings have been saved.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update numbering settings.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveNumbering = () => {
+    const jobNum = parseInt(nextJobNumber, 10);
+    const invNum = parseInt(nextInvoiceNumber, 10);
+    
+    if (isNaN(jobNum) || jobNum < 1) {
+      toast({ title: "Invalid input", description: "Next Job Number must be a positive number.", variant: "destructive" });
+      return;
+    }
+    if (isNaN(invNum) || invNum < 1) {
+      toast({ title: "Invalid input", description: "Next Invoice Number must be a positive number.", variant: "destructive" });
+      return;
+    }
+    
+    updateNumberingMutation.mutate({ nextJobNumber: jobNum, nextInvoiceNumber: invNum });
+  };
 
   if (isLoading) {
     return (
@@ -284,6 +341,67 @@ export default function CompanySettingsPage() {
                 </div>
               </form>
             </Form>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Hash className="h-5 w-5 text-muted-foreground" />
+              <CardTitle>Numbering Settings</CardTitle>
+            </div>
+            <CardDescription>
+              Configure starting numbers for jobs and invoices. Useful when migrating from another system.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {numberingLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="nextJobNumber">Next Job Number</Label>
+                    <Input
+                      id="nextJobNumber"
+                      type="number"
+                      min="1"
+                      value={nextJobNumber}
+                      onChange={(e) => setNextJobNumber(e.target.value)}
+                      data-testid="input-next-job-number"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The next job created will use this number. Subsequent jobs will increment from there.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nextInvoiceNumber">Next Invoice Number</Label>
+                    <Input
+                      id="nextInvoiceNumber"
+                      type="number"
+                      min="1"
+                      value={nextInvoiceNumber}
+                      onChange={(e) => setNextInvoiceNumber(e.target.value)}
+                      data-testid="input-next-invoice-number"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The next invoice created will use this number. Subsequent invoices will increment from there.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleSaveNumbering}
+                    disabled={updateNumberingMutation.isPending}
+                    data-testid="button-save-numbering"
+                  >
+                    {updateNumberingMutation.isPending ? "Saving..." : "Save Numbering Settings"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

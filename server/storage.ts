@@ -284,6 +284,9 @@ export interface IStorage {
   updateJobStatus(companyId: string, id: string, status: string): Promise<Job | undefined>;
   deleteJob(companyId: string, id: string): Promise<boolean>;
   getNextJobNumber(companyId: string): Promise<number>;
+  getNextInvoiceNumber(companyId: string): Promise<number>;
+  getCompanyCounters(companyId: string): Promise<{ nextJobNumber: number; nextInvoiceNumber: number }>;
+  updateCompanyCounters(companyId: string, updates: { nextJobNumber?: number; nextInvoiceNumber?: number }): Promise<void>;
   
   // Recurring Job Series methods
   getRecurringSeries(companyId: string, id: string): Promise<RecurringJobSeries | undefined>;
@@ -1914,6 +1917,21 @@ export class MemStorage implements IStorage {
     const next = current + 1;
     this.jobNumberCounters.set(companyId, next);
     return next;
+  }
+
+  async getNextInvoiceNumber(_companyId: string): Promise<number> {
+    return 1001;
+  }
+
+  async getCompanyCounters(companyId: string): Promise<{ nextJobNumber: number; nextInvoiceNumber: number }> {
+    const nextJobNumber = this.jobNumberCounters.get(companyId) || 10000;
+    return { nextJobNumber, nextInvoiceNumber: 1001 };
+  }
+
+  async updateCompanyCounters(companyId: string, updates: { nextJobNumber?: number; nextInvoiceNumber?: number }): Promise<void> {
+    if (updates.nextJobNumber !== undefined) {
+      this.jobNumberCounters.set(companyId, updates.nextJobNumber);
+    }
   }
 
   async createJob(companyId: string, data: InsertJob): Promise<Job> {
@@ -4609,12 +4627,8 @@ export class DbStorage implements IStorage {
     const location = await this.getClient(companyId, job.locationId);
     if (!location) throw new Error("Location not found");
     
-    // Get next invoice number
-    const counter = await db.select().from(companyCounters).where(eq(companyCounters.companyId, companyId)).limit(1);
-    let nextInvoiceNumber = 1001;
-    if (counter.length > 0) {
-      nextInvoiceNumber = (counter[0].nextJobNumber || 1000) + 1000; // Offset from job numbers
-    }
+    // Get next invoice number atomically
+    const nextInvoiceNumber = await this.getNextInvoiceNumber(companyId);
     
     const today = new Date();
     const dueDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000); // Net 30
@@ -4623,7 +4637,7 @@ export class DbStorage implements IStorage {
     const invoiceData: InsertInvoice = {
       locationId: job.locationId,
       customerCompanyId: location.parentCompanyId || null,
-      invoiceNumber: `INV-${nextInvoiceNumber}`,
+      invoiceNumber: `${nextInvoiceNumber}`,
       status: "draft",
       issueDate: today.toISOString().split('T')[0],
       dueDate: dueDate.toISOString().split('T')[0],
@@ -4660,6 +4674,7 @@ export class DbStorage implements IStorage {
           lineItemType: "material",
           description: part.description,
           quantity: part.quantity,
+          unitCost: part.unitCost || "0",
           unitPrice: part.unitPrice || "0",
           taxRate: "0.13", // Default 13% HST
           lineSubtotal: lineTotal.toFixed(2),
@@ -4712,6 +4727,7 @@ export class DbStorage implements IStorage {
         lineItemType: "material",
         description: part.description,
         quantity: part.quantity,
+        unitCost: part.unitCost || "0",
         unitPrice: part.unitPrice || "0",
         taxRate: "0.13",
         lineSubtotal: lineTotal.toFixed(2),
@@ -4802,6 +4818,7 @@ export class DbStorage implements IStorage {
       await db.insert(companyCounters).values({
         companyId,
         nextJobNumber: 10001,
+        nextInvoiceNumber: 1002,
       });
       return 10000;
     }
@@ -4812,6 +4829,74 @@ export class DbStorage implements IStorage {
       .where(eq(companyCounters.companyId, companyId));
     
     return current;
+  }
+
+  async getNextInvoiceNumber(companyId: string): Promise<number> {
+    // Use company_counters table for atomic invoice number generation
+    const result = await db.select()
+      .from(companyCounters)
+      .where(eq(companyCounters.companyId, companyId))
+      .limit(1);
+    
+    if (result.length === 0) {
+      // Initialize counter for this company
+      await db.insert(companyCounters).values({
+        companyId,
+        nextJobNumber: 10000,
+        nextInvoiceNumber: 1002,
+      });
+      return 1001;
+    }
+    
+    const current = result[0].nextInvoiceNumber;
+    await db.update(companyCounters)
+      .set({ nextInvoiceNumber: current + 1 })
+      .where(eq(companyCounters.companyId, companyId));
+    
+    return current;
+  }
+
+  async getCompanyCounters(companyId: string): Promise<{ nextJobNumber: number; nextInvoiceNumber: number }> {
+    const result = await db.select()
+      .from(companyCounters)
+      .where(eq(companyCounters.companyId, companyId))
+      .limit(1);
+    
+    if (result.length === 0) {
+      return { nextJobNumber: 10000, nextInvoiceNumber: 1001 };
+    }
+    
+    return {
+      nextJobNumber: result[0].nextJobNumber,
+      nextInvoiceNumber: result[0].nextInvoiceNumber,
+    };
+  }
+
+  async updateCompanyCounters(companyId: string, updates: { nextJobNumber?: number; nextInvoiceNumber?: number }): Promise<void> {
+    const result = await db.select()
+      .from(companyCounters)
+      .where(eq(companyCounters.companyId, companyId))
+      .limit(1);
+    
+    if (result.length === 0) {
+      // Create counter with provided values
+      await db.insert(companyCounters).values({
+        companyId,
+        nextJobNumber: updates.nextJobNumber ?? 10000,
+        nextInvoiceNumber: updates.nextInvoiceNumber ?? 1001,
+      });
+    } else {
+      // Update existing counters
+      const updateData: Partial<{ nextJobNumber: number; nextInvoiceNumber: number }> = {};
+      if (updates.nextJobNumber !== undefined) updateData.nextJobNumber = updates.nextJobNumber;
+      if (updates.nextInvoiceNumber !== undefined) updateData.nextInvoiceNumber = updates.nextInvoiceNumber;
+      
+      if (Object.keys(updateData).length > 0) {
+        await db.update(companyCounters)
+          .set(updateData)
+          .where(eq(companyCounters.companyId, companyId));
+      }
+    }
   }
 
   async createJob(companyId: string, data: InsertJob): Promise<Job> {

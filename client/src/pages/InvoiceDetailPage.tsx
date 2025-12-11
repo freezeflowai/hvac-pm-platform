@@ -212,6 +212,22 @@ export default function InvoiceDetailPage() {
   const canEdit = invoice.status !== "paid" && invoice.status !== "voided";
   const isDraft = invoice.status === "draft";
 
+  // Calculate profit summary from invoice lines
+  const profitSummary = useMemo(() => {
+    let totalPrice = 0;
+    let totalCost = 0;
+    for (const line of lines) {
+      const qty = parseFloat(line.quantity) || 0;
+      const price = parseFloat(line.unitPrice) || 0;
+      const cost = parseFloat(line.unitCost || "0") || 0;
+      totalPrice += qty * price;
+      totalCost += qty * cost;
+    }
+    const profit = totalPrice - totalCost;
+    const margin = totalPrice > 0 ? (profit / totalPrice) * 100 : 0;
+    return { totalPrice, totalCost, profit, margin };
+  }, [lines]);
+
   const handleRecordPayment = () => {
     if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
       toast({ title: "Please enter a valid amount", variant: "destructive" });
@@ -388,13 +404,34 @@ export default function InvoiceDetailPage() {
 
               <Card>
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-base font-medium">Products & Services</CardTitle>
-                    {isEditing && (
-                      <Button size="sm" variant="outline" data-testid="button-add-line-item">
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Item
-                      </Button>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="text-base font-medium">Products & Services</CardTitle>
+                      {isEditing && (
+                        <Button size="sm" variant="outline" data-testid="button-add-line-item">
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Item
+                        </Button>
+                      )}
+                    </div>
+                    {profitSummary.totalCost > 0 && (
+                      <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg bg-muted/50 border">
+                        <div className="text-center">
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Price</div>
+                          <div className="text-base font-bold">{formatCurrency(profitSummary.totalPrice)}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Cost</div>
+                          <div className="text-base font-bold">{formatCurrency(profitSummary.totalCost)}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Profit</div>
+                          <div className={`text-base font-bold ${profitSummary.profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {formatCurrency(profitSummary.profit)}
+                            <span className="ml-1 text-xs font-medium text-muted-foreground">({profitSummary.margin.toFixed(1)}%)</span>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </CardHeader>

@@ -301,12 +301,21 @@ export const calendarAssignments = pgTable("calendar_assignments", {
   completionNotes: text("completion_notes"),
 });
 
-// Company counters table - tracks sequential counters per company (e.g., job numbers)
+// Company counters table - tracks sequential counters per company (e.g., job numbers, invoice numbers)
 export const companyCounters = pgTable("company_counters", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").notNull().unique().references(() => companies.id, { onDelete: "cascade" }),
   nextJobNumber: integer("next_job_number").notNull().default(10000),
+  nextInvoiceNumber: integer("next_invoice_number").notNull().default(1001),
 });
+
+export const updateCompanyCountersSchema = z.object({
+  nextJobNumber: z.number().int().positive().optional(),
+  nextInvoiceNumber: z.number().int().positive().optional(),
+});
+
+export type UpdateCompanyCounters = z.infer<typeof updateCompanyCountersSchema>;
+export type CompanyCounters = typeof companyCounters.$inferSelect;
 
 export const insertCalendarAssignmentSchema = createInsertSchema(calendarAssignments).omit({
   id: true,
@@ -609,6 +618,7 @@ export const invoiceLines = pgTable("invoice_lines", {
   date: date("date"), // Optional date for the line item
   technicianId: varchar("technician_id"), // Optional technician reference
   quantity: text("quantity").notNull().default("1"), // Stored as text for decimal precision
+  unitCost: text("unit_cost"), // Cost per unit (for profit margin calc)
   unitPrice: text("unit_price").notNull().default("0"), // Stored as text for decimal precision
   taxRate: text("tax_rate").notNull().default("0"), // Tax rate as decimal (e.g., "0.13" for 13%)
   lineSubtotal: text("line_subtotal").notNull().default("0"), // quantity * unitPrice
@@ -640,6 +650,7 @@ export const updateInvoiceLineSchema = z.object({
   date: z.string().nullable().optional(),
   technicianId: z.string().nullable().optional(),
   quantity: z.string().optional(),
+  unitCost: z.string().nullable().optional(),
   unitPrice: z.string().optional(),
   taxRate: z.string().optional(),
   lineSubtotal: z.string().optional(),

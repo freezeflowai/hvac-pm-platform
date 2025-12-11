@@ -709,21 +709,28 @@ export default function JobDetailPage() {
 
       {/* HEADER */}
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        {/* LEFT: job identity */}
+        {/* LEFT: job identity - client focused */}
         <div>
-          <h1 className="text-2xl font-semibold" data-testid="text-job-title">
-            {job.summary || "Job"}
+          <h1 className="text-2xl font-semibold" data-testid="text-client-title">
+            {clientName}
           </h1>
 
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-            <Badge variant="secondary" className="text-xs capitalize" data-testid="badge-job-type">
-              {job.jobType}
-            </Badge>
-          </div>
+          {job.summary && (
+            <p className="mt-0.5 text-base text-muted-foreground" data-testid="text-job-summary">
+              {job.summary}
+            </p>
+          )}
 
-          <p className="mt-1 text-xs text-muted-foreground" data-testid="text-location-info">
-            {clientName} • {locationName} • {fullAddress || "No address"}
-          </p>
+          <div className="mt-2 flex items-center gap-1.5 text-sm" data-testid="text-location-info">
+            <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <span className="font-medium">{locationName}</span>
+            {fullAddress && (
+              <>
+                <span className="text-muted-foreground">•</span>
+                <span>{fullAddress}</span>
+              </>
+            )}
+          </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
             <Button

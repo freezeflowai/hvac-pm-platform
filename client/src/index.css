@@ -227,14 +227,9 @@
     @apply border-border;
   }
 
-  /* Base font size - slightly larger for improved readability */
+  /* Base font size - standardized on larger size for improved readability */
   html {
-    font-size: 16.5px; /* improved base readability */
-  }
-
-  /* Large-text mode: applied when we add this class from JS */
-  html.text-scale-large {
-    font-size: 19px; /* bump everything that uses rem */
+    font-size: 19px;
   }
 
   body {

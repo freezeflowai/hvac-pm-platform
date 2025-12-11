@@ -1,0 +1,244 @@
+You are helping me refine my HVAC dispatch & invoicing app. There are 4 main changes:
+
+1. Configurable starting numbers for Jobs and Invoices (no duplicates).
+2. Job Detail header redesign (client-focused).
+3. Remove global font-size toggle and standardize on the larger font.
+4. Highlight profit summary on Parts & Billing and mirror a similar summary on the Invoice page.
+
+Use the existing stack and design system; do NOT add new libraries unless already in use.
+
+================================================
+1) CONFIGURABLE STARTING JOB & INVOICE NUMBERS
+================================================
+
+Goal: When a company migrates from another system, they can set their own starting job and invoice numbers. New jobs/invoices should continue from that sequence and never generate duplicates.
+
+A) Data model / settings
+
+1. Introduce persistent settings (if not already present) for numbering:
+
+   - `jobNumberNext: number`
+   - `invoiceNumberNext: number`
+
+   These can live in a global `Settings` table/collection (per tenant/company) or in whatever config mechanism is already used.
+
+   Example (SQL-style):
+
+   - `settings` table with key/value pairs, or
+   - `company_settings` keyed by companyId.
+
+2. Migration / defaults:
+
+   - If these values are missing for a company:
+     - Set `jobNumberNext` to (max existing job number + 1) or a reasonable default (e.g., 1000).
+     - Set `invoiceNumberNext` similarly.
+   - This avoids breaking existing data.
+
+B) Admin UI – Numbering Settings
+
+3. Add a section in Settings (e.g., `Settings → Numbering` or under an existing "General" settings page):
+
+   Fields:
+
+   - “Next Job Number”
+     - Numeric input bound to `jobNumberNext`.
+     - Help text: “The next job created will use this number. Subsequent jobs will increment from there.”
+   - “Next Invoice Number”
+     - Numeric input bound to `invoiceNumberNext`.
+     - Help text: “The next invoice created will use this number. Subsequent invoices will increment from there.”
+
+   Behavior:
+
+   - Only allow admins to modify these fields.
+   - Validate:
+     - Must be integer, > 0.
+     - Optionally warn if user sets it less than an existing highest number.
+
+   - On save:
+     - PATCH/PUT to `/api/settings/numbering` (or equivalent) to update both values.
+
+C) Number generation & uniqueness
+
+4. Job creation logic:
+
+   - When creating a job, if jobs use an auto-generated number (e.g. `jobNumber`):
+
+     - In a single atomic operation (transaction-safe if possible):
+
+       - Read `jobNumberNext` for the current company.
+       - Assign that value as the new job’s `jobNumber`.
+       - Increment `jobNumberNext` by 1 and save back to settings.
+
+   - Ensure the `jobNumber` column has a unique index per company/tenant to prevent duplicates even under concurrency.
+
+5. Invoice creation logic:
+
+   - Do the same with `invoiceNumberNext`:
+
+     - Read `invoiceNumberNext`.
+     - Assign to `invoiceNumber`.
+     - Increment `invoiceNumberNext`.
+     - Enforce uniqueness via DB constraint.
+
+6. Behavior when admin changes starting values:
+
+   - If admin sets `jobNumberNext` to some value lower than the current max:
+     - Allow it, but rely on the unique index to prevent duplicates.
+     - If a conflict occurs on insert, handle gracefully and bump the counter up until a free number is found.
+   - Add a short comment in code explaining this behavior.
+
+================================================
+2) JOB DETAIL HEADER REDESIGN
+================================================
+
+Goal: Make the Job header more client-focused and visually clear.
+
+Current (approximate) layout:
+
+- Breadcrumb: `Jobs / #10165`
+- Title: job name (e.g. “Makeuup install”)
+- Subline: job type (e.g. “Installation”)
+- Below: client name + location + address in smaller text.
+
+Desired changes:
+
+A) Title content & hierarchy
+
+1. In the Job header, adjust the main title:
+
+   - Remove “Jobs / #12345” styling from the title area.
+     - The breadcrumb “Jobs” can remain in the top-left nav area if needed, but the prominent header should NOT show “#JobNumber” as the main label.
+   - Instead, make the **client display name** the main large title (same font size as the previous job title).
+
+   - Under the main title, show:
+     - The job title / job description that the office user entered when creating the job (e.g. “Makeup install”).
+
+   So visually:
+
+   - Line 1 (large): `[Client Name or Company]`
+   - Line 2 (medium): `[Job Title / Job Summary]`
+
+2. The job number can still appear subtly, e.g. in the metadata card, but it should not dominate the header.
+
+B) Remove job type label and enlarge address
+
+3. Remove the job type label from the header (“Installation”, “Emergency”, etc.) from the main header area; it is not needed visually.
+
+4. Make the address line more prominent:
+
+   - Increase font size slightly.
+   - Ensure the client + location + address line is easy to read (e.g., `[Contact] • [Location Name] • [Full Address]`).
+
+C) Font-size toggle removal & default
+
+5. Remove the global font-size toggle (the “A A” control in the top-right):
+
+   - Remove its icon/control from the header bar.
+   - Remove its associated state and behavior.
+
+6. Standardize on the **larger font size** used when that toggle was set to “large”:
+
+   - Make that the default typography scale for the entire app.
+   - Clean up any conditional CSS/class logic that depended on “small/large font” preference.
+
+================================================
+3) PARTS & BILLING – HIGHLIGHT PROFIT SUMMARY
+================================================
+
+Current:
+
+- In the Parts & Billing card on the Job page, at the top of the table, there are summary numbers:
+  - Total Price
+  - Total Cost
+  - Profit Margin (dollar value + %)
+
+Goal:
+
+- Visually highlight this summary so it stands out.
+- Mirror similar logic on the Invoice page.
+
+A) Job → Parts & Billing summary styling
+
+1. In the Parts & Billing card header area where these numbers are currently displayed, change the styling to make it stand out:
+
+   - Wrap the summary in a small banner or pill-style bar with a subtle background color distinct from the rest of the card (e.g., a light accent or muted tone from the existing design system).
+   - Keep typography consistent but slightly emphasize values (e.g. bold amounts).
+
+2. Example layout inside the highlighted bar:
+
+   - `TOTAL PRICE  $X`
+   - `TOTAL COST   $Y`
+   - `PROFIT       $Z (N%)`
+
+   These can be inline with some spacing or in a small 3-column grid, whichever matches the existing UI pattern.
+
+3. Ensure that:
+
+   - The values are derived from the **current JobParts** (i.e., sum of line item totals).
+   - If there are no parts, show zeros or hide the profit margin gracefully.
+
+B) Invoice page – profit summary
+
+4. On the **Invoice Detail** page, add a similar summary strip, using the same styling.
+
+   Values to show:
+
+   - Total Price (invoice subtotal or total before tax, depending on your current invoice model).
+   - Total Cost (sum of underlying costs for each invoice line item).
+     - If invoice items are linked to JobParts (via jobId/jobPartId), use those costs.
+     - If cost data is stored directly on invoice lines, sum that.
+   - Profit and/or Profit Margin:
+     - `Profit = Total Price - Total Cost`
+     - `Profit Margin = Profit / Total Price` (guard against division by zero).
+
+5. Place this summary:
+
+   - At the top of the invoice line items section (similar to Parts & Billing), or
+   - In the invoice header area if that’s more consistent.
+
+6. Ensure that when an invoice is created from a job:
+
+   - The job line item costs are carried onto the invoice lines (if that isn’t already happening).
+   - The invoice’s profit summary uses its own line items as the source of truth, not just the job totals.
+
+================================================
+4) DESCRIPTION LOGIC (KEEP FROM PREVIOUS IMPLEMENTATION)
+================================================
+
+Please keep the description logic we agreed on previously for Parts & Billing:
+
+- Each JobPart should have:
+  - `name` (item name)
+  - `description` = template description override OR item.description OR empty string.
+
+- In the UI:
+  - Always show the **name**.
+  - Show a second line (description) only when:
+    - `description` is non-empty, AND
+    - `description.trim() !== name.trim()`.
+
+Do not alter this logic; just keep it in place while implementing the new summary styling and header changes.
+
+================================================
+WHAT TO DELIVER
+================================================
+
+1. Backend:
+   - Settings storage for `jobNumberNext` and `invoiceNumberNext`.
+   - Atomic number assignment logic for jobs and invoices using those settings, with uniqueness constraints.
+   - (If needed) endpoints to get/update numbering settings.
+
+2. Frontend:
+   - Settings UI to configure next Job and Invoice numbers.
+   - Job Detail header:
+     - Main title = client name/company.
+     - Second line = job title/summary.
+     - Remove prominent “Jobs #12345” title and job type label.
+     - Make address line more prominent.
+   - Remove font-size toggle control and associated logic; use large font scale app-wide.
+   - Parts & Billing summary bar:
+     - Highlight total price, total cost, profit margin in a distinct color strip on the Job page.
+   - Invoice Detail page:
+     - Add a matching summary bar showing price, cost, and profit/margin derived from invoice line items.
+
+All styling should follow the existing design system (spacing, colors, typography), just emphasizing the summary and adjusting the header hierarchy.

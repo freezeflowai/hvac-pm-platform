@@ -7,10 +7,9 @@ import { useQuery } from "@tanstack/react-query";
 import type { CompanySettings } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import FeedbackDialog from "./FeedbackDialog";
 import QuickAddClientModal from "./QuickAddClientModal";
-import { useTextScale } from "@/hooks/useTextScale";
 
 interface HeaderProps {
   onAddClient?: () => void;
@@ -28,7 +27,6 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
   const [searchQuery, setSearchQuery] = useState("");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [addClientModalOpen, setAddClientModalOpen] = useState(false);
-  const { scale, toggleScale } = useTextScale();
 
   const handleClientCreated = (clientId: string, _companyId?: string) => {
     // Navigate to the client detail page after creation
@@ -227,20 +225,6 @@ export default function Header({ onAddClient, onDashboardClick, onSearch, onClie
             >
               <MessageCircle className="h-4 w-4" />
             </Button>
-            <button
-              type="button"
-              onClick={toggleScale}
-              className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted h-8"
-              aria-pressed={scale === "large"}
-              aria-label={scale === "large" ? "Switch to normal text size" : "Switch to large text size"}
-              data-testid="button-text-scale"
-            >
-              <span className="text-sm">A</span>
-              <span className="text-lg font-semibold">A</span>
-              {scale === "large" && (
-                <span className="ml-1 text-[11px] text-muted-foreground">Large</span>
-              )}
-            </button>
             <Link href="/company-settings">
               <Button 
                 variant="ghost"

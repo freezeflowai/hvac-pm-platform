@@ -3151,6 +3151,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Numbering settings routes
+  app.get("/api/settings/numbering", isAuthenticated, async (req, res) => {
+    try {
+      const counters = await storage.getCompanyCounters(req.user!.companyId);
+      res.json(counters);
+    } catch (error) {
+      console.error('Get numbering settings error:', error);
+      res.status(500).json({ error: "Failed to fetch numbering settings" });
+    }
+  });
+
+  app.patch("/api/settings/numbering", isAuthenticated, async (req, res) => {
+    try {
+      const { nextJobNumber, nextInvoiceNumber } = req.body;
+      
+      // Validate inputs
+      if (nextJobNumber !== undefined && (typeof nextJobNumber !== 'number' || nextJobNumber < 1)) {
+        return res.status(400).json({ error: "nextJobNumber must be a positive integer" });
+      }
+      if (nextInvoiceNumber !== undefined && (typeof nextInvoiceNumber !== 'number' || nextInvoiceNumber < 1)) {
+        return res.status(400).json({ error: "nextInvoiceNumber must be a positive integer" });
+      }
+      
+      const updates: { nextJobNumber?: number; nextInvoiceNumber?: number } = {};
+      if (nextJobNumber !== undefined) updates.nextJobNumber = nextJobNumber;
+      if (nextInvoiceNumber !== undefined) updates.nextInvoiceNumber = nextInvoiceNumber;
+      
+      await storage.updateCompanyCounters(req.user!.companyId, updates);
+      const counters = await storage.getCompanyCounters(req.user!.companyId);
+      res.json(counters);
+    } catch (error) {
+      console.error('Update numbering settings error:', error);
+      res.status(500).json({ error: "Failed to update numbering settings" });
+    }
+  });
+
   // Route optimization routes
   app.post("/api/routes/optimize", isAuthenticated, async (req, res) => {
     try {
