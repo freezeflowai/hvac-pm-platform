@@ -4315,6 +4315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Sanitize input - only allow specific fields to prevent tenant boundary violations
       const sanitizedData = {
+        locationId: req.params.locationId,
         name: req.body.name,
         equipmentType: req.body.equipmentType || null,
         manufacturer: req.body.manufacturer || null,
@@ -4452,6 +4453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Sanitize input - only allow specific fields to prevent tenant boundary violations
       const sanitizedData = {
+        jobId: req.params.jobId,
         equipmentId: req.body.equipmentId,
         notes: req.body.notes || null,
       };
