@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, Send, MoreHorizontal, Plus, Trash2, DollarSign, 
   FileText, GripVertical, Check, X, RefreshCw, Phone, Mail, MapPin,
-  MessageSquare, User, Clock, Edit
+  MessageSquare, User, Clock, Edit, ChevronDown, ChevronRight, Settings
 } from "lucide-react";
 import {
   DndContext,
@@ -34,6 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Table,
@@ -190,6 +191,8 @@ export default function InvoiceDetailPage() {
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
   const [activityOpen, setActivityOpen] = useState(false);
+  const [workDescOpen, setWorkDescOpen] = useState(true);
+  const [visibilityOpen, setVisibilityOpen] = useState(false);
 
   const { data: details, isLoading } = useQuery<InvoiceDetails>({
     queryKey: ["/api/invoices", invoiceId, "details"],
@@ -205,6 +208,11 @@ export default function InvoiceDetailPage() {
   const { data: jobNotes = [], isLoading: notesLoading } = useQuery<JobNote[]>({
     queryKey: ["/api/jobs", jobId, "notes"],
     enabled: !!jobId,
+  });
+
+  const { data: companySettings } = useQuery<{ taxName?: string; defaultTaxRate?: string }>({
+    queryKey: ["/api/company-settings"],
+    staleTime: 5 * 60 * 1000,
   });
 
   const sendMutation = useMutation({
@@ -352,6 +360,30 @@ export default function InvoiceDetailPage() {
             sendPending={sendMutation.isPending}
           />
 
+          {/* Work Description (Client-Facing Job Description) - Collapsible */}
+          {invoice.workDescription && (
+            <Collapsible open={workDescOpen} onOpenChange={setWorkDescOpen}>
+              <Card className="mb-4" data-testid="card-work-description">
+                <CollapsibleTrigger asChild>
+                  <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-work-description">
+                    <span className="text-sm font-semibold flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      Work Description
+                    </span>
+                    {workDescOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="border-t px-4 pb-4 pt-3">
+                    <p className="text-sm whitespace-pre-wrap" data-testid="text-work-description">
+                      {invoice.workDescription}
+                    </p>
+                  </div>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-8 xl:col-span-8 space-y-6 order-1">
 
@@ -443,7 +475,9 @@ export default function InvoiceDetailPage() {
                         <span className="text-sm">{formatCurrency(invoice.subtotal)}</span>
                       </div>
                       <div className="flex justify-between w-56">
-                        <span className="text-sm text-muted-foreground">Tax</span>
+                        <span className="text-sm text-muted-foreground">
+                          {companySettings?.taxName || "Tax"} ({companySettings?.defaultTaxRate || "13"}%)
+                        </span>
                         <span className="text-sm">{formatCurrency(invoice.taxTotal)}</span>
                       </div>
                       <div className="flex justify-between w-56 pt-2 border-t mt-1">
@@ -535,25 +569,6 @@ export default function InvoiceDetailPage() {
                 </Card>
               )}
 
-              {/* Work Description - from job */}
-              {invoice.workDescription && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        Work Performed
-                      </CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {invoice.workDescription}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-
               <Card>
                 <CardContent className="p-0">
                   <Tabs defaultValue="public" className="w-full">
@@ -578,6 +593,70 @@ export default function InvoiceDetailPage() {
                   </Tabs>
                 </CardContent>
               </Card>
+
+              {/* Client Visibility Settings */}
+              {isEditing && (
+                <Collapsible open={visibilityOpen} onOpenChange={setVisibilityOpen}>
+                  <Card>
+                    <CollapsibleTrigger asChild>
+                      <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-visibility">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          <Settings className="h-4 w-4 text-muted-foreground" />
+                          Client Visibility
+                        </span>
+                        {visibilityOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="border-t px-4 pb-4 pt-3 space-y-3">
+                        <p className="text-xs text-muted-foreground mb-3">
+                          Control what the client sees on the invoice PDF and email.
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="showLineItems" className="text-sm">Show line item breakdown</Label>
+                          <Switch 
+                            id="showLineItems" 
+                            checked={invoice.showLineItems !== false}
+                            data-testid="switch-show-line-items"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="showQuantity" className="text-sm">Show quantities</Label>
+                          <Switch 
+                            id="showQuantity" 
+                            checked={invoice.showQuantity !== false}
+                            data-testid="switch-show-quantity"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="showUnitPrice" className="text-sm">Show unit prices</Label>
+                          <Switch 
+                            id="showUnitPrice" 
+                            checked={invoice.showUnitPrice !== false}
+                            data-testid="switch-show-unit-price"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="showLineTotals" className="text-sm">Show line totals</Label>
+                          <Switch 
+                            id="showLineTotals" 
+                            checked={invoice.showLineTotals !== false}
+                            data-testid="switch-show-line-totals"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="showBalance" className="text-sm">Show account balance</Label>
+                          <Switch 
+                            id="showBalance" 
+                            checked={invoice.showBalance !== false}
+                            data-testid="switch-show-balance"
+                          />
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
 
               <Collapsible open={activityOpen} onOpenChange={setActivityOpen}>
                 <Card>

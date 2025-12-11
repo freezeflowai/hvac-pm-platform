@@ -22,6 +22,9 @@ export const companies = pgTable("companies", {
   cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
+  // Tax settings
+  taxName: text("tax_name").notNull().default("HST"), // Default tax name (e.g., HST, GST, PST, VAT)
+  defaultTaxRate: text("default_tax_rate").notNull().default("13"), // Default tax rate as percentage (e.g., "13" for 13%)
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -561,6 +564,12 @@ export const invoices = pgTable("invoices", {
   workDescription: text("work_description"), // Full job description / work performed
   // Client message (customer-facing message for invoice PDF/email)
   clientMessage: text("client_message"), // Customer-facing message
+  // Client visibility toggles (controls what appears on client-facing invoice)
+  showQuantity: boolean("show_quantity").notNull().default(true),
+  showUnitPrice: boolean("show_unit_price").notNull().default(true),
+  showLineTotals: boolean("show_line_totals").notNull().default(true),
+  showLineItems: boolean("show_line_items").notNull().default(true), // If false, client sees only subtotal/total
+  showBalance: boolean("show_balance").notNull().default(true),
   // QBO sync fields
   qboInvoiceId: text("qbo_invoice_id"), // QBO Invoice.Id
   qboSyncToken: text("qbo_sync_token"), // QBO Invoice.SyncToken (required for updates)
@@ -603,6 +612,11 @@ export const updateInvoiceSchema = z.object({
   notesCustomer: z.string().nullable().optional(),
   workDescription: z.string().nullable().optional(),
   clientMessage: z.string().nullable().optional(),
+  showQuantity: z.boolean().optional(),
+  showUnitPrice: z.boolean().optional(),
+  showLineTotals: z.boolean().optional(),
+  showLineItems: z.boolean().optional(),
+  showBalance: z.boolean().optional(),
   qboInvoiceId: z.string().nullable().optional(),
   qboSyncToken: z.string().nullable().optional(),
   qboLastSyncedAt: z.date().nullable().optional(),
