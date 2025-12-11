@@ -5680,10 +5680,8 @@ export class DbStorage implements IStorage {
       throw new Error("Template not found");
     }
 
-    // Copy template description to job if job has no description
-    if (template.description && (!job.description || job.description.trim() === '')) {
-      await this.updateJob(companyId, jobId, { description: template.description });
-    }
+    // Always replace job description with template description (or clear if template has none)
+    await this.updateJob(companyId, jobId, { description: template.description || null });
 
     // Get template line items
     const templateLines = await this.getJobTemplateLineItems(templateId);
