@@ -15,6 +15,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -87,6 +97,11 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
     seedName: string;
     lineItemId: string | null;
   }>({ open: false, seedName: "", lineItemId: null });
+  const [templateConfirmState, setTemplateConfirmState] = useState<{
+    open: boolean;
+    templateId: string | null;
+    templateName: string;
+  }>({ open: false, templateId: null, templateName: "" });
   const lastSyncedPartsRef = useRef<string>("");
 
   const { data: jobParts = [], isLoading: partsLoading } = useQuery<JobPart[]>({
@@ -108,7 +123,12 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
   });
 
   const applyTemplateMutation = useMutation({
-    mutationFn: async (templateId: string) => {
+    mutationFn: async ({ templateId, replaceExisting }: { templateId: string; replaceExisting: boolean }) => {
+      if (replaceExisting && jobParts.length > 0) {
+        for (const part of jobParts) {
+          await apiRequest("DELETE", `/api/jobs/${jobId}/parts/${part.id}`);
+        }
+      }
       const res = await fetch("/api/job-templates/apply-to-job", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -124,12 +144,30 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "parts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId] });
-      toast({ title: "Template applied", description: "Parts from the template have been added to this job." });
+      toast({ title: "Template applied", description: "Line items have been replaced with the template." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const handleApplyTemplate = (templateId: string) => {
+    const template = jobTemplates.find(t => t.id === templateId);
+    const templateName = template?.name || "selected template";
+    
+    if (items.filter(i => !i.isNew).length > 0) {
+      setTemplateConfirmState({ open: true, templateId, templateName });
+    } else {
+      applyTemplateMutation.mutate({ templateId, replaceExisting: false });
+    }
+  };
+
+  const handleConfirmTemplateReplace = () => {
+    if (templateConfirmState.templateId) {
+      applyTemplateMutation.mutate({ templateId: templateConfirmState.templateId, replaceExisting: true });
+    }
+    setTemplateConfirmState({ open: false, templateId: null, templateName: "" });
+  };
 
   const { data: catalogData } = useQuery<{ items: Part[] }>({
     queryKey: ["/api/parts", { limit: 1000 }],
@@ -496,7 +534,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
               <Select
                 onValueChange={(templateId) => {
                   if (templateId) {
-                    applyTemplateMutation.mutate(templateId);
+                    handleApplyTemplate(templateId);
                   }
                 }}
                 disabled={applyTemplateMutation.isPending}
@@ -526,6 +564,29 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog 
+        open={templateConfirmState.open} 
+        onOpenChange={(open) => !open && setTemplateConfirmState({ open: false, templateId: null, templateName: "" })}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace Line Items?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This job already has line items. Applying the "{templateConfirmState.templateName}" template will remove all existing line items and replace them with the template items. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-template-replace">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmTemplateReplace}
+              data-testid="button-confirm-template-replace"
+            >
+              Replace Items
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AddProductModal
         open={productModalState.open}
