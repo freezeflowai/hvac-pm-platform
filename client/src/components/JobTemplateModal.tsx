@@ -30,7 +30,26 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Trash2, Loader2, GripVertical } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Plus, Trash2, Loader2, GripVertical, Check, ChevronsUpDown, HelpCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { JobTemplate, Part } from "@shared/schema";
 
 interface JobTemplateModalProps {
@@ -45,6 +64,7 @@ interface LineItemDraft {
   descriptionOverride: string;
   quantity: string;
   unitPriceOverride: string;
+  productSearchOpen?: boolean;
 }
 
 const JOB_TYPE_OPTIONS = [
@@ -205,9 +225,18 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
           ? {
               ...item,
               productId,
-              unitPriceOverride: item.unitPriceOverride || "",
+              unitPriceOverride: item.unitPriceOverride || (product?.unitPrice ? "" : ""),
+              productSearchOpen: false,
             }
           : item
+      )
+    );
+  };
+
+  const toggleProductSearch = (itemId: string, open: boolean) => {
+    setLineItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, productSearchOpen: open } : item
       )
     );
   };
@@ -383,7 +412,19 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
                       <TableRow>
                         <TableHead className="w-8"></TableHead>
                         <TableHead>Product / Service</TableHead>
-                        <TableHead>Description Override</TableHead>
+                        <TableHead>
+                          <div className="flex items-center gap-1">
+                            Description
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[200px]">
+                                <p className="text-xs">If left blank, the product's default description will be used.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TableHead>
                         <TableHead className="w-24">Qty</TableHead>
                         <TableHead className="w-32">Unit Price</TableHead>
                         <TableHead className="w-16"></TableHead>
@@ -394,32 +435,70 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
                         const defaultPrice = item.productId
                           ? getProductPrice(item.productId)
                           : "";
+                        const selectedProduct = item.productId
+                          ? catalogParts.find((p) => p.id === item.productId)
+                          : null;
                         return (
                           <TableRow key={item.id}>
-                            <TableCell className="text-muted-foreground">
+                            <TableCell className="text-muted-foreground cursor-grab">
                               <GripVertical className="h-4 w-4" />
                             </TableCell>
                             <TableCell>
-                              <Select
-                                value={item.productId}
-                                onValueChange={(val) =>
-                                  handleProductSelect(item.id, val)
-                                }
+                              <Popover
+                                open={item.productSearchOpen}
+                                onOpenChange={(open) => toggleProductSearch(item.id, open)}
                               >
-                                <SelectTrigger
-                                  className="w-full"
-                                  data-testid={`select-product-${index}`}
-                                >
-                                  <SelectValue placeholder="Select product..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {catalogParts.map((p) => (
-                                    <SelectItem key={p.id} value={p.id}>
-                                      {p.name || p.description}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={item.productSearchOpen}
+                                    className="w-full justify-between text-sm font-normal"
+                                    data-testid={`select-product-${index}`}
+                                  >
+                                    <span className="truncate">
+                                      {selectedProduct
+                                        ? selectedProduct.name || selectedProduct.description
+                                        : "Select product..."}
+                                    </span>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[300px] p-0" align="start">
+                                  <Command>
+                                    <CommandInput placeholder="Search products..." />
+                                    <CommandList>
+                                      <CommandEmpty>No products found.</CommandEmpty>
+                                      <CommandGroup>
+                                        {catalogParts.map((p) => (
+                                          <CommandItem
+                                            key={p.id}
+                                            value={p.name || p.description || p.id}
+                                            onSelect={() => handleProductSelect(item.id, p.id)}
+                                          >
+                                            <Check
+                                              className={cn(
+                                                "mr-2 h-4 w-4",
+                                                item.productId === p.id
+                                                  ? "opacity-100"
+                                                  : "opacity-0"
+                                              )}
+                                            />
+                                            <div className="flex flex-col">
+                                              <span>{p.name || p.description}</span>
+                                              {p.sku && (
+                                                <span className="text-xs text-muted-foreground">
+                                                  SKU: {p.sku}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
                             </TableCell>
                             <TableCell>
                               <Input
@@ -431,7 +510,7 @@ export function JobTemplateModal({ open, onClose, template }: JobTemplateModalPr
                                     e.target.value
                                   )
                                 }
-                                placeholder="Optional override..."
+                                placeholder={selectedProduct?.description || "Leave blank for default"}
                                 className="text-sm"
                                 data-testid={`input-description-${index}`}
                               />
