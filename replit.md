@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is a preventive maintenance scheduling application for HVAC/R contractors. It aims to streamline client contract management, schedule maintenance visits, and track parts inventory. The application provides a dashboard for overdue maintenance, upcoming schedules, and completed work, enhancing productivity and data organization. The business vision is to offer a robust tool for efficient maintenance operations, reduced downtime, and improved client satisfaction.
+This project is a preventive maintenance scheduling application designed for HVAC/R contractors. Its primary goal is to streamline client contract management, automate maintenance scheduling, and track parts inventory. The application provides a comprehensive dashboard displaying overdue maintenance, upcoming schedules, and completed work, aiming to significantly enhance operational efficiency, reduce downtime, and improve client satisfaction. The business vision is to deliver a robust tool that supports efficient maintenance operations and optimizes resource management for HVAC/R businesses.
 
 ## User Preferences
 
@@ -11,88 +11,30 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Frontend
-
-The frontend is built with React and TypeScript, using Vite for development. It features `wouter` for routing, `shadcn/ui` (based on Radix UI) styled with Tailwind CSS following Material Design principles. State management and data fetching are handled by TanStack Query, while React Hook Form and Zod manage forms and validation. The component structure follows an atomic design pattern.
+The frontend is developed using React and TypeScript with Vite. It employs `wouter` for routing, `shadcn/ui` (built on Radix UI) styled with Tailwind CSS, adhering to Material Design principles. TanStack Query manages state and data fetching, while React Hook Form and Zod handle form management and validation. The component structure follows an atomic design pattern.
 
 ### Backend
-
-The backend is an Express.js server in TypeScript, adhering to a RESTful API design. Data persistence uses a PostgreSQL database (Neon serverless) with Drizzle ORM. The API supports CRUD operations for clients, parts, and client-part relationships. Database schema includes `clients`, `parts`, and `client_parts` tables with foreign key constraints.
+The backend is an Express.js server written in TypeScript, providing a RESTful API. It uses a PostgreSQL database (Neon serverless) with Drizzle ORM for data persistence, managing clients, parts, and their relationships with enforced data integrity via foreign key constraints.
 
 ### Design System
-
-The application uses a Material Design-inspired typography with the Inter font family. Spacing and layout are consistent, using Tailwind's spacing units and a responsive 12-column grid system (mobile-first). The color system utilizes CSS custom properties for semantic naming. Key UI patterns include stats cards, maintenance cards, and dialog-based forms.
+The application features a Material Design-inspired typography with the Inter font family, consistent spacing, and a responsive 12-column grid system (mobile-first). The color system uses CSS custom properties, and key UI patterns include stats cards, maintenance cards, and dialog-based forms.
 
 ### Key Features & Technical Implementations
-
-- **Data Integrity**: Enforced via foreign key constraints with CASCADE delete.
-- **Parts Management**: Automatic and manual seeding of 244 standard parts (idempotent). Comprehensive inventory with custom parts, categorized selection (Filters, Belts, Other), and bulk addition.
-- **Client Management**: Alphabetical sorting, client deletion, and "Inactive" status to exclude clients from reports and schedules. CSV import for clients with validation and import statistics.
-- **Maintenance Scheduling**: Monthly PM schedule reports, recently completed maintenance with undo option, and automated next due date assignment upon completion.
-- **UI/UX Enhancements**: Redesigned maintenance cards for higher density and categorized parts selection for improved user experience. Enhanced typography with 16.5px base font size and improved muted-foreground contrast (36% lightness). Job Detail page uses 70/30 grid layout with collapsible right column cards (Notes expanded by default). Parts & Billing line items feature per-line Save/Cancel controls with draft state visual indicators.
-- **Authentication & Authorization**: Secure login with comprehensive Role-Based Access Control (RBAC):
-  - Database schema: `roles`, `permissions`, `role_permissions`, `user_permission_overrides`, `technician_profiles`, `working_hours` tables.
-  - 5 default roles: Owner, Admin, Manager, Dispatcher, Technician with hierarchical permissions.
-  - 24 granular permissions covering: clients (view, create, edit, delete), jobs (view, create, edit, delete, assign), scheduling (calendar view, calendar manage, route optimize), invoicing (view, create, edit, delete, send), team (view, manage, invite), reports (view PM, view financial, export), settings (company, billing, integrations, subscription).
-  - Permission inheritance: Role-based defaults with user-level overrides (grant/revoke).
-  - Technician profiles: Labor cost per hour, billable rate per hour, calendar color, notes.
-  - Working hours: Per-user weekly schedule with custom schedule override flag.
-  - Team Management UI: `/manage-team` list page with search/filter and "Manage Roles" link, `/manage-team/:id` detail page with tabs (Basic Info, Schedule, Billing, Permissions).
-  - Role Management: `/manage-roles` page with role listing, permission editor with collapsible accordion sections, and create/delete role functionality.
-  - Permissions Tab UX: Collapsible accordion sections grouped by category, search box for filtering permissions, Expand/Collapse all buttons, 3-state permission controls (Inherited / Allow / Deny) with visual indicators for overridden permissions.
-  - Permission State Architecture: UI state uses permission names as keys for consistency with role inheritance checks. Bidirectional lookup maps (`permissionNameById`, `permissionIdByName`) enable hydration from server IDs and conversion back to IDs for persistence.
-  - Helper functions: `getUserPermissions()`, `hasPermission()`, `checkPermission()`, `requirePermission()` in `server/permissions.ts`.
-  - API endpoints: GET/PATCH `/api/team`, PUT `/api/team/:userId/profile`, PUT `/api/team/:userId/working-hours`, PUT `/api/team/:userId/permissions`, GET `/api/roles`, GET `/api/permissions`, GET `/api/roles/:roleId/permissions`.
-- **Mobile Technician Dashboard**: Optimized view for field technicians with today's/upcoming schedules, client details, parts inventory, and equipment information. Includes tap-to-call/email.
-- **Technician System**: Technician-specific pages ("My Schedule", "Daily Parts"), assignment UI on Calendar, and PM visibility limited to assigned technicians.
-- **Subscription System (Feature Flagged)**: Tiered model (Free Trial, Silver, Gold, Enterprise) with location limits and usage tracking. Database schema includes `subscription_plans` and user subscription fields. Checks limits during client creation/import. Infrastructure ready for Stripe integration.
-- **Route Optimization**: Integrates OpenRouteService API for efficient technician routing. Converts addresses to GPS, calculates optimal visiting order, and visualizes routes on an interactive Leaflet map. Includes starting location input and smart reordering. Requires `OPENROUTESERVICE_API_KEY`.
-- **Calendar Cleanup**: Automatic removal of invalid calendar assignments when client PM months are updated, preserving completed jobs.
-- **Platform Admin Impersonation**: Secure system for platform administrators to impersonate company admins for support. Features server-side session storage, time limits, mandatory reason logging, and comprehensive audit trails. Includes an impersonation banner in the UI.
-- **Client Notes System**: Multiple timestamped notes per client with full CRUD operations. Notes display in client report dialog with add/edit/delete capability.
-- **Workflow-First Client Detail Page**: Redesigned client detail page (`/clients/:id`) with workflow-focused layout:
-  - Tabs: Overview | Jobs | Locations | Parts | Notes
-  - Quick Actions in header: Create Job, Create Invoice, Add Location buttons
-  - Jobs tab (`ClientJobsTab`): Displays all jobs for the client with location filter dropdown, job status badges (Completed, Scheduled, Overdue), and location metadata
-  - Location filter persisted via URL query params (`?tab=jobs&locationId=xxx`) enabling deep linking
-  - Locations tab: "View Jobs" action navigates to Jobs tab with pre-selected location filter
-  - Activity Summary placeholder on Overview tab for future metrics
-  - API endpoint: `GET /api/customer-companies/:parentId/jobs?locationId=xxx` returns enriched jobs with location names and billing flags
-- **QuickBooks Online (QBO) Sync Infrastructure**: Data model supporting QBO Customer/Sub-Customer hierarchy:
-  - `customer_companies` table: Parent entities mapping to QBO Customers with billing address, QBO sync fields (qboCustomerId, qboSyncToken, qboLastSyncedAt).
-  - `clients` table extended: Added parentCompanyId (FK to customer_companies), billWithParent flag, and QBO sync fields.
-  - QBO Mapper utilities (`server/qbo/mappers.ts`): Bidirectional mapping between app entities and QBO payloads.
-  - QBO Sync Service (`server/qbo/syncService.ts`): Stub implementation for create/update/deactivate sync operations.
-  - API routes for customer companies CRUD with soft delete (deactivate) support.
-  - Transactional storage method `createCustomerCompanyWithClient`: Atomic creation of CustomerCompany + Client + ClientParts using db.transaction() for rollback safety.
-  - API endpoint `POST /api/clients/with-company`: Creates parent Company and child Location together with upfront validation and proper QBO field mapping.
-- **Invoice System with QBO Integration**: Complete invoicing system supporting QuickBooks Online synchronization:
-  - `invoices` table: Full invoice data model with status workflow (draft, sent, paid, void, deleted), QBO sync fields (qboInvoiceId, qboSyncToken, qboLastSyncedAt, qboDocNumber), billing references to CustomerCompany or Location.
-  - `invoice_lines` table: Detailed line items with description, quantity, unitPrice, lineSubtotal, tax codes, and QBO item references.
-  - Billing logic: billWithParent flag determines invoice routing - if true, CustomerRef points to parent Company; if false, points to Location.
-  - Location context in parent-billed invoices via ShipAddr and CustomerMemo fields.
-  - QBO Mapper functions: mapInvoiceToQBO (build QBO Invoice payload), parseQBOInvoiceResponse (extract sync fields from QBO responses).
-  - QBO Sync Service: createInvoiceInQBO, updateInvoiceInQBO, voidInvoiceInQBO, deleteInvoiceInQBO stub methods ready for OAuth integration.
-  - API routes: Full CRUD for invoices with multi-tenant companyId scoping, includes invoice lines management.
-- **Jobs System**: Complete dispatching system with recurring series support:
-  - `jobs` table: Full job data model with status workflow (draft, scheduled, in_progress, on_hold, completed, cancelled, invoiced), priority levels (low, medium, high, urgent), job types (maintenance, repair, inspection, installation, emergency), technician assignment, and scheduling.
-  - `recurring_job_series` table: Recurring job templates with frequency (weekly, biweekly, monthly, quarterly, annually), start/end dates, and generation tracking.
-  - `recurring_job_phases` table: Multi-phase work templates within recurring series.
-  - `company_counters` table: Atomic company-scoped job number sequences (JOB-0001 format).
-  - Job status transitions: Draft → Scheduled → In Progress → On Hold/Completed → Cancelled/Invoiced with validation guards.
-  - Date range filtering: GET /api/jobs supports startDate and endDate query params for calendar views.
-  - Location-based filtering: Jobs linked to Locations (clients) via locationId FK.
-  - API endpoints: GET/POST /api/jobs, GET/PATCH/DELETE /api/jobs/:id, POST/GET /api/recurring-series.
-  - Frontend: QuickAddJobDialog for job creation, Jobs.tsx list page with status filters and sorting, JobDetailPage.tsx for detailed view and status management.
-  - Coexistence: Jobs system works alongside calendarAssignments during migration via optional calendarAssignmentId reference.
-- **Equipment Tracking System**: Location-level equipment registry with job linking for service history:
-  - `location_equipment` table: Equipment assets per location with name, equipmentType, manufacturer, modelNumber, serialNumber, tagNumber, installDate, warrantyExpiry, notes, and isActive soft delete flag.
-  - `job_equipment` table: Many-to-many relationship linking jobs to equipment serviced, with optional notes field.
-  - Equipment types: RTU, Split System, Chiller, Boiler, Furnace, Heat Pump, AHU, VRF, Walk-in Cooler/Freezer, Reach-in Cooler/Freezer, Ice Machine, Exhaust Fan, Makeup Air, Other.
-  - PM template integration: `location_pm_part_templates` and `job_parts` tables have optional equipmentId FK to link parts to specific equipment.
-  - Automatic PM job generation: When generating PM jobs from templates, automatically creates JobEquipment entries and sets JobPart.equipmentId based on template configuration.
-  - Service history tracking: API endpoint `/api/locations/:locationId/equipment/:equipmentId` returns equipment details with linked job history.
-  - Frontend components: `LocationEquipmentSection` (expandable equipment rows with service history), `JobEquipmentSection` (job detail page equipment management).
-  - API endpoints: Full CRUD for `/api/locations/:locationId/equipment`, CRUD for `/api/jobs/:jobId/equipment`.
+- **Client & Parts Management**: Includes client deletion, inactive status, CSV import for clients, and comprehensive parts inventory with custom parts and categorized selection.
+- **Maintenance Scheduling**: Supports monthly PM reports, tracking recently completed maintenance with an undo option, and automated next due date assignment.
+- **Authentication & Authorization**: Implements a secure Role-Based Access Control (RBAC) system with 5 default roles (Owner, Admin, Manager, Dispatcher, Technician), 24 granular permissions, and user-level overrides. Includes technician profiles with labor costs, billable rates, and working hours.
+- **Mobile Technician Dashboard**: An optimized view for field technicians displaying schedules, client details, parts inventory, and equipment information.
+- **Subscription System**: A feature-flagged tiered subscription model with location limits and usage tracking, designed for future Stripe integration.
+- **Route Optimization**: Integrates with OpenRouteService API for efficient technician routing, including GPS conversion, optimal sequencing, and interactive map visualization.
+- **Calendar Cleanup**: Automatically removes invalid calendar assignments when client PM months are updated, while preserving completed jobs.
+- **Platform Admin Impersonation**: A secure system for platform administrators to impersonate company admins for support, featuring server-side session management, time limits, and audit trails.
+- **Client Notes System**: Allows for multiple timestamped notes per client with full CRUD capabilities.
+- **Workflow-First Client Detail Page**: Redesigned client detail page with tabs for Overview, Jobs, Locations, Parts, and Notes, including quick actions and filtered job views.
+- **QuickBooks Online (QBO) Sync Infrastructure**: Supports QBO Customer/Sub-Customer hierarchy, bidirectional mapping between app entities and QBO payloads, and a QBO Sync Service for create/update/deactivate operations.
+- **Invoice System with QBO Integration**: A complete invoicing system with status workflow, QBO sync fields, and billing logic that integrates with QBO for invoice creation, updates, and voiding.
+- **Jobs System**: A comprehensive dispatching system supporting various job statuses, priority levels, job types, technician assignment, and recurring job series. It includes atomic job number sequences and date/location-based filtering.
+- **Equipment Tracking System**: Manages location-level equipment assets, links equipment to jobs for service history tracking, and integrates with PM templates for automatic job generation.
+- **Job Templates System**: Provides reusable templates for job parts and billing configurations, allowing for creation, editing, and application of default templates per job type.
 
 ## External Dependencies
 

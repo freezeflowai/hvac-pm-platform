@@ -21,8 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Loader2, Check, X } from "lucide-react";
-import type { JobPart, Part } from "@shared/schema";
+import { Plus, Trash2, Loader2, Check, X, FileText } from "lucide-react";
+import type { JobPart, Part, JobTemplate } from "@shared/schema";
 
 interface PartsBillingCardProps {
   jobId: string;
@@ -77,6 +77,38 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
       const res = await fetch(`/api/jobs/${jobId}/parts`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch job parts");
       return res.json();
+    },
+  });
+
+  const { data: jobTemplates = [] } = useQuery<JobTemplate[]>({
+    queryKey: ["/api/job-templates"],
+    queryFn: async () => {
+      const res = await fetch("/api/job-templates", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch job templates");
+      return res.json();
+    },
+  });
+
+  const applyTemplateMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      const res = await fetch("/api/job-templates/apply-to-job", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ jobId, templateId }),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: "Failed to apply template" }));
+        throw new Error(error.error || "Failed to apply template");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "parts"] });
+      toast({ title: "Template applied", description: "Parts from the template have been added to this job." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -384,7 +416,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
             </table>
           </div>
 
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -394,6 +426,37 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
               <Plus className="h-3 w-3 mr-1" />
               Add Line Item
             </Button>
+            {jobTemplates.length > 0 && (
+              <Select
+                onValueChange={(templateId) => {
+                  if (templateId) {
+                    applyTemplateMutation.mutate(templateId);
+                  }
+                }}
+                disabled={applyTemplateMutation.isPending}
+              >
+                <SelectTrigger 
+                  className="h-8 w-auto min-w-[160px]" 
+                  data-testid="select-apply-template"
+                >
+                  <FileText className="h-3 w-3 mr-1" />
+                  <SelectValue placeholder="Apply Template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobTemplates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                      {template.isDefaultForJobType && (
+                        <span className="ml-1 text-xs text-muted-foreground">(Default)</span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {applyTemplateMutation.isPending && (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            )}
           </div>
         </CardContent>
       </Card>

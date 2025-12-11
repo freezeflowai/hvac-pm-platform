@@ -1,0 +1,278 @@
+You are helping me add an **Admin → Job Templates** management screen to my HVAC dispatch app.
+
+Context (assume this now exists from previous work):
+
+- We have `Item` (products & services) with fields like id, name, unitPrice, type, etc.
+- We have `JobTemplate` and `JobTemplateLineItem` entities:
+
+  JobTemplate:
+    - id
+    - name
+    - jobType (string | null)      // e.g. "service_call", "pm", "install"
+    - description (string | null)
+    - isDefaultForJobType (boolean)
+    - isActive (boolean)
+    - createdAt, updatedAt
+
+  JobTemplateLineItem:
+    - id
+    - templateId
+    - itemId
+    - descriptionOverride (string | null)
+    - quantity (number)
+    - unitPriceOverride (number | null)
+    - sortOrder (number)
+
+- We have API endpoints (or you created them in earlier steps) like:
+
+  - GET /api/job-templates
+  - GET /api/job-templates/:id
+  - POST /api/job-templates
+  - PUT /api/job-templates/:id
+  - PATCH /api/job-templates/:id/default
+  - (Optionally) DELETE /api/job-templates/:id or a way to deactivate them
+  - GET /api/items?type=product|service for picking items (line items)
+
+- On the Job page we already have an “Apply template” dropdown that calls /api/jobs/:jobId/apply-template.
+
+Now I want a **dedicated Admin screen** to create, edit, and manage these templates.
+
+Use the existing frontend stack (React/TypeScript or whatever this project uses) and styling system. Do NOT add new UI libraries. Follow existing patterns for pages, tables, and modals.
+
+------------------------------------------------
+1) ROUTING & NAVIGATION
+------------------------------------------------
+
+1. Add a new route under the existing Admin section, e.g.:
+
+   - Path: `/admin/job-templates`
+   - Title: “Job Templates”
+
+2. In the left-hand navigation (Admin group), add a menu item “Job Templates” that links to this route.
+
+This page is only for office/admin users, not technicians.
+
+------------------------------------------------
+2) JOB TEMPLATE LIST PAGE
+------------------------------------------------
+
+The Job Templates page should have:
+
+- Title: **Job Templates**
+- Optional subtitle: “Manage reusable bundles of line items for service calls, PMs, installs, etc.”
+- A top-right action bar with:
+  - Filter:
+    - Dropdown for jobType (e.g. “All types”, “Service Call”, “PM”, “Install”).
+    - The exact jobType values can be free string options for now (just filter by exact string).
+  - Toggle/checkbox to “Show inactive” (default: hide inactive).
+  - Button: **+ New Template**
+
+### Table / list layout
+
+Display templates in a table:
+
+Columns:
+
+- Name
+- Job Type (show a human label, e.g. “Service Call” if jobType = "service_call")
+- Default? (e.g. a pill/tag if isDefaultForJobType = true)
+- Status (Active / Inactive)
+- Last Updated (date)
+- Actions
+
+Actions per row:
+
+- Edit (opens edit modal or navigates to edit screen)
+- Set as Default (if jobType is set and template is active)
+- Deactivate / Activate
+
+Behavior:
+
+- Clicking **Name** or **Edit** opens the edit UI.
+- Clicking **Set as Default**:
+  - Calls PATCH /api/job-templates/:id/default with the template’s jobType.
+  - On success, refreshes the list so only one template per jobType shows “Default”.
+- Deactivate/Activate:
+  - If active:
+    - Show “Deactivate” action; sets isActive = false.
+  - If inactive:
+    - Show “Activate” action; sets isActive = true.
+  - Implement via PUT /api/job-templates/:id with isActive updated.
+
+------------------------------------------------
+3) CREATE / EDIT JOB TEMPLATE UI
+------------------------------------------------
+
+Use a modal or dedicated page; a modal is fine if that matches existing UX patterns. I will describe it as a modal:
+
+### Modal structure
+
+Title:
+
+- “New Job Template” or “Edit Job Template”
+
+Sections:
+
+A) **Template Details**
+B) **Line Items**
+
+#### A) Template Details fields
+
+- Name (text, required)
+- Job Type (dropdown or text input):
+  - For now, use a simple text or dropdown with a few common options:
+    - service_call
+    - pm
+    - install
+    - repair
+    - custom
+  - You can show a human label in the UI, but store the string.
+
+- Description (textarea, optional)
+- Default for this job type (checkbox):
+  - Label: “Use as default template for this job type”
+  - If checked and jobType is defined:
+    - On save, backend should call/set `isDefaultForJobType = true` and handle clearing other defaults for that jobType.
+
+- Active (checkbox) – default = true
+
+#### B) Line Items editor
+
+Under a “Line Items” header, show a small table editor:
+
+Columns:
+
+- Item (select from Items)
+- Description (optional override, text input)
+- Quantity (number input, default 1)
+- Unit Price (number input, optional override)
+- Actions (Remove)
+
+Behavior:
+
+- “Add Line Item” button:
+  - Appends a new row with:
+    - Item = empty
+    - quantity = 1
+    - descriptionOverride empty
+    - unitPriceOverride empty
+- Item selection:
+  - Use a dropdown/autocomplete that fetches from `/api/items` (both products and services).
+  - When an item is selected:
+    - If unitPriceOverride is empty, show the item’s default unitPrice as a hint (you can either:
+      - copy it into the field, or
+      - show it as “Default: $X.XX” below/next to the field).
+- Quantity:
+  - Must be > 0.
+  - Use numeric coercion on save.
+
+- Unit Price:
+  - If left blank (null), backend should use item.unitPrice when applying the template to a job.
+  - If filled in, use this price instead of item.unitPrice.
+
+- Drag handle or simple up/down buttons to adjust `sortOrder`:
+  - Optional but nice; otherwise, the order can be the array order as entered.
+  - If you add move up/down, make sure to set sortOrder accordingly when saving.
+
+Validation:
+
+- At least one line item is required.
+- Each line item must have:
+  - itemId
+  - quantity > 0
+
+Buttons:
+
+- Save
+- Cancel
+
+### Save behavior
+
+On Save:
+
+- If creating:
+  - POST /api/job-templates with template fields + lines array.
+- If editing:
+  - PUT /api/job-templates/:id with updated template fields + whole new lines array.
+  - Simplify by replacing all existing lines with the new list.
+
+On success:
+
+- Close modal.
+- Refresh template list.
+
+------------------------------------------------
+4) API WIRING & ZOD VALIDATION
+------------------------------------------------
+
+Use Zod on the frontend or backend (or both) to validate template payloads.
+
+Example payload shape the UI should send to create/update:
+
+{
+  name: string,
+  jobType?: string,
+  description?: string,
+  isDefaultForJobType?: boolean,
+  isActive?: boolean,
+  lines: Array<{
+    id?: string,                     // for editing existing lines (optional)
+    itemId: string,
+    descriptionOverride?: string,
+    quantity: number,
+    unitPriceOverride?: number,
+    sortOrder?: number
+  }>
+}
+
+Backend:
+
+- When `isDefaultForJobType` is true and jobType is provided:
+  - Ensure this template becomes the only default for that jobType.
+- When saving lines:
+  - Normalize sortOrder (0, 10, 20, … or just index 0..N-1).
+
+------------------------------------------------
+5) NICE-TO-HAVE: READ-ONLY PREVIEW OF LINE ITEMS IN LIST
+------------------------------------------------
+
+On the main Job Templates list page, when the user clicks on a template row (or a small "View" icon), optionally show a small side drawer or expand row that lists the line items:
+
+- e.g.:
+
+  Service Call – Standard
+  - Labor – 1 hr
+  - Truck Charge – 1
+  - Environmental Fee – 1
+
+This is optional but helpful. If implementing:
+
+- Fetch `/api/job-templates/:id` when expanding.
+- Display items with their names and quantities, not item IDs.
+
+------------------------------------------------
+6) GENERAL REQUIREMENTS
+------------------------------------------------
+
+- Follow existing code style and component patterns.
+- Reuse current table, modal, button, and form components.
+- Handle loading and basic error states (spinners / error messages).
+
+------------------------------------------------
+WHAT TO DELIVER
+------------------------------------------------
+
+1. A new Admin route `/admin/job-templates` with:
+   - A list/table of templates (name, jobType, default flag, status, updated, actions).
+   - Filters for jobType and active/inactive status.
+   - “+ New Template” button.
+
+2. A create/edit Job Template modal or page:
+   - Template details (name, jobType, description, default flag, active).
+   - Editable line items table with item selection, quantity, descriptionOverride, unitPriceOverride.
+
+3. API hookups:
+   - Use existing `/api/job-templates` endpoints for list/get/create/update/setDefault.
+   - Use `/api/items` for item selection dropdown.
+
+4. Ensure the UI integrates cleanly with the existing styling and that template changes are reflected immediately on the Job Detail “Apply template…” dropdown.

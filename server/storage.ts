@@ -5483,7 +5483,16 @@ export class DbStorage implements IStorage {
   }
 
   async getJobTemplateLineItems(templateId: string): Promise<JobTemplateLineItem[]> {
-    return db.select()
+    return db.select({
+      id: jobTemplateLineItems.id,
+      templateId: jobTemplateLineItems.templateId,
+      productId: jobTemplateLineItems.productId,
+      descriptionOverride: jobTemplateLineItems.descriptionOverride,
+      quantity: jobTemplateLineItems.quantity,
+      unitPriceOverride: jobTemplateLineItems.unitPriceOverride,
+      sortOrder: jobTemplateLineItems.sortOrder,
+      createdAt: jobTemplateLineItems.createdAt,
+    })
       .from(jobTemplateLineItems)
       .where(eq(jobTemplateLineItems.templateId, templateId))
       .orderBy(jobTemplateLineItems.sortOrder);
