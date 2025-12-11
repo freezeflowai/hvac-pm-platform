@@ -1,0 +1,175 @@
+You are helping me refine the Job Detail → Parts & Billing experience in my HVAC dispatch app.
+
+Context (current state):
+
+- Job Detail page:
+  - Header shows job title/ID, job type, client/location, status, priority, etc.
+  - Below that, the first big card is **Parts & Billing**, which lists line items (Product/Service, Qty, Cost, Price, Total).
+  - There is currently no dedicated place to store a **job description / work performed** text.
+- Job Templates:
+  - Each template has a `description` that describes the procedure (e.g., compressor replacement steps).
+  - Applying a template copies line items to JobParts, and we’ve already agreed to copy the template’s `description` into the job when the job has no description.
+- Parts & Billing:
+  - Each JobPart is linked to an Item from the parts catalog (Products & Services).
+  - The UI currently shows the item name and a “duplicate-looking” description.
+- Templates:
+  - In the Job Templates editor, line items can be reordered via drag-and-drop.
+
+I want the following changes:
+
+------------------------------------------------
+1) JOB DESCRIPTION CARD UNDER HEADER
+------------------------------------------------
+
+Add a dedicated **Job Description / Work Performed** card on the Job Detail page, positioned:
+
+- Directly **under the main job header**, ABOVE Parts & Billing.
+- Full-width (or matching the current width of Parts & Billing), not tucked into the side column.
+
+A) Data model
+
+1. Ensure the Job entity has a long-text field for description, e.g.:
+
+   - `description: string | null`
+
+   If this already exists, use it specifically as “Job Description / Work Performed”.
+
+2. When applying a JobTemplate to a job:
+   - If `job.description` is null/empty AND `jobTemplate.description` is non-empty:
+     - Set `job.description = jobTemplate.description`.
+   - If `job.description` is already set, do **not** overwrite it when applying a template.
+
+   Implement this logic in the backend where template application runs (e.g. in `jobs.applyTemplateToJob`).
+
+B) UI – Job Description card
+
+3. Add a card between the header and Parts & Billing, titled **“Job Description”** (or “Work Performed”).
+
+   Behavior:
+
+   - If `job.description` is empty:
+     - Show a subtle empty state, e.g.:
+       - “No job description added yet.”
+       - A button or link: **“Add Description”**.
+     - Clicking the button turns the card into an editable textarea.
+
+   - If `job.description` has content:
+     - Show the text in a read-only mode with a small **“Edit”** button in the card header, OR use inline editing if that fits your patterns.
+
+   Editing:
+
+   - Use a multiline textarea.
+   - On save:
+     - PATCH/PUT to `/api/jobs/:id` with `{ description: "..." }`.
+   - On cancel:
+     - Revert to previous text.
+
+   Keep the styling consistent with other cards: title, body, actions.
+
+C) Invoice integration (existing idea from previous prompt; keep or implement if not done):
+
+4. When creating an invoice from a job:
+
+   - If the Invoice model has a `description` or `notes` field:
+     - Set it from `job.description` when the invoice is created.
+   - If such a field doesn’t exist yet, you can add it, but keep it simple:
+     - `invoice.description` = `job.description || ""`.
+
+   The goal: invoice shows a “Work Performed” block at the top, separate from line items.
+
+We are **not** making the Job Description card collapsible for now, since it’s under the header and should be prominent. If you want, you can add a chevron later, but it’s optional.
+
+------------------------------------------------
+2) REORDERABLE LINE ITEMS IN PARTS & BILLING
+------------------------------------------------
+
+I want to be able to reorder JobParts in the Parts & Billing table, similar to how we can reorder line items in Job Templates.
+
+A) Data / storage
+
+1. Ensure JobPart has a `sortOrder` (or equivalent) numeric field:
+
+   - e.g., `sortOrder: number` (default to index order when created).
+   - This field determines the display order in Parts & Billing and also the order used when creating invoice line items.
+
+2. When new JobParts are created (manually or from templates), assign sortOrder in sequence (0, 10, 20… or 0..N-1).
+
+B) UI – drag-and-drop
+
+3. In the Parts & Billing table:
+
+   - Add a drag handle column on the left side of each row (reuse the same drag handle icon from the Job Templates line items editor).
+   - Implement drag-and-drop reordering using the same mechanism you used for templates (same library and pattern – e.g. `react-beautiful-dnd` or custom hook).
+
+4. On drop:
+
+   - Update the local order in the UI so the user sees the new sequence.
+   - Send the new order to the backend via a dedicated endpoint, e.g.:
+
+     - `PATCH /api/jobs/:jobId/parts/reorder` with body:
+
+       ```json
+       {
+         "parts": [
+           { "id": "part1", "sortOrder": 0 },
+           { "id": "part2", "sortOrder": 1 },
+           ...
+         ]
+       }
+       ```
+
+   - Backend:
+     - Persist the new sortOrder for each JobPart.
+   - Ensure that any queries that fetch JobParts for a job order by `sortOrder ASC`.
+
+5. When converting a job to an invoice:
+
+   - Preserve this order when creating invoice line items. That is, invoice lines should be created based on JobParts ordered by sortOrder.
+
+------------------------------------------------
+3) DESCRIPTION LOGIC FOR LINE ITEMS
+------------------------------------------------
+
+I want clear, non-duplicated display for name/description:
+
+- **Name**: the Product/Service name (e.g., “Labour (Includes Travel)”).
+- **Description**: either:
+  - The description saved on the JobPart (override), or
+  - The description saved in the parts catalog (Item.description), or
+  - blank if none exists.
+
+Display rules:
+
+1. When building JobParts from Items and/or templates:
+
+   - Let:
+     - `name = item.name`
+     - `description`:
+       - If template line has descriptionOverride: use that.
+       - Else if item.description exists: use item.description.
+       - Else: empty string.
+
+   - Store both fields appropriately on the JobPart (or derive them at render time).
+
+2. In the Parts & Billing UI:
+
+   - For each row:
+     - Always show the **name**.
+     - Show the **description** only when BOTH:
+       - description is non-empty, AND
+       - `description.trim() !== name.trim()`.
+
+   Example JSX logic:
+
+   ```tsx
+   const name = part.name;
+   const description = part.description;
+
+   <div className="line-item-main">
+     <div className="line-item-title">{name}</div>
+     {description && description.trim() !== name.trim() && (
+       <div className="line-item-subtitle">
+         {description}
+       </div>
+     )}
+   </div>

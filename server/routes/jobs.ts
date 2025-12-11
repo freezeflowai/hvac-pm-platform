@@ -231,6 +231,26 @@ router.delete("/:jobId/parts/:id", isAuthenticated, async (req, res) => {
   }
 });
 
+router.patch("/:jobId/parts/reorder", isAuthenticated, async (req, res) => {
+  try {
+    const job = await storage.getJob(req.user!.companyId, req.params.jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    
+    const { parts } = req.body;
+    if (!Array.isArray(parts)) {
+      return res.status(400).json({ error: "parts array is required" });
+    }
+    
+    await storage.reorderJobParts(req.params.jobId, parts);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reorder job parts error:', error);
+    res.status(500).json({ error: "Failed to reorder job parts" });
+  }
+});
+
 router.get("/:jobId/equipment", isAuthenticated, async (req, res) => {
   try {
     const job = await storage.getJob(req.user!.companyId, req.params.jobId);

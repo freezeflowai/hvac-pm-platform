@@ -308,6 +308,7 @@ export interface IStorage {
   createJobPart(jobId: string, data: InsertJobPart): Promise<JobPart>;
   updateJobPart(id: string, data: UpdateJobPart): Promise<JobPart | undefined>;
   deleteJobPart(id: string): Promise<boolean>;
+  reorderJobParts(jobId: string, parts: { id: string; sortOrder: number }[]): Promise<void>;
   
   // PM Job generation
   generatePMJobForLocation(companyId: string, locationId: string, date: Date): Promise<{ job: Job; parts: JobPart[] } | null>;
@@ -2227,7 +2228,8 @@ export class MemStorage implements IStorage {
   // Job Parts methods
   async getJobParts(jobId: string): Promise<JobPart[]> {
     return Array.from(this.jobPartsMap.values())
-      .filter(p => p.jobId === jobId && p.isActive);
+      .filter(p => p.jobId === jobId && p.isActive)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }
 
   async createJobPart(jobId: string, data: InsertJobPart): Promise<JobPart> {
@@ -2243,6 +2245,7 @@ export class MemStorage implements IStorage {
       unitPrice: data.unitPrice ?? null,
       source: data.source ?? 'manual',
       equipmentLabel: data.equipmentLabel ?? null,
+      sortOrder: data.sortOrder ?? 0,
       isActive: data.isActive ?? true,
       createdAt: new Date(),
       updatedAt: null,
@@ -2271,6 +2274,15 @@ export class MemStorage implements IStorage {
       return true;
     }
     return false;
+  }
+
+  async reorderJobParts(jobId: string, parts: { id: string; sortOrder: number }[]): Promise<void> {
+    for (const { id, sortOrder } of parts) {
+      const part = this.jobPartsMap.get(id);
+      if (part && part.jobId === jobId) {
+        this.jobPartsMap.set(id, { ...part, sortOrder, updatedAt: new Date() });
+      }
+    }
   }
 
   // PM Job generation
@@ -5096,7 +5108,8 @@ export class DbStorage implements IStorage {
       .where(and(
         eq(jobParts.jobId, jobId),
         eq(jobParts.isActive, true)
-      ));
+      ))
+      .orderBy(jobParts.sortOrder);
   }
 
   async createJobPart(jobId: string, data: InsertJobPart): Promise<JobPart> {
@@ -5126,6 +5139,17 @@ export class DbStorage implements IStorage {
       .where(eq(jobParts.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  async reorderJobParts(jobId: string, parts: { id: string; sortOrder: number }[]): Promise<void> {
+    for (const { id, sortOrder } of parts) {
+      await db.update(jobParts)
+        .set({ sortOrder, updatedAt: new Date() })
+        .where(and(
+          eq(jobParts.id, id),
+          eq(jobParts.jobId, jobId)
+        ));
+    }
   }
 
   // PM Job generation
@@ -5656,11 +5680,20 @@ export class DbStorage implements IStorage {
       throw new Error("Template not found");
     }
 
+    // Copy template description to job if job has no description
+    if (template.description && (!job.description || job.description.trim() === '')) {
+      await this.updateJob(companyId, jobId, { description: template.description });
+    }
+
     // Get template line items
     const templateLines = await this.getJobTemplateLineItems(templateId);
     if (templateLines.length === 0) {
       return [];
     }
+
+    // Get existing job parts count to determine sortOrder start
+    const existingParts = await this.getJobParts(jobId);
+    const startSortOrder = existingParts.length;
 
     // Get product details for each line item
     const productIds = templateLines.map(line => line.productId);
@@ -5672,7 +5705,8 @@ export class DbStorage implements IStorage {
 
     // Create job parts from template lines
     const createdParts: JobPart[] = [];
-    for (const line of templateLines) {
+    for (let i = 0; i < templateLines.length; i++) {
+      const line = templateLines[i];
       const product = productMap.get(line.productId);
       if (!product) continue;
 
@@ -5688,7 +5722,8 @@ export class DbStorage implements IStorage {
           quantity,
           unitPrice,
           unitCost: product.cost ?? null,
-          source: 'manual', // Could add 'template' as a new source type
+          source: 'manual',
+          sortOrder: startSortOrder + i,
           isActive: true,
         })
         .returning();

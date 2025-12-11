@@ -1021,6 +1021,7 @@ export const jobParts = pgTable("job_parts", {
   unitPrice: text("unit_price"), // Stored as text for decimal precision
   source: text("source").notNull().default("manual"), // pm_template, added_by_tech, quoted, manual
   equipmentLabel: text("equipment_label"), // Legacy: Copied from PM template or added by tech
+  sortOrder: integer("sort_order").notNull().default(0), // For ordering line items in Parts & Billing
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at"),
@@ -1034,6 +1035,7 @@ export const insertJobPartSchema = createInsertSchema(jobParts).omit({
   source: z.enum(jobPartSourceEnum).default("manual"),
   unitCost: z.string().nullable().optional(),
   equipmentId: z.string().nullable().optional(),
+  sortOrder: z.number().optional(),
 });
 
 export const updateJobPartSchema = z.object({
@@ -1045,6 +1047,7 @@ export const updateJobPartSchema = z.object({
   unitPrice: z.string().nullable().optional(),
   source: z.enum(jobPartSourceEnum).optional(),
   equipmentLabel: z.string().nullable().optional(),
+  sortOrder: z.number().optional(),
   isActive: z.boolean().optional(),
 });
 

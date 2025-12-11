@@ -21,7 +21,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Loader2, Check, X, FileText } from "lucide-react";
+import { Plus, Trash2, Loader2, Check, X, FileText, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { JobPart, Part, JobTemplate } from "@shared/schema";
 
 interface PartsBillingCardProps {
@@ -39,6 +56,7 @@ interface LocalLineItem {
   unitCost: string;
   unitPrice: string;
   source: string;
+  sortOrder: number;
 }
 
 interface OriginalItemState {
@@ -126,10 +144,10 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
     if (!jobParts || editingRowId) return;
     
     const catalogKey = catalogParts.map(p => p.id + p.cost + p.unitPrice).join(",");
-    const partsKey = JSON.stringify(jobParts.map(jp => jp.id + jp.quantity + jp.unitCost + jp.unitPrice + jp.productId)) + "|" + catalogKey;
+    const partsKey = JSON.stringify(jobParts.map(jp => jp.id + jp.quantity + jp.unitCost + jp.unitPrice + jp.productId + jp.sortOrder)) + "|" + catalogKey;
     if (partsKey === lastSyncedPartsRef.current) return;
     
-    const mappedItems = jobParts.map((jp) => {
+    const mappedItems = jobParts.map((jp, index) => {
       const catalogItem = catalogParts.find((p) => p.id === jp.productId);
       const productName = catalogItem?.name || catalogItem?.description || "";
       return {
@@ -143,11 +161,48 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
         unitCost: jp.unitCost || catalogItem?.cost || "0",
         unitPrice: jp.unitPrice || "0",
         source: jp.source,
+        sortOrder: jp.sortOrder ?? index,
       };
     });
     lastSyncedPartsRef.current = partsKey;
     setItems(mappedItems);
   }, [jobParts, catalogParts, editingRowId]);
+
+  const reorderMutation = useMutation({
+    mutationFn: async (newOrder: { id: string; sortOrder: number }[]) => {
+      const res = await apiRequest("PATCH", `/api/jobs/${jobId}/parts/reorder`, { parts: newOrder });
+      if (!res.ok) throw new Error("Failed to reorder");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "parts"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to reorder items.", variant: "destructive" });
+    },
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = items.findIndex((i) => i.id === active.id);
+    const newIndex = items.findIndex((i) => i.id === over.id);
+    
+    const newItems = arrayMove(items, oldIndex, newIndex).map((item, idx) => ({
+      ...item,
+      sortOrder: idx,
+    }));
+    
+    setItems(newItems);
+    reorderMutation.mutate(
+      newItems.filter(i => !i.isNew).map((item, idx) => ({ id: item.id, sortOrder: idx }))
+    );
+  };
 
   const { totalPrice, totalCost, profit, margin } = useMemo(() => {
     const totalPrice = items.reduce(
@@ -175,6 +230,7 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
       unitCost: "",
       unitPrice: "",
       source: "manual",
+      sortOrder: items.length,
     };
     setItems((prev) => [...prev, newItem]);
     setEditingRowId(id);
@@ -376,44 +432,53 @@ export function PartsBillingCard({ jobId }: PartsBillingCardProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="overflow-visible">
-            <table className="min-w-full text-xs">
-              <thead className="border-b text-[11px] uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="py-2 pr-3 text-left font-medium">Product / Service</th>
-                  <th className="py-2 px-3 text-right font-medium w-20">Qty</th>
-                  <th className="py-2 px-3 text-right font-medium w-28">Cost</th>
-                  <th className="py-2 px-3 text-right font-medium w-28">Price</th>
-                  <th className="py-2 pl-3 text-right font-medium w-28">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.length === 0 && (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <table className="min-w-full text-xs">
+                <thead className="border-b text-[11px] uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <td colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
-                      No line items yet. Add parts or services to this job.
-                    </td>
+                    <th className="py-2 pr-2 w-8"></th>
+                    <th className="py-2 pr-3 text-left font-medium">Product / Service</th>
+                    <th className="py-2 px-3 text-right font-medium w-20">Qty</th>
+                    <th className="py-2 px-3 text-right font-medium w-28">Cost</th>
+                    <th className="py-2 px-3 text-right font-medium w-28">Price</th>
+                    <th className="py-2 pl-3 text-right font-medium w-28">Total</th>
                   </tr>
-                )}
-                {items.map((item) => (
-                  <LineItemRow
-                    key={item.id}
-                    item={item}
-                    catalog={catalogParts.filter((p) => p.isActive !== false)}
-                    isEditing={editingRowId === item.id}
-                    isSaving={savingRowId === item.id}
-                    onEnterEdit={() => handleEnterEdit(item.id)}
-                    onChange={(patch) => handleRowChange(item.id, patch)}
-                    onSave={() => handleRowSave(item.id)}
-                    onCancel={() => handleRowCancel(item.id)}
-                    onDelete={() => handleRowDelete(item.id)}
-                    onSelectProduct={(product) => handleSelectProduct(item.id, product)}
-                    onRequestAddProduct={(name) =>
-                      setProductModalState({ open: true, seedName: name, lineItemId: item.id })
-                    }
-                  />
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+                  <tbody>
+                    {items.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-6 text-center text-xs text-muted-foreground">
+                          No line items yet. Add parts or services to this job.
+                        </td>
+                      </tr>
+                    )}
+                    {items.map((item) => (
+                      <SortableLineItemRow
+                        key={item.id}
+                        item={item}
+                        catalog={catalogParts.filter((p) => p.isActive !== false)}
+                        isEditing={editingRowId === item.id}
+                        isSaving={savingRowId === item.id}
+                        onEnterEdit={() => handleEnterEdit(item.id)}
+                        onChange={(patch) => handleRowChange(item.id, patch)}
+                        onSave={() => handleRowSave(item.id)}
+                        onCancel={() => handleRowCancel(item.id)}
+                        onDelete={() => handleRowDelete(item.id)}
+                        onSelectProduct={(product) => handleSelectProduct(item.id, product)}
+                        onRequestAddProduct={(name) =>
+                          setProductModalState({ open: true, seedName: name, lineItemId: item.id })
+                        }
+                      />
+                    ))}
+                  </tbody>
+                </SortableContext>
+              </table>
+            </DndContext>
           </div>
 
           <div className="flex items-center gap-2">
@@ -681,6 +746,245 @@ function LineItemRow({
             value={item.unitPrice || ""}
             onChange={(e) => onChange({ unitPrice: e.target.value })}
             data-testid={`input-price-${item.id}`}
+          />
+        </div>
+      </td>
+      <td className="py-2.5 pl-3 pr-1 align-top text-right text-xs font-semibold">{formatCurrency(lineTotal)}</td>
+    </tr>
+  );
+}
+
+function SortableLineItemRow(props: LineItemRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: props.item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const [query, setQuery] = useState(props.item.description ?? "");
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  useEffect(() => {
+    setQuery(props.item.description ?? "");
+  }, [props.item.description]);
+
+  const suggestions = useMemo(() => {
+    if (!query.trim()) return props.catalog.slice(0, 8);
+    const lower = query.toLowerCase();
+    return props.catalog
+      .filter((c) => (c.name || c.description || "").toLowerCase().includes(lower))
+      .slice(0, 8);
+  }, [props.catalog, query]);
+
+  const lineTotal = parseFloat(props.item.unitPrice || "0") * parseFloat(props.item.quantity || "0");
+
+  if (!props.isEditing) {
+    return (
+      <tr
+        ref={setNodeRef}
+        style={style}
+        className={`border-b border-border/50 hover:bg-muted/50 cursor-pointer ${props.item.isDraft ? 'bg-amber-50 dark:bg-amber-950/20 border-l-2 border-l-amber-400' : ''}`}
+        onClick={props.onEnterEdit}
+        data-testid={`row-line-item-${props.item.id}`}
+      >
+        <td className="py-3 pr-2 align-top w-8">
+          <div
+            className="cursor-grab touch-none text-muted-foreground hover:text-foreground"
+            {...attributes}
+            {...listeners}
+            onClick={(e) => e.stopPropagation()}
+            role="button"
+            tabIndex={0}
+            data-testid={`drag-handle-${props.item.id}`}
+          >
+            <GripVertical className="h-4 w-4" />
+          </div>
+        </td>
+        <td className="py-3 pr-3 align-top">
+          <div className="flex items-center gap-2">
+            <div className="text-xs font-medium">
+              {props.item.description || <span className="italic text-muted-foreground">No product</span>}
+            </div>
+            {props.item.isDraft && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">
+                Draft
+              </span>
+            )}
+          </div>
+          {props.item.notes && (
+            <div className="mt-0.5 text-[11px] text-muted-foreground">{props.item.notes}</div>
+          )}
+        </td>
+        <td className="py-3 px-3 text-right align-top text-xs">{props.item.quantity}</td>
+        <td className="py-3 px-3 text-right align-top text-xs">{formatCurrency(parseFloat(props.item.unitCost || "0"))}</td>
+        <td className="py-3 px-3 text-right align-top text-xs">{formatCurrency(parseFloat(props.item.unitPrice || "0"))}</td>
+        <td className="py-3 pl-3 pr-1 text-right align-top text-xs font-semibold">
+          {formatCurrency(lineTotal)}
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className="border-b border-border/50 bg-primary/5"
+    >
+      <td className="py-2.5 pr-2 align-top w-8">
+        <div
+          className="cursor-grab touch-none text-muted-foreground hover:text-foreground"
+          {...attributes}
+          {...listeners}
+          role="button"
+          tabIndex={0}
+          data-testid={`drag-handle-${props.item.id}`}
+        >
+          <GripVertical className="h-4 w-4" />
+        </div>
+      </td>
+      <td className="py-2.5 pr-3 align-top">
+        <div className="relative">
+          <Input
+            className="text-xs"
+            placeholder="Search product / service..."
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              props.onChange({ description: e.target.value });
+              setShowDropdown(true);
+            }}
+            onFocus={() => setShowDropdown(true)}
+            onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+            data-testid={`input-product-search-${props.item.id}`}
+          />
+          {showDropdown && (
+            <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover shadow-lg">
+              {suggestions.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    props.onSelectProduct(c);
+                    setQuery(c.name || c.description || "");
+                    setShowDropdown(false);
+                  }}
+                  className="flex w-full flex-col items-start px-2.5 py-1.5 text-left hover:bg-muted"
+                >
+                  <span className="text-xs">{c.name || c.description}</span>
+                  {c.sku && <span className="text-[11px] text-muted-foreground">SKU: {c.sku}</span>}
+                </button>
+              ))}
+              <div className="border-t" />
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => props.onRequestAddProduct(query)}
+                className="flex w-full items-center px-2.5 py-1.5 text-left text-xs text-primary hover:bg-primary/10"
+              >
+                + Add "{query || "new item"}" as product
+              </button>
+            </div>
+          )}
+        </div>
+        <Input
+          className="mt-1.5 text-xs"
+          placeholder="Description / notes..."
+          value={props.item.notes}
+          onChange={(e) => props.onChange({ notes: e.target.value })}
+          data-testid={`input-notes-${props.item.id}`}
+        />
+        <div className="flex items-center gap-2 mt-2">
+          <Button
+            type="button"
+            size="sm"
+            onClick={props.onSave}
+            disabled={props.isSaving}
+            data-testid={`button-save-line-${props.item.id}`}
+            className="h-7 text-xs"
+          >
+            {props.isSaving ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <>
+                <Check className="h-3 w-3 mr-1" />
+                Save
+              </>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={props.onCancel}
+            disabled={props.isSaving}
+            data-testid={`button-cancel-line-${props.item.id}`}
+            className="h-7 text-xs"
+          >
+            <X className="h-3 w-3 mr-1" />
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={props.onDelete}
+            disabled={props.isSaving}
+            className="h-7 text-xs text-destructive hover:text-destructive"
+            data-testid={`button-delete-line-${props.item.id}`}
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            Delete
+          </Button>
+        </div>
+      </td>
+      <td className="py-2.5 px-3 align-top">
+        <Input
+          type="number"
+          min={0}
+          className="text-xs text-right w-full"
+          value={props.item.quantity}
+          onChange={(e) => props.onChange({ quantity: e.target.value || "0" })}
+          data-testid={`input-qty-${props.item.id}`}
+        />
+      </td>
+      <td className="py-2.5 px-3 align-top">
+        <div className="relative">
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">$</span>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            placeholder="0.00"
+            className="text-xs text-right w-full pl-5 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            value={props.item.unitCost || ""}
+            onChange={(e) => props.onChange({ unitCost: e.target.value })}
+            data-testid={`input-cost-${props.item.id}`}
+          />
+        </div>
+      </td>
+      <td className="py-2.5 px-3 align-top">
+        <div className="relative">
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">$</span>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            placeholder="0.00"
+            className="text-xs text-right w-full pl-5 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            value={props.item.unitPrice || ""}
+            onChange={(e) => props.onChange({ unitPrice: e.target.value })}
+            data-testid={`input-price-${props.item.id}`}
           />
         </div>
       </td>
