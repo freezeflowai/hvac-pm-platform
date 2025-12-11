@@ -63,7 +63,14 @@ import {
   type Payment,
   type InsertPayment,
   type UpdatePayment,
+  type JobTemplate,
+  type InsertJobTemplate,
+  type UpdateJobTemplate,
+  type JobTemplateLineItem,
+  type InsertJobTemplateLineItem,
   customerCompanies,
+  jobTemplates,
+  jobTemplateLineItems,
   invoices,
   invoiceLines,
   payments,
@@ -360,6 +367,17 @@ export interface IStorage {
     permissionId: string;
     override: 'grant' | 'revoke';
   }>): Promise<void>;
+  
+  // Job Template methods
+  getJobTemplates(companyId: string, filter?: { jobType?: string; activeOnly?: boolean }): Promise<JobTemplate[]>;
+  getJobTemplate(companyId: string, id: string): Promise<JobTemplate | undefined>;
+  getJobTemplateLineItems(templateId: string): Promise<JobTemplateLineItem[]>;
+  createJobTemplate(companyId: string, data: InsertJobTemplate, lines: InsertJobTemplateLineItem[]): Promise<JobTemplate>;
+  updateJobTemplate(companyId: string, id: string, data: UpdateJobTemplate, lines?: InsertJobTemplateLineItem[]): Promise<JobTemplate | undefined>;
+  deleteJobTemplate(companyId: string, id: string): Promise<boolean>;
+  setJobTemplateAsDefault(companyId: string, id: string, jobType: string): Promise<JobTemplate | undefined>;
+  getDefaultJobTemplateForJobType(companyId: string, jobType: string): Promise<JobTemplate | undefined>;
+  applyJobTemplateToJob(companyId: string, jobId: string, templateId: string): Promise<JobPart[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -2431,6 +2449,35 @@ export class MemStorage implements IStorage {
         const dateB = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
         return dateB - dateA;
       });
+  }
+
+  // Job Template methods - MemStorage stubs (not implemented for in-memory storage)
+  async getJobTemplates(_companyId: string, _filter?: { jobType?: string; activeOnly?: boolean }): Promise<JobTemplate[]> {
+    return [];
+  }
+  async getJobTemplate(_companyId: string, _id: string): Promise<JobTemplate | undefined> {
+    return undefined;
+  }
+  async getJobTemplateLineItems(_templateId: string): Promise<JobTemplateLineItem[]> {
+    return [];
+  }
+  async createJobTemplate(_companyId: string, _data: InsertJobTemplate, _lines: InsertJobTemplateLineItem[]): Promise<JobTemplate> {
+    throw new Error("Job templates not implemented in MemStorage");
+  }
+  async updateJobTemplate(_companyId: string, _id: string, _data: UpdateJobTemplate, _lines?: InsertJobTemplateLineItem[]): Promise<JobTemplate | undefined> {
+    return undefined;
+  }
+  async deleteJobTemplate(_companyId: string, _id: string): Promise<boolean> {
+    return false;
+  }
+  async setJobTemplateAsDefault(_companyId: string, _id: string, _jobType: string): Promise<JobTemplate | undefined> {
+    return undefined;
+  }
+  async getDefaultJobTemplateForJobType(_companyId: string, _jobType: string): Promise<JobTemplate | undefined> {
+    return undefined;
+  }
+  async applyJobTemplateToJob(_companyId: string, _jobId: string, _templateId: string): Promise<JobPart[]> {
+    return [];
   }
 }
 
@@ -5401,6 +5448,231 @@ export class DbStorage implements IStorage {
       .where(eq(rolePermissions.roleId, roleId));
     
     return result.map(r => r.permissionKey);
+  }
+
+  // Job Template methods
+  async getJobTemplates(companyId: string, filter?: { jobType?: string; activeOnly?: boolean }): Promise<JobTemplate[]> {
+    let query = db.select()
+      .from(jobTemplates)
+      .where(eq(jobTemplates.companyId, companyId));
+    
+    const conditions = [eq(jobTemplates.companyId, companyId)];
+    
+    if (filter?.jobType) {
+      conditions.push(eq(jobTemplates.jobType, filter.jobType));
+    }
+    if (filter?.activeOnly !== false) {
+      conditions.push(eq(jobTemplates.isActive, true));
+    }
+    
+    return db.select()
+      .from(jobTemplates)
+      .where(and(...conditions))
+      .orderBy(desc(jobTemplates.isDefaultForJobType), jobTemplates.name);
+  }
+
+  async getJobTemplate(companyId: string, id: string): Promise<JobTemplate | undefined> {
+    const result = await db.select()
+      .from(jobTemplates)
+      .where(and(
+        eq(jobTemplates.id, id),
+        eq(jobTemplates.companyId, companyId)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async getJobTemplateLineItems(templateId: string): Promise<JobTemplateLineItem[]> {
+    return db.select()
+      .from(jobTemplateLineItems)
+      .where(eq(jobTemplateLineItems.templateId, templateId))
+      .orderBy(jobTemplateLineItems.sortOrder);
+  }
+
+  async createJobTemplate(companyId: string, data: InsertJobTemplate, lines: InsertJobTemplateLineItem[]): Promise<JobTemplate> {
+    // If setting as default for a job type, first unset any existing default
+    if (data.isDefaultForJobType && data.jobType) {
+      await db.update(jobTemplates)
+        .set({ isDefaultForJobType: false, updatedAt: new Date() })
+        .where(and(
+          eq(jobTemplates.companyId, companyId),
+          eq(jobTemplates.jobType, data.jobType),
+          eq(jobTemplates.isDefaultForJobType, true)
+        ));
+    }
+
+    const [template] = await db.insert(jobTemplates)
+      .values({
+        ...data,
+        companyId,
+      })
+      .returning();
+
+    // Insert line items
+    if (lines.length > 0) {
+      await db.insert(jobTemplateLineItems)
+        .values(lines.map((line, index) => ({
+          templateId: template.id,
+          productId: line.productId,
+          descriptionOverride: line.descriptionOverride ?? null,
+          quantity: String(line.quantity ?? '1'),
+          unitPriceOverride: line.unitPriceOverride ? String(line.unitPriceOverride) : null,
+          sortOrder: line.sortOrder ?? index,
+        })));
+    }
+
+    return template;
+  }
+
+  async updateJobTemplate(companyId: string, id: string, data: UpdateJobTemplate, lines?: InsertJobTemplateLineItem[]): Promise<JobTemplate | undefined> {
+    // Verify template belongs to company
+    const existing = await this.getJobTemplate(companyId, id);
+    if (!existing) return undefined;
+
+    // If setting as default for a job type, first unset any existing default
+    if (data.isDefaultForJobType && data.jobType) {
+      await db.update(jobTemplates)
+        .set({ isDefaultForJobType: false, updatedAt: new Date() })
+        .where(and(
+          eq(jobTemplates.companyId, companyId),
+          eq(jobTemplates.jobType, data.jobType),
+          eq(jobTemplates.isDefaultForJobType, true)
+        ));
+    }
+
+    const [updated] = await db.update(jobTemplates)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(jobTemplates.id, id))
+      .returning();
+
+    // If lines provided, replace them
+    if (lines !== undefined) {
+      await db.delete(jobTemplateLineItems)
+        .where(eq(jobTemplateLineItems.templateId, id));
+
+      if (lines.length > 0) {
+        await db.insert(jobTemplateLineItems)
+          .values(lines.map((line, index) => ({
+            templateId: id,
+            productId: line.productId,
+            descriptionOverride: line.descriptionOverride ?? null,
+            quantity: String(line.quantity ?? '1'),
+            unitPriceOverride: line.unitPriceOverride ? String(line.unitPriceOverride) : null,
+            sortOrder: line.sortOrder ?? index,
+          })));
+      }
+    }
+
+    return updated;
+  }
+
+  async deleteJobTemplate(companyId: string, id: string): Promise<boolean> {
+    const existing = await this.getJobTemplate(companyId, id);
+    if (!existing) return false;
+
+    const result = await db.delete(jobTemplates)
+      .where(eq(jobTemplates.id, id))
+      .returning();
+    
+    return result.length > 0;
+  }
+
+  async setJobTemplateAsDefault(companyId: string, id: string, jobType: string): Promise<JobTemplate | undefined> {
+    // Unset any existing default for this job type
+    await db.update(jobTemplates)
+      .set({ isDefaultForJobType: false, updatedAt: new Date() })
+      .where(and(
+        eq(jobTemplates.companyId, companyId),
+        eq(jobTemplates.jobType, jobType),
+        eq(jobTemplates.isDefaultForJobType, true)
+      ));
+
+    // Set the new default
+    const [updated] = await db.update(jobTemplates)
+      .set({ 
+        isDefaultForJobType: true, 
+        jobType,
+        updatedAt: new Date() 
+      })
+      .where(and(
+        eq(jobTemplates.id, id),
+        eq(jobTemplates.companyId, companyId)
+      ))
+      .returning();
+
+    return updated;
+  }
+
+  async getDefaultJobTemplateForJobType(companyId: string, jobType: string): Promise<JobTemplate | undefined> {
+    const result = await db.select()
+      .from(jobTemplates)
+      .where(and(
+        eq(jobTemplates.companyId, companyId),
+        eq(jobTemplates.jobType, jobType),
+        eq(jobTemplates.isDefaultForJobType, true),
+        eq(jobTemplates.isActive, true)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async applyJobTemplateToJob(companyId: string, jobId: string, templateId: string): Promise<JobPart[]> {
+    // Verify job exists and belongs to company
+    const job = await this.getJob(companyId, jobId);
+    if (!job) {
+      throw new Error("Job not found");
+    }
+
+    // Verify template exists and belongs to company
+    const template = await this.getJobTemplate(companyId, templateId);
+    if (!template) {
+      throw new Error("Template not found");
+    }
+
+    // Get template line items
+    const templateLines = await this.getJobTemplateLineItems(templateId);
+    if (templateLines.length === 0) {
+      return [];
+    }
+
+    // Get product details for each line item
+    const productIds = templateLines.map(line => line.productId);
+    const products = await db.select()
+      .from(partsTable)
+      .where(inArray(partsTable.id, productIds));
+    
+    const productMap = new Map(products.map(p => [p.id, p]));
+
+    // Create job parts from template lines
+    const createdParts: JobPart[] = [];
+    for (const line of templateLines) {
+      const product = productMap.get(line.productId);
+      if (!product) continue;
+
+      const description = line.descriptionOverride ?? product.description ?? product.name ?? 'Unknown item';
+      const unitPrice = line.unitPriceOverride ?? product.unitPrice ?? '0';
+      const quantity = line.quantity ?? '1';
+
+      const [created] = await db.insert(jobParts)
+        .values({
+          jobId,
+          productId: line.productId,
+          description,
+          quantity,
+          unitPrice,
+          unitCost: product.cost ?? null,
+          source: 'manual', // Could add 'template' as a new source type
+          isActive: true,
+        })
+        .returning();
+      
+      createdParts.push(created);
+    }
+
+    return createdParts;
   }
 }
 
