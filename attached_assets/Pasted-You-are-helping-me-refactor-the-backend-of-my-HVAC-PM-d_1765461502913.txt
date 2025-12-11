@@ -1,0 +1,118 @@
+You are helping me refactor the backend of my HVAC PM/dispatch app to improve architecture and data integrity.
+
+Tech assumptions:
+- Node/TypeScript backend (Express or similar).
+- We already have a single server file with mixed routes (jobs, invoices, team, calendar, etc.).
+- We are using Zod for validation and have a storage abstraction (storage.ts) or similar DB layer.
+
+Goals of this refactor:
+1. Split server routes into modular route files:
+   - routes/jobs.ts
+   - routes/invoices.ts
+   - routes/team.ts
+   - routes/calendar.ts
+   - routes/index.ts to register them.
+2. Strengthen shared Zod schemas with:
+   - Shared enums for job and invoice statuses.
+   - Numeric coercion for pricing fields (cost, markupPercent, unitPrice) so string inputs like "12.34" become numbers.
+3. Centralize business logic in storage.ts (thin routes, fat storage layer).
+4. Implement explicit status transition rules for jobs and invoices and enforce them in the routes.
+
+Please do the following:
+
+------------------------------------------------
+A) ROUTE SPLIT & REGISTRATION
+------------------------------------------------
+1. Create a folder `src/server/routes` (or equivalent) and move existing job-, invoice-, team-, and calendar-related endpoints into:
+   - jobs.ts
+   - invoices.ts
+   - team.ts
+   - calendar.ts
+
+2. Create `src/server/routes/index.ts` with a function:
+
+   export function registerRoutes(app: Express) {
+     app.use("/api/jobs", jobsRoutes);
+     app.use("/api/invoices", invoicesRoutes);
+     app.use("/api/team", teamRoutes);
+     app.use("/api/calendar", calendarRoutes);
+   }
+
+3. Update the main server entry (e.g. server.ts) to call `registerRoutes(app)`.
+
+Make the route files thin and delegate logic to storage.ts + schemas.ts + statusRules.ts.
+
+------------------------------------------------
+B) SHARED ZOD SCHEMAS WITH NUMERIC COERCION
+------------------------------------------------
+1. In `src/server/schemas.ts` (or create it if missing), define:
+
+   - `moneyNumber` using z.coerce.number().min(0).finite()
+   - `optionalMoneyNumber` for nullable numeric fields.
+
+2. Define shared enums:
+
+   - `jobStatusEnum = z.enum(["draft","scheduled","in_progress","completed","invoiced","on_hold","cancelled"])`
+   - `invoiceStatusEnum = z.enum(["draft","pending","sent","paid","void","cancelled"])`
+
+3. Define schemas:
+
+   - `itemBaseSchema` for products/services including:
+     - type, name, sku, description, category
+     - cost: moneyNumber
+     - markupPercent: optionalMoneyNumber
+     - unitPrice: moneyNumber
+     - isTaxable: z.coerce.boolean().default(true)
+
+   - `jobCreateSchema` with fields:
+     - companyId, locationId, summary, description?, accessInstructions?, jobType?, priority, scheduledStart?, scheduledEnd?
+
+   - `jobUpdateStatusSchema` containing `{ status: jobStatusEnum }`
+
+   - `invoiceUpdateStatusSchema` containing `{ status: invoiceStatusEnum }`
+
+Export the inferred TS types as needed (JobStatus, InvoiceStatus, etc.).
+
+------------------------------------------------
+C) CENTRALIZE BUSINESS LOGIC IN storage.ts
+------------------------------------------------
+1. In `src/server/storage.ts`, create grouped namespaces:
+
+   export const jobs = { create, getById, updateStatus, ... };
+   export const invoices = { create, getById, updateStatus, ... };
+   export const team = { listTechnicians, ... };
+   export const calendar = { jobsForRange, ... };
+
+2. Move DB-facing logic out of the route handlers into these functions.
+
+3. Where necessary, apply derived values or defaults in storage.ts (e.g., computing fallback fields, handling timestamps).
+
+------------------------------------------------
+D) EXPLICIT STATUS TRANSITION RULES
+------------------------------------------------
+1. Create `src/server/statusRules.ts` with:
+
+   - Type aliases: JobStatus, InvoiceStatus (from the Zod enums).
+   - A map `jobTransitions: Record<JobStatus, JobStatus[]>` defining allowed transitions.
+   - A map `invoiceTransitions: Record<InvoiceStatus, InvoiceStatus[]>`.
+
+2. Implement helper functions:
+
+   - `assertJobStatusTransition(from: JobStatus, to: JobStatus): void`
+   - `assertInvoiceStatusTransition(from: InvoiceStatus, to: InvoiceStatus): void`
+
+   Each should throw an Error if the transition is not allowed (except when from === to).
+
+3. Update job status and invoice status routes to:
+
+   - Load the existing record from storage.
+   - Call the relevant `assert*StatusTransition` before calling `storage.jobs.updateStatus` / `storage.invoices.updateStatus`.
+
+------------------------------------------------
+E) CLEAN-UP & TYPE SAFETY
+------------------------------------------------
+1. Ensure all routes use the new Zod schemas’ `.parse()` calls for payload validation.
+2. Replace any ad-hoc parsing of cost/unitPrice/markupPercent with the shared numeric coercion logic.
+3. Make sure the types in the storage layer match the Zod-inferred types (e.g., JobStatus, InvoiceStatus, ItemInput, etc.).
+
+Please modify the existing codebase accordingly, re-using current DB calls and route shapes where possible, and keep the coding style consistent with the existing project.
