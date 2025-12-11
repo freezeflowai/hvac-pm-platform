@@ -4429,6 +4429,11 @@ export class DbStorage implements IStorage {
       status: newStatus as any,
     });
     
+    // If invoice is fully paid and linked to a job, update job status to "invoiced"
+    if (newStatus === "paid" && invoice.jobId) {
+      await this.updateJob(companyId, invoice.jobId, { status: "invoiced" });
+    }
+    
     return result[0];
   }
 
@@ -4755,6 +4760,11 @@ export class DbStorage implements IStorage {
   async sendInvoice(companyId: string, id: string): Promise<Invoice | undefined> {
     const invoice = await this.getInvoice(companyId, id);
     if (!invoice) return undefined;
+    
+    // Update linked job status to "invoiced" when invoice is sent
+    if (invoice.jobId) {
+      await this.updateJob(companyId, invoice.jobId, { status: "invoiced" });
+    }
     
     return this.updateInvoice(companyId, id, {
       status: "sent",

@@ -336,6 +336,26 @@ export function JobHeaderCard({
                 <span className="font-semibold text-foreground" data-testid="text-job-number">#{job.jobNumber}</span>
               </div>
 
+              {/* Invoice row */}
+              <div className="mb-2 flex items-center justify-between gap-4">
+                <span className="font-medium text-muted-foreground">Invoice</span>
+                {existingInvoice ? (
+                  <button
+                    type="button"
+                    onClick={() => setLocation(`/invoices/${existingInvoice.id}`)}
+                    className="text-[11px] text-primary hover:underline font-medium"
+                    data-testid="link-invoice"
+                  >
+                    <FileText className="h-3 w-3 inline-block mr-1" />
+                    {existingInvoice.invoiceNumber || `INV-${existingInvoice.id.slice(0, 6).toUpperCase()}`}
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground" data-testid="text-no-invoice">
+                    Not invoiced yet
+                  </span>
+                )}
+              </div>
+
               {/* Status row */}
               <div className="mb-2 flex items-center justify-between gap-4">
                 <span className="font-medium text-muted-foreground">Status</span>

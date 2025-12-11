@@ -846,66 +846,6 @@ export default function JobDetailPage() {
             </Card>
           </Collapsible>
 
-          {/* Invoices – open by default */}
-          <Collapsible open={invoicesOpen} onOpenChange={setInvoicesOpen}>
-            <Card>
-              <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-invoices">
-                  <span className="text-sm font-semibold">
-                    Invoices {jobInvoices.length > 0 && <span className="text-muted-foreground ml-1">({jobInvoices.length})</span>}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {job.status === "completed" && jobInvoices.length === 0 && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-xs h-auto p-0 text-primary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowCreateInvoiceDialog(true);
-                        }}
-                        data-testid="button-create-invoice-right"
-                      >
-                        Create Invoice
-                      </Button>
-                    )}
-                    {invoicesOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                  </div>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="border-t px-4 pb-4 pt-3">
-                  {jobInvoices.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      No invoices yet for this job.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {jobInvoices.map((inv) => (
-                        <Link key={inv.id} href={`/invoices/${inv.id}`}>
-                          <div className="flex items-center justify-between p-2 rounded-md hover-elevate cursor-pointer" data-testid={`link-invoice-${inv.id}`}>
-                            <div className="flex items-center gap-2">
-                              <Receipt className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm font-medium">
-                                {inv.invoiceNumber || `INV-${inv.id.slice(0, 6).toUpperCase()}`}
-                              </span>
-                              <Badge variant={inv.status === "paid" ? "default" : inv.status === "draft" ? "outline" : "secondary"} className="text-xs">
-                                {inv.status}
-                              </Badge>
-                            </div>
-                            <span className="text-sm font-medium">
-                              ${parseFloat(inv.total).toFixed(2)}
-                            </span>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
           {/* Visits – collapsed by default */}
           <Collapsible open={visitsOpen} onOpenChange={setVisitsOpen}>
             <Card>

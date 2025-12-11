@@ -245,18 +245,6 @@ export default function InvoiceDetailPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Minimal sticky nav bar */}
-      <div className="sticky top-0 bg-background z-10 border-b">
-        <div className="p-2 max-w-[1600px] mx-auto flex items-center gap-2">
-          <Link href="/invoices">
-            <Button variant="ghost" size="icon" data-testid="button-back-invoices">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <span className="text-sm text-muted-foreground">Back to Invoices</span>
-        </div>
-      </div>
-
       <div className="flex-1 overflow-auto">
         <div className="p-4 max-w-[1600px] mx-auto">
           {/* Invoice Header Card */}
