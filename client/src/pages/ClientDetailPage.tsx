@@ -73,11 +73,16 @@ export default function ClientDetailPage() {
     return locations.some(loc => loc.id === job.locationId);
   });
 
-  const activeJobs = companyJobs.filter(j => j.status === "in_progress" || j.status === "scheduled");
   const overdueJobs = companyJobs.filter(j => {
     if (!j.scheduledStart) return false;
-    return new Date(j.scheduledStart) < new Date() && j.status !== "completed" && j.status !== "cancelled";
+    const isPastDue = new Date(j.scheduledStart) < new Date();
+    const isOpenStatus = j.status !== "completed" && j.status !== "invoiced" && j.status !== "cancelled";
+    return isPastDue && isOpenStatus;
   });
+  const overdueJobIds = new Set(overdueJobs.map(j => j.id));
+  const activeJobs = companyJobs.filter(j => 
+    (j.status === "in_progress" || j.status === "scheduled") && !overdueJobIds.has(j.id)
+  );
 
   const createNoteMutation = useMutation({
     mutationFn: async (noteText: string) => {
