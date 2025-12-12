@@ -188,7 +188,7 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
             {/* Line 1: Client + Location */}
             <div className="flex items-start gap-1">
               <div className="flex-1 min-w-0">
-                <div className={`font-semibold text-[14px] leading-4 truncate ${isCompleted ? 'line-through opacity-60' : ''}`}>
+                <div className={`font-semibold text-[12px] leading-4 truncate ${isCompleted ? 'line-through opacity-60' : ''}`}>
                   {client.companyName}
                   {client.location && <span className="font-normal text-muted-foreground"> - {client.location}</span>}
                 </div>
@@ -199,13 +199,13 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
               )}
             </div>
             {/* Line 2: Job description */}
-            <div className={`text-[14px] text-foreground/80 leading-4 mt-0.5 ${isCompleted ? 'line-through opacity-60' : ''}`}>
+            <div className={`text-[12px] text-foreground/80 leading-4 mt-0.5 ${isCompleted ? 'line-through opacity-60' : ''}`}>
               Preventive Maintenance
               {assignment?.jobNumber && <span className="text-muted-foreground ml-1">#{assignment.jobNumber}</span>}
             </div>
             {/* Line 3: City */}
             {client.city && (
-              <div className={`text-[14px] text-muted-foreground leading-4 ${isCompleted ? 'opacity-60' : ''}`}>
+              <div className={`text-[12px] text-muted-foreground leading-4 ${isCompleted ? 'opacity-60' : ''}`}>
                 {client.city}
               </div>
             )}
@@ -215,7 +215,7 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
           <>
             {/* Line 1: Client name + red dot if overdue */}
             <div className="flex items-start gap-1">
-              <div className={`font-semibold text-[14px] leading-4 truncate flex-1 min-w-0 ${isPastMonth ? 'text-red-700 dark:text-red-300' : ''}`}>
+              <div className={`font-semibold text-[12px] leading-4 truncate flex-1 min-w-0 ${isPastMonth ? 'text-red-700 dark:text-red-300' : ''}`}>
                 {client.companyName}
               </div>
               {isPastMonth && (
@@ -224,12 +224,12 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
             </div>
             {/* Line 2: Location info */}
             {client.location && (
-              <div className="text-[14px] text-muted-foreground leading-4 mt-0.5 truncate">
+              <div className="text-[12px] text-muted-foreground leading-4 mt-0.5 truncate">
                 {client.location}
               </div>
             )}
             {/* Line 3: Due date info */}
-            <div className={`text-[14px] leading-4 mt-0.5 ${isPastMonth ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'}`}>
+            <div className={`text-[12px] leading-4 mt-0.5 ${isPastMonth ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'}`}>
               {isPastMonth ? 'Overdue' : 'Due'} {monthLabel}
             </div>
           </>
