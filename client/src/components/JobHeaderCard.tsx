@@ -15,7 +15,10 @@ import {
   Download,
   Printer,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  User as UserIcon,
+  UserPlus,
+  Plus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,17 +55,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Job, Client, CustomerCompany, Invoice } from "@shared/schema";
+import type { Job, Client, CustomerCompany, Invoice, User } from "@shared/schema";
 
 interface JobHeaderCardProps {
   job: Job & {
     location?: Client;
     parentCompany?: CustomerCompany;
+    technicians?: Array<User & { firstName?: string | null; lastName?: string | null }>;
   };
   jobInvoices: Invoice[];
   onEdit: () => void;
   onDelete: () => void;
   onStatusChange: (status: string) => void;
+  onAssignTechnician?: () => void;
   statusChangePending?: boolean;
 }
 
@@ -112,6 +117,7 @@ export function JobHeaderCard({
   onEdit, 
   onDelete, 
   onStatusChange,
+  onAssignTechnician,
   statusChangePending 
 }: JobHeaderCardProps) {
   const [, setLocation] = useLocation();
@@ -398,6 +404,74 @@ export function JobHeaderCard({
                     {job.scheduledStart ? format(new Date(job.scheduledStart), "MMM d, yyyy h:mm a") : "Not set"}
                   </span>
                 </div>
+              </div>
+
+              {/* Assigned Technicians Mini-Section */}
+              <div className="pt-2 mt-2 border-t">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="font-medium text-muted-foreground flex items-center gap-1">
+                    <UserIcon className="h-3 w-3" />
+                    Technicians
+                  </span>
+                  {onAssignTechnician && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onAssignTechnician}
+                      className="text-xs text-primary"
+                      data-testid="button-assign-tech-header"
+                    >
+                      <UserPlus className="h-3 w-3 mr-1" />
+                      Assign
+                    </Button>
+                  )}
+                </div>
+                {job.technicians && job.technicians.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {job.technicians.map(tech => (
+                      <div 
+                        key={tech.id} 
+                        className="flex items-center gap-1 text-[11px]"
+                        data-testid={`badge-tech-header-${tech.id}`}
+                      >
+                        <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-[9px] font-medium text-primary">
+                            {(tech.firstName?.[0] || tech.email[0]).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="text-foreground">
+                          {tech.firstName || tech.email.split('@')[0]}
+                        </span>
+                        {tech.id === job.primaryTechnicianId && (
+                          <Badge variant="secondary" className="text-[9px] h-4 px-1">P</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground">None assigned</span>
+                )}
+              </div>
+
+              {/* Visits Mini-Section */}
+              <div className="pt-2 mt-2 border-t">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="font-medium text-muted-foreground flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Visits
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toast({ title: "Coming Soon", description: "Visit scheduling coming soon." })}
+                    className="text-xs text-primary"
+                    data-testid="button-new-visit-header"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    New
+                  </Button>
+                </div>
+                <span className="text-[10px] text-muted-foreground">No visits scheduled</span>
               </div>
             </div>
           </div>

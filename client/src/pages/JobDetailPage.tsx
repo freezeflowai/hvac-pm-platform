@@ -675,88 +675,16 @@ export default function JobDetailPage() {
 
   return (
     <div className="p-4" data-testid="job-detail-page">
-      {/* JOB HEADER CARD */}
+      {/* JOB HEADER CARD - includes Technicians & Visits in right column */}
       <JobHeaderCard
         job={job}
         jobInvoices={jobInvoices}
         onEdit={() => setShowEditDialog(true)}
         onDelete={() => deleteJobMutation.mutate()}
         onStatusChange={handleStatusChange}
+        onAssignTechnician={() => setShowAssignTech(true)}
         statusChangePending={updateStatusMutation.isPending}
       />
-
-      {/* ASSIGNED TECHNICIANS & VISITS - Header Mini-Card */}
-      <Card className="mb-4" data-testid="card-techs-visits-header">
-        <CardContent className="p-4 space-y-4">
-          {/* Assigned Technicians Section */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-medium flex items-center gap-2 text-muted-foreground">
-                <User className="h-3.5 w-3.5" />
-                Assigned Technicians
-              </h3>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-xs h-auto p-0 text-primary"
-                onClick={() => setShowAssignTech(true)}
-                data-testid="button-assign-tech-header"
-              >
-                <UserPlus className="h-3 w-3 mr-1" />
-                Assign
-              </Button>
-            </div>
-            {job.technicians && job.technicians.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {job.technicians.map(tech => (
-                  <div 
-                    key={tech.id} 
-                    className="flex items-center gap-1.5 text-sm"
-                    data-testid={`badge-tech-${tech.id}`}
-                  >
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-xs font-medium text-primary">
-                        {(tech.firstName?.[0] || tech.email[0]).toUpperCase()}
-                      </span>
-                    </div>
-                    <span>
-                      {tech.firstName && tech.lastName 
-                        ? `${tech.firstName} ${tech.lastName}`
-                        : tech.email}
-                    </span>
-                    {tech.id === job.primaryTechnicianId && (
-                      <Badge variant="secondary" className="text-[10px]">Primary</Badge>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">No technicians assigned yet.</p>
-            )}
-          </div>
-
-          {/* Visits Section */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-medium flex items-center gap-2 text-muted-foreground">
-                <Calendar className="h-3.5 w-3.5" />
-                Visits
-              </h3>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-xs h-auto p-0 text-primary"
-                onClick={() => toast({ title: "Coming Soon", description: "Visit scheduling coming soon." })}
-                data-testid="button-new-visit-header"
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                New Visit
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">No visits scheduled yet.</p>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* JOB DESCRIPTION CARD - Full Width Above Main Layout */}
       <JobDescriptionCard 
