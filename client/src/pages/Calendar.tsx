@@ -129,7 +129,232 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
   );
 }
 
-function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician, monthLabel, isOffMonth, isPastMonth, technicianColor, densityStyle }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void; monthLabel?: string | null; isOffMonth?: boolean; isPastMonth?: boolean; technicianColor?: { bg: string; border: string; text: string; borderLeft?: string; dot?: string }; densityStyle?: string }) {
+// Helper function to calculate lanes for overlapping jobs
+function calculateLanes(assignments: any[]): Map<string, { laneIndex: number; totalLanes: number }> {
+  const laneMap = new Map<string, { laneIndex: number; totalLanes: number }>();
+  
+  if (assignments.length === 0) return laneMap;
+  
+  // Get time range for each assignment
+  const getTimeRange = (a: any) => {
+    const start = a.scheduledStartMinutes ?? (a.scheduledHour != null ? a.scheduledHour * 60 : 0);
+    const duration = a.durationMinutes || 60;
+    return { start, end: start + duration };
+  };
+  
+  // Sort by start time
+  const sorted = [...assignments].sort((a, b) => {
+    return getTimeRange(a).start - getTimeRange(b).start;
+  });
+  
+  // Track active lanes (each lane has an end time)
+  const lanes: number[] = [];
+  
+  // First pass: assign lane indices using greedy allocation
+  for (const assignment of sorted) {
+    const range = getTimeRange(assignment);
+    
+    // Find the first lane that's free (ends before this job starts)
+    let laneIndex = lanes.findIndex(laneEnd => laneEnd <= range.start);
+    
+    if (laneIndex === -1) {
+      // No free lane, create a new one
+      laneIndex = lanes.length;
+      lanes.push(range.end);
+    } else {
+      // Use this lane and update its end time
+      lanes[laneIndex] = range.end;
+    }
+    
+    laneMap.set(assignment.id, { laneIndex, totalLanes: 1 });
+  }
+  
+  // Second pass: use sweep-line to find max concurrent at each moment
+  // Build events for sweep line
+  type Event = { time: number; type: 'start' | 'end'; id: string };
+  const events: Event[] = [];
+  for (const assignment of assignments) {
+    const range = getTimeRange(assignment);
+    events.push({ time: range.start, type: 'start', id: assignment.id });
+    events.push({ time: range.end, type: 'end', id: assignment.id });
+  }
+  // Sort: by time, then 'end' before 'start' at same time (half-open intervals [start, end))
+  // This ensures back-to-back jobs (A ends at 60, C starts at 60) don't count as overlapping
+  events.sort((a, b) => a.time - b.time || (a.type === 'end' ? -1 : 1));
+  
+  // Track max concurrent for each active assignment during sweep
+  const maxConcurrentMap = new Map<string, number>();
+  const activeSet = new Set<string>();
+  
+  for (const event of events) {
+    if (event.type === 'start') {
+      activeSet.add(event.id);
+      const currentCount = activeSet.size;
+      // Update max concurrent for ALL currently active assignments
+      activeSet.forEach(id => {
+        const existing = maxConcurrentMap.get(id) || 1;
+        maxConcurrentMap.set(id, Math.max(existing, currentCount));
+      });
+    } else {
+      activeSet.delete(event.id);
+    }
+  }
+  
+  // Apply max concurrent to lane map
+  for (const assignment of assignments) {
+    const lane = laneMap.get(assignment.id);
+    if (lane) {
+      lane.totalLanes = maxConcurrentMap.get(assignment.id) || 1;
+    }
+  }
+  
+  // Third pass: ensure directly overlapping assignments share the same totalLanes
+  for (const assignment of assignments) {
+    const range = getTimeRange(assignment);
+    const lane = laneMap.get(assignment.id);
+    if (!lane) continue;
+    
+    for (const other of assignments) {
+      if (other.id === assignment.id) continue;
+      const otherRange = getTimeRange(other);
+      const otherLane = laneMap.get(other.id);
+      if (!otherLane) continue;
+      
+      // If they directly overlap, ensure same totalLanes (take max)
+      if (otherRange.start < range.end && otherRange.end > range.start) {
+        const maxLanes = Math.max(lane.totalLanes, otherLane.totalLanes);
+        lane.totalLanes = maxLanes;
+        otherLane.totalLanes = maxLanes;
+      }
+    }
+  }
+  
+  return laneMap;
+}
+
+// Resizable job card wrapper for weekly/daily views with absolute positioning
+function ResizableJobCard({ 
+  assignment, 
+  client, 
+  rowHeight, 
+  onResize, 
+  getTechnicianColor, 
+  densityStyle, 
+  onClick,
+  isCompleted,
+  isOverdue,
+  laneIndex = 0,
+  totalLanes = 1
+}: { 
+  assignment: any; 
+  client: any; 
+  rowHeight: number; 
+  onResize: (assignmentId: string, newDurationMinutes: number) => void;
+  getTechnicianColor: (assignment: any) => any;
+  densityStyle: string;
+  onClick: () => void;
+  isCompleted: boolean;
+  isOverdue: boolean;
+  laneIndex?: number;
+  totalLanes?: number;
+}) {
+  const [isResizing, setIsResizing] = useState(false);
+  const [tempDuration, setTempDuration] = useState<number | null>(null);
+  const resizeStartRef = useRef<{ y: number; duration: number } | null>(null);
+
+  const startMinutes = assignment.scheduledStartMinutes ?? (assignment.scheduledHour != null ? assignment.scheduledHour * 60 : 0);
+  const durationMinutes = tempDuration ?? (assignment.durationMinutes || 60);
+  
+  // Calculate position and height based on time
+  const pixelsPerMinute = rowHeight / 60;
+  const topOffset = (startMinutes % 60) * pixelsPerMinute; // Offset within the hour cell
+  const height = durationMinutes * pixelsPerMinute;
+  
+  // Minimum height for visibility (15 minutes)
+  const minHeight = 15 * pixelsPerMinute;
+  
+  // Calculate width and left position for overlapping jobs
+  const widthPercent = 100 / totalLanes;
+  const leftPercent = laneIndex * widthPercent;
+
+  const handleResizeStart = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    resizeStartRef.current = { y: e.clientY, duration: assignment.durationMinutes || 60 };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, [assignment.durationMinutes]);
+
+  const handleResizeMove = useCallback((e: React.PointerEvent) => {
+    if (!isResizing || !resizeStartRef.current) return;
+    
+    const deltaY = e.clientY - resizeStartRef.current.y;
+    const deltaMinutes = Math.round(deltaY / pixelsPerMinute);
+    
+    // Snap to 15-minute increments
+    const snappedDelta = Math.round(deltaMinutes / 15) * 15;
+    const newDuration = Math.max(15, Math.min(720, resizeStartRef.current.duration + snappedDelta));
+    
+    setTempDuration(newDuration);
+  }, [isResizing, pixelsPerMinute]);
+
+  const handleResizeEnd = useCallback((e: React.PointerEvent) => {
+    if (!isResizing) return;
+    
+    setIsResizing(false);
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    
+    if (tempDuration !== null && tempDuration !== (assignment.durationMinutes || 60)) {
+      onResize(assignment.id, tempDuration);
+    }
+    setTempDuration(null);
+    resizeStartRef.current = null;
+  }, [isResizing, tempDuration, assignment.id, assignment.durationMinutes, onResize]);
+
+  const techColor = getTechnicianColor(assignment);
+
+  return (
+    <div
+      className="absolute z-10"
+      style={{ 
+        top: `${topOffset}px`, 
+        height: `${Math.max(height, minHeight)}px`,
+        left: `calc(${leftPercent}% + 1px)`,
+        width: `calc(${widthPercent}% - 2px)`,
+      }}
+    >
+      <DraggableClient
+        id={assignment.id}
+        client={client}
+        inCalendar
+        onClick={onClick}
+        isCompleted={isCompleted}
+        isOverdue={isOverdue}
+        assignment={assignment}
+        technicianColor={techColor}
+        densityStyle={densityStyle}
+        cardHeight={Math.max(height, minHeight)}
+      />
+      {/* Resize handle at bottom */}
+      <div
+        className={`absolute bottom-0 left-0 right-0 h-2 cursor-row-resize hover:bg-primary/20 transition-colors ${isResizing ? 'bg-primary/30' : ''}`}
+        onPointerDown={handleResizeStart}
+        onPointerMove={handleResizeMove}
+        onPointerUp={handleResizeEnd}
+        onPointerCancel={handleResizeEnd}
+        data-testid={`resize-handle-${assignment.id}`}
+      />
+      {/* Duration tooltip during resize */}
+      {isResizing && tempDuration !== null && (
+        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-foreground text-background text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap z-20">
+          {Math.floor(tempDuration / 60)}h {tempDuration % 60}m
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician, monthLabel, isOffMonth, isPastMonth, technicianColor, densityStyle, cardHeight }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void; monthLabel?: string | null; isOffMonth?: boolean; isPastMonth?: boolean; technicianColor?: { bg: string; border: string; text: string; borderLeft?: string; dot?: string }; densityStyle?: string; cardHeight?: number }) {
   // Calendar items: use ONLY useDraggable for unrestricted movement
   // Unscheduled items: use ONLY useSortable for sorting in panel
   const draggableResult = inCalendar ? useDraggable({ 
@@ -170,12 +395,15 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     return `${baseStyle} border-l-4 ${leftBorder} ${completedOpacity}`;
   };
 
+  // When cardHeight is provided, use full height styling
+  const heightStyle = cardHeight ? { height: `${cardHeight}px` } : {};
+
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{ ...style, ...heightStyle }}
       {...attributes}
-      className={`text-xs rounded-md transition-all relative select-none group ${densityStyle || 'py-1.5 px-2.5'} ${getCardStyle()}`}
+      className={`text-xs rounded-md transition-all relative select-none group ${cardHeight ? 'overflow-hidden' : ''} ${densityStyle || 'py-1.5 px-2.5'} ${getCardStyle()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
       <div 
@@ -633,6 +861,26 @@ export default function Calendar() {
       });
     },
   });
+
+  const updateDuration = useMutation({
+    mutationFn: async ({ id, durationMinutes }: { id: string; durationMinutes: number }) => {
+      return apiRequest("PATCH", `/api/calendar/assign/${id}`, { durationMinutes });
+    },
+    onSuccess: async () => {
+      await refetchCalendar();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update duration",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleResize = useCallback((assignmentId: string, newDurationMinutes: number) => {
+    updateDuration.mutate({ id: assignmentId, durationMinutes: newDurationMinutes });
+  }, [updateDuration]);
 
   const deleteAssignment = useMutation({
     mutationFn: async (id: string) => {
@@ -1215,28 +1463,32 @@ export default function Calendar() {
   };
 
   // Drop zone component for hourly slots in weekly view
-  const HourlyDropZone = ({ dayName, hour, dayNumber, dayAssignments = [] }: { dayName: string; hour: number; dayNumber: number; dayAssignments?: any[] }) => {
+  const HourlyDropZone = ({ dayName, hour, dayNumber, dayAssignments = [], laneMap }: { dayName: string; hour: number; dayNumber: number; dayAssignments?: any[]; laneMap?: Map<string, { laneIndex: number; totalLanes: number }> }) => {
     const { setNodeRef, isOver } = useDroppable({ id: `weekly-${dayName}-${hour}-${dayNumber}` });
+    const rowHeight = DENSITY_STYLES[density].rowHeight;
     
     // Filter assignments for this specific hour (explicitly check for number to handle hour 0)
     const hourlyAssignments = (dayAssignments || []).filter((a: any) => a.scheduledHour !== null && a.scheduledHour !== undefined && a.scheduledHour === hour);
     
     return (
-      <div ref={setNodeRef} className={`p-1 border-r ${DENSITY_STYLES[density].row} ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`}>
+      <div ref={setNodeRef} className={`border-r ${DENSITY_STYLES[density].row} ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'} relative`} style={{ minHeight: `${rowHeight}px` }}>
         {hourlyAssignments.map((assignment: any) => {
           const client = clients.find((c: any) => c.id === assignment.clientId);
+          const lane = laneMap?.get(assignment.id) || { laneIndex: 0, totalLanes: 1 };
           return client ? (
-            <DraggableClient
+            <ResizableJobCard
               key={assignment.id}
-              id={assignment.id}
+              assignment={assignment}
               client={client}
-              inCalendar
+              rowHeight={rowHeight}
+              onResize={handleResize}
+              getTechnicianColor={getTechnicianColor}
+              densityStyle={DENSITY_STYLES[density].card}
               onClick={() => handleClientClick(client, assignment)}
               isCompleted={assignment.completed}
               isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
-              assignment={assignment}
-              technicianColor={getTechnicianColor(assignment)}
-              densityStyle={DENSITY_STYLES[density].card}
+              laneIndex={lane.laneIndex}
+              totalLanes={lane.totalLanes}
             />
           ) : null;
         })}
@@ -1249,7 +1501,7 @@ export default function Calendar() {
     const currentWeekStart = getMondayOfWeek(currentDate);
 
     const startHour = companySettings?.calendarStartHour || 8;
-    const weekDaysData: Array<{date: Date; dayNumber: number; monthNumber: number; yearNumber: number; dayAssignments: any[]; dayName: string}> = [];
+    const weekDaysData: Array<{date: Date; dayNumber: number; monthNumber: number; yearNumber: number; dayAssignments: any[]; dayName: string; laneMap: Map<string, { laneIndex: number; totalLanes: number }>}> = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(currentWeekStart);
       date.setDate(currentWeekStart.getDate() + i);
@@ -1272,6 +1524,10 @@ export default function Calendar() {
           a.assignedTechnicianIds && a.assignedTechnicianIds.includes(selectedTechnicianId)
         );
       }
+      
+      // Calculate lanes for timed assignments (not all-day)
+      const timedAssignments = dayAssignments.filter((a: any) => a.scheduledHour !== null && a.scheduledHour !== undefined);
+      const laneMap = calculateLanes(timedAssignments);
 
       weekDaysData.push({
         date,
@@ -1279,7 +1535,8 @@ export default function Calendar() {
         monthNumber,
         yearNumber,
         dayAssignments,
-        dayName: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i]
+        dayName: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i],
+        laneMap
       });
     }
 
@@ -1384,7 +1641,7 @@ export default function Calendar() {
               {h.display}
             </div>
             {weekDaysData.map((dayData) => (
-              <HourlyDropZone key={`${dayData.dayName}-${h.hour}`} dayName={dayData.dayName} hour={h.hour} dayNumber={dayData.dayNumber} dayAssignments={dayData.dayAssignments} />
+              <HourlyDropZone key={`${dayData.dayName}-${h.hour}`} dayName={dayData.dayName} hour={h.hour} dayNumber={dayData.dayNumber} dayAssignments={dayData.dayAssignments} laneMap={dayData.laneMap} />
             ))}
           </div>
         ))}
@@ -1392,17 +1649,39 @@ export default function Calendar() {
     );
   };
 
-  // Daily View Drop Zone Component
-  const DailyDropZone = ({ technicianId, hour, children }: { technicianId: string; hour: number; children?: React.ReactNode }) => {
+  // Daily View Drop Zone Component with ResizableJobCard support
+  const DailyDropZone = ({ technicianId, hour, assignments, laneMap }: { technicianId: string; hour: number; assignments: any[]; laneMap: Map<string, { laneIndex: number; totalLanes: number }> }) => {
     const { setNodeRef, isOver } = useDroppable({
       id: `daily-${technicianId}-${hour}-${currentDate.getDate()}-${currentDate.getMonth()}-${currentDate.getFullYear()}`,
     });
+    const rowHeight = DENSITY_STYLES[density].rowHeight;
+    
     return (
       <div
         ref={setNodeRef}
-        className={`min-h-[60px] border-b border-r relative ${isOver ? 'bg-primary/10' : ''}`}
+        className={`border-b border-r relative ${isOver ? 'bg-primary/10' : ''}`}
+        style={{ minHeight: `${rowHeight}px` }}
       >
-        {children}
+        {assignments.map((assignment: any) => {
+          const client = clients.find((c: any) => c.id === assignment.clientId);
+          const lane = laneMap.get(assignment.id) || { laneIndex: 0, totalLanes: 1 };
+          return client ? (
+            <ResizableJobCard
+              key={assignment.id}
+              assignment={assignment}
+              client={client}
+              rowHeight={rowHeight}
+              onResize={handleResize}
+              getTechnicianColor={getTechnicianColor}
+              densityStyle={DENSITY_STYLES[density].card}
+              onClick={() => handleClientClick(client, assignment)}
+              isCompleted={assignment.completed}
+              isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
+              laneIndex={lane.laneIndex}
+              totalLanes={lane.totalLanes}
+            />
+          ) : null;
+        })}
       </div>
     );
   };
@@ -1455,6 +1734,17 @@ export default function Calendar() {
         const isAllDay = a.scheduledHour === null || a.scheduledHour === undefined;
         return matchesTech && isAllDay;
       });
+    };
+    
+    // Calculate lane maps per technician for timed assignments
+    const getLaneMapForTechnician = (techId: string | null) => {
+      const techTimedAssignments = dayAssignments.filter((a: any) => {
+        const matchesTech = techId === null 
+          ? (!a.assignedTechnicianIds || a.assignedTechnicianIds.length === 0)
+          : (a.assignedTechnicianIds && a.assignedTechnicianIds.includes(techId));
+        return matchesTech && a.scheduledHour !== null && a.scheduledHour !== undefined;
+      });
+      return calculateLanes(techTimedAssignments);
     };
 
     return (
@@ -1555,52 +1845,24 @@ export default function Calendar() {
             </div>
             {visibleTechnicians.map((tech: any) => {
               const slotAssignments = getAssignmentsForSlot(tech.id, h.hour);
+              const techLaneMap = getLaneMapForTechnician(tech.id);
               return (
-                <DailyDropZone key={`daily-${tech.id}-${h.hour}`} technicianId={tech.id} hour={h.hour}>
-                  <div className="p-0.5">
-                    {slotAssignments.map((assignment: any) => {
-                      const client = clients.find((c: any) => c.id === assignment.clientId);
-                      return client ? (
-                        <DraggableClient
-                          key={assignment.id}
-                          id={assignment.id}
-                          client={client}
-                          inCalendar
-                          onClick={() => handleClientClick(client, assignment)}
-                          isCompleted={assignment.completed}
-                          isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
-                          assignment={assignment}
-                          technicianColor={getTechnicianColor(assignment)}
-                          densityStyle={DENSITY_STYLES[density].card}
-                        />
-                      ) : null;
-                    })}
-                  </div>
-                </DailyDropZone>
+                <DailyDropZone 
+                  key={`daily-${tech.id}-${h.hour}`} 
+                  technicianId={tech.id} 
+                  hour={h.hour}
+                  assignments={slotAssignments}
+                  laneMap={techLaneMap}
+                />
               );
             })}
             {showUnassigned && (
-              <DailyDropZone technicianId="unassigned" hour={h.hour}>
-                <div className="p-0.5">
-                  {getAssignmentsForSlot(null, h.hour).map((assignment: any) => {
-                    const client = clients.find((c: any) => c.id === assignment.clientId);
-                    return client ? (
-                      <DraggableClient
-                        key={assignment.id}
-                        id={assignment.id}
-                        client={client}
-                        inCalendar
-                        onClick={() => handleClientClick(client, assignment)}
-                        isCompleted={assignment.completed}
-                        isOverdue={!assignment.completed && new Date(assignment.scheduledDate) < new Date()}
-                        assignment={assignment}
-                        technicianColor={getTechnicianColor(assignment)}
-                        densityStyle={DENSITY_STYLES[density].card}
-                      />
-                    ) : null;
-                  })}
-                </div>
-              </DailyDropZone>
+              <DailyDropZone 
+                technicianId="unassigned" 
+                hour={h.hour}
+                assignments={getAssignmentsForSlot(null, h.hour)}
+                laneMap={getLaneMapForTechnician(null)}
+              />
             )}
           </div>
         ))}

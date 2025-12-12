@@ -299,6 +299,8 @@ export const calendarAssignments = pgTable("calendar_assignments", {
   day: integer("day"),
   scheduledDate: text("scheduled_date").notNull(),
   scheduledHour: integer("scheduled_hour"),
+  scheduledStartMinutes: integer("scheduled_start_minutes"), // Time of day in minutes (0-1439), e.g., 540 = 9:00 AM
+  durationMinutes: integer("duration_minutes").default(60), // Duration in minutes (15-minute increments), default 60
   autoDueDate: boolean("auto_due_date").notNull().default(true),
   completed: boolean("completed").notNull().default(false),
   completionNotes: text("completion_notes"),
@@ -333,6 +335,8 @@ export const updateCalendarAssignmentSchema = z.object({
   day: z.number().int().min(1).max(31).nullable().optional(),
   scheduledDate: z.string().nullable().optional(),
   scheduledHour: z.number().int().min(0).max(23).nullable().optional(),
+  scheduledStartMinutes: z.number().int().min(0).max(1439).nullable().optional(), // 0-1439 (minutes in a day)
+  durationMinutes: z.number().int().min(15).max(720).nullable().optional(), // 15 min to 12 hours
   autoDueDate: z.boolean().optional(),
   completed: z.boolean().optional(),
   completionNotes: z.string().nullable().optional(),
