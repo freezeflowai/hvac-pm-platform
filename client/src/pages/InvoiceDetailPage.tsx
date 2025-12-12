@@ -570,27 +570,16 @@ export default function InvoiceDetailPage() {
               )}
 
               <Card>
-                <CardContent className="p-0">
-                  <Tabs defaultValue="public" className="w-full">
-                    <div className="px-4 pt-4">
-                      <TabsList className="w-full grid grid-cols-2">
-                        <TabsTrigger value="public" data-testid="tab-public-notes">Public Notes</TabsTrigger>
-                        <TabsTrigger value="internal" data-testid="tab-internal-notes">Internal Notes</TabsTrigger>
-                      </TabsList>
-                    </div>
-                    
-                    <TabsContent value="public" className="p-4 pt-3">
-                      <p className="text-sm text-muted-foreground min-h-[60px]">
-                        {invoice.notesCustomer || "No public notes added."}
-                      </p>
-                    </TabsContent>
-                    
-                    <TabsContent value="internal" className="p-4 pt-3">
-                      <p className="text-sm text-muted-foreground min-h-[60px]">
-                        {invoice.notesInternal || "No internal notes added."}
-                      </p>
-                    </TabsContent>
-                  </Tabs>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                    Client Message
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <p className="text-sm text-muted-foreground min-h-[60px]">
+                    {invoice.notesCustomer || "No client message added."}
+                  </p>
                 </CardContent>
               </Card>
 
