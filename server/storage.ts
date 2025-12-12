@@ -4361,6 +4361,7 @@ export class DbStorage implements IStorage {
     lines: InvoiceLine[];
     location: Client;
     customerCompany?: CustomerCompany;
+    job?: Job;
   } | undefined> {
     const invoice = await this.getInvoice(companyId, id);
     if (!invoice) return undefined;
@@ -4376,7 +4377,13 @@ export class DbStorage implements IStorage {
       customerCompany = await this.getCustomerCompany(companyId, location.parentCompanyId);
     }
 
-    return { invoice, lines, location, customerCompany };
+    // Fetch linked job if exists
+    let job: Job | undefined;
+    if (invoice.jobId) {
+      job = await this.getJob(companyId, invoice.jobId);
+    }
+
+    return { invoice, lines, location, customerCompany, job };
   }
 
   // Payment methods

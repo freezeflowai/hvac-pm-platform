@@ -360,32 +360,32 @@ export default function InvoiceDetailPage() {
             sendPending={sendMutation.isPending}
           />
 
-          {/* Job Description - Collapsible (from linked job or invoice work description) */}
-          {(job?.description || invoice.workDescription) && (
-            <Collapsible open={workDescOpen} onOpenChange={setWorkDescOpen}>
-              <Card className="mb-4" data-testid="card-job-description">
-                <CollapsibleTrigger asChild>
-                  <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-job-description">
-                    <span className="text-sm font-semibold flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      Job Description
-                    </span>
-                    {workDescOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="border-t px-4 pb-4 pt-3">
-                    <p className="text-sm whitespace-pre-wrap" data-testid="text-job-description">
-                      {job?.description || invoice.workDescription}
-                    </p>
-                  </div>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
-          )}
-
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-8 xl:col-span-8 space-y-6 order-1">
+
+              {/* Job Description - Collapsible (from linked job or invoice work description) */}
+              {(job?.description || invoice.workDescription) && (
+                <Collapsible open={workDescOpen} onOpenChange={setWorkDescOpen}>
+                  <Card data-testid="card-job-description">
+                    <CollapsibleTrigger asChild>
+                      <button className="w-full flex items-center justify-between px-4 py-3 hover-elevate" data-testid="trigger-job-description">
+                        <span className="text-sm font-semibold flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          Job Description
+                        </span>
+                        {workDescOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="border-t px-4 pb-4 pt-3">
+                        <p className="text-sm whitespace-pre-wrap" data-testid="text-job-description">
+                          {job?.description || invoice.workDescription}
+                        </p>
+                      </div>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
 
               <Card>
                 <CardHeader className="pb-3">
