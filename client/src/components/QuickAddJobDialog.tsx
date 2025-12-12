@@ -53,13 +53,6 @@ const JOB_TYPES = [
   { value: "emergency", label: "Emergency" },
 ];
 
-const PRIORITIES = [
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
-  { value: "urgent", label: "Urgent" },
-];
-
 const STATUSES = [
   { value: "draft", label: "Draft" },
   { value: "scheduled", label: "Scheduled" },
@@ -76,7 +69,6 @@ export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId, e
     summary: "",
     description: "",
     jobType: "maintenance",
-    priority: "medium",
     status: "scheduled",
     scheduledStart: "",
     scheduledEnd: "",
@@ -101,7 +93,6 @@ export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId, e
         summary: editJob.summary || "",
         description: editJob.description || "",
         jobType: editJob.jobType || "maintenance",
-        priority: editJob.priority || "medium",
         status: editJob.status || "scheduled",
         scheduledStart: formatDateForInput(editJob.scheduledStart),
         scheduledEnd: formatDateForInput(editJob.scheduledEnd),
@@ -213,7 +204,7 @@ export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId, e
       summary: formData.summary.trim(),
       description: formData.description.trim() || null,
       jobType: formData.jobType as any,
-      priority: formData.priority as any,
+      priority: "medium" as any,
       status: formData.status as any,
       scheduledStart: formData.scheduledStart || null,
       scheduledEnd: formData.scheduledEnd || null,
@@ -321,25 +312,6 @@ export function QuickAddJobDialog({ open, onOpenChange, preselectedLocationId, e
                   {JOB_TYPES.map(type => (
                     <SelectItem key={type.value} value={type.value} data-testid={`option-type-${type.value}`}>
                       {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="priority">Priority</Label>
-              <Select
-                value={formData.priority}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}
-              >
-                <SelectTrigger data-testid="select-priority">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRIORITIES.map(p => (
-                    <SelectItem key={p.value} value={p.value} data-testid={`option-priority-${p.value}`}>
-                      {p.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

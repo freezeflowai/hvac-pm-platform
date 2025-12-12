@@ -26,7 +26,7 @@ interface EnrichedJob extends Job {
 }
 
 type JobStatusFilter = "all" | "draft" | "scheduled" | "in_progress" | "completed" | "cancelled" | "on_hold" | "overdue";
-type SortField = "location" | "jobNumber" | "schedule" | "status" | "priority";
+type SortField = "location" | "jobNumber" | "schedule" | "status";
 type SortDirection = "asc" | "desc";
 
 function getJobStatusDisplay(status: string, scheduledStart: Date | null): { 
@@ -62,21 +62,6 @@ function getJobStatusDisplay(status: string, scheduledStart: Date | null): {
   }
   
   return { label: status, variant: "outline", priority: 3 };
-}
-
-function getPriorityDisplay(priority: string): { label: string; variant: "default" | "destructive" | "secondary" | "outline" } {
-  switch (priority) {
-    case "urgent":
-      return { label: "Urgent", variant: "destructive" };
-    case "high":
-      return { label: "High", variant: "default" };
-    case "medium":
-      return { label: "Medium", variant: "secondary" };
-    case "low":
-      return { label: "Low", variant: "outline" };
-    default:
-      return { label: priority, variant: "outline" };
-  }
 }
 
 function formatJobNumber(jobNumber: number): string {
@@ -158,11 +143,6 @@ export default function Jobs() {
           break;
         case "status":
           comparison = a.statusInfo.priority - b.statusInfo.priority;
-          break;
-        case "priority":
-          const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
-          comparison = (priorityOrder[a.priority as keyof typeof priorityOrder] ?? 2) - 
-                       (priorityOrder[b.priority as keyof typeof priorityOrder] ?? 2);
           break;
       }
       return sortDirection === "asc" ? comparison : -comparison;
@@ -333,14 +313,13 @@ export default function Jobs() {
               <SortableHeader field="jobNumber" testId="header-jobnumber">Job</SortableHeader>
               <TableHead data-testid="header-summary">Summary</TableHead>
               <SortableHeader field="schedule" testId="header-schedule">Schedule</SortableHeader>
-              <SortableHeader field="priority" testId="header-priority">Priority</SortableHeader>
               <SortableHeader field="status" testId="header-status">Status</SortableHeader>
             </TableRow>
           </TableHeader>
           <TableBody>
             {visibleJobs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground" data-testid="text-no-jobs">
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground" data-testid="text-no-jobs">
                   {jobs.length === 0 ? (
                     <div className="flex flex-col items-center gap-2">
                       <Wrench className="h-8 w-8 opacity-50" />
@@ -361,54 +340,46 @@ export default function Jobs() {
                 </TableCell>
               </TableRow>
             ) : (
-              visibleJobs.map((job) => {
-                const priorityDisplay = getPriorityDisplay(job.priority);
-                return (
-                  <TableRow 
-                    key={job.id} 
-                    className="cursor-pointer hover-elevate"
-                    onClick={() => handleRowClick(job)}
-                    data-testid={`row-job-${job.id}`}
-                  >
-                    <TableCell className="font-medium" data-testid={`text-location-${job.id}`}>
-                      <div>{job.locationName || "Unknown"}</div>
-                      {job.locationCity && (
-                        <div className="text-xs text-muted-foreground">{job.locationCity}</div>
+              visibleJobs.map((job) => (
+                <TableRow 
+                  key={job.id} 
+                  className="cursor-pointer hover-elevate"
+                  onClick={() => handleRowClick(job)}
+                  data-testid={`row-job-${job.id}`}
+                >
+                  <TableCell className="font-medium" data-testid={`text-location-${job.id}`}>
+                    <div>{job.locationName || "Unknown"}</div>
+                    {job.locationCity && (
+                      <div className="text-xs text-muted-foreground">{job.locationCity}</div>
+                    )}
+                  </TableCell>
+                  <TableCell data-testid={`text-jobnumber-${job.id}`}>
+                    <div className="font-mono text-sm">{formatJobNumber(job.jobNumber)}</div>
+                    <div className="text-xs text-muted-foreground capitalize">{job.jobType}</div>
+                  </TableCell>
+                  <TableCell data-testid={`text-summary-${job.id}`}>
+                    <div className="max-w-[300px] truncate">{job.summary}</div>
+                  </TableCell>
+                  <TableCell data-testid={`text-schedule-${job.id}`}>
+                    {job.scheduledStart ? (
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3 text-muted-foreground" />
+                        {format(new Date(job.scheduledStart), "MMM d, yyyy")}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Not scheduled</span>
+                    )}
+                  </TableCell>
+                  <TableCell data-testid={`badge-status-${job.id}`}>
+                    <Badge variant={job.statusInfo.variant}>
+                      {job.statusInfo.isOverdue && (
+                        <AlertTriangle className="h-3 w-3 mr-1" />
                       )}
-                    </TableCell>
-                    <TableCell data-testid={`text-jobnumber-${job.id}`}>
-                      <div className="font-mono text-sm">{formatJobNumber(job.jobNumber)}</div>
-                      <div className="text-xs text-muted-foreground capitalize">{job.jobType}</div>
-                    </TableCell>
-                    <TableCell data-testid={`text-summary-${job.id}`}>
-                      <div className="max-w-[300px] truncate">{job.summary}</div>
-                    </TableCell>
-                    <TableCell data-testid={`text-schedule-${job.id}`}>
-                      {job.scheduledStart ? (
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          {format(new Date(job.scheduledStart), "MMM d, yyyy")}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">Not scheduled</span>
-                      )}
-                    </TableCell>
-                    <TableCell data-testid={`badge-priority-${job.id}`}>
-                      <Badge variant={priorityDisplay.variant} className="text-xs">
-                        {priorityDisplay.label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell data-testid={`badge-status-${job.id}`}>
-                      <Badge variant={job.statusInfo.variant}>
-                        {job.statusInfo.isOverdue && (
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                        )}
-                        {job.statusInfo.label}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+                      {job.statusInfo.label}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>

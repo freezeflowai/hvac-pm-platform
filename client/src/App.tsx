@@ -43,6 +43,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
+import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Search, Plus, Settings, AlertTriangle, X, ChevronRight, ClipboardList, Users, FileText, Receipt } from "lucide-react";
@@ -220,6 +221,7 @@ function AppContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [overdueAlertMinimized, setOverdueAlertMinimized] = useState(false);
   const [addClientModalOpen, setAddClientModalOpen] = useState(false);
+  const [addJobModalOpen, setAddJobModalOpen] = useState(false);
 
   // Fetch unscheduled backlog to check for past-month items
   const { data: unscheduledBacklog = [] } = useQuery<any[]>({
@@ -379,7 +381,7 @@ function AppContent() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={() => setLocation('/jobs?create=true')} data-testid="menu-new-job">
+                    <DropdownMenuItem onClick={() => setAddJobModalOpen(true)} data-testid="menu-new-job">
                       <ClipboardList className="h-4 w-4 mr-2" />
                       New Job
                     </DropdownMenuItem>
@@ -416,6 +418,10 @@ function AppContent() {
         open={addClientModalOpen}
         onOpenChange={setAddClientModalOpen}
         onSuccess={handleClientCreated}
+      />
+      <QuickAddJobDialog
+        open={addJobModalOpen}
+        onOpenChange={setAddJobModalOpen}
       />
     </SidebarProvider>
   );
