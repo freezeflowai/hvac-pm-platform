@@ -35,9 +35,9 @@ const TECHNICIAN_COLORS = [
 type CalendarDensity = 'compact' | 'comfortable' | 'expanded';
 
 const DENSITY_STYLES = {
-  compact: { card: 'py-0.5 px-1', row: 'min-h-10', gap: 'gap-px', rowHeight: 40 },
-  comfortable: { card: 'py-0.5 px-1.5', row: 'min-h-12', gap: 'gap-0.5', rowHeight: 48 },
-  expanded: { card: 'py-1 px-1.5', row: 'min-h-14', gap: 'gap-1', rowHeight: 56 },
+  compact: { card: 'py-1 px-2', row: 'min-h-10', gap: 'gap-1', rowHeight: 40 },
+  comfortable: { card: 'py-1.5 px-2.5', row: 'min-h-12', gap: 'gap-1', rowHeight: 48 },
+  expanded: { card: 'py-2 px-3', row: 'min-h-14', gap: 'gap-1.5', rowHeight: 56 },
 };
 
 function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimize, currentMonth, currentYear }: { 
@@ -175,7 +175,7 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className={`text-xs rounded-md transition-all relative select-none group ${densityStyle || 'py-1 px-1.5'} ${getCardStyle()}`}
+      className={`text-xs rounded-md transition-all relative select-none group ${densityStyle || 'py-1.5 px-2.5'} ${getCardStyle()}`}
       data-testid={inCalendar ? `assigned-client-${id}` : `unscheduled-client-${client.id}`}
     >
       <div 
@@ -184,11 +184,11 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
       >
         {/* In Calendar: Clean layout - no status badges, job info only */}
         {inCalendar ? (
-          <>
+          <div className="space-y-0.5">
             {/* Line 1: Client + Location */}
             <div className="flex items-start gap-1">
               <div className="flex-1 min-w-0">
-                <div className={`font-semibold text-[12px] leading-4 truncate ${isCompleted ? 'line-through opacity-60' : ''}`}>
+                <div className={`font-semibold text-[12px] leading-[1.2] truncate ${isCompleted ? 'line-through opacity-60' : ''}`}>
                   {client.companyName}
                   {client.location && <span className="font-normal text-muted-foreground"> - {client.location}</span>}
                 </div>
@@ -199,23 +199,23 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
               )}
             </div>
             {/* Line 2: Job description */}
-            <div className={`text-[12px] text-foreground/80 leading-4 mt-0.5 ${isCompleted ? 'line-through opacity-60' : ''}`}>
+            <div className={`text-[12px] text-foreground/80 leading-[1.2] ${isCompleted ? 'line-through opacity-60' : ''}`}>
               Preventive Maintenance
               {assignment?.jobNumber && <span className="text-muted-foreground ml-1">#{assignment.jobNumber}</span>}
             </div>
             {/* Line 3: City */}
             {client.city && (
-              <div className={`text-[12px] text-muted-foreground leading-4 ${isCompleted ? 'opacity-60' : ''}`}>
+              <div className={`text-[12px] text-muted-foreground leading-[1.2] ${isCompleted ? 'opacity-60' : ''}`}>
                 {client.city}
               </div>
             )}
-          </>
+          </div>
         ) : (
           /* Unscheduled drawer: Stacked 3-line layout - no date pill, only bottom text line */
-          <>
+          <div className="space-y-0.5">
             {/* Line 1: Client name + red dot if overdue */}
             <div className="flex items-start gap-1">
-              <div className={`font-semibold text-[12px] leading-4 truncate flex-1 min-w-0 ${isPastMonth ? 'text-red-700 dark:text-red-300' : ''}`}>
+              <div className={`font-semibold text-[12px] leading-[1.2] truncate flex-1 min-w-0 ${isPastMonth ? 'text-red-700 dark:text-red-300' : ''}`}>
                 {client.companyName}
               </div>
               {isPastMonth && (
@@ -224,15 +224,15 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
             </div>
             {/* Line 2: Location info */}
             {client.location && (
-              <div className="text-[12px] text-muted-foreground leading-4 mt-0.5 truncate">
+              <div className="text-[12px] text-muted-foreground leading-[1.2] truncate">
                 {client.location}
               </div>
             )}
             {/* Line 3: Due date info */}
-            <div className={`text-[12px] leading-4 mt-0.5 ${isPastMonth ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'}`}>
+            <div className={`text-[12px] leading-[1.2] ${isPastMonth ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'}`}>
               {isPastMonth ? 'Overdue' : 'Due'} {monthLabel}
             </div>
-          </>
+          </div>
         )}
       </div>
       {inCalendar && onClick && (

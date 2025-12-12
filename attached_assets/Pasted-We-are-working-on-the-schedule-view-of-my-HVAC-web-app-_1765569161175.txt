@@ -1,0 +1,107 @@
+We are working on the schedule view of my HVAC web app. I want to make three specific upgrades to the job cards and calendar behavior so that it behaves more like Jobber.
+
+Please read this carefully and then update the React + CSS/Tailwind code accordingly.
+
+=======================================
+PART 1 – TIGHTER JOB CARD VERTICAL SPACING
+=======================================
+
+Right now my job cards in the calendar and in the unscheduled list have too much vertical space between the text lines, and too much padding, which makes each card look tall and chunky.
+
+Adjust the job card styling so that:
+
+- The overall card padding is smaller:
+  - Around 6–8px vertically and 10–12px horizontally.
+- The font size is about 12–13px, with a tighter line-height (~1.2), similar to Jobber.
+- The gap between the title and the second line is very small (2–4px).
+- The gap between consecutive cards is also small (4–6px margin-bottom).
+
+In code terms:
+- Replace any large `py-2.5`, `py-3`, `space-y-2`, etc. on job cards with smaller values like `py-1`, `space-y-1`.
+- Set `text-[12px]` or similar and `leading-tight` (or explicit `line-height: 1.2`) for the card text.
+- Ensure the card still looks clean but more compact.
+
+Create or update a reusable `JobCard` component so this compact style is consistent everywhere we show jobs in lists or on the calendar.
+
+=======================================
+PART 2 – RESIZABLE JOB DURATION BY DRAGGING THE BOTTOM EDGE
+=======================================
+
+Currently jobs on the calendar can only be dragged from hour slot to hour slot (8 AM, 9 AM, 10 AM, etc.) and their duration is basically fixed.
+
+I want to support variable-duration jobs with 15-minute increments by dragging the bottom edge of the job card, similar to Jobber or Google Calendar.
+
+Implementation requirements:
+
+1. Data model
+   - Each job must have a `startsAt` and `endsAt` (or `durationMinutes`) field.
+   - The calendar time grid should be based on 15-minute increments. For example:
+     - 1 hour = 60px tall -> 15 minutes = 15px.
+   - The job card height must be proportional to the duration:
+     `height = durationMinutes * pxPerMinute`.
+
+2. Resize handle
+   - At the bottom of each job card, render a small “resize handle” area (full width, a few pixels tall) with a `cursor: row-resize`.
+   - When the user presses the mouse down on this handle (or touch equivalent), start a “resize” interaction:
+     - Track vertical mouse movement (`deltaY`).
+     - Convert `deltaY` to minutes using `pxPerMinute`.
+     - Snap to **15-minute increments** using `Math.round(deltaMinutes / 15) * 15`.
+     - Compute a tentative `newEndTime = originalEndTime + snappedDeltaMinutes`.
+     - While dragging, visually resize the card to match this new end time.
+
+3. Saving the change
+   - On mouse up:
+     - Finalize `newEndTime` snapped to the nearest 15 minutes.
+     - Update the job in state and call the existing API to persist the new `endsAt` (or `durationMinutes`).
+   - Prevent shrinking the job smaller than some minimum (e.g. 15 or 30 minutes).
+
+4. Drag vs resize
+   - Keep the existing ability to drag the entire job to a new start time to move it vertically.
+   - Make sure dragging the main body of the card still moves the job (as now), while dragging the bottom handle specifically changes duration.
+
+=======================================
+PART 3 – OVERLAPPING JOBS SIDE-BY-SIDE FOR THE SAME TECHNICIAN
+=======================================
+
+In Jobber, when two jobs for the same technician overlap in time, they appear side-by-side in that technician’s column instead of stacking completely on top of each other.
+
+I want the same behavior in my calendar.
+
+Implementation:
+
+- Work per technician per day (or per column if the calendar is grouped by tech).
+- For each technician column:
+  1. Take all jobs for that tech on that day.
+  2. Sort them by `startsAt`.
+  3. Compute overlap groups:
+     - Any jobs whose [start, end] intervals intersect belong to the same overlap group.
+  4. For each overlap group:
+     - Assign a `laneIndex` from 0 to N-1.
+     - Compute `laneCount = number of overlapping jobs in that group`.
+
+- When rendering each job event:
+  - Position it absolutely inside the tech column using:
+    - `top` based on its start time.
+    - `height` based on duration.
+    - `width = 100% / laneCount`.
+    - `left = laneIndex * (100% / laneCount)`.
+
+In CSS/Tailwind terms, you can:
+- Wrap the events in a `relative` container for each tech-day cell.
+- Apply inline styles or CSS variables like:
+  - `style={{ top, height, left: `${laneIndex * (100 / laneCount)}%`, width: `${100 / laneCount}%` }}`.
+
+This will allow multiple overlapping jobs in the same time range for one technician to appear side-by-side instead of completely overlapping.
+
+=======================================
+DELIVERABLES
+=======================================
+
+1. Update the job card component styling to be more compact as described in Part 1.
+2. Implement the resize-handle behavior for changing job duration in Part 2, with 15-minute snapping and persistence.
+3. Implement the overlapping job lane layout in Part 3 so overlapping jobs render side-by-side within a technician’s column.
+
+Please show me the key updated React components and any new helper functions or hooks you create for:
+- JobCard
+- Calendar day/column components that handle event layout
+- Resize/drag logic for jobs.
