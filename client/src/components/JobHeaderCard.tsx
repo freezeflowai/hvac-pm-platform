@@ -6,30 +6,17 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
   MapPin, 
-  Calendar, 
   MoreHorizontal,
-  FileText,
   Copy,
   Receipt,
   PenTool,
   Download,
   Printer,
   XCircle,
-  AlertTriangle,
-  User as UserIcon,
-  UserPlus,
-  Plus
+  AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,20 +42,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Job, Client, CustomerCompany, Invoice, User } from "@shared/schema";
+import type { Job, Client, CustomerCompany, Invoice } from "@shared/schema";
 
 interface JobHeaderCardProps {
   job: Job & {
     location?: Client;
     parentCompany?: CustomerCompany;
-    technicians?: Array<User & { firstName?: string | null; lastName?: string | null }>;
   };
   jobInvoices: Invoice[];
   onEdit: () => void;
   onDelete: () => void;
-  onStatusChange: (status: string) => void;
-  onAssignTechnician?: () => void;
-  statusChangePending?: boolean;
 }
 
 function getJobStatusDisplay(status: string, scheduledStart: Date | null): { 
@@ -115,19 +98,13 @@ export function JobHeaderCard({
   job, 
   jobInvoices,
   onEdit, 
-  onDelete, 
-  onStatusChange,
-  onAssignTechnician,
-  statusChangePending 
+  onDelete
 }: JobHeaderCardProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showCloseJobDialog, setShowCloseJobDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [closeOption, setCloseOption] = useState<"invoice_now" | "invoice_later" | "archive">("invoice_now");
-
-  const statusInfo = getJobStatusDisplay(job.status, job.scheduledStart);
-  const priorityInfo = getPriorityDisplay(job.priority);
 
   const locationName = job.location?.location || job.location?.companyName || "Location";
   const clientName = job.parentCompany?.name || job.location?.companyName || "Client";
@@ -226,7 +203,7 @@ export function JobHeaderCard({
 
   return (
     <>
-      <Card className="mb-4" data-testid="card-job-header">
+      <Card data-testid="card-job-header">
         <CardContent className="p-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             {/* LEFT: Client info, job summary, address */}
@@ -331,147 +308,6 @@ export function JobHeaderCard({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </div>
-            </div>
-
-            {/* RIGHT: Status card / meta info */}
-            <div className="rounded-xl border bg-muted/30 px-4 py-3 text-xs min-w-[220px]">
-              {/* Job number row */}
-              <div className="mb-2 flex items-center justify-between gap-4">
-                <span className="font-medium text-muted-foreground">Job</span>
-                <span className="font-semibold text-foreground" data-testid="text-job-number">#{job.jobNumber}</span>
-              </div>
-
-              {/* Invoice row */}
-              <div className="mb-2 flex items-center justify-between gap-4">
-                <span className="font-medium text-muted-foreground">Invoice</span>
-                {existingInvoice ? (
-                  <button
-                    type="button"
-                    onClick={() => setLocation(`/invoices/${existingInvoice.id}`)}
-                    className="font-semibold text-primary hover:underline"
-                    data-testid="link-invoice"
-                  >
-                    {existingInvoice.invoiceNumber || `INV-${existingInvoice.id.slice(0, 6).toUpperCase()}`}
-                  </button>
-                ) : (
-                  <span className="text-[11px] text-muted-foreground" data-testid="text-no-invoice">
-                    Not invoiced yet
-                  </span>
-                )}
-              </div>
-
-              {/* Status row */}
-              <div className="mb-2 flex items-center justify-between gap-4">
-                <span className="font-medium text-muted-foreground">Status</span>
-                <div className="flex items-center gap-2">
-                  {statusInfo.isOverdue && (
-                    <Badge variant="destructive" className="text-[11px]" data-testid="badge-overdue">
-                      Overdue
-                    </Badge>
-                  )}
-                  <Select
-                    value={job.status}
-                    onValueChange={onStatusChange}
-                    disabled={statusChangePending}
-                  >
-                    <SelectTrigger className="h-6 w-auto min-w-[100px] text-[11px]" data-testid="select-status">
-                      <SelectValue placeholder="Change" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="scheduled">Scheduled</SelectItem>
-                      <SelectItem value="dispatched">Dispatched</SelectItem>
-                      <SelectItem value="en_route">En Route</SelectItem>
-                      <SelectItem value="on_site">On Site</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="needs_parts">Needs Parts</SelectItem>
-                      <SelectItem value="on_hold">On Hold</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="invoiced">Invoiced</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Scheduled */}
-              <div className="flex items-center justify-between gap-4">
-                <span className="font-medium text-muted-foreground">Scheduled</span>
-                <div className="flex items-center gap-1 text-[11px]">
-                  <Calendar className="h-3 w-3 text-muted-foreground" />
-                  <span>
-                    {job.scheduledStart ? format(new Date(job.scheduledStart), "MMM d, yyyy h:mm a") : "Not set"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Assigned Technicians Mini-Section */}
-              <div className="pt-2 mt-2 border-t">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="font-medium text-muted-foreground flex items-center gap-1">
-                    <UserIcon className="h-3 w-3" />
-                    Technicians
-                  </span>
-                  {onAssignTechnician && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={onAssignTechnician}
-                      className="text-xs text-primary"
-                      data-testid="button-assign-tech-header"
-                    >
-                      <UserPlus className="h-3 w-3 mr-1" />
-                      Assign
-                    </Button>
-                  )}
-                </div>
-                {job.technicians && job.technicians.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {job.technicians.map(tech => (
-                      <div 
-                        key={tech.id} 
-                        className="flex items-center gap-1 text-[11px]"
-                        data-testid={`badge-tech-header-${tech.id}`}
-                      >
-                        <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-[9px] font-medium text-primary">
-                            {(tech.firstName?.[0] || tech.email[0]).toUpperCase()}
-                          </span>
-                        </div>
-                        <span className="text-foreground">
-                          {tech.firstName || tech.email.split('@')[0]}
-                        </span>
-                        {tech.id === job.primaryTechnicianId && (
-                          <Badge variant="secondary" className="text-[9px] h-4 px-1">P</Badge>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground">None assigned</span>
-                )}
-              </div>
-
-              {/* Visits Mini-Section */}
-              <div className="pt-2 mt-2 border-t">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="font-medium text-muted-foreground flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    Visits
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toast({ title: "Coming Soon", description: "Visit scheduling coming soon." })}
-                    className="text-xs text-primary"
-                    data-testid="button-new-visit-header"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    New
-                  </Button>
-                </div>
-                <span className="text-[10px] text-muted-foreground">No visits scheduled</span>
               </div>
             </div>
           </div>

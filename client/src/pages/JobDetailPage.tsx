@@ -40,6 +40,8 @@ import JobEquipmentSection from "@/components/JobEquipmentSection";
 import { PartsBillingCard } from "@/components/PartsBillingCard";
 import { QuickAddJobDialog } from "@/components/QuickAddJobDialog";
 import { JobHeaderCard } from "@/components/JobHeaderCard";
+import { JobAssignmentsCard } from "@/components/JobAssignmentsCard";
+import { JobMetaCard } from "@/components/JobMetaCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -675,16 +677,32 @@ export default function JobDetailPage() {
 
   return (
     <div className="p-4" data-testid="job-detail-page">
-      {/* JOB HEADER CARD - includes Technicians & Visits in right column */}
-      <JobHeaderCard
-        job={job}
-        jobInvoices={jobInvoices}
-        onEdit={() => setShowEditDialog(true)}
-        onDelete={() => deleteJobMutation.mutate()}
-        onStatusChange={handleStatusChange}
-        onAssignTechnician={() => setShowAssignTech(true)}
-        statusChangePending={updateStatusMutation.isPending}
-      />
+      {/* JOB HEADER ROW - 3 cards side-by-side */}
+      <div className="grid gap-4 mb-4 grid-cols-1 lg:grid-cols-[2fr_1.2fr_1.2fr]">
+        {/* LEFT: Client / Job info */}
+        <JobHeaderCard
+          job={job}
+          jobInvoices={jobInvoices}
+          onEdit={() => setShowEditDialog(true)}
+          onDelete={() => deleteJobMutation.mutate()}
+        />
+        
+        {/* MIDDLE: Technicians & Visits */}
+        <JobAssignmentsCard
+          technicians={job.technicians || []}
+          primaryTechnicianId={job.primaryTechnicianId}
+          onAssignTechnician={() => setShowAssignTech(true)}
+          onNewVisit={() => toast({ title: "Coming Soon", description: "Visit scheduling coming soon." })}
+        />
+        
+        {/* RIGHT: Job Meta (Job #, Invoice, Status, Scheduled) */}
+        <JobMetaCard
+          job={job}
+          invoice={jobInvoices.length > 0 ? jobInvoices[0] : null}
+          onStatusChange={handleStatusChange}
+          statusChangePending={updateStatusMutation.isPending}
+        />
+      </div>
 
       {/* JOB DESCRIPTION CARD - Full Width Above Main Layout */}
       <JobDescriptionCard 

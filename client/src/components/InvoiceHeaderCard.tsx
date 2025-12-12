@@ -273,8 +273,26 @@ export function InvoiceHeaderCard({
               <div className="mb-2 flex items-center justify-between gap-4">
                 <span className="font-medium text-muted-foreground">Invoice</span>
                 <span className="font-semibold text-foreground" data-testid="text-invoice-number">
-                  {invoice.invoiceNumber || `INV-${invoice.id.slice(0, 6).toUpperCase()}`}
+                  #{invoice.invoiceNumber || `INV-${invoice.id.slice(0, 6).toUpperCase()}`}
                 </span>
+              </div>
+
+              {/* Job row - right after Invoice */}
+              <div className="mb-2 flex items-center justify-between gap-4">
+                <span className="font-medium text-muted-foreground">Job</span>
+                {job ? (
+                  <Link href={`/jobs/${job.id}`}>
+                    <button 
+                      type="button"
+                      className="font-semibold text-primary hover:underline"
+                      data-testid="link-job"
+                    >
+                      #{job.jobNumber}
+                    </button>
+                  </Link>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground">N/A</span>
+                )}
               </div>
 
               {/* Status row */}
@@ -306,29 +324,12 @@ export function InvoiceHeaderCard({
               </div>
 
               {/* Balance Due */}
-              <div className="mb-2 flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-4">
                 <span className="font-medium text-muted-foreground">Balance Due</span>
                 <span className={`font-bold text-sm ${balanceColor}`} data-testid="text-balance-due">
                   {formatCurrency(invoice.balance)}
                 </span>
               </div>
-
-              {/* Job Link */}
-              {job && (
-                <div className="pt-2 border-t flex items-center justify-between gap-4">
-                  <span className="font-medium text-muted-foreground">Job</span>
-                  <Link href={`/jobs/${job.id}`}>
-                    <button 
-                      type="button"
-                      className="flex items-center gap-1 text-[11px] text-primary hover:underline"
-                      data-testid="link-job"
-                    >
-                      <Briefcase className="h-3 w-3" />
-                      #{job.jobNumber}
-                    </button>
-                  </Link>
-                </div>
-              )}
             </div>
           </div>
         </CardContent>

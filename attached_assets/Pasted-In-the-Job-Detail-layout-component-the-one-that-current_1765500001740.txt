@@ -1,0 +1,209 @@
+In the Job Detail layout component (the one that currently renders the top header section), change the layout so the top row is something like:
+
+<div className="job-header-row">
+  <div className="job-header-left">
+    <JobHeaderCard /> {/* existing client/job info card */}
+  </div>
+  <div className="job-header-middle">
+    <JobAssignmentsCard /> {/* NEW card for technicians + visits */}
+  </div>
+  <div className="job-header-right">
+    <JobMetaCard /> {/* existing meta card with Job / Invoice / Status / Scheduled */}
+  </div>
+</div>
+
+
+Style this as a 3-column row, for example:
+
+.job-header-row {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+
+Remove / delete ANY technicians/visits sections that currently live inside the Job Meta card. The Technicians and Visits UI must live ONLY in the middle JobAssignmentsCard.
+
+Do NOT change the existing Job Description card or Parts & Billing section here – just the header row layout.
+
+================================================
+PART 2 – INVOICE HEADER META: ADD JOB ROW UNDER INVOICE
+
+Look at the Invoices page screenshot.
+
+On the top right is an Invoice Meta card that currently shows:
+
+Invoice 1001
+
+Status Not Sent
+
+Issue Date
+
+Due Date
+
+Balance Due
+
+The client header on the left says "Juju", and there is no job number row anywhere.
+
+I need the Job number row inside the Invoice Meta card, just under the Invoice row.
+
+Concrete instructions:
+
+In the invoice meta component (whatever is rendering that right-hand card), update the JSX to look like this (conceptually):
+
+<Card>
+  <Row>
+    <Label>Invoice</Label>
+    <Value>#{invoice.number}</Value> {/* NOTE THE # IN FRONT */}
+  </Row>
+
+  <Row>
+    <Label>Job</Label>
+    {invoice.jobId ? (
+      <Value>
+        <Link to={`/jobs/${invoice.jobId}`}>#{job.number}</Link>
+      </Value>
+    ) : (
+      <Value>N/A</Value>
+    )}
+  </Row>
+
+  <Row>
+    <Label>Status</Label>
+    <Value>{invoice.sentAt ? 'Sent' : 'Not Sent'}</Value>
+  </Row>
+
+  <Row>
+    <Label>Issue Date</Label>
+    <Value>{formattedIssueDate}</Value>
+  </Row>
+
+  <Row>
+    <Label>Due Date</Label>
+    <Value>{formattedDueDate}</Value>
+  </Row>
+
+  <Row>
+    <Label>Balance Due</Label>
+    <Value>{formattedBalance}</Value>
+  </Row>
+</Card>
+
+
+IMPORTANT:
+
+The Invoice number must be rendered as #1001 (with the # symbol), not just 1001.
+
+The Job row must appear in the meta card, not somewhere else.
+
+The Job number (#10165) must be clickable and navigate back to the Job Detail page.
+
+Do NOT show Draft 1001 under the client name on the left side anymore. That label under the client header should be removed.
+
+================================================
+PART 3 – INVOICE PAGE: JOB DESCRIPTION CARD IN MAIN COLUMN (NOT INTERNAL NOTES)
+
+Right now, the Job Description text from the job is showing up in the Internal Notes tab on the right-hand side of the Invoice page. That is incorrect.
+
+What I want:
+
+The Job Description is for the client, and should be visible above the Products & Services table in the main content column.
+
+Internal Notes are for technicians/internal staff only, and should stay on the right-hand side tabbed card.
+
+So there are TWO different things:
+
+Job Description (client-facing, main column)
+
+Internal Notes (staff-only, right sidebar)
+
+Concrete instructions:
+
+When an invoice is created from a job (jobId is present):
+
+Fetch the job’s description (the same text that appears in the Job Description card on the Job Detail page).
+
+Store this job description on the invoice model as a separate field, for example invoice.jobDescription.
+
+DO NOT put this text into invoice.internalNotes.
+
+On the Invoice Detail page, in the main center column, add a Job Description card ABOVE the “Products & Services” card.
+
+The layout should be similar to the Job page:
+
+<Card>
+  <CardHeader onClick={toggleCollapsed}>
+    <ChevronIcon direction={collapsed ? 'down' : 'up'} />
+    <span>Job Description</span>
+  </CardHeader>
+
+  {!collapsed && (
+    <CardBody>
+      {invoice.jobDescription ? (
+        <pre className="job-description-text">
+          {invoice.jobDescription}
+        </pre>
+      ) : (
+        <p>No job description added.</p>
+      )}
+    </CardBody>
+  )}
+</Card>
+
+
+This card must sit between the header (client info + invoice meta) and the “Products & Services” table.
+
+It must be collapsible like on the Job page (chevron to minimize/expand).
+
+The right side Internal Notes tab should remain, but it should NOT be auto-filled with the job description.
+
+Internal Notes should only show notes that users explicitly enter as internal notes.
+
+They should not be shown on the client PDF/email.
+
+Summary of expected invoice layout (top down):
+
+Row 1: Client header (left) + Invoice meta card (right)
+
+Row 2: Job Description collapsible card (center column)
+
+Row 3: Products & Services table
+
+Right sidebar: Public Notes / Internal Notes tabs + Activity card
+
+================================================
+PART 4 – DATA FLOW CLARIFICATION (TO AVOID CONFUSION)
+
+To avoid mixing fields:
+
+Job.description (from the Job page) is copied into:
+
+Invoice.jobDescription (client-facing, main column card)
+
+Job.internalNotes and Invoice.internalNotes should be shared or kept in sync for internal-only notes (right sidebar card), but they are separate from Job Description.
+
+Under no circumstance should Job Description text be rendered in the Internal Notes tab.
+
+================================================
+PLEASE CONFIRM IMPLEMENTATION
+
+After you implement:
+
+On the Job Detail page:
+
+At the very top, there should be three cards side-by-side:
+
+Client/Job info
+
+Technicians & Visits card
+
+Job Meta card (Job #, Invoice #, Status, Scheduled)
+
+On the Invoice Detail page:
+
+The Invoice meta card shows both Invoice # and Job # (with # symbols), with Job clickable.
+
+Under the header, in the main center column, there is a “Job Description” card that can be minimized and shows the job description text.
+
+The Internal Notes tab on the right is empty unless I manually add notes; it no longer shows the job description.

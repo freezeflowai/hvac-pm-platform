@@ -4650,8 +4650,7 @@ export class DbStorage implements IStorage {
       subtotal: "0",
       taxTotal: "0",
       total: "0",
-      notesInternal: options?.includeNotes ? job.description || null : null,
-      workDescription: job.description || null, // Copy job description as work performed
+      workDescription: job.description || null, // Copy job description as work performed (client-facing)
     };
     
     const invoice = await this.createInvoice(companyId, invoiceData);
