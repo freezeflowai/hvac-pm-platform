@@ -435,7 +435,7 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
             )}
           </div>
         ) : (
-          /* Unscheduled drawer: Stacked 3-line layout - no date pill, only bottom text line */
+          /* Unscheduled drawer: Stacked 2-line layout - client name and location only */
           <div className="space-y-0.5">
             {/* Line 1: Client name */}
             <div className="flex items-start gap-1">
@@ -449,10 +449,6 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
                 {client.location}
               </div>
             )}
-            {/* Line 3: Due date info */}
-            <div className="text-[12px] leading-[1.2] text-muted-foreground">
-              Due {monthLabel}
-            </div>
           </div>
         )}
       </div>
@@ -1092,46 +1088,23 @@ export default function Calendar() {
     } else if (overId.startsWith('weekly-')) {
       // Dropped on hourly slot in weekly view (weekly-{dayName}-{hour}-{dayNumber})
       const parts = overId.replace('weekly-', '').split('-');
-      const targetHour = parseInt(parts[1]);
+      const hour = parseInt(parts[1]);
       const targetDay = parseInt(parts[2]);
       
       if (isExistingCalendarAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
-        if (currentAssignment) {
-          // Calculate 15-minute snapped position using delta
-          const rowHeight = DENSITY_STYLES[density].rowHeight;
-          const pixelsPerMinute = rowHeight / 60;
-          
-          // Get current start minutes
-          const currentStartMinutes = currentAssignment.scheduledStartMinutes ?? 
-            (currentAssignment.scheduledHour != null ? currentAssignment.scheduledHour * 60 : 0);
-          
-          // Calculate delta in minutes and snap to 15-minute increments
-          const deltaMinutes = Math.round(event.delta.y / pixelsPerMinute);
-          const newStartMinutes = Math.max(0, Math.min(24 * 60 - 15, 
-            Math.round((currentStartMinutes + deltaMinutes) / 15) * 15));
-          
-          // Check if position actually changed
-          const positionChanged = currentAssignment.day !== targetDay || 
-            currentStartMinutes !== newStartMinutes;
-          
-          if (positionChanged) {
-            updateAssignment.mutate({ 
-              id: activeId, 
-              day: targetDay, 
-              scheduledStartMinutes: newStartMinutes 
-            });
-          }
+        if (currentAssignment && (currentAssignment.day !== targetDay || currentAssignment.scheduledHour !== hour)) {
+          updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: hour });
         }
       } else if (unscheduledItem && hasExistingAssignment) {
         // Update existing unscheduled assignment to current view's month/day/hour
-        updateAssignment.mutate({ id: unscheduledItem.assignmentId, day: targetDay, scheduledStartMinutes: targetHour * 60, targetMonth: month, targetYear: year });
+        updateAssignment.mutate({ id: unscheduledItem.assignmentId, day: targetDay, scheduledHour: hour, targetMonth: month, targetYear: year });
       } else if (unscheduledItem) {
         // Create new assignment from unscheduled client - use ITEM's original month/year
         createAssignment.mutate({ 
           clientId: unscheduledItem.clientId, 
           day: targetDay, 
-          scheduledStartMinutes: targetHour * 60,
+          scheduledHour: hour,
           targetMonth: unscheduledItem.month,
           targetYear: unscheduledItem.year
         });
@@ -1140,7 +1113,7 @@ export default function Calendar() {
       // Dropped on hourly slot in daily view (daily-{technicianId}-{hour}-{day}-{month}-{year})
       const parts = overId.replace('daily-', '').split('-');
       const technicianId = parts[0];
-      const targetHour = parseInt(parts[1]);
+      const hour = parseInt(parts[1]);
       const targetDay = parseInt(parts[2]);
       const targetMonthIdx = parseInt(parts[3]); // 0-based month from Date.getMonth()
       const targetYr = parseInt(parts[4]);
@@ -1150,23 +1123,10 @@ export default function Calendar() {
       if (isExistingCalendarAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
         if (currentAssignment) {
-          // Calculate 15-minute snapped position using delta
-          const rowHeight = DENSITY_STYLES[density].rowHeight;
-          const pixelsPerMinute = rowHeight / 60;
-          
-          // Get current start minutes
-          const currentStartMinutes = currentAssignment.scheduledStartMinutes ?? 
-            (currentAssignment.scheduledHour != null ? currentAssignment.scheduledHour * 60 : 0);
-          
-          // Calculate delta in minutes and snap to 15-minute increments
-          const deltaMinutes = Math.round(event.delta.y / pixelsPerMinute);
-          const newStartMinutes = Math.max(0, Math.min(24 * 60 - 15, 
-            Math.round((currentStartMinutes + deltaMinutes) / 15) * 15));
-          
           updateAssignment.mutate({ 
             id: activeId, 
             day: targetDay, 
-            scheduledStartMinutes: newStartMinutes,
+            scheduledHour: hour,
             targetMonth: targetMo,
             targetYear: targetYr
           });
@@ -1179,7 +1139,7 @@ export default function Calendar() {
         updateAssignment.mutate({ 
           id: unscheduledItem.assignmentId, 
           day: targetDay, 
-          scheduledStartMinutes: targetHour * 60, 
+          scheduledHour: hour, 
           targetMonth: targetMo,
           targetYear: targetYr
         });
@@ -1188,7 +1148,7 @@ export default function Calendar() {
         createAssignment.mutate({ 
           clientId: unscheduledItem.clientId, 
           day: targetDay, 
-          scheduledStartMinutes: targetHour * 60,
+          scheduledHour: hour,
           targetMonth: unscheduledItem.month,
           targetYear: unscheduledItem.year
         });
