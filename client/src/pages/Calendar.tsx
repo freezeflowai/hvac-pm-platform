@@ -421,10 +421,6 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
                   {client.location && <span className="font-normal text-muted-foreground"> - {client.location}</span>}
                 </div>
               </div>
-              {/* Small red dot for overdue instead of badge */}
-              {isOverdue && (
-                <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 mt-0.5" title="Overdue" />
-              )}
             </div>
             {/* Line 2: Job description */}
             <div className={`text-[12px] text-foreground/80 leading-[1.2] ${isCompleted ? 'line-through opacity-60' : ''}`}>
@@ -441,14 +437,11 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
         ) : (
           /* Unscheduled drawer: Stacked 3-line layout - no date pill, only bottom text line */
           <div className="space-y-0.5">
-            {/* Line 1: Client name + red dot if overdue */}
+            {/* Line 1: Client name */}
             <div className="flex items-start gap-1">
-              <div className={`font-semibold text-[12px] leading-[1.2] truncate flex-1 min-w-0 ${isPastMonth ? 'text-red-700 dark:text-red-300' : ''}`}>
+              <div className="font-semibold text-[12px] leading-[1.2] truncate flex-1 min-w-0">
                 {client.companyName}
               </div>
-              {isPastMonth && (
-                <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 mt-0.5" title="Overdue" />
-              )}
             </div>
             {/* Line 2: Location info */}
             {client.location && (
@@ -457,8 +450,8 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
               </div>
             )}
             {/* Line 3: Due date info */}
-            <div className={`text-[12px] leading-[1.2] ${isPastMonth ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'}`}>
-              {isPastMonth ? 'Overdue' : 'Due'} {monthLabel}
+            <div className="text-[12px] leading-[1.2] text-muted-foreground">
+              Due {monthLabel}
             </div>
           </div>
         )}
@@ -2239,7 +2232,7 @@ export default function Calendar() {
             </div>
 
             {!isUnscheduledMinimized && (
-              <aside className="w-80 flex-shrink-0 h-full overflow-hidden">
+              <aside className="w-[13%] min-w-[260px] flex-shrink-0 h-full overflow-hidden">
                 <UnscheduledPanel 
                   clients={unscheduledClients} 
                   onClientClick={setReportDialogClientId}

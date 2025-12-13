@@ -1,0 +1,114 @@
+We are working on the weekly calendar view of my HVAC scheduling app. I’ve attached a screenshot of the current layout. I want to simplify the visuals and fix the time-slot behavior. Please carefully implement the following changes.
+
+========================================
+PART 1 – REMOVE OVERDUE DOTS + OVERDUE LABELS FROM CALENDAR
+========================================
+
+Right now, jobs and unscheduled jobs are showing a red “overdue” dot and overdue text in the calendar and in the Unscheduled sidebar.
+
+I want to completely remove the “overdue” indicators from the calendar UI:
+
+1. On the main calendar grid:
+   - Remove any red dot or overdue icon from job cards.
+   - Job cards should no longer display an “overdue” visual state in the calendar view.
+
+2. In the Unscheduled sidebar (right-hand column):
+   - Remove the red dot from the job cards.
+   - Remove or hide any “Overdue Nov ’25” style text from these cards.
+   - The unscheduled list should simply show the job title, location, and (optionally) due date in a subtle way, but WITHOUT red overdue styling.
+
+We will handle “overdue” awareness in the Jobs list or Dashboard later, so do not show overdue on the calendar at all.
+
+========================================
+PART 2 – SHRINK THE UNSCHEDULED SIDEBAR WIDTH
+========================================
+
+The Unscheduled column on the right is currently too wide for the content and wastes horizontal space that we need for the calendar.
+
+Please:
+
+1. Reduce the width of the Unscheduled sidebar to roughly half of what it is now.
+   - If it is currently using something like 20–25% of the layout width, change it to around 10–13%.
+   - Use a fixed min width so it doesn’t collapse too small (e.g. `min-width: 260px`), but keep it as narrow as is comfortable.
+
+2. Keep the job cards inside that sidebar readable by:
+   - Using the compact job-card styling we already defined (small padding, 12–13px text, tight line height).
+   - Ensuring long titles truncate with an ellipsis instead of wrapping to 3–4 lines.
+
+3. The main calendar area should expand to use the space freed from the narrower sidebar.
+
+========================================
+PART 3 – SLIGHTLY NARROWER LEFT NAVIGATION SIDEBAR
+========================================
+
+The left navigation menu (Dashboard / Jobs / Invoices / Calendar / etc.) is also slightly wider than it needs to be.
+
+Update its layout so that:
+
+- It uses a smaller fixed width (for example 210–220px) instead of a larger width.
+- Icons and labels still fit comfortably, but the sidebar feels more compact.
+- The extra space should be given to the main calendar area (center column).
+
+If you are using CSS grid or flex for the overall shell, adjust the grid columns so the ratios are approximately:
+- ~12–13% width for the left sidebar
+- ~72–75% width for the calendar
+- ~10–13% width for the Unscheduled sidebar (from Part 2)
+
+Use responsive behavior so that:
+- On smaller screens, the right sidebar can collapse or turn into a drawer, as already implemented.
+- The left nav can also collapse to icons-only or a hamburger menu, if that behavior already exists.
+
+========================================
+PART 4 – ENABLE TRUE 15-MINUTE INCREMENT DRAGGING
+========================================
+
+Right now, when I drag a job card up or down on the calendar, it will only snap into full-hour blocks (e.g. from 11:00 directly to 12:00). I need it to support 15-minute increments (11:00, 11:15, 11:30, 11:45, etc.), matching the vertical grid.
+
+Requirements:
+
+1. Time grid:
+   - The calendar day columns should internally represent time in 15-minute increments.
+   - Define a constant like `const SLOT_MINUTES = 15` and `const PX_PER_MINUTE = (rowHeight / 60)` where `rowHeight` is the pixel height of an hour.
+
+2. Drag behavior for moving a job:
+   - When dragging a job card vertically:
+     - Convert the vertical delta (deltaY in pixels) to minutes using `deltaMinutes = deltaY / PX_PER_MINUTE`.
+     - Snap this to 15-minute increments using something like:
+       `const snappedMinutes = Math.round(deltaMinutes / SLOT_MINUTES) * SLOT_MINUTES;`
+     - Compute the new start time:
+       `newStart = originalStart + snappedMinutes`.
+   - While dragging, show the job at its snapped vertical position.
+   - On drop, update the job’s `startsAt` (and `endsAt` based on its duration) in state and persist it via the existing API.
+
+3. Interaction with resize:
+   - Keep the resize-from-bottom behavior we already discussed previously for changing duration.
+   - Make sure both dragging and resizing use the same 15-minute snapping logic so there are no weird off-grid times.
+
+4. Constraints:
+   - Prevent dragging outside the working hours range for that day (if such a range exists).
+   - Optionally enforce a minimum job duration (e.g. 15 or 30 minutes).
+
+========================================
+PART 5 – SMALL VISUAL REFINEMENTS
+========================================
+
+While applying the changes above, also:
+
+1. Ensure the Unscheduled sidebar header (e.g. “Unscheduled (15)”) remains visible and aligned nicely after we shrink the width.
+2. Maintain the existing ability to show multiple jobs side-by-side in the main calendar when times overlap; the layout changes must not break that behavior.
+3. Verify that drag-and-drop and resizing still work correctly after we alter the column widths.
+
+========================================
+DELIVERABLES
+========================================
+
+Please:
+- Update the layout/container code for the calendar shell (left sidebar, main calendar, right Unscheduled sidebar) to reflect the new widths.
+- Update the job card and unscheduled card styling for a more compact look.
+- Implement the 15-minute snapping logic for dragging job cards vertically, reusing the same snapping constants used for duration resizing.
+- Remove all overdue-related dots/labels from the calendar and Unscheduled sidebar.
+
+Show me:
+- The key updated React components (calendar layout, job event rendering, unscheduled list).
+- Any updated CSS/Tailwind classes or inline styles.
+- The helper functions/hooks used to convert between pixels and 15-minute time slots and to snap times correctly.
