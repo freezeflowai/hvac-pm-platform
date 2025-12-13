@@ -1477,6 +1477,8 @@ export class MemStorage implements IStorage {
       day: assignmentUpdate.day !== undefined ? assignmentUpdate.day : existing.day,
       scheduledDate: assignmentUpdate.scheduledDate !== undefined && assignmentUpdate.scheduledDate !== null ? assignmentUpdate.scheduledDate : existing.scheduledDate,
       scheduledHour: assignmentUpdate.scheduledHour !== undefined ? assignmentUpdate.scheduledHour : existing.scheduledHour,
+      scheduledStartMinutes: assignmentUpdate.scheduledStartMinutes !== undefined ? assignmentUpdate.scheduledStartMinutes : existing.scheduledStartMinutes,
+      durationMinutes: assignmentUpdate.durationMinutes !== undefined ? assignmentUpdate.durationMinutes : existing.durationMinutes,
       autoDueDate: assignmentUpdate.autoDueDate !== undefined ? assignmentUpdate.autoDueDate : existing.autoDueDate
     };
     this.calendarAssignments.set(id, updated);
@@ -3502,12 +3504,14 @@ export class DbStorage implements IStorage {
 
   async updateCalendarAssignment(companyId: string, id: string, assignmentUpdate: UpdateCalendarAssignment): Promise<CalendarAssignment | undefined> {
     // Build update object with only provided fields
-    const updateFields: Partial<Pick<CalendarAssignment, 'year' | 'month' | 'day' | 'scheduledDate' | 'scheduledHour' | 'autoDueDate' | 'completed' | 'assignedTechnicianIds' | 'completionNotes'>> = {};
+    const updateFields: Partial<Pick<CalendarAssignment, 'year' | 'month' | 'day' | 'scheduledDate' | 'scheduledHour' | 'scheduledStartMinutes' | 'durationMinutes' | 'autoDueDate' | 'completed' | 'assignedTechnicianIds' | 'completionNotes'>> = {};
     if (assignmentUpdate.year !== undefined) updateFields.year = assignmentUpdate.year;
     if (assignmentUpdate.month !== undefined) updateFields.month = assignmentUpdate.month;
     if (assignmentUpdate.day !== undefined) updateFields.day = assignmentUpdate.day;
     if (assignmentUpdate.scheduledDate !== undefined && assignmentUpdate.scheduledDate !== null) updateFields.scheduledDate = assignmentUpdate.scheduledDate;
     if (assignmentUpdate.scheduledHour !== undefined) updateFields.scheduledHour = assignmentUpdate.scheduledHour;
+    if (assignmentUpdate.scheduledStartMinutes !== undefined) updateFields.scheduledStartMinutes = assignmentUpdate.scheduledStartMinutes;
+    if (assignmentUpdate.durationMinutes !== undefined) updateFields.durationMinutes = assignmentUpdate.durationMinutes;
     if (assignmentUpdate.autoDueDate !== undefined) updateFields.autoDueDate = assignmentUpdate.autoDueDate;
     if (assignmentUpdate.completed !== undefined) updateFields.completed = assignmentUpdate.completed;
     if (assignmentUpdate.assignedTechnicianIds !== undefined) updateFields.assignedTechnicianIds = assignmentUpdate.assignedTechnicianIds;
