@@ -17,13 +17,17 @@ export const jobTransitions: Record<JobStatus, JobStatus[]> = {
 };
 
 export const invoiceTransitions: Record<InvoiceStatus, InvoiceStatus[]> = {
-  draft: ["pending", "sent", "void", "cancelled"],
-  pending: ["sent", "void", "cancelled"],
-  sent: ["paid", "void", "cancelled"],
-  paid: ["void"],
-  void: [],
+  draft: ["pending", "sent", "voided", "cancelled"],
+  pending: ["sent", "voided", "cancelled"],
+  sent: ["partial_paid", "paid", "voided", "cancelled"],
+  partial_paid: ["paid"],
+
+  // Terminal states (recommended policy)
+  paid: [],
+  voided: [],
   cancelled: [],
 };
+
 
 export function assertJobStatusTransition(from: JobStatus, to: JobStatus): void {
   if (from === to) return;
