@@ -355,6 +355,8 @@ export default function InvoiceDetailPage() {
             onEdit={() => setIsEditing(!isEditing)}
             onSend={() => sendMutation.mutate()}
             onCollectPayment={() => setShowPaymentDialog(true)}
+            onRefreshFromJob={() => refreshFromJobMutation.mutate()}
+            refreshPending={refreshFromJobMutation.isPending}
             canEdit={canEdit}
             isDraft={isDraft}
             sendPending={sendMutation.isPending}

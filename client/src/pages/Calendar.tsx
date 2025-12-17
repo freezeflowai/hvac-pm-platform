@@ -34,11 +34,15 @@ const TECHNICIAN_COLORS = [
 
 type CalendarDensity = 'compact' | 'comfortable' | 'expanded';
 
+const DRAG_ENABLED = true; // enable drag & drop
+
 const DENSITY_STYLES = {
   compact: { card: 'py-1 px-2', row: 'min-h-10', gap: 'gap-1', rowHeight: 40 },
   comfortable: { card: 'py-1.5 px-2.5', row: 'min-h-12', gap: 'gap-1', rowHeight: 48 },
   expanded: { card: 'py-2 px-3', row: 'min-h-14', gap: 'gap-1.5', rowHeight: 56 },
 };
+
+const ALLDAY_ROW_HEIGHTS: Record<string, number> = { compact: 72, comfortable: 84, roomy: 96 };
 
 function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimize, currentMonth, currentYear }: { 
   clients: any[]; 
@@ -130,6 +134,14 @@ function UnscheduledPanel({ clients, onClientClick, isMinimized, onToggleMinimiz
 }
 
 // Helper function to calculate lanes for overlapping jobs
+
+function getAssignmentStartMinutes(a: any): number {
+  if (a == null) return 0;
+  const hour = a.scheduledHour;
+  if (hour == null) return 0;
+  const offset = a.scheduledStartMinutes != null ? Number(a.scheduledStartMinutes) : 0;
+  return hour * 60 + offset;
+}
 function calculateLanes(assignments: any[]): Map<string, { laneIndex: number; totalLanes: number }> {
   const laneMap = new Map<string, { laneIndex: number; totalLanes: number }>();
   
@@ -137,7 +149,7 @@ function calculateLanes(assignments: any[]): Map<string, { laneIndex: number; to
   
   // Get time range for each assignment
   const getTimeRange = (a: any) => {
-    const start = a.scheduledStartMinutes ?? (a.scheduledHour != null ? a.scheduledHour * 60 : 0);
+    const start = getAssignmentStartMinutes(a);
     const duration = a.durationMinutes || 60;
     return { start, end: start + duration };
   };
@@ -262,12 +274,13 @@ function ResizableJobCard({
   const [tempDuration, setTempDuration] = useState<number | null>(null);
   const resizeStartRef = useRef<{ y: number; duration: number } | null>(null);
 
-  const startMinutes = assignment.scheduledStartMinutes ?? (assignment.scheduledHour != null ? assignment.scheduledHour * 60 : 0);
+  const startMinutes = getAssignmentStartMinutes(assignment);
+  const startOffsetWithinHour = startMinutes % 60;
   const durationMinutes = tempDuration ?? (assignment.durationMinutes || 60);
   
   // Calculate position and height based on time
   const pixelsPerMinute = rowHeight / 60;
-  const topOffset = (startMinutes % 60) * pixelsPerMinute; // Offset within the hour cell
+  const topOffset = startOffsetWithinHour * pixelsPerMinute; // Offset within the hour cell
   const height = durationMinutes * pixelsPerMinute;
   
   // Minimum height for visibility (15 minutes)
@@ -357,12 +370,13 @@ function ResizableJobCard({
 function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverdue, assignment, onAssignTechnician, monthLabel, isOffMonth, isPastMonth, technicianColor, densityStyle, cardHeight }: { id: string; client: any; inCalendar?: boolean; onClick?: () => void; isCompleted?: boolean; isOverdue?: boolean; assignment?: any; onAssignTechnician?: (assignmentId: string, technicianId: string | null) => void; monthLabel?: string | null; isOffMonth?: boolean; isPastMonth?: boolean; technicianColor?: { bg: string; border: string; text: string; borderLeft?: string; dot?: string }; densityStyle?: string; cardHeight?: number }) {
   // Calendar items: use ONLY useDraggable for unrestricted movement
   // Unscheduled items: use ONLY useSortable for sorting in panel
-  const draggableResult = inCalendar ? useDraggable({ 
+  const draggableResult = inCalendar ? useDraggable({
     id,
+    disabled: !DRAG_ENABLED,
     data: { type: 'assignment', assignmentId: id }
   }) : null;
   
-  const sortableResult = !inCalendar ? useSortable({ id }) : null;
+  const sortableResult = !inCalendar ? useSortable({ id, disabled: !DRAG_ENABLED }) : null;
   
   const {
     attributes,
@@ -408,7 +422,7 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
     >
       <div 
         {...listeners}
-        className={inCalendar ? "cursor-grab active:cursor-grabbing" : ""}
+        className={inCalendar ? (DRAG_ENABLED ? "cursor-grab active:cursor-grabbing" : "cursor-default") : ""}
       >
         {/* In Calendar: Clean layout - no status badges, job info only */}
         {inCalendar ? (
@@ -422,6 +436,24 @@ function DraggableClient({ id, client, inCalendar, onClick, isCompleted, isOverd
                 </div>
               </div>
             </div>
+            {/* Line 2: Time range (shows 15-min starts/ends when present) */}
+            {assignment && (assignment.scheduledHour !== null && assignment.scheduledHour !== undefined) && (
+              <div className={`text-[11px] text-muted-foreground leading-[1.2] ${isCompleted ? 'opacity-60' : ''}`}>
+                {(() => {
+                  const startM = (getAssignmentStartMinutes(assignment)) as number;
+                  const dur = (assignment.durationMinutes || 60) as number;
+                  const endM = startM + dur;
+                  const fmt = (m: number) => {
+                    const h24 = Math.floor(m / 60) % 24;
+                    const min = m % 60;
+                    const ampm = h24 >= 12 ? 'PM' : 'AM';
+                    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+                    return `${h12}:${String(min).padStart(2, '0')} ${ampm}`;
+                  };
+                  return `${fmt(startM)}–${fmt(endM)}`;
+                })()}
+              </div>
+            )}
             {/* Line 2: Job description */}
             <div className={`text-[12px] text-foreground/80 leading-[1.2] ${isCompleted ? 'line-through opacity-60' : ''}`}>
               Preventive Maintenance
@@ -789,7 +821,21 @@ export default function Calendar() {
   });
 
   const createAssignment = useMutation({
-    mutationFn: async ({ clientId, day, scheduledHour, targetYear, targetMonth }: { clientId: string; day: number; scheduledHour?: number; targetYear?: number; targetMonth?: number }) => {
+    mutationFn: async ({
+      clientId,
+      day,
+      scheduledHour,
+      scheduledStartMinutes,
+      targetYear,
+      targetMonth,
+    }: {
+      clientId: string;
+      day: number;
+      scheduledHour?: number;
+      scheduledStartMinutes?: number;
+      targetYear?: number;
+      targetMonth?: number;
+    }) => {
       const useYear = targetYear ?? year;
       const useMonth = targetMonth ?? month;
       return apiRequest("POST", `/api/calendar/assign`, {
@@ -799,6 +845,7 @@ export default function Calendar() {
         day,
         scheduledDate: new Date(useYear, useMonth - 1, day).toISOString().split('T')[0],
         scheduledHour: scheduledHour !== undefined ? scheduledHour : undefined,
+        scheduledStartMinutes: scheduledStartMinutes !== undefined ? scheduledStartMinutes : undefined,
         autoDueDate: false,
       });
     },
@@ -821,7 +868,21 @@ export default function Calendar() {
   });
 
   const updateAssignment = useMutation({
-    mutationFn: async ({ id, day, scheduledHour, targetYear, targetMonth }: { id: string; day: number; scheduledHour?: number | null; targetYear?: number; targetMonth?: number }) => {
+    mutationFn: async ({
+      id,
+      day,
+      scheduledHour,
+      scheduledStartMinutes,
+      targetYear,
+      targetMonth,
+    }: {
+      id: string;
+      day: number;
+      scheduledHour?: number | null;
+      scheduledStartMinutes?: number | null;
+      targetYear?: number;
+      targetMonth?: number;
+    }) => {
       const updateYear = targetYear ?? year;
       const updateMonth = targetMonth ?? month;
       return apiRequest("PATCH", `/api/calendar/assign/${id}`, {
@@ -830,6 +891,8 @@ export default function Calendar() {
         day,
         scheduledDate: new Date(updateYear, updateMonth - 1, day).toISOString().split('T')[0],
         scheduledHour: scheduledHour !== undefined ? scheduledHour : undefined,
+        // When scheduling into timed slots, allow sub-hour starts (15-min snapping).
+        scheduledStartMinutes: scheduledStartMinutes !== undefined ? scheduledStartMinutes : undefined,
       });
     },
     onSuccess: async () => {
@@ -1015,13 +1078,37 @@ export default function Calendar() {
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    if (!DRAG_ENABLED) return;
     setActiveId(event.active.id as string);
   };
+
+  // Compute a 15-minute snapped start minute within an hour slot based on the final drag position.
+  // This keeps droppable zones hour-based, but stores precise starts via `scheduledStartMinutes`.
+  const computeSnappedStartMinutes = useCallback((event: DragEndEvent, hour: number) => {
+    const rowHeight = DENSITY_STYLES[density].rowHeight;
+    const overRect = event.over?.rect;
+    const activeRect = event.active?.rect?.current;
+
+    if (!overRect || !activeRect) return hour * 60;
+
+    const translatedTop = (activeRect.translated?.top ?? activeRect.initial?.top);
+    if (typeof translatedTop !== 'number') return hour * 60;
+
+    // How far from the top of the hour cell did the card land?
+    const offsetY = translatedTop - overRect.top;
+    const pixelsPerMinute = rowHeight / 60;
+    const rawMinutes = Math.round(offsetY / pixelsPerMinute);
+
+    // Snap within the hour to 15-minute increments and clamp.
+    const snappedWithinHour = Math.max(0, Math.min(59, Math.round(rawMinutes / 15) * 15));
+    return hour * 60 + snappedWithinHour;
+  }, [density]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
 
+    if (!DRAG_ENABLED) return;
     if (!over) return;
 
     const overId = over.id as string;
@@ -1088,35 +1175,47 @@ export default function Calendar() {
     } else if (overId.startsWith('weekly-')) {
       // Dropped on hourly slot in weekly view (weekly-{dayName}-{hour}-{dayNumber})
       const parts = overId.replace('weekly-', '').split('-');
+      // weekly-{dayName}-{hour}-{minute}-{dayNumber}
       const hour = parseInt(parts[1]);
-      const targetDay = parseInt(parts[2]);
+      const scheduledStartMinutes = parseInt(parts[2]); // 0/15/30/45
+      const targetDay = parseInt(parts[3]);
       
       if (isExistingCalendarAssignment) {
         const currentAssignment = assignments.find((a: any) => a.id === activeId);
-        if (currentAssignment && (currentAssignment.day !== targetDay || currentAssignment.scheduledHour !== hour)) {
-          updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: hour });
+        if (currentAssignment) {
+          const currentStart = currentAssignment.scheduledStartMinutes ?? (currentAssignment.scheduledHour != null ? currentAssignment.scheduledHour * 60 : null);
+          if (
+            currentAssignment.day !== targetDay ||
+            currentAssignment.scheduledHour !== hour ||
+            currentStart !== scheduledStartMinutes
+          ) {
+            updateAssignment.mutate({ id: activeId, day: targetDay, scheduledHour: hour, scheduledStartMinutes });
+          }
         }
       } else if (unscheduledItem && hasExistingAssignment) {
         // Update existing unscheduled assignment to current view's month/day/hour
-        updateAssignment.mutate({ id: unscheduledItem.assignmentId, day: targetDay, scheduledHour: hour, targetMonth: month, targetYear: year });
+        updateAssignment.mutate({ id: unscheduledItem.assignmentId, day: targetDay, scheduledHour: hour, scheduledStartMinutes, targetMonth: month, targetYear: year });
       } else if (unscheduledItem) {
         // Create new assignment from unscheduled client - use ITEM's original month/year
         createAssignment.mutate({ 
           clientId: unscheduledItem.clientId, 
           day: targetDay, 
           scheduledHour: hour,
+          // New assignments will snap to quarter-hour based on where you drop.
+          scheduledStartMinutes,
           targetMonth: unscheduledItem.month,
           targetYear: unscheduledItem.year
         });
       }
     } else if (overId.startsWith('daily-')) {
-      // Dropped on hourly slot in daily view (daily-{technicianId}-{hour}-{day}-{month}-{year})
+      // Dropped on 15-min slot in daily view (daily-{technicianId}-{hour}-{minute}-{day}-{month}-{year})
       const parts = overId.replace('daily-', '').split('-');
       const technicianId = parts[0];
       const hour = parseInt(parts[1]);
-      const targetDay = parseInt(parts[2]);
-      const targetMonthIdx = parseInt(parts[3]); // 0-based month from Date.getMonth()
-      const targetYr = parseInt(parts[4]);
+      const scheduledStartMinutes = parseInt(parts[2]); // 0/15/30/45
+      const targetDay = parseInt(parts[3]);
+      const targetMonthIdx = parseInt(parts[4]); // 0-based month from Date.getMonth()
+      const targetYr = parseInt(parts[5]);
       // Convert 0-based month to 1-based for API
       const targetMo = targetMonthIdx + 1;
       
@@ -1127,6 +1226,7 @@ export default function Calendar() {
             id: activeId, 
             day: targetDay, 
             scheduledHour: hour,
+            scheduledStartMinutes,
             targetMonth: targetMo,
             targetYear: targetYr
           });
@@ -1139,7 +1239,8 @@ export default function Calendar() {
         updateAssignment.mutate({ 
           id: unscheduledItem.assignmentId, 
           day: targetDay, 
-          scheduledHour: hour, 
+          scheduledHour: hour,
+          scheduledStartMinutes,
           targetMonth: targetMo,
           targetYear: targetYr
         });
@@ -1149,6 +1250,7 @@ export default function Calendar() {
           clientId: unscheduledItem.clientId, 
           day: targetDay, 
           scheduledHour: hour,
+          scheduledStartMinutes,
           targetMonth: unscheduledItem.month,
           targetYear: unscheduledItem.year
         });
@@ -1352,27 +1454,27 @@ export default function Calendar() {
       }
     );
 
-    // Use rectIntersection for better grid layout support
-    const rectCollisions = rectIntersection({
-      ...args,
-      droppableContainers: dropZoneContainers,
-    });
-    
-    if (rectCollisions.length > 0) {
-      return rectCollisions;
-    }
-
-    // Fallback to pointerWithin
+    // Prefer pointerWithin for small (15-min) drop zones
     const pointerCollisions = pointerWithin({
       ...args,
       droppableContainers: dropZoneContainers,
     });
-    
+
     if (pointerCollisions.length > 0) {
       return pointerCollisions;
     }
 
-    // Final fallback to closestCenter
+    // Fallback to rectIntersection for grid layout support
+    const rectCollisions = rectIntersection({
+      ...args,
+      droppableContainers: dropZoneContainers,
+    });
+
+    if (rectCollisions.length > 0) {
+      return rectCollisions;
+    }
+
+// Final fallback to closestCenter
     return closestCenter({
       ...args,
       droppableContainers: dropZoneContainers,
@@ -1444,23 +1546,47 @@ export default function Calendar() {
   // Drop zone component for all-day slots in weekly view
   const AllDayDropZone = ({ dayName, dayNumber, children }: { dayName: string; dayNumber: number; children: React.ReactNode }) => {
     const { setNodeRef, isOver } = useDroppable({ id: `allday-${dayName}-${dayNumber}` });
+
+    // Full-cell hit area: the droppable rect must match the grid cell height, not just content height.
     return (
-      <div ref={setNodeRef} className={`p-1 border-r ${DENSITY_STYLES[density].row} ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'}`}>
-        {children}
+      <div className="border-r w-full relative" style={{ minHeight: 64, height: "100%" }}>
+        <div
+          ref={setNodeRef}
+          className={`absolute inset-0 ${isOver ? "bg-primary/20 border-2 border-primary" : "bg-background"}`}
+        />
+        <div className="relative h-full p-2">
+          {children}
+        </div>
       </div>
     );
   };
 
-  // Drop zone component for hourly slots in weekly view
+  // Quarter-hour drop zone (15-min increments) (15-min increments)
+  const QuarterDropZone = ({ id }: { id: string }) => {
+    const { setNodeRef, isOver } = useDroppable({ id });
+    return (
+      <div
+        ref={setNodeRef}
+        className={`h-1/4 w-full pointer-events-none ${isOver ? 'bg-primary/20 border border-primary' : ''}`}
+      />
+    );
+  };
+
+// Drop zone component for hourly slots in weekly view
   const HourlyDropZone = ({ dayName, hour, dayNumber, dayAssignments = [], laneMap }: { dayName: string; hour: number; dayNumber: number; dayAssignments?: any[]; laneMap?: Map<string, { laneIndex: number; totalLanes: number }> }) => {
-    const { setNodeRef, isOver } = useDroppable({ id: `weekly-${dayName}-${hour}-${dayNumber}` });
     const rowHeight = DENSITY_STYLES[density].rowHeight;
     
     // Filter assignments for this specific hour (explicitly check for number to handle hour 0)
     const hourlyAssignments = (dayAssignments || []).filter((a: any) => a.scheduledHour !== null && a.scheduledHour !== undefined && a.scheduledHour === hour);
     
     return (
-      <div ref={setNodeRef} className={`border-r ${DENSITY_STYLES[density].row} ${isOver ? 'bg-primary/20 border-2 border-primary' : 'bg-background'} relative`} style={{ minHeight: `${rowHeight}px` }}>
+      <div className={`border-r ${DENSITY_STYLES[density].row} bg-background relative`} style={{ minHeight: `${rowHeight}px` }}>
+        <div className="absolute inset-0 flex flex-col pointer-events-none">
+          {[0, 15, 30, 45].map((m) => (
+            <QuarterDropZone key={m} id={`weekly-${dayName}-${hour}-${m}-${dayNumber}`} />
+          ))}
+        </div>
+
         {hourlyAssignments.map((assignment: any) => {
           const client = clients.find((c: any) => c.id === assignment.clientId);
           const lane = laneMap?.get(assignment.id) || { laneIndex: 0, totalLanes: 1 };
@@ -1555,8 +1681,11 @@ export default function Calendar() {
         </div>
 
         {/* All Day Slot - Sticky below header */}
-        <div className={`grid ${gridCols} sticky top-[41px] bg-background z-20 border-b`}>
-          <div className="px-1.5 py-1 text-[10px] font-semibold border-r bg-primary/10 flex items-center">
+        <div
+          className={`grid ${gridCols} sticky top-[41px] bg-background z-20 border-b`}
+          style={{ height: ALLDAY_ROW_HEIGHTS[density] ?? 84 }}
+        >
+          <div className="px-1.5 py-1 text-[10px] font-semibold border-r bg-primary/10 flex items-center h-full">
             All Day
           </div>
           {weekDaysData.map((dayData) => {
@@ -1640,17 +1769,22 @@ export default function Calendar() {
 
   // Daily View Drop Zone Component with ResizableJobCard support
   const DailyDropZone = ({ technicianId, hour, assignments, laneMap }: { technicianId: string; hour: number; assignments: any[]; laneMap: Map<string, { laneIndex: number; totalLanes: number }> }) => {
-    const { setNodeRef, isOver } = useDroppable({
-      id: `daily-${technicianId}-${hour}-${currentDate.getDate()}-${currentDate.getMonth()}-${currentDate.getFullYear()}`,
-    });
     const rowHeight = DENSITY_STYLES[density].rowHeight;
     
     return (
       <div
-        ref={setNodeRef}
-        className={`border-b border-r relative ${isOver ? 'bg-primary/10' : ''}`}
+        className={`border-b border-r relative bg-background`}
         style={{ minHeight: `${rowHeight}px` }}
       >
+        <div className="absolute inset-0 flex flex-col pointer-events-none">
+          {[0, 15, 30, 45].map((m) => (
+            <QuarterDropZone
+              key={m}
+              id={`daily-${technicianId}-${hour}-${m}-${currentDate.getDate()}-${currentDate.getMonth()}-${currentDate.getFullYear()}`}
+            />
+          ))}
+        </div>
+
         {assignments.map((assignment: any) => {
           const client = clients.find((c: any) => c.id === assignment.clientId);
           const lane = laneMap.get(assignment.id) || { laneIndex: 0, totalLanes: 1 };
@@ -1742,7 +1876,7 @@ export default function Calendar() {
         {isToday && currentTimePosition >= 0 && currentTimePosition < 24 && (
           <div 
             className="absolute left-0 right-0 z-40 pointer-events-none"
-            style={{ top: `calc(41px + 28px + ${currentTimePosition * 60}px)` }}
+            style={{ top: `calc(41px + 28px + ${currentTimePosition * DENSITY_STYLES[density].rowHeight}px)` }}
           >
             <div className="flex items-center">
               <div className="w-2 h-2 rounded-full bg-red-500 -ml-1" />
@@ -1776,7 +1910,7 @@ export default function Calendar() {
 
         {/* All Day Row */}
         <div className={`grid ${gridCols} sticky top-[41px] bg-background z-20 border-b`}>
-          <div className="px-1.5 py-1 text-[10px] font-semibold border-r bg-primary/10 flex items-center">
+          <div className="px-1.5 py-1 text-[10px] font-semibold border-r bg-primary/10 flex items-center h-full">
             All Day
           </div>
           {visibleTechnicians.map((tech: any) => {

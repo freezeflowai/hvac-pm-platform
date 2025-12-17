@@ -126,13 +126,6 @@ router.post("/assign", isAuthenticated, async (req, res) => {
     
     const assignment = await storage.createCalendarAssignment(companyId, userId, assignmentData);
     
-    const client = await storage.getClient(companyId, assignmentData.clientId);
-    if (client) {
-      await storage.updateClient(companyId, assignmentData.clientId, {
-        nextDue: assignmentData.scheduledDate
-      });
-    }
-    
     res.json(assignment);
   } catch (error) {
     console.error('Create calendar assignment error:', error);
@@ -160,13 +153,6 @@ router.patch("/assign/:id", isAuthenticated, async (req, res) => {
     if (!assignment) {
       return res.status(404).json({ error: "Assignment not found" });
     }
-    
-    if (assignmentUpdate.scheduledDate) {
-      await storage.updateClient(req.user!.companyId, assignment.clientId, {
-        nextDue: assignmentUpdate.scheduledDate
-      });
-    }
-    
     if (assignmentUpdate.completed !== undefined) {
       const dueDate = assignment.scheduledDate;
       
@@ -197,21 +183,12 @@ router.patch("/assign/:id", isAuthenticated, async (req, res) => {
             nextMonth = client.selectedMonths[0];
             nextYear = currentYear + 1;
           }
-          
-          const nextDueDate = new Date(nextYear, nextMonth, 15);
-          await storage.updateClient(req.user!.companyId, assignment.clientId, {
-            nextDue: nextDueDate.toISOString().split('T')[0]
-          });
         }
       } else {
         const record = await storage.getMaintenanceRecord(req.user!.companyId, assignment.clientId, dueDate);
         if (record) {
           await storage.updateMaintenanceRecord(req.user!.companyId, record.id, { completedAt: null });
         }
-        
-        await storage.updateClient(req.user!.companyId, assignment.clientId, {
-          nextDue: dueDate
-        });
       }
     }
     
@@ -253,11 +230,6 @@ router.delete("/assign/:id", isAuthenticated, async (req, res) => {
         nextMonth = client.selectedMonths[0];
         nextYear = currentYear + 1;
       }
-      
-      const nextDueDate = new Date(nextYear, nextMonth, 15);
-      await storage.updateClient(req.user!.companyId, assignment.clientId, {
-        nextDue: nextDueDate.toISOString().split('T')[0]
-      });
     }
     
     res.json({ success: true });

@@ -328,4 +328,18 @@ router.delete("/:jobId/equipment/:jobEquipmentId", isAuthenticated, async (req, 
   }
 });
 
+
+
+// Stage 4 utility: reconcile Job ↔ Invoice links for a specific job
+router.post("/:id/reconcile-invoice-links", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const { id: jobId } = req.params;
+    const result = await storage.reconcileJobInvoiceLinks(req.user!.companyId, jobId);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Reconcile job/invoice links error:", error);
+    res.status(500).json({ error: error.message || "Failed to reconcile job/invoice links" });
+  }
+});
+
 export default router;

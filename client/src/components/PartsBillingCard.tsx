@@ -1069,7 +1069,8 @@ function AddProductModal({ open, initialName, onClose, onSave, isSaving }: AddPr
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState("");
   const [type, setType] = useState<string>("product");
-  const [cost, setCost] = useState("");
+  const [cost, setCost] = useState<string>("");
+
   const [price, setPrice] = useState("");
 
   useEffect(() => {

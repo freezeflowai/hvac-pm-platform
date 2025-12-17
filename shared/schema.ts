@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, date, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, date, numeric, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -584,7 +584,16 @@ export const invoices = pgTable("invoices", {
   // Metadata
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at"),
-});
+}, (table) => ({
+  // Enforce one invoice per job *when jobId is set*
+  oneInvoicePerJob: uniqueIndex("invoices_company_job_uq")
+    .on(table.companyId, table.jobId)
+    .where(sql`job_id is not null`),
+  // Enforce unique invoice numbers per company when invoiceNumber is set
+  invoiceNumberPerCompany: uniqueIndex("invoices_company_invoice_number_uq")
+    .on(table.companyId, table.invoiceNumber)
+    .where(sql`invoice_number is not null`),
+}));
 
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({
   id: true,
@@ -852,7 +861,9 @@ export const jobs = pgTable("jobs", {
   // Metadata
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at"),
-});
+}, (table) => ({
+  jobNumberPerCompany: uniqueIndex("jobs_company_job_number_uq").on(table.companyId, table.jobNumber),
+}));
 
 export const insertJobSchema = createInsertSchema(jobs).omit({
   id: true,

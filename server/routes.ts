@@ -34,6 +34,53 @@ function isAuthenticated(req: Request, res: Response, next: NextFunction) {
   res.status(401).json({ error: "Not authenticated" });
 }
 
+
+
+function formatDateOnly(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
+function deriveNextDueForClient(client: any, futureDueByClientId: Map<string, string>): string {
+  const derived = futureDueByClientId.get(client.id);
+  if (derived) return derived;
+
+  // Fallback: derive from selectedMonths (0-11) on the 15th
+  try {
+    const months: number[] = Array.isArray(client.selectedMonths) ? [...client.selectedMonths].sort((a, b) => a - b) : [];
+    if (months.length === 0) return client.nextDue;
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    let nextMonth = months.find(m => m > currentMonth);
+    let nextYear = now.getFullYear();
+
+    if (nextMonth === undefined) {
+      nextMonth = months[0];
+      nextYear = nextYear + 1;
+    }
+
+    return formatDateOnly(new Date(nextYear, nextMonth, 15));
+  } catch {
+    return client.nextDue;
+  }
+}
+
+function buildFutureDueIndex(assignments: any[]): Map<string, string> {
+  const todayStr = formatDateOnly(new Date());
+  const best = new Map<string, string>();
+
+  for (const a of assignments || []) {
+    if (!a || !a.clientId || !a.scheduledDate) continue;
+    const sd: string = a.scheduledDate;
+    if (sd < todayStr) continue;
+
+    const prev = best.get(a.clientId);
+    if (!prev || sd < prev) best.set(a.clientId, sd);
+  }
+
+  return best;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // Job Templates API (modular routes)
@@ -716,8 +763,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Client routes
   app.get("/api/clients", isAuthenticated, async (req, res) => {
     try {
-      const clients = await storage.getAllClients(req.user!.companyId);
-      res.json(clients);
+      const companyId = req.user!.companyId;
+      const clients = await storage.getAllClients(companyId);
+      const assignments = await storage.getAllCalendarAssignments(companyId);
+      const futureDueByClientId = buildFutureDueIndex(assignments);
+
+      const clientsWithDue = clients.map((c: any) => ({
+        ...c,
+        nextDue: deriveNextDueForClient(c, futureDueByClientId),
+      }));
+
+      res.json(clientsWithDue);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch clients" });
     }
@@ -889,11 +945,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/clients/:id", isAuthenticated, async (req, res) => {
     try {
-      const client = await storage.getClient(req.user!.companyId, req.params.id);
+      const companyId = req.user!.companyId;
+      const client = await storage.getClient(companyId, req.params.id);
       if (!client) {
         return res.status(404).json({ error: "Client not found" });
       }
-      res.json(client);
+
+      const assignments = await storage.getAssignmentsByClient(companyId, client.id);
+      const futureDueByClientId = buildFutureDueIndex(assignments);
+      const clientWithDue = {
+        ...client,
+        nextDue: deriveNextDueForClient(client, futureDueByClientId),
+      };
+
+      res.json(clientWithDue);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch client" });
     }

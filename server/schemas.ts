@@ -24,7 +24,8 @@ export const invoiceStatusEnum = z.enum([
   "pending",
   "sent",
   "paid",
-  "void",
+  "partial_paid",
+  "voided",
   "cancelled"
 ]);
 

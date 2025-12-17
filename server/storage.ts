@@ -1914,104 +1914,74 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  async getNextJobNumber(companyId: string): Promise<number> {
-    const current = this.jobNumberCounters.get(companyId) || 10000;
-    const next = current + 1;
-    this.jobNumberCounters.set(companyId, next);
-    return next;
+  
+  // --- Company counters (DB-backed; race-safe) ---
+  // Semantics:
+  // - companyCounters.nextJobNumber / nextInvoiceNumber store the NEXT number to ISSUE.
+  // - getNext* returns the issued number and increments the stored counter atomically.
+  private async ensureCompanyCountersRow(tx: any, companyId: string) {
+    const existing = await tx.select().from(companyCounters)
+      .where(eq(companyCounters.companyId, companyId))
+      .limit(1);
+    if (existing.length) return existing[0];
+
+    // Defaults preserve your historical behavior:
+    // - Jobs started issuing at 10001 (with an internal base of 10000)
+    // - Invoices started issuing at 1001
+    const inserted = await tx.insert(companyCounters).values({
+      companyId,
+      nextJobNumber: 10001,
+      nextInvoiceNumber: 1001,
+    }).returning();
+
+    return inserted[0];
   }
 
-  async getNextInvoiceNumber(_companyId: string): Promise<number> {
-    return 1001;
+  async getNextJobNumber(companyId: string): Promise<number> {
+    return db.transaction(async (tx) => {
+      const row = await this.ensureCompanyCountersRow(tx, companyId);
+      const current = Number(row.nextJobNumber) || 10001;
+      await tx.update(companyCounters)
+        .set({ nextJobNumber: current + 1, updatedAt: new Date() })
+        .where(eq(companyCounters.companyId, companyId));
+      return current;
+    });
+  }
+
+  async getNextInvoiceNumber(companyId: string): Promise<number> {
+    return db.transaction(async (tx) => {
+      const row = await this.ensureCompanyCountersRow(tx, companyId);
+      const current = Number(row.nextInvoiceNumber) || 1001;
+      await tx.update(companyCounters)
+        .set({ nextInvoiceNumber: current + 1, updatedAt: new Date() })
+        .where(eq(companyCounters.companyId, companyId));
+      return current;
+    });
   }
 
   async getCompanyCounters(companyId: string): Promise<{ nextJobNumber: number; nextInvoiceNumber: number }> {
-    const nextJobNumber = this.jobNumberCounters.get(companyId) || 10000;
-    return { nextJobNumber, nextInvoiceNumber: 1001 };
+    return db.transaction(async (tx) => {
+      const row = await this.ensureCompanyCountersRow(tx, companyId);
+      return {
+        nextJobNumber: Number(row.nextJobNumber) || 10001,
+        nextInvoiceNumber: Number(row.nextInvoiceNumber) || 1001,
+      };
+    });
   }
 
   async updateCompanyCounters(companyId: string, updates: { nextJobNumber?: number; nextInvoiceNumber?: number }): Promise<void> {
-    if (updates.nextJobNumber !== undefined) {
-      this.jobNumberCounters.set(companyId, updates.nextJobNumber);
-    }
-  }
+    await db.transaction(async (tx) => {
+      await this.ensureCompanyCountersRow(tx, companyId);
+      const set: any = { updatedAt: new Date() };
+      if (updates.nextJobNumber !== undefined) set.nextJobNumber = updates.nextJobNumber;
+      if (updates.nextInvoiceNumber !== undefined) set.nextInvoiceNumber = updates.nextInvoiceNumber;
 
-  async createJob(companyId: string, data: InsertJob): Promise<Job> {
-    const id = randomUUID();
-    const jobNumber = await this.getNextJobNumber(companyId);
-    const now = new Date();
-    
-    // If primaryTechnicianId is set but assignedTechnicianIds is not, include primary in assigned list
-    let assignedTechnicianIds = data.assignedTechnicianIds || null;
-    if (data.primaryTechnicianId && (!assignedTechnicianIds || assignedTechnicianIds.length === 0)) {
-      assignedTechnicianIds = [data.primaryTechnicianId];
-    }
-    
-    const newJob: Job = {
-      id,
-      companyId,
-      jobNumber,
-      locationId: data.locationId,
-      primaryTechnicianId: data.primaryTechnicianId || null,
-      assignedTechnicianIds,
-      status: data.status || 'draft',
-      priority: data.priority || 'medium',
-      jobType: data.jobType || 'maintenance',
-      summary: data.summary,
-      description: data.description || null,
-      accessInstructions: data.accessInstructions || null,
-      scheduledStart: data.scheduledStart ? new Date(data.scheduledStart) : null,
-      scheduledEnd: data.scheduledEnd ? new Date(data.scheduledEnd) : null,
-      actualStart: null,
-      actualEnd: null,
-      invoiceId: data.invoiceId || null,
-      qboInvoiceId: data.qboInvoiceId || null,
-      billingNotes: data.billingNotes || null,
-      recurringSeriesId: data.recurringSeriesId || null,
-      calendarAssignmentId: data.calendarAssignmentId || null,
-      isActive: true,
-      createdAt: now,
-      updatedAt: null,
-    };
-    this.jobsMap.set(id, newJob);
-    return newJob;
+      await tx.update(companyCounters)
+        .set(set)
+        .where(eq(companyCounters.companyId, companyId));
+    });
   }
-
-  async updateJob(companyId: string, id: string, data: UpdateJob): Promise<Job | undefined> {
-    const existing = this.jobsMap.get(id);
-    if (!existing || existing.companyId !== companyId) {
-      return undefined;
-    }
-    const updated: Job = {
-      ...existing,
-      ...data,
-      scheduledStart: data.scheduledStart !== undefined ? (data.scheduledStart ? new Date(data.scheduledStart) : null) : existing.scheduledStart,
-      scheduledEnd: data.scheduledEnd !== undefined ? (data.scheduledEnd ? new Date(data.scheduledEnd) : null) : existing.scheduledEnd,
-      actualStart: data.actualStart !== undefined ? (data.actualStart ? new Date(data.actualStart) : null) : existing.actualStart,
-      actualEnd: data.actualEnd !== undefined ? (data.actualEnd ? new Date(data.actualEnd) : null) : existing.actualEnd,
-      updatedAt: new Date(),
-    };
-    this.jobsMap.set(id, updated);
-    return updated;
-  }
-
-  async updateJobStatus(companyId: string, id: string, status: string): Promise<Job | undefined> {
-    return this.updateJob(companyId, id, { status: status as any });
-  }
-
-  async deleteJob(companyId: string, id: string): Promise<boolean> {
-    const job = this.jobsMap.get(id);
-    if (job && job.companyId === companyId) {
-      // Soft delete
-      job.isActive = false;
-      job.updatedAt = new Date();
-      this.jobsMap.set(id, job);
-      return true;
-    }
-    return false;
-  }
-
-  // Recurring Job Series methods
+// Recurring Job Series methods
   async getRecurringSeries(companyId: string, id: string): Promise<RecurringJobSeries | undefined> {
     const series = this.recurringSeriesMap.get(id);
     if (series && series.companyId === companyId) {
@@ -4633,85 +4603,145 @@ export class DbStorage implements IStorage {
   }
 
   // Create invoice from job
-  async createInvoiceFromJob(companyId: string, jobId: string, options?: {
+  
+/**
+ * Canonical Job ↔ Invoice link enforcement (Sprint 3)
+ * Canonical relationship: invoices.jobId
+ * Derived/back-compat: jobs.invoiceId (written only here, in the same transaction)
+ */
+private async linkInvoiceToJob(companyId: string, invoiceId: string, jobId: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    // Set canonical link
+    await tx.update(invoices)
+      .set({ jobId })
+      .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)));
+
+    // Set derived link (back-compat)
+    await tx.update(jobs)
+      .set({ invoiceId })
+      .where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId)));
+  });
+}
+
+private async unlinkInvoiceFromJob(companyId: string, invoiceId: string): Promise<void> {
+  const inv = await this.getInvoice(companyId, invoiceId);
+  if (!inv?.jobId) return;
+
+  const jobId = inv.jobId;
+  await db.transaction(async (tx) => {
+    await tx.update(invoices)
+      .set({ jobId: null })
+      .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)));
+
+    // Only clear the job's invoiceId if it points to this invoice
+    await tx.update(jobs)
+      .set({ invoiceId: null })
+      .where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId), eq(jobs.invoiceId, invoiceId)));
+  });
+}
+
+async createInvoiceFromJob(companyId: string, jobId: string, options?: {
     includeLineItems?: boolean;
     includeNotes?: boolean;
   }): Promise<Invoice> {
     const job = await this.getJob(companyId, jobId);
     if (!job) throw new Error("Job not found");
-    
+
     const location = await this.getClient(companyId, job.locationId);
     if (!location) throw new Error("Location not found");
-    
-    // Get next invoice number atomically
-    const nextInvoiceNumber = await this.getNextInvoiceNumber(companyId);
-    
+
+    const jobParts = (options?.includeLineItems !== false) ? await this.getJobParts(jobId) : [];
+
     const today = new Date();
     const dueDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000); // Net 30
-    
-    // Create the invoice
-    const invoiceData: InsertInvoice = {
-      locationId: job.locationId,
-      customerCompanyId: location.parentCompanyId || null,
-      invoiceNumber: `${nextInvoiceNumber}`,
-      status: "draft",
-      issueDate: today.toISOString().split('T')[0],
-      dueDate: dueDate.toISOString().split('T')[0],
-      currency: "CAD",
-      subtotal: "0",
-      taxTotal: "0",
-      total: "0",
-      workDescription: job.description || null, // Copy job description as work performed (client-facing)
-    };
-    
-    const invoice = await this.createInvoice(companyId, invoiceData);
-    
-    // Link job to invoice
-    await this.updateJob(companyId, jobId, { invoiceId: invoice.id });
-    
-    // Update invoice with jobId reference
-    await this.updateInvoice(companyId, invoice.id, { jobId: jobId });
-    
-    // Copy job parts as invoice line items
-    if (options?.includeLineItems !== false) {
-      const jobParts = await this.getJobParts(jobId);
-      let lineNumber = 1;
-      let subtotal = 0;
-      
-      for (const part of jobParts) {
-        const qty = parseFloat(part.quantity);
-        const price = parseFloat(part.unitPrice || "0");
-        const lineTotal = qty * price;
-        subtotal += lineTotal;
-        
-        await this.createInvoiceLine({
-          invoiceId: invoice.id,
-          lineNumber: lineNumber++,
-          lineItemType: "material",
-          description: part.description,
-          quantity: part.quantity,
-          unitCost: part.unitCost || "0",
-          unitPrice: part.unitPrice || "0",
-          taxRate: "0.13", // Default 13% HST
-          lineSubtotal: lineTotal.toFixed(2),
-          jobLineItemId: part.id,
-        });
+
+    return db.transaction(async (tx) => {
+      // --- Hard invariant: one invoice per job (canonical = invoices.jobId) ---
+      const existing = await tx.select()
+        .from(invoices)
+        .where(and(eq(invoices.companyId, companyId), eq(invoices.jobId, jobId)))
+        .limit(1);
+
+      if (existing.length) {
+        // Keep derived/back-compat pointer consistent.
+        await tx.update(jobs)
+          .set({ invoiceId: existing[0].id })
+          .where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId)));
+        return existing[0];
       }
-      
-      // Update invoice totals
-      const taxTotal = subtotal * 0.13;
-      const total = subtotal + taxTotal;
-      
-      await this.updateInvoice(companyId, invoice.id, {
-        subtotal: subtotal.toFixed(2),
-        taxTotal: taxTotal.toFixed(2),
-        total: total.toFixed(2),
-        balance: total.toFixed(2),
-      });
-    }
-    
-    // Return updated invoice
-    return (await this.getInvoice(companyId, invoice.id))!;
+
+      // --- Issue invoice number atomically (DB-backed counter) ---
+      const counterRow = await this.ensureCompanyCountersRow(tx, companyId);
+      const nextInvoiceNumber = Number(counterRow.nextInvoiceNumber) || 1001;
+      await tx.update(companyCounters)
+        .set({ nextInvoiceNumber: nextInvoiceNumber + 1, updatedAt: new Date() })
+        .where(eq(companyCounters.companyId, companyId));
+
+      // Create the invoice (including canonical jobId link)
+      const invoiceData: InsertInvoice = {
+        locationId: job.locationId,
+        customerCompanyId: location.parentCompanyId || null,
+        invoiceNumber: `${nextInvoiceNumber}`,
+        status: "draft",
+        issueDate: today.toISOString().split('T')[0],
+        dueDate: dueDate.toISOString().split('T')[0],
+        currency: "CAD",
+        subtotal: "0",
+        taxTotal: "0",
+        total: "0",
+        workDescription: job.description || null,
+      };
+
+      const inserted = await tx.insert(invoices).values({
+        ...(invoiceData as any),
+        companyId,
+        jobId, // canonical
+      } as any).returning();
+
+      const invoice = inserted[0];
+
+      // Derived/back-compat link
+      await tx.update(jobs)
+        .set({ invoiceId: invoice.id })
+        .where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId)));
+
+      // Copy job parts to invoice lines (invoice-only snapshot)
+      if (jobParts.length) {
+        const lineItems: InsertInvoiceLine[] = jobParts.map((part, index) => {
+          const quantity = Number(part.quantity) || 1;
+          const unitPrice = Number(part.salePrice) || 0;
+          const lineSubtotal = quantity * unitPrice;
+          return {
+            invoiceId: invoice.id,
+            description: part.description || part.name || "Part",
+            quantity: quantity.toString(),
+            unitPrice: unitPrice.toFixed(2),
+            taxRate: "0.13",
+            lineSubtotal: lineSubtotal.toFixed(2),
+            sortOrder: index,
+          } as any;
+        });
+
+        await tx.insert(invoiceLines).values(lineItems as any);
+
+        // Update totals (simple calc; Stage 5+ can replace with centralized recalculation)
+        const subtotal = lineItems.reduce((sum, l) => sum + Number(l.lineSubtotal || 0), 0);
+        const taxTotal = subtotal * 0.13;
+        const total = subtotal + taxTotal;
+
+        await tx.update(invoices)
+          .set({
+            subtotal: subtotal.toFixed(2),
+            taxTotal: taxTotal.toFixed(2),
+            total: total.toFixed(2),
+            balance: total.toFixed(2),
+            updatedAt: new Date(),
+          } as any)
+          .where(and(eq(invoices.id, invoice.id), eq(invoices.companyId, companyId)));
+      }
+
+      return invoice;
+    });
   }
 
   // Refresh invoice line items from linked job (for draft invoices only)
@@ -4723,7 +4753,7 @@ export class DbStorage implements IStorage {
     // Delete existing line items
     const existingLines = await this.getInvoiceLines(invoiceId);
     for (const line of existingLines) {
-      await this.deleteInvoiceLine(line.id);
+      await this.deleteInvoiceLine(invoiceId, line.id);
     }
     
     // Copy fresh job parts as invoice line items

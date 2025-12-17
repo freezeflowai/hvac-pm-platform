@@ -7,6 +7,18 @@ import type { InvoiceStatus } from "../schemas";
 
 const router = Router();
 
+const LOCKED_INVOICE_STATUSES = new Set(["sent", "paid", "partial_paid", "voided", "cancelled"]);
+
+function assertInvoiceEditable(invoice: any) {
+  const status = String(invoice?.status || "").toLowerCase();
+  if (LOCKED_INVOICE_STATUSES.has(status)) {
+    const err: any = new Error("Invoice is locked once it is sent (or later).");
+    err.statusCode = 409;
+    throw err;
+  }
+}
+
+
 function isAuthenticated(req: Request, res: Response, next: NextFunction) {
   if (req.isAuthenticated()) {
     return next();
@@ -30,7 +42,9 @@ router.get("/", isAuthenticated, async (req, res) => {
     res.json(invoices);
   } catch (error) {
     console.error('Get invoices error:', error);
-    res.status(500).json({ error: "Failed to get invoices" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to get invoices";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -40,7 +54,9 @@ router.get("/stats", isAuthenticated, async (req, res) => {
     res.json(stats);
   } catch (error) {
     console.error('Get invoice stats error:', error);
-    res.status(500).json({ error: "Failed to get invoice stats" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to get invoice stats";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -57,7 +73,9 @@ router.get("/list", isAuthenticated, async (req, res) => {
     res.json(invoices);
   } catch (error) {
     console.error('Get invoices list error:', error);
-    res.status(500).json({ error: "Failed to get invoices list" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to get invoices list";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -121,7 +139,9 @@ router.get("/:id", isAuthenticated, async (req, res) => {
     res.json(invoice);
   } catch (error) {
     console.error('Get invoice error:', error);
-    res.status(500).json({ error: "Failed to get invoice" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to get invoice";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -135,7 +155,9 @@ router.get("/:id/details", isAuthenticated, async (req, res) => {
     res.json(details);
   } catch (error) {
     console.error('Get invoice details error:', error);
-    res.status(500).json({ error: "Failed to get invoice details" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to get invoice details";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -146,7 +168,9 @@ router.post("/", isAuthenticated, async (req, res) => {
     res.status(201).json(invoice);
   } catch (error) {
     console.error('Create invoice error:', error);
-    res.status(500).json({ error: "Failed to create invoice" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to create invoice";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -155,6 +179,9 @@ router.patch("/:id", isAuthenticated, async (req, res) => {
     const { id } = req.params;
     const data = updateInvoiceSchema.parse(req.body);
     
+    const existing = await storage.getInvoice(req.user!.companyId, req.params.id);
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+    assertInvoiceEditable(existing);
     if (data.status) {
       const existingInvoice = await storage.getInvoice(req.user!.companyId, id);
       if (!existingInvoice) {
@@ -175,7 +202,9 @@ router.patch("/:id", isAuthenticated, async (req, res) => {
     res.json(invoice);
   } catch (error) {
     console.error('Update invoice error:', error);
-    res.status(500).json({ error: "Failed to update invoice" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to update invoice";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -189,7 +218,9 @@ router.delete("/:id", isAuthenticated, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Delete invoice error:', error);
-    res.status(500).json({ error: "Failed to delete invoice" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to delete invoice";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -203,7 +234,9 @@ router.post("/:id/void", isAuthenticated, async (req, res) => {
     res.json(invoice);
   } catch (error) {
     console.error('Void invoice error:', error);
-    res.status(500).json({ error: "Failed to void invoice" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to void invoice";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -217,7 +250,9 @@ router.post("/:id/send", isAuthenticated, async (req, res) => {
     res.json(invoice);
   } catch (error) {
     console.error('Send invoice error:', error);
-    res.status(500).json({ error: "Failed to send invoice" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to send invoice";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -232,13 +267,29 @@ router.get("/:invoiceId/payments", isAuthenticated, async (req, res) => {
     res.json(payments);
   } catch (error) {
     console.error('Get invoice payments error:', error);
-    res.status(500).json({ error: "Failed to get invoice payments" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to get invoice payments";
+    res.status(code).json({ error: msg });
   }
 });
 
 router.post("/:invoiceId/payments", isAuthenticated, async (req, res) => {
   try {
     const { invoiceId } = req.params;
+
+    // Stage 6 hardening: prevent payments on draft/pending and void/cancelled
+    const invoice = await storage.getInvoice(req.user!.companyId, invoiceId);
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    const st = String(invoice.status || "").toLowerCase();
+    if (st === "draft" || st === "pending") {
+      return res.status(409).json({ error: "Invoice must be sent before recording payments" });
+    }
+    if (st === "voided" || st === "cancelled") {
+      return res.status(409).json({ error: "Cannot record payments for a voided/cancelled invoice" });
+    }
+
     const parseResult = insertPaymentSchema.safeParse({ ...req.body, invoiceId });
     if (!parseResult.success) {
       return res.status(400).json({ error: "Invalid payment data", details: parseResult.error.flatten() });
@@ -247,7 +298,9 @@ router.post("/:invoiceId/payments", isAuthenticated, async (req, res) => {
     res.status(201).json(payment);
   } catch (error) {
     console.error('Create payment error:', error);
-    res.status(500).json({ error: "Failed to create payment" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to create payment";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -265,7 +318,9 @@ router.delete("/:invoiceId/payments/:paymentId", isAuthenticated, async (req, re
     res.json({ success: true });
   } catch (error) {
     console.error('Delete payment error:', error);
-    res.status(500).json({ error: "Failed to delete payment" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to delete payment";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -280,7 +335,9 @@ router.get("/:invoiceId/lines", isAuthenticated, async (req, res) => {
     res.json(lines);
   } catch (error) {
     console.error('Get invoice lines error:', error);
-    res.status(500).json({ error: "Failed to get invoice lines" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to get invoice lines";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -292,6 +349,8 @@ router.post("/:invoiceId/lines", isAuthenticated, async (req, res) => {
       return res.status(404).json({ error: "Invoice not found" });
     }
     
+    assertInvoiceEditable(invoice);
+
     const parseResult = insertInvoiceLineSchema.safeParse({ ...req.body, invoiceId });
     if (!parseResult.success) {
       return res.status(400).json({ error: "Invalid line data", details: parseResult.error.flatten() });
@@ -300,7 +359,9 @@ router.post("/:invoiceId/lines", isAuthenticated, async (req, res) => {
     res.status(201).json(line);
   } catch (error) {
     console.error('Create invoice line error:', error);
-    res.status(500).json({ error: "Failed to create invoice line" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to create invoice line";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -312,6 +373,8 @@ router.patch("/:invoiceId/lines/:lineId", isAuthenticated, async (req, res) => {
       return res.status(404).json({ error: "Invoice not found" });
     }
     
+    assertInvoiceEditable(invoice);
+
     const parseResult = updateInvoiceLineSchema.safeParse(req.body);
     if (!parseResult.success) {
       return res.status(400).json({ error: "Invalid line data", details: parseResult.error.flatten() });
@@ -323,7 +386,9 @@ router.patch("/:invoiceId/lines/:lineId", isAuthenticated, async (req, res) => {
     res.json(line);
   } catch (error) {
     console.error('Update invoice line error:', error);
-    res.status(500).json({ error: "Failed to update invoice line" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to update invoice line";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -334,7 +399,8 @@ router.delete("/:invoiceId/lines/:lineId", isAuthenticated, async (req, res) => 
     if (!invoice) {
       return res.status(404).json({ error: "Invoice not found" });
     }
-    
+    assertInvoiceEditable(invoice);
+
     const deleted = await storage.deleteInvoiceLine(invoiceId, lineId);
     if (!deleted) {
       return res.status(404).json({ error: "Line not found" });
@@ -342,7 +408,9 @@ router.delete("/:invoiceId/lines/:lineId", isAuthenticated, async (req, res) => 
     res.json({ success: true });
   } catch (error) {
     console.error('Delete invoice line error:', error);
-    res.status(500).json({ error: "Failed to delete invoice line" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to delete invoice line";
+    res.status(code).json({ error: msg });
   }
 });
 
@@ -354,6 +422,8 @@ router.put("/:invoiceId/lines", isAuthenticated, async (req, res) => {
       return res.status(404).json({ error: "Invoice not found" });
     }
     
+    assertInvoiceEditable(invoice);
+
     const { lines } = req.body;
     if (!Array.isArray(lines)) {
       return res.status(400).json({ error: "lines must be an array" });
@@ -363,7 +433,9 @@ router.put("/:invoiceId/lines", isAuthenticated, async (req, res) => {
     res.json(updated);
   } catch (error) {
     console.error('Replace invoice lines error:', error);
-    res.status(500).json({ error: "Failed to replace invoice lines" });
+        const code = (error as any)?.statusCode || 500;
+    const msg = (error as any)?.statusCode ? (error as any)?.message : "Failed to replace invoice lines";
+    res.status(code).json({ error: msg });
   }
 });
 
