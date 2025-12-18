@@ -274,7 +274,7 @@ const router = Router();
     }
   });
 
-  app.put("/api/clients/:id", isAuthenticated, async (req, res) => {
+  router.put("/:id", isAuthenticated, async (req, res) => {
     try {
       const validated = insertClientSchema.partial().parse(req.body);
       const companyId = req.user!.companyId;
