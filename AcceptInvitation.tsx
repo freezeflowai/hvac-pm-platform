@@ -1,0 +1,1 @@
+// Public accept invitation screen
