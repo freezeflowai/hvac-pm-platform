@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { storage } from "../storage";
+import { storage } from "../storage/index";
 
 const router = Router();
 

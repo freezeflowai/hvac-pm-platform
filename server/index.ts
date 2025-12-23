@@ -7,12 +7,13 @@ import { registerRoutes } from "./routes.ts";
 import { setupVite, serveStatic, log } from "./vite";
 import { passport } from "./auth";
 import { impersonationMiddleware, trackActivity } from "./impersonationMiddleware";
-import { storage } from "./storage";
+import { storage } from "./storage/index";
+import { ensureTenantContext, rateLimitPerTenant } from "./auth/tenantIsolation";
 
 const app = express();
 
 // ---- CRITICAL: body parsing MUST come before auth routes ----
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: false }));
 
 // Serve static uploads directory for job note images
@@ -63,12 +64,18 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
+// IMPORTANT: Impersonation middleware must run BEFORE tenant context
+app.use(impersonationMiddleware(storage));
+app.use(trackActivity);
+
+// IMPORTANT: Tenant security middleware runs AFTER authentication
+app.use(ensureTenantContext);
+app.use(rateLimitPerTenant(1000, 60000));
+
 // Health check (foundation sanity endpoint)
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 // --- Auth endpoints (safety net) ---
-// These are defined here to prevent missing route registration when ESM resolution
-// accidentally loads server/routes/index.ts instead of server/routes.ts.
 app.post("/api/auth/login", (req: Request, res: Response, next: NextFunction) => {
   passport.authenticate("local", (err: any, user: any, info: any) => {
     if (err) return res.status(500).json({ error: "Internal server error" });
@@ -115,11 +122,7 @@ app.post("/api/auth/logout", (req: any, res: Response) => {
   });
 });
 
-
-// Impersonation middleware - must run after authentication
-app.use(impersonationMiddleware(storage));
-app.use(trackActivity);
-
+// Type declarations
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
@@ -152,7 +155,6 @@ declare global {
       password: string;
       role: string;
       companyId: string;
-      // Subscription fields
       trialEndsAt: Date | null;
       subscriptionStatus: string;
       subscriptionPlan: string | null;
@@ -164,14 +166,8 @@ declare global {
     }
   }
 }
-app.use(express.json({
-  limit: '5mb',
-  verify: (req, _res, buf) => {
-    req.rawBody = buf;
-  }
-}));
-app.use(express.urlencoded({ extended: false }));
 
+// Request logging
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -212,24 +208,17 @@ app.use((req, res, next) => {
     res.status(status).json({ message });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
   server.listen({
     port,
     host: "0.0.0.0",
-     }, () => {
+  }, () => {
     log(`serving on port ${port}`);
   });
 })();

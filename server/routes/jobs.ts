@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { storage } from "../storage";
+import { storage } from "../storage/index";
 import { insertJobSchema, updateJobSchema, insertRecurringJobSeriesSchema, insertRecurringJobPhaseSchema, jobStatusEnum } from "@shared/schema";
 import { assertJobStatusTransition } from "../statusRules";
 import type { JobStatus } from "../schemas";
