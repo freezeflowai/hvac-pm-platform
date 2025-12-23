@@ -32,7 +32,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    allowedhosts: true,
+    allowedHosts: true,
     fs: {
       strict: true,
       deny: ["**/.*"],
