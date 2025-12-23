@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { useLocation, Link } from "wouter";
 import { Search, Plus, FileText, DollarSign, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -94,6 +94,24 @@ export default function InvoicesListPage() {
     queryKey: ["/api/invoices/stats"],
   });
 
+  const outstandingAmount = stats?.outstanding?.amount ?? 0;
+  const outstandingCount = stats?.outstanding?.count ?? 0;
+  const issuedCount30d = stats?.issuedLast30Days?.count ?? 0;
+  const overdueAmount = stats?.overdue?.amount ?? 0;
+  const overdueCount = stats?.overdue?.count ?? 0;
+  const averageInvoiceAmount = stats?.averageInvoice ?? 0;
+
+  const safeFormatDate = (value: unknown): string => {
+    if (!value) return "-";
+    const d =
+      value instanceof Date
+        ? value
+        : typeof value === "string"
+          ? parseISO(value)
+          : new Date(String(value));
+    return isValid(d) ? format(d, "MMM d, yyyy") : "-";
+  };
+
   const autoCompact = invoices.length <= 10;
   const effectiveDensity: ViewDensity = userDensityPreference ?? (autoCompact ? "compact" : "comfortable");
   const isCompact = effectiveDensity === "compact";
@@ -157,20 +175,20 @@ export default function InvoicesListPage() {
           <div className="flex items-center gap-1.5">
             <DollarSign className="h-4 w-4 text-amber-500" />
             <span className="font-semibold" data-testid="text-outstanding-amount">
-              {stats ? formatCurrency(stats.outstanding.amount) : "$0.00"}
+              {formatCurrency(outstandingAmount)}
             </span>
-            <span className="text-muted-foreground">Outstanding ({stats?.outstanding.count || 0})</span>
+            <span className="text-muted-foreground">Outstanding ({outstandingCount})</span>
           </div>
           <span className="text-muted-foreground">|</span>
           <div className="flex items-center gap-1.5">
             <FileText className="h-4 w-4 text-primary" />
-            <span className="font-semibold" data-testid="text-issued-count">{stats?.issuedLast30Days.count || 0}</span>
+            <span className="font-semibold" data-testid="text-issued-count">{issuedCount30d}</span>
             <span className="text-muted-foreground">Issued (30d)</span>
           </div>
           <span className="text-muted-foreground">|</span>
           <div className="flex items-center gap-1.5">
             <AlertTriangle className="h-4 w-4 text-destructive" />
-            <span className="font-semibold" data-testid="text-overdue-count">{stats?.overdue.count || 0}</span>
+            <span className="font-semibold" data-testid="text-overdue-count">{overdueCount}</span>
             <span className="text-muted-foreground">Overdue</span>
           </div>
         </div>
@@ -184,9 +202,9 @@ export default function InvoicesListPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold" data-testid="text-outstanding-amount">
-                    {stats ? formatCurrency(stats.outstanding.amount) : "$0.00"}
+                    {formatCurrency(outstandingAmount)}
                   </p>
-                  <p className="text-xs text-muted-foreground">Outstanding ({stats?.outstanding.count || 0})</p>
+                  <p className="text-xs text-muted-foreground">Outstanding ({outstandingCount})</p>
                 </div>
               </div>
             </CardContent>
@@ -198,7 +216,7 @@ export default function InvoicesListPage() {
                   <FileText className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold" data-testid="text-issued-count">{stats?.issuedLast30Days.count || 0}</p>
+                  <p className="text-2xl font-bold" data-testid="text-issued-count">{issuedCount30d}</p>
                   <p className="text-xs text-muted-foreground">Issued (30 days)</p>
                 </div>
               </div>
@@ -212,7 +230,7 @@ export default function InvoicesListPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold" data-testid="text-average-invoice">
-                    {stats ? formatCurrency(stats.averageInvoice) : "$0.00"}
+                    {formatCurrency(averageInvoiceAmount)}
                   </p>
                   <p className="text-xs text-muted-foreground">Average Invoice</p>
                 </div>
@@ -227,9 +245,9 @@ export default function InvoicesListPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold" data-testid="text-overdue-amount">
-                    {stats ? formatCurrency(stats.overdue.amount) : "$0.00"}
+                    {formatCurrency(overdueAmount)}
                   </p>
-                  <p className="text-xs text-muted-foreground">Overdue ({stats?.overdue.count || 0})</p>
+                  <p className="text-xs text-muted-foreground">Overdue ({overdueCount})</p>
                 </div>
               </div>
             </CardContent>
@@ -339,10 +357,10 @@ export default function InvoicesListPage() {
                       </span>
                     </TableCell>
                     <TableCell className={isCompact ? "py-1" : ""}>
-                      {format(new Date(invoice.issueDate), "MMM d, yyyy")}
+                      {safeFormatDate(invoice.issueDate)}
                     </TableCell>
                     <TableCell className={isCompact ? "py-1" : ""}>
-                      {invoice.dueDate ? format(new Date(invoice.dueDate), "MMM d, yyyy") : "-"}
+                      {safeFormatDate(invoice.dueDate)}
                     </TableCell>
                     <TableCell className={isCompact ? "py-1" : ""}>
                       <Badge variant={invoice.statusInfo.variant}>

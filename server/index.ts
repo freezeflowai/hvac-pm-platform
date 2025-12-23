@@ -1,232 +1,187 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import { Pool } from "pg";
+import helmet from "helmet";
+import cors from "cors";
+import csrf from "csurf";
 import path from "path";
-import { registerRoutes } from "./routes.ts";
+
+import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { passport } from "./auth";
-import { impersonationMiddleware, trackActivity } from "./impersonationMiddleware";
-import { storage } from "./storage/index";
-import { ensureTenantContext, rateLimitPerTenant } from "./auth/tenantIsolation";
+import passport from "passport";
+
+/**
+ * Production security defaults.
+ * Adjust CORS_ORIGIN to your deployed frontend origin.
+ */
+const NODE_ENV = process.env.NODE_ENV ?? "development";
+const IS_PROD = NODE_ENV === "production";
 
 const app = express();
 
-// ---- CRITICAL: body parsing MUST come before auth routes ----
-app.use(express.json({ limit: '5mb' }));
-app.use(express.urlencoded({ extended: false }));
+// If deployed behind a proxy (Render/Fly/Railway/Nginx), this is required for secure cookies + IPs.
+app.set("trust proxy", 1);
 
-// Serve static uploads directory for job note images
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+// Body parsing limits
+app.use(express.json({ limit: process.env.JSON_LIMIT ?? "2mb" }));
+app.use(express.urlencoded({ extended: true, limit: process.env.URLENCODED_LIMIT ?? "2mb" }));
 
-// Detect if running in production (published app)
-const isProduction = process.env.NODE_ENV === "production" || !!process.env.REPLIT_DEPLOYMENT;
-
-// Trust Replit's proxy for secure cookies to work properly
-if (isProduction) {
-  app.set('trust proxy', 1);
-}
-
-const PgSession = ConnectPgSimple(session);
-const pgPool = new Pool({ 
-  connectionString: process.env.DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: false } : undefined
-});
-
-// Log session store errors
-pgPool.on('error', (err) => {
-  console.error('Session pool error:', err);
-});
-
-const sessionStore = new PgSession({
-  pool: pgPool,
-  createTableIfMissing: true,
-  errorLog: (err: Error) => {
-    console.error('Session store error:', err);
-  }
-});
-
+// Security headers with CSP enabled
 app.use(
-  session({
-    store: sessionStore,
-    secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: "lax",
+  helmet({
+    frameguard: { action: "deny" },
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // unsafe-eval needed for Vite in dev
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
     },
   })
 );
 
+// CORS (lock down in production)
+const corsOrigin = process.env.CORS_ORIGIN;
+if (IS_PROD && corsOrigin) {
+  app.use(
+    cors({
+      origin: corsOrigin.split(",").map((s) => s.trim()),
+      credentials: true,
+    })
+  );
+} else {
+  // Dev-friendly default
+  app.use(cors({ origin: true, credentials: true }));
+}
+
+// Sessions
+const PgStore = ConnectPgSimple(session);
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  if (IS_PROD) throw new Error("SESSION_SECRET is required in production");
+}
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: IS_PROD ? { rejectUnauthorized: false } : undefined,
+});
+
+app.use(
+  session({
+    store: new PgStore({
+      pool,
+      tableName: process.env.SESSION_TABLE ?? "session",
+      createTableIfMissing: true,
+    }),
+    secret: sessionSecret ?? "dev-secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: IS_PROD,
+      sameSite: "lax",
+      maxAge: Number(process.env.SESSION_MAX_AGE_MS ?? 1000 * 60 * 60 * 24 * 14), // 14 days
+    },
+    name: process.env.SESSION_COOKIE_NAME ?? "sid",
+  })
+);
+
+// Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
-// IMPORTANT: Impersonation middleware must run BEFORE tenant context
-app.use(impersonationMiddleware(storage));
-app.use(trackActivity);
-
-// IMPORTANT: Tenant security middleware runs AFTER authentication
-app.use(ensureTenantContext);
-app.use(rateLimitPerTenant(1000, 60000));
-
-// Health check (foundation sanity endpoint)
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
-
-// --- Auth endpoints (safety net) ---
-app.post("/api/auth/login", (req: Request, res: Response, next: NextFunction) => {
-  passport.authenticate("local", (err: any, user: any, info: any) => {
-    if (err) return res.status(500).json({ error: "Internal server error" });
-    if (!user) return res.status(401).json({ error: info?.message || "Invalid credentials" });
-
-    req.session.regenerate((regenErr) => {
-      if (regenErr) return res.status(500).json({ error: "Failed to regenerate session" });
-
-      req.login(user, (loginErr) => {
-        if (loginErr) return res.status(500).json({ error: "Failed to login" });
-
-        return res.json({
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          companyId: user.companyId,
-        });
-      });
-    });
-  })(req, res, next);
+// CSRF Protection (after session, before routes)
+const csrfProtection = csrf({ 
+  cookie: false // Use session storage instead of cookies
 });
 
-app.get("/api/auth/user", (req: any, res: Response) => {
-  if (!req.isAuthenticated?.() || !req.user) {
-    return res.status(401).json({ error: "Not authenticated" });
+// Apply CSRF to state-changing requests
+app.use('/api', (req, res, next) => {
+  // Skip CSRF for:
+  // 1. Safe methods (GET, HEAD, OPTIONS)
+  // 2. Public endpoints
+  const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
+  const publicEndpoints = [
+    '/api/auth/login',
+    '/api/auth/logout',
+    '/api/invitations/accept',
+    '/api/health',
+    '/api/csrf-token'
+  ];
+
+  if (safeMethods.includes(req.method) || 
+      publicEndpoints.some(endpoint => req.path.startsWith(endpoint))) {
+    return next();
   }
-  const user = req.user;
-  return res.json({
-    id: user.id,
-    email: user.email,
-    role: user.role,
-    companyId: user.companyId,
-  });
+
+  // Apply CSRF protection to all other API requests
+  return csrfProtection(req, res, next);
 });
 
-app.post("/api/auth/logout", (req: any, res: Response) => {
-  req.logout((err: any) => {
-    if (err) return res.status(500).json({ error: "Failed to logout" });
-    req.session.destroy((destroyErr: any) => {
-      if (destroyErr) return res.status(500).json({ error: "Failed to destroy session" });
-      res.clearCookie("connect.sid");
-      return res.json({ success: true });
-    });
-  });
+// CSRF token endpoint (must be before requireAuth)
+app.get('/api/csrf-token', (req, res) => {
+  res.json({ csrfToken: (req as any).csrfToken() });
 });
 
-// Type declarations
-declare module 'http' {
-  interface IncomingMessage {
-    rawBody: unknown
+// Log requests
+app.use((req, _res, next) => {
+  if (req.path.startsWith("/api")) {
+    log(`${req.method} ${req.path}`);
   }
-}
-
-declare module 'express-session' {
-  interface SessionData {
-    passport?: {
-      user?: string;
-    };
-    impersonation?: {
-      platformAdminId: string;
-      platformAdminEmail: string;
-      targetUserId: string;
-      targetCompanyId: string;
-      reason: string;
-      startedAt: number;
-      expiresAt: number;
-      lastActivityAt: number;
-    };
-  }
-}
-
-declare global {
-  namespace Express {
-    interface User {
-      id: string;
-      email: string;
-      password: string;
-      role: string;
-      companyId: string;
-      trialEndsAt: Date | null;
-      subscriptionStatus: string;
-      subscriptionPlan: string | null;
-      billingInterval: string | null;
-      currentPeriodEnd: Date | null;
-      cancelAtPeriodEnd: boolean;
-      stripeCustomerId: string | null;
-      stripeSubscriptionId: string | null;
-    }
-  }
-}
-
-// Request logging
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
   next();
 });
 
-(async () => {
-  const server = await registerRoutes(app);
+// Register API routes and create server
+const server = registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+// Static/Vite
+if (IS_PROD) {
+  serveStatic(app);
+} else {
+  setupVite(app, server);
+}
 
-    res.status(status).json({ message });
-  });
-
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-  }, () => {
-    log(`serving on port ${port}`);
-  });
-})();
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+// 404 handler for API
+app.use("/api", (_req: Request, res: Response) => {
+  res.status(404).json({ error: "Not found" });
 });
 
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
+// Central error handler (no stack traces in prod)
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status = Number(err?.statusCode ?? err?.status ?? 500);
+  
+  // Special handling for CSRF errors
+  if (err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ 
+      error: "Invalid CSRF token",
+      code: "CSRF_ERROR"
+    });
+  }
+
+  if (IS_PROD) {
+    // Hide stack traces in production
+    res.status(status).json({ 
+      error: status >= 500 ? "Internal server error" : err?.message ?? "Error" 
+    });
+  } else {
+    // Show full errors in development
+    res.status(status).json({ 
+      error: err?.message ?? "Error", 
+      stack: err?.stack,
+      ...(err?.details && { details: err.details })
+    });
+  }
+});
+
+// Start listening when run directly (Replit/Node entry)
+const port = Number(process.env.PORT ?? 5000);
+server.listen(port, "0.0.0.0", () => {
+  log(`serving on port ${port}`);
 });

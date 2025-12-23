@@ -1,108 +1,142 @@
 import { db } from "../db";
-import { eq, and, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { validate as isUUID } from "uuid";
 
 /**
- * Base repository class with tenant isolation
- * All domain repositories extend this for automatic security
+ * Base repository helpers for tenant isolation and safety.
+ *
+ * IMPORTANT:
+ * - All domain repositories must scope reads/writes by companyId.
+ * - NEVER query by id alone for tenant-owned resources.
  */
 export class BaseRepository {
   /**
-   * Ensures a record belongs to the specified company
-   * Throws 404 if not found or doesn't belong to company
+   * Defensive guard: companyId must always be present.
+   * This prevents accidental global queries if middleware wiring breaks.
    */
-  protected async validateTenantOwnership<T extends { companyId: string }>(
+  protected assertCompanyId(companyId: string): void {
+    if (!companyId || typeof companyId !== "string") {
+      throw new Error("Tenant context missing (companyId)");
+    }
+  }
+
+  /**
+   * Validate that a string is a valid UUID.
+   * Prevents injection attacks and invalid ID formats.
+   */
+  protected validateUUID(value: string, fieldName: string = "id"): void {
+    if (!isUUID(value)) {
+      const err = new Error(`Invalid ${fieldName} format`);
+      (err as any).statusCode = 400;
+      throw err;
+    }
+  }
+
+  /**
+   * Ensures a record belongs to the specified company.
+   * Throwing a 404-equivalent error avoids leaking existence across tenants.
+   */
+  protected validateTenantOwnership<T extends { companyId: string }>(
     record: T | null,
     companyId: string,
     resourceName: string
-  ): Promise<T> {
-    if (!record) {
-      const err: any = new Error(`${resourceName} not found`);
-      err.status = 404;
-      throw err;
-    }
+  ): T {
+    this.assertCompanyId(companyId);
 
-    if (record.companyId !== companyId) {
-      // Security: Don't reveal that resource exists in another tenant
-      const err: any = new Error(`${resourceName} not found`);
-      err.status = 404;
-      throw err;
+    if (!record || record.companyId !== companyId) {
+      // Routes should catch this and return 404.
+      throw this.notFoundError(resourceName);
     }
 
     return record;
   }
 
   /**
-   * Validates that a user belongs to the specified company
+   * Helper for common (id + companyId) lookups with validation.
    */
-  protected async validateUserInCompany(
-    userId: string,
+  protected whereIdAndCompany<TTable extends { id: any; companyId: any }>(
+    table: TTable,
+    id: string,
     companyId: string
-  ): Promise<void> {
-    const result = await db.query.users.findFirst({
-      where: (users, { eq, and }) => 
-        and(eq(users.id, userId), eq(users.companyId, companyId))
-    });
-
-    if (!result) {
-      const err: any = new Error("User not found or not in company");
-      err.status = 403;
-      throw err;
-    }
+  ) {
+    this.assertCompanyId(companyId);
+    this.validateUUID(id, "id");
+    return and(eq((table as any).id, id), eq((table as any).companyId, companyId));
   }
 
   /**
-   * Creates a not found error
+   * Run a unit of work in a DB transaction.
+   */
+  protected async tx<T>(fn: (txDb: typeof db) => Promise<T>): Promise<T> {
+    return db.transaction(async (txDb) => fn(txDb as any));
+  }
+
+  /**
+   * Standard error creators for consistent HTTP responses
    */
   protected notFoundError(resourceName: string): Error {
-    const err: any = new Error(`${resourceName} not found`);
-    err.status = 404;
+    const err = new Error(`${resourceName} not found`);
+    (err as any).statusCode = 404;
     return err;
   }
 
-  /**
-   * Creates a validation error
-   */
   protected validationError(message: string): Error {
-    const err: any = new Error(message);
-    err.status = 400;
+    const err = new Error(message);
+    (err as any).statusCode = 400;
     return err;
   }
 
-  /**
-   * Creates a forbidden error
-   */
-  protected forbiddenError(message: string): Error {
-    const err: any = new Error(message);
-    err.status = 403;
+  protected forbiddenError(message: string = "Forbidden"): Error {
+    const err = new Error(message);
+    (err as any).statusCode = 403;
+    return err;
+  }
+
+  protected conflictError(message: string): Error {
+    const err = new Error(message);
+    (err as any).statusCode = 409;
     return err;
   }
 }
 
 /**
- * Tenant isolation helper - adds companyId filter to where clause
- */
-export function withCompanyId<T extends Record<string, any>>(
-  table: T,
-  companyId: string
-) {
-  return eq((table as any).companyId, companyId);
-}
-
-/**
- * Safely parse numeric values from text fields
+ * Parse decimals coming from DB/user input safely.
+ * Returns a string (to avoid floating precision in money values).
  */
 export function parseDecimal(value: string | null | undefined, defaultValue = "0"): string {
   if (!value) return defaultValue;
-  const parsed = parseFloat(value);
-  return isNaN(parsed) ? defaultValue : value;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? String(value) : defaultValue;
 }
 
 /**
- * Format date to ISO date string (YYYY-MM-DD)
+ * Format date to ISO date string (YYYY-MM-DD). Returns null if invalid.
  */
 export function formatDateOnly(date: Date | string | null): string | null {
   if (!date) return null;
-  const d = typeof date === 'string' ? new Date(date) : date;
-  if (isNaN(d.getTime())) return null;
-  return d.toISOString().split('T')[0];
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Helper for safe text search patterns (avoids wildcard injection / runaway LIKE scans).
+ */
+export function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (m) => `\\${m}`);
+}
+
+/**
+ * Helper for paginated queries.
+ */
+export function clampLimit(limit: number, max = 200): number {
+  const n = Number(limit);
+  if (!Number.isFinite(n) || n <= 0) return 50;
+  return Math.min(Math.floor(n), max);
+}
+
+export function clampOffset(offset: number): number {
+  const n = Number(offset);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.floor(n);
 }

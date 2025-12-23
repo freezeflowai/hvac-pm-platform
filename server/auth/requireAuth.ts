@@ -1,14 +1,34 @@
+import type { Request, Response, NextFunction } from "express";
 
-import { Request, Response, NextFunction } from "express";
-
+/**
+ * Require an authenticated session user for API routes.
+ * Frontend routes (non-/api) are allowed through so Vite/static can serve them.
+ * 
+ * SECURITY: Public endpoints must be explicitly listed to bypass auth.
+ */
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  // Only require auth for API routes - let frontend routes pass through to Vite
-  if (!req.path.startsWith("/api")) {
+  if (!req.path.startsWith("/api")) return next();
+
+  // Public endpoints that don't require authentication
+  const publicEndpoints = [
+    "/api/auth/login",
+    "/api/auth/logout", 
+    "/api/invitations/accept",
+    "/api/health",
+    "/api/csrf-token"
+  ];
+
+  // Check if this is a public endpoint
+  if (publicEndpoints.some(endpoint => req.path.startsWith(endpoint))) {
     return next();
   }
-  
-  if (!req.user || !req.user.id || !req.user.companyId) {
+
+  // Passport adds req.user and req.isAuthenticated()
+  const user = (req as any).user as { id?: string; companyId?: string } | undefined;
+
+  if (!user?.id || !user?.companyId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  next();
+
+  return next();
 }

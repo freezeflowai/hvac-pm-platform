@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Pencil, Trash2, Wrench, Download, Package, Upload, Info } from "lucide-react";
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
-import { format, parse } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
@@ -46,7 +46,7 @@ export interface Client {
   notes?: string | null;
   selectedMonths: number[];
   inactive: boolean;
-  nextDue: Date;
+  nextDue: Date | string | null;
   createdAt?: string;
 }
 
@@ -61,6 +61,20 @@ const MONTH_NAMES = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
+
+// Never throw on invalid/missing dates coming from the API (string/null/undefined).
+const formatSafeDate = (value: unknown, fmt: string) => {
+  if (!value) return "—";
+  const date =
+    value instanceof Date
+      ? value
+      : typeof value === "string"
+        ? parseISO(value)
+        : null;
+
+  return date && isValid(date) ? format(date, fmt) : "—";
+};
+
 
 export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }: ClientListTableProps) {
   const [, setLocation] = useLocation();
@@ -788,7 +802,7 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
                     {client.inactive ? (
                       <Badge variant="secondary">Inactive</Badge>
                     ) : (
-                      format(client.nextDue, "MMM d, yyyy")
+                      formatSafeDate(client.nextDue, "MMM d, yyyy")
                     )}
                   </td>
                   <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
@@ -852,7 +866,7 @@ export default function ClientListTable({ clients, onEdit, onDelete, onRefresh }
                       {client.inactive ? (
                         <Badge variant="secondary">Inactive</Badge>
                       ) : (
-                        format(client.nextDue, "MMM d, yyyy")
+                        formatSafeDate(client.nextDue, "MMM d, yyyy")
                       )}
                     </span>
                   </div>

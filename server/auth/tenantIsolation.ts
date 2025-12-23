@@ -1,153 +1,141 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
 
 /**
  * CRITICAL SECURITY MIDDLEWARE
- * 
- * This middleware ensures every API request has proper tenant context.
- * It must run AFTER authentication but BEFORE any route handlers.
- * 
- * Security guarantees:
- * 1. req.user.companyId is validated and present
- * 2. req.companyId is set for convenient access
- * 3. Requests without valid company context are rejected
+ *
+ * Guarantees:
+ * - Every authenticated /api request has a valid tenant/company context
+ * - Tenant context is derived ONLY from the authenticated user (or impersonation)
+ * - req.companyId is set for convenient downstream access
+ *
+ * This middleware must run AFTER authentication (passport + requireAuth)
+ * but BEFORE any route handlers.
  */
 
+declare global {
+  namespace Express {
+    interface Request {
+      companyId?: string;
+    }
+    interface User {
+      id: string;
+      email?: string;
+      role?: string;
+      companyId: string;
+      impersonatedById?: string | null;
+    }
+  }
+}
+
 /**
- * Ensures authenticated user has valid company context
- * Place this AFTER requireAuth in your middleware chain
+ * Ensures authenticated user has valid company context and attaches req.companyId.
  */
-export function ensureTenantContext(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  // Skip for non-API routes
-  if (!req.path.startsWith("/api")) {
+export const ensureTenantContext: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.path.startsWith("/api")) return next();
+
+  // Skip for public endpoints (they don't need tenant context)
+  const publicEndpoints = [
+    "/api/auth/login",
+    "/api/auth/logout",
+    "/api/invitations/accept",
+    "/api/health",
+    "/api/csrf-token"
+  ];
+
+  if (publicEndpoints.some(endpoint => req.path.startsWith(endpoint))) {
     return next();
   }
 
-  // Skip for public endpoints (handled by individual route auth)
-  const publicEndpoints = ["/api/auth/", "/api/invitations/accept"];
-  if (publicEndpoints.some((endpoint) => req.path.startsWith(endpoint))) {
+  const user = req.user as any;
+  const companyId = user?.companyId;
+
+  if (!companyId || typeof companyId !== "string") {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  req.companyId = companyId;
+  return next();
+};
+
+/**
+ * Lightweight per-tenant + per-IP rate limiter (no external deps).
+ *
+ * NOTE: If you already use express-rate-limit, you can replace this with that.
+ * This implementation is safe and works in single-process deployments.
+ * For multi-instance deployments, move to a shared store (Redis).
+ */
+type Bucket = { count: number; resetAt: number };
+const buckets = new Map<string, Bucket>();
+
+function nowMs() {
+  return Date.now();
+}
+
+function makeKey(req: Request, scope: string) {
+  const companyId = (req as any).companyId || (req.user as any)?.companyId || "unknown";
+  const ip = req.ip || (req.headers["x-forwarded-for"] as string) || "unknown";
+  return `${scope}:${companyId}:${ip}`;
+}
+
+// Cleanup expired buckets every 5 minutes to prevent memory leak
+setInterval(() => {
+  const now = nowMs();
+  for (const [key, bucket] of buckets.entries()) {
+    if (bucket.resetAt <= now) {
+      buckets.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
+export function rateLimitPerTenant(options?: {
+  windowMs?: number;
+  max?: number;
+  scope?: string;
+}): RequestHandler {
+  const windowMs = options?.windowMs ?? 60_000; // 1 minute
+  const max = options?.max ?? 1200; // per tenant+ip per window
+  const scope = options?.scope ?? "api";
+
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.path.startsWith("/api")) return next();
+
+    const key = makeKey(req, scope);
+    const t = nowMs();
+    const bucket = buckets.get(key);
+
+    if (!bucket || bucket.resetAt <= t) {
+      buckets.set(key, { count: 1, resetAt: t + windowMs });
+      res.setHeader("X-RateLimit-Limit", String(max));
+      res.setHeader("X-RateLimit-Remaining", String(max - 1));
+      res.setHeader("X-RateLimit-Reset", String(Math.floor((t + windowMs) / 1000)));
+      return next();
+    }
+
+    bucket.count += 1;
+    const remaining = Math.max(0, max - bucket.count);
+
+    res.setHeader("X-RateLimit-Limit", String(max));
+    res.setHeader("X-RateLimit-Remaining", String(remaining));
+    res.setHeader("X-RateLimit-Reset", String(Math.floor(bucket.resetAt / 1000)));
+
+    if (bucket.count > max) {
+      const retryAfter = Math.ceil((bucket.resetAt - t) / 1000);
+      res.setHeader("Retry-After", String(retryAfter));
+      return res.status(429).json({ error: "Too many requests" });
+    }
+
     return next();
-  }
-
-  // At this point, user should be authenticated (by requireAuth)
-  if (!req.user) {
-    return res.status(401).json({ error: "Authentication required" });
-  }
-
-  // Validate company context exists
-  if (!req.user.companyId) {
-    console.error(`User ${req.user.id} has no companyId - data integrity issue`);
-    return res.status(403).json({
-      error: "No company association found. Please contact support.",
-    });
-  }
-
-  // Set convenient accessor (some code uses req.companyId)
-  (req as any).companyId = req.user.companyId;
-
-  next();
-}
-
-/**
- * Validates that a resource ID belongs to the authenticated company
- * Use this when you need to verify ownership before proceeding
- * 
- * Example:
- *   app.get('/api/jobs/:id', 
- *     requireAuth,
- *     ensureTenantContext,
- *     validateResourceOwnership('jobs'),
- *     async (req, res) => { ... }
- *   )
- */
-export function validateResourceOwnership(tableName: string) {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    // This is a helper for future use
-    // For now, all storage functions handle this validation internally
-    next();
   };
 }
 
 /**
- * Rate limiting per tenant
- * Prevents one company from overwhelming the system
+ * Very small audit helper for sensitive routes. This does NOT persist by itself.
+ * If you have server/services/audit.ts, wire it there and call that from routes.
  */
-interface RateLimitStore {
-  [companyId: string]: {
-    count: number;
-    resetAt: number;
-  };
-}
-
-const rateLimitStore: RateLimitStore = {};
-
-export function rateLimitPerTenant(
-  maxRequests: number = 1000,
-  windowMs: number = 60000 // 1 minute
-) {
+export function auditSensitiveAction(action: string): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.path.startsWith("/api")) {
-      return next();
-    }
-
-    const companyId = req.user?.companyId;
-    if (!companyId) {
-      return next(); // Let authentication middleware handle this
-    }
-
-    const now = Date.now();
-    const limit = rateLimitStore[companyId];
-
-    // Reset or initialize
-    if (!limit || now > limit.resetAt) {
-      rateLimitStore[companyId] = {
-        count: 1,
-        resetAt: now + windowMs,
-      };
-      return next();
-    }
-
-    // Check limit
-    if (limit.count >= maxRequests) {
-      return res.status(429).json({
-        error: "Too many requests. Please try again later.",
-        retryAfter: Math.ceil((limit.resetAt - now) / 1000),
-      });
-    }
-
-    // Increment
-    limit.count++;
-    next();
-  };
-}
-
-/**
- * Audit logging for sensitive operations
- * Tracks who did what and when
- */
-export function auditLog(action: string) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    // Log after response is sent
-    res.on("finish", () => {
-      if (res.statusCode < 400 && req.user) {
-        console.log(
-          JSON.stringify({
-            timestamp: new Date().toISOString(),
-            action,
-            userId: req.user.id,
-            companyId: req.user.companyId,
-            method: req.method,
-            path: req.path,
-            statusCode: res.statusCode,
-            ip: req.ip,
-          })
-        );
-      }
-    });
-
-    next();
+    // Only annotate; actual persistence should be handled by your audit service
+    (req as any)._auditAction = action;
+    return next();
   };
 }

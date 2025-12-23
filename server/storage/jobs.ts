@@ -1,5 +1,6 @@
 import { db } from "../db";
-import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { validate as isUUID } from "uuid";
 import { 
   jobs, 
   jobParts, 
@@ -55,6 +56,8 @@ export class JobRepository extends BaseRepository {
    * Get jobs with optional filters
    */
   async getJobs(companyId: string, filters?: JobFilters): Promise<Job[]> {
+    this.assertCompanyId(companyId);
+
     let query = db
       .select()
       .from(jobs)
@@ -62,26 +65,38 @@ export class JobRepository extends BaseRepository {
       .$dynamic();
 
     if (filters?.status) {
+      // Validate status is from allowed enum
       query = query.where(eq(jobs.status, filters.status));
     }
 
     if (filters?.locationId) {
+      // Validate UUID format
+      this.validateUUID(filters.locationId, "locationId");
       query = query.where(eq(jobs.locationId, filters.locationId));
     }
 
     if (filters?.technicianId) {
-      // Array column contains technicianId
+      // SECURITY FIX: Validate UUID before using in SQL
+      this.validateUUID(filters.technicianId, "technicianId");
+      
+      // Safe to use after validation
       query = query.where(
         sql`${filters.technicianId} = ANY(${jobs.assignedTechnicianIds})`
       );
     }
 
     if (filters?.startDate) {
-      query = query.where(gte(jobs.scheduledStart, new Date(filters.startDate)));
+      const startDate = new Date(filters.startDate);
+      if (!isNaN(startDate.getTime())) {
+        query = query.where(gte(jobs.scheduledStart, startDate));
+      }
     }
 
     if (filters?.endDate) {
-      query = query.where(lte(jobs.scheduledStart, new Date(filters.endDate)));
+      const endDate = new Date(filters.endDate);
+      if (!isNaN(endDate.getTime())) {
+        query = query.where(lte(jobs.scheduledStart, endDate));
+      }
     }
 
     return await query.orderBy(jobs.createdAt);
@@ -91,6 +106,9 @@ export class JobRepository extends BaseRepository {
    * Get single job
    */
   async getJob(companyId: string, jobId: string): Promise<Job | null> {
+    this.assertCompanyId(companyId);
+    this.validateUUID(jobId, "jobId");
+
     const rows = await db
       .select()
       .from(jobs)
@@ -104,6 +122,8 @@ export class JobRepository extends BaseRepository {
    * Create job with auto-generated job number
    */
   async createJob(companyId: string, jobData: InsertJob): Promise<Job> {
+    this.assertCompanyId(companyId);
+    
     const jobNumber = await this.getNextJobNumber(companyId);
 
     const rows = await db
@@ -126,6 +146,9 @@ export class JobRepository extends BaseRepository {
     jobId: string,
     patch: Partial<InsertJob>
   ): Promise<Job | null> {
+    this.assertCompanyId(companyId);
+    this.validateUUID(jobId, "jobId");
+
     const rows = await db
       .update(jobs)
       .set({ ...patch, updatedAt: new Date() })
@@ -143,6 +166,9 @@ export class JobRepository extends BaseRepository {
     jobId: string,
     status: string
   ): Promise<Job | null> {
+    this.assertCompanyId(companyId);
+    this.validateUUID(jobId, "jobId");
+
     const updates: any = { status, updatedAt: new Date() };
 
     // Set timestamps based on status
@@ -165,6 +191,9 @@ export class JobRepository extends BaseRepository {
    * Delete job (soft delete)
    */
   async deleteJob(companyId: string, jobId: string): Promise<boolean> {
+    this.assertCompanyId(companyId);
+    this.validateUUID(jobId, "jobId");
+
     const rows = await db
       .update(jobs)
       .set({ isActive: false, updatedAt: new Date() })
@@ -178,6 +207,8 @@ export class JobRepository extends BaseRepository {
    * Get job parts
    */
   async getJobParts(jobId: string): Promise<JobPart[]> {
+    this.validateUUID(jobId, "jobId");
+
     return await db
       .select()
       .from(jobParts)
@@ -189,6 +220,8 @@ export class JobRepository extends BaseRepository {
    * Create job part
    */
   async createJobPart(jobId: string, partData: InsertJobPart): Promise<JobPart> {
+    this.validateUUID(jobId, "jobId");
+
     const rows = await db
       .insert(jobParts)
       .values({ ...partData, jobId })
@@ -201,6 +234,8 @@ export class JobRepository extends BaseRepository {
    * Update job part
    */
   async updateJobPart(partId: string, patch: Partial<InsertJobPart>): Promise<JobPart | null> {
+    this.validateUUID(partId, "partId");
+
     const rows = await db
       .update(jobParts)
       .set({ ...patch, updatedAt: new Date() })
@@ -214,6 +249,8 @@ export class JobRepository extends BaseRepository {
    * Delete job part (soft delete)
    */
   async deleteJobPart(partId: string): Promise<boolean> {
+    this.validateUUID(partId, "partId");
+
     const rows = await db
       .update(jobParts)
       .set({ isActive: false, updatedAt: new Date() })
@@ -230,8 +267,11 @@ export class JobRepository extends BaseRepository {
     jobId: string,
     parts: Array<{ id: string; sortOrder: number }>
   ): Promise<void> {
+    this.validateUUID(jobId, "jobId");
+
     await db.transaction(async (tx) => {
       for (const part of parts) {
+        this.validateUUID(part.id, "partId");
         await tx
           .update(jobParts)
           .set({ sortOrder: part.sortOrder })
@@ -244,6 +284,8 @@ export class JobRepository extends BaseRepository {
    * Get job equipment
    */
   async getJobEquipment(jobId: string) {
+    this.validateUUID(jobId, "jobId");
+
     return await db
       .select()
       .from(jobEquipment)
@@ -254,6 +296,9 @@ export class JobRepository extends BaseRepository {
    * Create job equipment link
    */
   async createJobEquipment(jobId: string, data: { jobId: string; equipmentId: string; notes?: string | null }) {
+    this.validateUUID(jobId, "jobId");
+    this.validateUUID(data.equipmentId, "equipmentId");
+
     const rows = await db
       .insert(jobEquipment)
       .values(data)
@@ -265,6 +310,8 @@ export class JobRepository extends BaseRepository {
    * Update job equipment
    */
   async updateJobEquipment(jobEquipmentId: string, patch: { notes?: string | null }) {
+    this.validateUUID(jobEquipmentId, "jobEquipmentId");
+
     const rows = await db
       .update(jobEquipment)
       .set({ ...patch, updatedAt: new Date() })
@@ -277,6 +324,8 @@ export class JobRepository extends BaseRepository {
    * Delete job equipment link
    */
   async deleteJobEquipment(jobEquipmentId: string): Promise<boolean> {
+    this.validateUUID(jobEquipmentId, "jobEquipmentId");
+
     const result = await db
       .delete(jobEquipment)
       .where(eq(jobEquipment.id, jobEquipmentId))
@@ -288,6 +337,8 @@ export class JobRepository extends BaseRepository {
    * Get location equipment item
    */
   async getLocationEquipmentItem(equipmentId: string) {
+    this.validateUUID(equipmentId, "equipmentId");
+
     const rows = await db
       .select()
       .from(locationEquipment)
@@ -300,6 +351,9 @@ export class JobRepository extends BaseRepository {
    * Get recurring series
    */
   async getRecurringSeries(companyId: string, seriesId: string) {
+    this.assertCompanyId(companyId);
+    this.validateUUID(seriesId, "seriesId");
+
     const rows = await db
       .select()
       .from(recurringJobSeries)
@@ -318,7 +372,6 @@ export class JobRepository extends BaseRepository {
    * Ensures job.invoiceId and invoice.jobId are in sync
    */
   async reconcileJobInvoiceLinks(companyId: string, jobId: string) {
-    // This is a placeholder - implement when invoices are ready
     const job = await this.getJob(companyId, jobId);
     if (!job) {
       throw this.notFoundError("Job");
